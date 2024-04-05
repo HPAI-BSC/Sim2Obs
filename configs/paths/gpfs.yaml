@@ -1,7 +1,7 @@
 # path to root directory
 # this requires PROJECT_ROOT environment variable to exist
 # you can replace it with "." if you want the root to be the current working directory
-root_dir: /gpfs/projects/bsc70/space/pipelines
+root_dir: .
 
 # path to data directory
 datasets_dir: /gpfs/projects/bsc70/space/datasets
