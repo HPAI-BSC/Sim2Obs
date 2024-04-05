@@ -1,0 +1,5 @@
+add_frame:
+  _target_: src.preprocessing.steps.add_frame.Frame
+  frame_width: 4
+  frame_height: 1
+  frame_value: 255

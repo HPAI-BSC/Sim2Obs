@@ -1,0 +1,20 @@
+# @package _global_
+
+defaults:
+  - _self_
+  - data: mnist # choose datamodule with `test_dataloader()` for evaluation
+  - model: mnist
+  - logger: mlflow
+  - trainer: default
+  - paths: gpfs
+  - extras: default
+  - hydra: default
+
+task_name: "eval"
+
+tags: ["dev"]
+
+commit_tag: "commit_hash"
+
+# passing checkpoint path is necessary for evaluation
+ckpt_path: ${paths.output_dir}/checkpoints/196611ac/epoch_005.ckpt

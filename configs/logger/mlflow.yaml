@@ -1,0 +1,12 @@
+# https://mlflow.org
+
+mlflow:
+  _target_: lightning.pytorch.loggers.mlflow.MLFlowLogger
+  experiment_name: mlops-template
+  run_name: ${task_name}-${commit_tag}
+  tracking_uri: ${paths.log_dir} # run `mlflow ui` command inside the `logs/mlflow/` dir to open the UI
+  tags: null
+  save_dir: ${paths.log_dir}
+  prefix: ""
+  artifact_location: null
+  # run_id: ""

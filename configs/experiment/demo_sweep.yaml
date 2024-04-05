@@ -1,0 +1,29 @@
+# @package _global_
+
+# to execute this experiment run:
+# python train.py experiment=example
+
+defaults:
+  - override /data: mnist
+  - override /model: mnist
+  - override /callbacks: default
+  - override /trainer: default
+  - override /logger: mlflow
+
+# all parameters below will be merged with parameters from default configurations set above
+# this allows you to overwrite only specified parameters
+
+seed: 12345
+
+trainer:
+  min_epochs: 1
+  max_epochs: 5
+  gradient_clip_val: 0.5
+
+
+logger:
+  mlflow:
+    tracking_uri: /gpfs/projects/bsc70/hpai/storage/data/logging/mlflow/mlruns
+    experiment_name: "mlops_template"
+    run_name: "${commit_tag}_run"
+    artifact_location: null

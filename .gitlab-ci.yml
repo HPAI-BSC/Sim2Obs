@@ -1,0 +1,31 @@
+variables:
+  #  DOCKERFILE: path/to/Dockerfile
+  #  pypi_user: (if you need to access the private pypi repo)
+  #  pypi_pass: (if you need to access the private pypi repo)
+  LAUNCH_TARGET_HOSTNAME: amdlogin.bsc.es
+  LAUNCH_TARGET_USERNAME: hpai # bsc08561 
+  LAUNCH_TARGET_FOLDER: /gpfs/projects/bsc70/hpai/storage/data/martag
+  LAUNCH_TARGET_SRC_DIR: ./
+  LAUNCH_TARGET_SSH_KEY: ${LAUNCH_TARGET_SSH_KEY_HPAI} #some_file, preferrably from the project CI/CD settings
+  LAUNCH_CONFIG_PATH: config.json
+  KNOWN_HOSTS_FILE: known_hosts
+  SINGULARITY_VERSION: 3.6.4
+  AUTOLAUNCHER_VERSION: &AUTOLAUNCHER_VERSION main
+  LAUNCH_IMAGE_NAME: ${CI_PROJECT_PATH}:${CI_COMMIT_SHORT_SHA}-${CI_COMMIT_REF_NAME}
+  TAGS: estufa
+
+stages:
+  - build
+  - transfer
+  - launch
+  - monitor
+
+include:
+  - project: "hpai/autolauncher"
+    ref: *AUTOLAUNCHER_VERSION
+    file:
+      - "/templates/autolauncher-build.yml"
+      - "/templates/autolauncher-transfer.yml"
+      - "/templates/autolauncher-launch.yml"
+      - "/templates/autolauncher-monitor.yml"
+

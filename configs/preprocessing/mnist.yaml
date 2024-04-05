@@ -1,0 +1,3 @@
+_target_: src.preprocessing.mnist_preprocess.Preprocessor
+source_dir: ${paths.datasets_dir}/raw
+target_dir: ${paths.datasets_dir}/frame-${commit_tag}

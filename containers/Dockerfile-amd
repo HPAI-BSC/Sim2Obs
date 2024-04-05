@@ -1,0 +1,15 @@
+FROM rocm/dev-ubuntu-20.04:5.1.1
+
+# Set the environment variable to avoid user prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+ENV PATH="/usr/local/bin:${PATH}"
+RUN mkdir -p /gpfs/home /gpfs/scratch /gpfs/projects /gpfs/apps /apps
+
+ADD . .
+
+RUN pip3 install --upgrade pip
+RUN pip3 install -r containers/requirements-amd.txt --extra-index-url https://download.pytorch.org/whl/rocm5.1.1
+
+ENTRYPOINT []

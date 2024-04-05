@@ -1,0 +1,20 @@
+FROM ubuntu:22.04
+
+RUN mkdir -p /gpfs/projects
+WORKDIR /
+
+# HPAI PyPI
+COPY pip.conf /tmp/pip.conf
+ENV PIP_CONFIG_FILE /tmp/pip.conf
+ENV MINIO_DOMAIN 'https://storage.hpai.bsc.es/'
+
+# Python set up
+RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN apt-get update && apt-get install -y python3 python3-pip
+RUN pip3 install --upgrade pip
+
+# Add project files
+ADD . .
+
+# Install dependencies
+RUN pip3 install -r containers/requirements-local.txt

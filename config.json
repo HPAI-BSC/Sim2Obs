@@ -1,0 +1,11 @@
+{
+    "binary": "python3",
+    "command": "/src/train.py",
+    "add_commit_tag": false,
+    "time": "00:01:00",
+    "qos": "debug",
+    "nodes": 1,
+    "ntasks": 1,
+    "cpus-per-task": 48,
+    "gres": 1
+}
