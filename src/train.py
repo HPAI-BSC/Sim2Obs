@@ -7,10 +7,8 @@ from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
-#PROJECT_ROOT="__file__"
-PROJECT_ROOT="/gpfs/projects/bsc70/space"
 
-rootutils.setup_root(PROJECT_ROOT, indicator=".project-root", pythonpath=True)
+#rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
 # - adding project root dir to PYTHONPATH
