@@ -8,7 +8,7 @@ from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
 #PROJECT_ROOT="__file__"
-PROJECT_ROOT="."
+PROJECT_ROOT="/gpfs/projects/bsc70/space"
 
 rootutils.setup_root(PROJECT_ROOT, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
