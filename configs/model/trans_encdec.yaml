@@ -23,4 +23,4 @@ net:
   dropout: 0.1
 
 # compile model for faster training with pytorch 2.0
-compile: true
+compile: false
