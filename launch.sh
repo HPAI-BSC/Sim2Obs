@@ -17,6 +17,7 @@ CURRENT_DIR=$(pwd)
 echo "Current directory: '$CURRENT_DIR'"
 
 module load singularity
-singularity exec -B /gpfs/projects/bsc70 \
+singularity exec -B '${CURRENT_DIR}':/
+                 -B /gpfs/projects/bsc70 \
                  --nv /gpfs/scratch/bsc70/hpai/storage/projects/heka/singularity/space_v0.sif \
    bash -c 'python src/train.py'
