@@ -20,4 +20,4 @@ module load singularity
 singularity exec -B $CURRENT_DIR:/ \
                  -B /gpfs/projects/bsc70 \
                  --nv /gpfs/scratch/bsc70/hpai/storage/projects/heka/singularity/space_v0.sif \
-   bash -c 'python src/train.py'
+   bash -c 'export PROJECT_ROOT='$CURRENT_DIR' && python src/train.py'
