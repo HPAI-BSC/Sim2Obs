@@ -1,7 +1,7 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
 data_dir: ${paths.datasets_dir}/ilarias_dataset_v0/Velocity_Dispersion
 target_maskdir: ${paths.datasets_dir}/ilarias_dataset_v0/Labels
-batch_size: 8
+batch_size: 16
 train_val_test_split: [.85, .05, .10]
 resize_shape: [128, 128]
 random_seed:  0
