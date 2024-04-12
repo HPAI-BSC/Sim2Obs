@@ -10,8 +10,12 @@ class TransEncDec(nn.Module):
             n_heads: int = 4,
             n_layers: int = 6,
             dim_feedforward: int = 2048,
+            patch_size: int = 16,
             dropout: float = 0.1):
         super(TransEncDec, self).__init__()
+
+        input_resolution = 128
+        scale = dim_feedforward ** -0.5
 
         # Encoder
         self.encoder = TransformerEncoder(in_channels, n_heads, n_layers, dim_feedforward, dropout)
@@ -20,13 +24,38 @@ class TransEncDec(nn.Module):
         self.decoder = TransformerDecoder(out_channels, n_heads, n_layers, dim_feedforward, dropout)
 
         # Input and output projections
-        self.input_proj = nn.Conv2d(in_channels, dim_feedforward, kernel_size=1)
+        self.input_proj = nn.Conv2d(in_channels, dim_feedforward, kernel_size=patch_size, stride=patch_size, bias=False)
+        self.positional_embedding = nn.Parameter(scale * torch.randn((input_resolution // patch_size) ** 2 + 1, dim_feedforward))
+        self.ln_pre = LayerNorm(dim_feedforward)
+
+        self.transformer(dim_feedforward, n_layers, n_heads)
+
+        self.ln_post = LayerNorm(dim_feedforward)
+
         self.output_proj = nn.Conv2d(dim_feedforward, out_channels, kernel_size=1)
+
+
 
     def forward(self, x):
         # Encode input image
-        x = self.input_proj(x)
-        enc_out = self.encoder(x)
+        x = self.input_proj(x)  # shape = [*, width, grid, grid]
+        x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
+        x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
+        x = torch.cat([self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x], dim=1)  # shape = [*, grid ** 2 + 1, width]
+        x = x + self.positional_embedding.to(x.dtype)
+        x = self.ln_pre(x)
+
+        print(f'After ln_pre')
+        print(x.size())
+
+        x = x.permute(1, 0, 2)  # NLD -> LND
+        x = self.transformer(x)
+        x = x.permute(1, 0, 2)  # LND -> NLD
+        x = self.ln_post(x[:, 0, :])
+
+        print(x.size())
+
+        #enc_out = self.encoder(x)
 
         # Decode latent representation
         dec_out = self.decoder(enc_out)
@@ -75,3 +104,14 @@ class TransformerDecoder(nn.Module):
         out = self.transformer_decoder(tgt, memory=x.flatten(2).permute(2, 0, 1))
 
         return out.permute(1, 2, 0).view(x.shape)
+
+
+class Transformer(nn.Module):
+    def __init__(self, width: int, layers: int, heads: int, attn_mask: torch.Tensor = None):
+        super().__init__()
+        self.width = width
+        self.layers = layers
+        self.resblocks = nn.Sequential(*[ResidualAttentionBlock(width, heads, attn_mask) for _ in range(layers)])
+
+    def forward(self, x: torch.Tensor):
+        return self.resblocks(x)
