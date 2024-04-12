@@ -7,9 +7,8 @@
 #SBATCH -e slurm_output/err.txt       # Name of stderr output file(%j expands to jobId)
 #SBATCH -n 1
 #SBATCH --gres=gpu:1
-#SBATCH --exclusive         # No other jobs allowed in our gpu
 #SBATCH -c 32               # Cores per task requested
-#SBATCH -t 00:30:00         # Run time (hh:mm:ss) - 30 min
+#SBATCH -t 02:00:00         # Run time (hh:mm:ss) - 30 min
 #SBATCH --account bsc70
 #SBATCH --qos=acc_bsccs
 
