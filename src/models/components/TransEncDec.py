@@ -1,5 +1,21 @@
 import torch.nn as nn
 import torch
+from collections import OrderedDict
+import matplotlib.pyplot as plt
+
+
+class LayerNorm(nn.LayerNorm):
+    """Subclass torch's LayerNorm to handle fp16."""
+
+    def forward(self, x: torch.Tensor):
+        orig_type = x.dtype
+        ret = super().forward(x.type(torch.float32))
+        return ret.type(orig_type)
+
+
+class QuickGELU(nn.Module):
+    def forward(self, x: torch.Tensor):
+        return x * torch.sigmoid(1.702 * x)
 
 
 class TransEncDec(nn.Module):
@@ -21,14 +37,15 @@ class TransEncDec(nn.Module):
         self.encoder = TransformerEncoder(in_channels, n_heads, n_layers, dim_feedforward, dropout)
 
         # Decoder
-        self.decoder = TransformerDecoder(out_channels, n_heads, n_layers, dim_feedforward, dropout)
+        #self.decoder = TransformerDecoder(out_channels, n_heads, n_layers, dim_feedforward, dropout)
+        self.decoder = CNNDecoder(dim_feedforward, out_channels)
 
         # Input and output projections
         self.input_proj = nn.Conv2d(in_channels, dim_feedforward, kernel_size=patch_size, stride=patch_size, bias=False)
-        self.positional_embedding = nn.Parameter(scale * torch.randn((input_resolution // patch_size) ** 2 + 1, dim_feedforward))
+        self.positional_embedding = nn.Parameter(scale * torch.randn((input_resolution // patch_size) ** 2, dim_feedforward))
         self.ln_pre = LayerNorm(dim_feedforward)
 
-        self.transformer(dim_feedforward, n_layers, n_heads)
+        self.transformer = Transformer(dim_feedforward, n_layers, n_heads)
 
         self.ln_post = LayerNorm(dim_feedforward)
 
@@ -41,29 +58,24 @@ class TransEncDec(nn.Module):
         x = self.input_proj(x)  # shape = [*, width, grid, grid]
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
-        x = torch.cat([self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x], dim=1)  # shape = [*, grid ** 2 + 1, width]
+        #x = torch.cat([self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x], dim=1)  # shape = [*, grid ** 2 + 1, width]
         x = x + self.positional_embedding.to(x.dtype)
         x = self.ln_pre(x)
-
-        print(f'After ln_pre')
-        print(x.size())
 
         x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer(x)
         x = x.permute(1, 0, 2)  # LND -> NLD
         x = self.ln_post(x[:, 0, :])
 
-        print(x.size())
-
         #enc_out = self.encoder(x)
 
         # Decode latent representation
-        dec_out = self.decoder(enc_out)
+        dec_out = self.decoder(x)
 
         # Project output
-        out = self.output_proj(dec_out)
+        #out = self.output_proj(dec_out)
 
-        return out
+        return dec_out
 
 
 class TransformerEncoder(nn.Module):
@@ -87,6 +99,47 @@ class TransformerEncoder(nn.Module):
         return out.permute(1, 2, 0).view(x.shape)
 
 
+
+class CNNDecoder(nn.Module):
+    def __init__(self, input_dim, output_channels=1):
+        super(CNNDecoder, self).__init__()
+        self.input_dim = input_dim
+        self.output_channels = output_channels
+
+        # Encoder
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, 256),
+            nn.ReLU(),
+            nn.Linear(256, 512),
+            nn.ReLU(),
+            nn.Linear(512, 16 * 16 * 256),
+            nn.ReLU()
+        )
+
+        # Decoder
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.ConvTranspose2d(32, output_channels, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        x = self.encoder(x)
+        x = x.view(batch_size, 256, 16, 16)
+        x = self.decoder(x)
+        return x
+
+
 class TransformerDecoder(nn.Module):
     def __init__(self, out_channels, n_heads, n_layers, dim_feedforward, dropout):
         super(TransformerDecoder, self).__init__()
@@ -97,11 +150,12 @@ class TransformerDecoder(nn.Module):
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, n_layers)
 
     def forward(self, x):
-        batch_size, _, height, width = x.shape
-        tgt = torch.zeros((height * width, batch_size, self.dim_feedforward), device=x.device)
+        tgt = torch.zeros_like(x, device=x.device)
+        print(tgt.shape)
 
         # Transformer decoder
-        out = self.transformer_decoder(tgt, memory=x.flatten(2).permute(2, 0, 1))
+        out = self.transformer_decoder(tgt, memory=x)
+        print(out.shape)
 
         return out.permute(1, 2, 0).view(x.shape)
 
@@ -115,3 +169,27 @@ class Transformer(nn.Module):
 
     def forward(self, x: torch.Tensor):
         return self.resblocks(x)
+
+
+class ResidualAttentionBlock(nn.Module):
+    def __init__(self, d_model: int, n_head: int, attn_mask: torch.Tensor = None):
+        super().__init__()
+
+        self.attn = nn.MultiheadAttention(d_model, n_head)
+        self.ln_1 = LayerNorm(d_model)
+        self.mlp = nn.Sequential(OrderedDict([
+            ("c_fc", nn.Linear(d_model, d_model * 4)),
+            ("gelu", QuickGELU()),
+            ("c_proj", nn.Linear(d_model * 4, d_model))
+        ]))
+        self.ln_2 = LayerNorm(d_model)
+        self.attn_mask = attn_mask
+
+    def attention(self, x: torch.Tensor):
+        self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
+        return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
+
+    def forward(self, x: torch.Tensor):
+        x = x + self.attention(self.ln_1(x))
+        x = x + self.mlp(self.ln_2(x))
+        return x

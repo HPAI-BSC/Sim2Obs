@@ -14,7 +14,7 @@ scheduler:
   patience: 10
 
 net:
-  _target_: src.models.components.U_Net.UNet
+  _target_: src.models.components.UNet.UNet
   n_channels: 1
   n_classes: 1
   bilinear: False
