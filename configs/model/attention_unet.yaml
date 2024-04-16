@@ -15,9 +15,8 @@ scheduler:
 
 net:
   _target_: src.models.components.Attention_UNet.Attention_UNet
-  n_channels: 1
-  n_classes: 1
-  bilinear: False
+  img_ch: 1
+  output_ch: 1
 
 # compile model for faster training with pytorch 2.0
 compile: false

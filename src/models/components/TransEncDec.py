@@ -160,6 +160,43 @@ class TransformerDecoder(nn.Module):
         return out.permute(1, 2, 0).view(x.shape)
 
 
+"""
+import torch
+import torch.nn as nn
+from einops import rearrange
+
+class ViTDecoder(nn.Module):
+    def __init__(self, input_dim, output_channels=1, patch_size=16, num_heads=8, num_layers=6, dim_feedforward=2048, dropout=0.1):
+        super(ViTDecoder, self).__init__()
+        self.input_dim = input_dim
+        self.output_channels = output_channels
+        self.patch_size = patch_size
+        self.num_heads = num_heads
+        self.num_layers = num_layers
+        self.dim_feedforward = dim_feedforward
+        self.dropout = dropout
+
+        self.encoder = nn.Linear(input_dim, 1024)
+
+        self.patch_embedding = nn.Conv2d(1, 1024 // patch_size ** 2, kernel_size=patch_size, stride=patch_size)
+        self.positional_encoding = nn.Parameter(torch.randn(1, (128 // patch_size) ** 2 + 1, 1024))
+
+        decoder_layer = nn.TransformerDecoderLayer(d_model=1024, nhead=num_heads, dim_feedforward=dim_feedforward, dropout=dropout)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_layers)
+
+        self.output_projection = nn.Conv2d(1024, output_channels, kernel_size=1)
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        encoded = self.encoder(x).unsqueeze(1)
+        patches = self.patch_embedding(encoded.permute(0, 3, 1, 2)).flatten(2).permute(0, 2, 1)
+        positional_encoding = self.positional_encoding[:, :patches.shape[1]].expand(batch_size, -1, -1)
+        output = self.transformer_decoder(tgt=patches + positional_encoding, memory=encoded)
+        output = rearrange(output, 'b (h w) c -> b c h w', h=128 // self.patch_size, w=128 // self.patch_size)
+        output = self.output_projection(output)
+        return output
+"""
+
 class Transformer(nn.Module):
     def __init__(self, width: int, layers: int, heads: int, attn_mask: torch.Tensor = None):
         super().__init__()
