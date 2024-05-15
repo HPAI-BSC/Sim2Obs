@@ -7,7 +7,7 @@ defaults:
   - data: galaxy
   - model: attention_unet
   - callbacks: default
-  - logger:  # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
+  - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
   - paths: gpfs
   - extras: default
