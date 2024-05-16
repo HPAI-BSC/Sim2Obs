@@ -3,6 +3,7 @@ import torch
 from collections import OrderedDict
 import matplotlib.pyplot as plt
 
+#ToDo: Add image size
 
 class LayerNorm(nn.LayerNorm):
     """Subclass torch's LayerNorm to handle fp16."""
@@ -38,7 +39,8 @@ class TransEncDec(nn.Module):
 
         # Decoder
         #self.decoder = TransformerDecoder(out_channels, n_heads, n_layers, dim_feedforward, dropout)
-        self.decoder = CNNDecoder(dim_feedforward, out_channels)
+        #self.decoder = CNNDecoder(dim_feedforward, out_channels)
+        self.decoder = ViTDecoder(dim_feedforward, patch_size=patch_size, embed_dim=768, num_heads=n_heads, num_layers=n_layers, dropout=dropout)
 
         # Input and output projections
         self.input_proj = nn.Conv2d(in_channels, dim_feedforward, kernel_size=patch_size, stride=patch_size, bias=False)
@@ -55,6 +57,7 @@ class TransEncDec(nn.Module):
 
     def forward(self, x):
         # Encode input image
+        print(self.n_heads, self.n_layers)
         x = self.input_proj(x)  # shape = [*, width, grid, grid]
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
@@ -159,6 +162,42 @@ class TransformerDecoder(nn.Module):
 
         return out.permute(1, 2, 0).view(x.shape)
 
+
+import torch
+import torch.nn as nn
+
+
+class ViTDecoder(nn.Module):
+    def __init__(self, n_features, patch_size=16, embed_dim=768, num_heads=12, num_layers=12, dropout=0.1):
+        super(ViTDecoder, self).__init__()
+        self.patch_size = patch_size
+        self.num_patches = (128 // patch_size) ** 2
+
+        self.embedding = nn.Linear(n_features, embed_dim)
+        #self.pos_embedding = nn.Parameter(torch.randn(1, self.num_patches + 1, embed_dim))
+
+        self.dropout = nn.Dropout(dropout)
+
+        decoder_layers = nn.TransformerDecoderLayer(embed_dim, num_heads, dim_feedforward=1024, dropout=dropout,
+                                                    batch_first=True)
+        self.decoder = nn.TransformerDecoder(decoder_layers, num_layers)
+
+        self.output = nn.Linear(embed_dim, 128 ** 2)
+
+    def forward(self, x):
+        x = self.embedding(x)
+        x = x.view(x.size(0), 1, -1)
+
+        #pos_emb = self.pos_embedding[:, :x.size(1) + 1]
+        #x = x + pos_emb
+
+        x = self.dropout(x)
+
+        x = self.decoder(x, x)
+        x = self.output(x)
+
+        x = x.view(x.size(0), 1, 128, 128)
+        return x
 
 """
 import torch
