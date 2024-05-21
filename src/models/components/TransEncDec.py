@@ -57,7 +57,6 @@ class TransEncDec(nn.Module):
 
     def forward(self, x):
         # Encode input image
-        print(self.n_heads, self.n_layers)
         x = self.input_proj(x)  # shape = [*, width, grid, grid]
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
