@@ -40,7 +40,7 @@ class TransEncDec(nn.Module):
         # Decoder
         #self.decoder = TransformerDecoder(out_channels, n_heads, n_layers, dim_feedforward, dropout)
         #self.decoder = CNNDecoder(dim_feedforward, out_channels)
-        self.decoder = ViTDecoder(dim_feedforward, patch_size=patch_size, embed_dim=768, num_heads=n_heads, num_layers=n_layers, dropout=dropout)
+        self.decoder = ViTDecoder(dim_feedforward, patch_size=patch_size, embed_dim=dim_feedforward, num_heads=n_heads, num_layers=n_layers, dropout=dropout)
 
         # Input and output projections
         self.input_proj = nn.Conv2d(in_channels, dim_feedforward, kernel_size=patch_size, stride=patch_size, bias=False)
