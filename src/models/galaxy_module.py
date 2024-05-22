@@ -61,7 +61,8 @@ class GalaxyLitModule(LightningModule):
         self.net = net
 
         # loss function
-        self.criterion = nn.MSELoss()
+        #self.criterion = nn.MSELoss()
+        self.criterion = nn.BCELoss()
 
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
