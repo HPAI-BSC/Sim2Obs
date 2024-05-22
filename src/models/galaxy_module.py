@@ -117,7 +117,7 @@ class GalaxyLitModule(LightningModule):
         """
         x, y = batch
         preds = self.forward(x)
-        loss = self.criterion(preds, y)
+        loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
         return loss, preds, y
 
     def training_step(
