@@ -7,6 +7,9 @@ from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErro
 import torch.nn as nn
 
 
+torch.set_float32_matmul_precision('medium')
+
+
 class GalaxyLitModule(LightningModule):
     """
     A `LightningModule` implements 8 key methods:
