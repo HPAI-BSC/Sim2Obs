@@ -5,9 +5,9 @@
 defaults:
   - _self_
   - data: galaxy
-  - model: trans_encdec
+  - model: vae
   - callbacks: default
-  - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
+  - logger: # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
   - paths: gpfs
   - extras: default

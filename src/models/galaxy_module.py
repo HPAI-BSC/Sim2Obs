@@ -6,6 +6,10 @@ from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
 
+import matplotlib.pyplot as plt
+
+plot_bool = True
+
 
 torch.set_float32_matmul_precision('medium')
 
@@ -64,8 +68,7 @@ class GalaxyLitModule(LightningModule):
         self.net = net
 
         # loss function
-        #self.criterion = nn.MSELoss()
-        self.criterion = nn.BCELoss()
+        self.criterion = nn.MSELoss()
 
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
@@ -119,7 +122,7 @@ class GalaxyLitModule(LightningModule):
             - A tensor of target labels.
         """
         x, y = batch
-        preds = torch.sigmoid(self.forward(x))
+        preds = self.forward(x)
         loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
         return loss, preds, y
 
