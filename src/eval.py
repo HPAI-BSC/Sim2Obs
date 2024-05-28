@@ -74,6 +74,7 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     print(len(predictions))
     print(type(predictions[0]))
     print(predictions[0].size())
+    print('a')
 
     metric_dict = trainer.callback_metrics
 
