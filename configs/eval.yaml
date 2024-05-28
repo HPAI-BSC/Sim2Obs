@@ -2,8 +2,8 @@
 
 defaults:
   - _self_
-  - data: mnist # choose datamodule with `test_dataloader()` for evaluation
-  - model: mnist
+  - data: galaxy # choose datamodule with `test_dataloader()` for evaluation
+  - model: unet
   - logger: mlflow
   - trainer: default
   - paths: gpfs
@@ -16,5 +16,5 @@ tags: ["dev"]
 
 commit_tag: "commit_hash"
 
-# passing checkpoint path is necessary for evaluation
-ckpt_path: ${paths.output_dir}/checkpoints/196611ac/epoch_005.ckpt
+# passing checkpoint path is necessary for evaluation # last.skpt
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c1d07246/output/checkpoints/commit_hash/epoch_000.ckpt

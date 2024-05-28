@@ -69,7 +69,11 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
 
     # for predictions use trainer.predict(...)
-    # predictions = trainer.predict(model=model, dataloaders=dataloaders, ckpt_path=cfg.ckpt_path)
+    predictions = trainer.predict(model=model, dataloaders=datamodule.test_dataloader(), ckpt_path=cfg.ckpt_path)
+    print('Predictions:', type(predictions))
+    print(len(predictions))
+    print(type(predictions[0]))
+    print(predictions[0].size())
 
     metric_dict = trainer.callback_metrics
 
