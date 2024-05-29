@@ -5,7 +5,7 @@
 defaults:
   - _self_
   - data: galaxy
-  - model: unet
+  - model: vae
   - callbacks: default
   - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
