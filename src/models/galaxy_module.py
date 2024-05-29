@@ -8,8 +8,6 @@ import torch.nn as nn
 
 import matplotlib.pyplot as plt
 
-plot_bool = True
-
 
 torch.set_float32_matmul_precision('medium')
 
@@ -53,7 +51,7 @@ class GalaxyLitModule(LightningModule):
         scheduler: torch.optim.lr_scheduler,
         compile: bool,
     ) -> None:
-        """Initialize a `MNISTLitModule`.
+        """Initialize a `LitModule`.
 
         :param net: The model to train.
         :param optimizer: The optimizer to use for training.
@@ -123,7 +121,9 @@ class GalaxyLitModule(LightningModule):
         """
         x, y = batch
         preds = self.forward(x)
-        loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
+        #loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
+        y, preds = torch.sigmoid(y), torch.sigmoid(preds)
+        loss = nn.functional.binary_cross_entropy(preds, y, reduction='sum')
         return loss, preds, y
 
     def training_step(
