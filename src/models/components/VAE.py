@@ -4,6 +4,8 @@ import torch.nn as nn
 """
     See https://github.com/Jackson-Kang/Pytorch-VAE-tutorial/blob/master/01_Variational_AutoEncoder.ipynb
     A simple implementation of Gaussian MLP Encoder and Decoder
+
+    We apply some changes: add batch normalization and xavier initialization
 """
 
 
@@ -13,17 +15,30 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
 
         self.FC_input = nn.Linear(input_dim, hidden_dim)
+        self.bn1 = nn.BatchNorm1d(hidden_dim)
         self.FC_input2 = nn.Linear(hidden_dim, hidden_dim)
+        self.bn2 = nn.BatchNorm1d(hidden_dim)
         self.FC_mean = nn.Linear(hidden_dim, latent_dim)
         self.FC_var = nn.Linear(hidden_dim, latent_dim)
 
         self.LeakyReLU = nn.LeakyReLU(0.2)
 
-        self.training = True
+        # Apply Xavier initialization
+        self.initialize_weights()
+
+    def initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm1d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
-        h_ = self.LeakyReLU(self.FC_input(x))
-        h_ = self.LeakyReLU(self.FC_input2(h_))
+        h_ = self.LeakyReLU(self.bn1(self.FC_input(x)))
+        h_ = self.LeakyReLU(self.bn2(self.FC_input2(h_)))
         mean = self.FC_mean(h_)
         log_var = self.FC_var(h_)  # encoder produces mean and log of variance
         #             (i.e., parateters of simple tractable normal distribution "q"
