@@ -6,6 +6,8 @@ from lightning import LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 
+import matplotlib.pyplot as plt
+
 #rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 rootutils.setup_root(__file__, pythonpath=True)
 # ------------------------------------------------------------------------------------ #
@@ -28,6 +30,31 @@ rootutils.setup_root(__file__, pythonpath=True)
 from src import utils
 
 log = utils.get_pylogger(__name__)
+
+
+def plot_predictions(predictions, ground_truths, output_path):
+    if len(predictions) != len(ground_truths):
+        raise ValueError("Predictions and ground truths must have the same length")
+
+    # Create a grid of subplots
+    fig, axes = plt.subplots(2, len(predictions), figsize=(len(predictions) * 4, 2 * 4))
+
+    # Plot each image in a subplot
+    i = 0
+    for pred, gt in zip(predictions, ground_truths):
+        axes[0, i].imshow(pred.permute(1, 2, 0))
+        axes[0, i].axis('off')
+        axes[0, i].set_title(f'Prediction {i}')
+
+        axes[1, i].imshow(gt.permute(1, 2, 0))
+        axes[1, i].axis('off')
+        axes[1, i].set_title(f'Ground truth {i}')
+        i += 1
+
+    plt.tight_layout()
+
+    fig.savefig(f'{output_path}/prediction_sample.png')
+    plt.close(fig)
 
 
 @utils.task_wrapper
@@ -70,12 +97,17 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
 
     # for predictions use trainer.predict(...)
-    predictions = trainer.predict(model=model, dataloaders=datamodule.test_dataloader(), ckpt_path=cfg.ckpt_path)
-    print('Predictions:', type(predictions))
-    print(len(predictions))
-    print(type(predictions[0]))
-    print(predictions[0].size())
-    print('a')
+    predictions = trainer.predict(model=model, dataloaders=datamodule.predict_dataloader(), ckpt_path=cfg.ckpt_path)
+
+    pred0, pred1, pred2 = predictions[0][0], predictions[0][1], predictions[1][0]
+    preds = [pred0, pred1, pred2]
+
+    for imgs, labels in datamodule.test_dataloader():
+        gts = [labels[0], labels[1], labels[2]] # Get the first two in the batch
+        break
+
+    output_path = cfg.paths.output_dir
+    plot_predictions(preds, gts, output_path)
 
     metric_dict = trainer.callback_metrics
 

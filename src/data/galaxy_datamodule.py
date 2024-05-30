@@ -1,4 +1,4 @@
-from src.data.components.galaxy_dataset import GalaxyDataset
+from src.data.components.galaxy_dataset import GalaxyDataset, PredictDataset
 import torch
 from torch.utils.data import Dataset
 from typing import Any, Dict, Optional, Tuple
@@ -111,10 +111,12 @@ class GalaxyDataModule(LightningDataModule):
         print(f'train/val/test sizes: {(train_size, val_size, test_size)}')
         torch.manual_seed(random_seed)
         train_ds, val_ds, test_ds = torch.utils.data.random_split(full_dataset, [train_size, val_size, test_size])
+        predict_ds = PredictDataset(test_ds)
 
         self.data_train: Optional[Dataset] = train_ds
         self.data_val: Optional[Dataset] = val_ds
         self.data_test: Optional[Dataset] = test_ds
+        self.data_predict: Optional[Dataset] = predict_ds
 
 
     def prepare_data(self) -> None:
@@ -175,6 +177,19 @@ class GalaxyDataModule(LightningDataModule):
         """
         return DataLoader(
             dataset=self.data_test,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            pin_memory=self.hparams.pin_memory,
+            shuffle=False,
+        )
+
+    def predict_dataloader(self) -> DataLoader[Any]:
+        """Create and return the predict dataloader (same as test but without labels).
+
+        :return: The predict dataloader.
+        """
+        return DataLoader(
+            dataset=self.data_predict,
             batch_size=self.hparams.batch_size,
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,

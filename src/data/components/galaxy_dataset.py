@@ -34,3 +34,15 @@ class GalaxyDataset(Dataset):
             image = self.transform(image)
         label = label.float().unsqueeze(0)
         return image, label
+
+
+class PredictDataset(Dataset):
+    def __init__(self, original_dataset):
+        self.original_dataset = original_dataset
+
+    def __len__(self):
+        return len(self.original_dataset)
+
+    def __getitem__(self, idx):
+        x, _ = self.original_dataset[idx]
+        return x

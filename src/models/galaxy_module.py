@@ -6,8 +6,6 @@ from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
 
-import matplotlib.pyplot as plt
-
 
 torch.set_float32_matmul_precision('medium')
 
