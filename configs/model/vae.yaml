@@ -16,8 +16,8 @@ scheduler:
 net:
   _target_: src.models.components.VAE.VAE
   x_dim: 16384
-  hidden_dim: 1024
-  latent_dim: 1024
+  hidden_dim: 2048
+  latent_dim: 512
 
 # compile model for faster training with pytorch 2.0
 compile: false
