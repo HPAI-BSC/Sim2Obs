@@ -17,7 +17,7 @@ BCE_loss = nn.BCELoss()
 def vae_loss_function(x, x_hat, mean, log_var):
     x, x_hat = torch.sigmoid(x), torch.sigmoid(x_hat)
     x, x_hat = torch.nan_to_num(x, nan=0.0), torch.nan_to_num(x_hat, nan=0.0),
-    reproduction_loss = nn.functional.binary_cross_entropy(x_hat, x, reduction='sum')
+    reproduction_loss = nn.functional.binary_cross_entropy(x_hat, x, reduction='mean')
     KLD = - 0.5 * torch.sum(1 + log_var - mean.pow(2) - log_var.exp())
     return reproduction_loss + KLD
 
@@ -68,6 +68,8 @@ class VAELitModule(LightningModule):
         :param scheduler: The learning rate scheduler to use for training.
         """
         super().__init__()
+
+        self.automatic_optimization = False
 
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
@@ -133,7 +135,7 @@ class VAELitModule(LightningModule):
         x, y = batch
         x = x.view(x.size()[0], -1)
         x_hat, mean, log_var = self.forward(x)
-        loss = vae_loss_function(x, x_hat, mean, log_var)
+        loss = vae_loss_function(y.view(y.size()[0],-1), x_hat, mean, log_var)
         x_hat = x_hat.view(x.size()[0], 1, 128, 128)
         return loss, x_hat, y
 
@@ -156,6 +158,12 @@ class VAELitModule(LightningModule):
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
+
+        opt = self.optimizers()
+        opt.zero_grad()
+        self.manual_backward(loss)
+        self.clip_gradients(opt, gradient_clip_val=0.5, gradient_clip_algorithm="norm")
+        opt.step()
 
         # return loss or backpropagation will fail
         return loss
