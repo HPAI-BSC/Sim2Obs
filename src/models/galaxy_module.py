@@ -73,9 +73,10 @@ class GalaxyLitModule(LightningModule):
         self.val_RASE = RelativeAverageSpectralError(window_size=8)
         self.test_RASE = RelativeAverageSpectralError(window_size=8)
 
-        self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
-        self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
-        self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
+        
+        self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=10)
+        self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=10)
+        self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=10)
 
 
         # for averaging loss across batches
