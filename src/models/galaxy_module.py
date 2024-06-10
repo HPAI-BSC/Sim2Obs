@@ -74,9 +74,9 @@ class GalaxyLitModule(LightningModule):
         self.test_RASE = RelativeAverageSpectralError(window_size=8)
 
         
-        self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=10)
-        self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=10)
-        self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=10)
+        self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
+        self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
+        self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
 
 
         # for averaging loss across batches
@@ -150,6 +150,7 @@ class GalaxyLitModule(LightningModule):
 
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
+        print('a')
         torch.cuda.empty_cache()
         pass
 
@@ -171,6 +172,7 @@ class GalaxyLitModule(LightningModule):
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_validation_epoch_end(self) -> None:
+        print('b')
         torch.cuda.empty_cache()
         "Lightning hook that is called when a validation epoch ends."
         rase = self.val_RASE.compute()  # get current val rase
@@ -189,6 +191,7 @@ class GalaxyLitModule(LightningModule):
             labels.
         :param batch_idx: The index of the current batch.
         """
+        print('c')
         loss, preds, targets = self.model_step(batch)
 
         # update and log metrics
