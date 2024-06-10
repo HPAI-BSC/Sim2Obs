@@ -177,12 +177,15 @@ class GalaxyLitModule(LightningModule):
         "Lightning hook that is called when a validation epoch ends."
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
+        print('c')
         self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
+        print('d')
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/rmse_best", self.val_rmse_best.compute(), sync_dist=True, prog_bar=True)
+        print('_')
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set.
