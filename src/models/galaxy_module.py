@@ -171,6 +171,7 @@ class GalaxyLitModule(LightningModule):
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_validation_epoch_end(self) -> None:
+        torch.cuda.empty_cache()
         "Lightning hook that is called when a validation epoch ends."
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
