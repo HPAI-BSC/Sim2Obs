@@ -74,7 +74,7 @@ class NonRASELitModule(LightningModule):
         self.test_RASE = RelativeAverageSpectralError(window_size=8)
 
         
-        self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
+        #self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
 
@@ -140,17 +140,16 @@ class NonRASELitModule(LightningModule):
         # update and log metrics
         self.train_loss(loss)
         #self.train_RASE(preds.to(torch.float32), targets.to(torch.float32))
-        self.train_rmse(preds.to(torch.float32), targets.to(torch.float32))
+        #self.train_rmse(preds.to(torch.float32), targets.to(torch.float32))
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
         #self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
+        #self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
 
         # return loss or backpropagation will fail
         return loss
 
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
-        print('a')
         torch.cuda.empty_cache()
         pass
 
@@ -174,13 +173,13 @@ class NonRASELitModule(LightningModule):
     def on_validation_epoch_end(self) -> None:
         torch.cuda.empty_cache()
         "Lightning hook that is called when a validation epoch ends."
-        #rase = self.val_RASE.compute()  # get current val rase
+        rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
-        #self.val_rase_best(rase)  # update best so far val rase
+        self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
-        #self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
+        self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/rmse_best", self.val_rmse_best.compute(), sync_dist=True, prog_bar=True)
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
