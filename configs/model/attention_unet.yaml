@@ -1,4 +1,4 @@
-_target_: src.models.galaxy_module.GalaxyLitModule
+_target_: src.models.galaxy_module.NonRASELitModule
 
 optimizer:
   _target_: torch.optim.Adam
