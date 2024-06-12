@@ -1,4 +1,4 @@
-_target_: src.models.non_rase_module.NonRASELitModule
+_target_: src.models.bce_module.BCELitModule
 
 optimizer:
   _target_: torch.optim.Adam

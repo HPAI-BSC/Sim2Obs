@@ -10,7 +10,7 @@ import torch.nn as nn
 torch.set_float32_matmul_precision('medium')
 
 
-class NonRASELitModule(LightningModule):
+class MSELitModule(LightningModule):
     """
     A `LightningModule` implements 8 key methods:
 
@@ -120,9 +120,7 @@ class NonRASELitModule(LightningModule):
         """
         x, y = batch
         preds = self.forward(x)
-        #loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
-        y, preds = torch.sigmoid(y), torch.sigmoid(preds)
-        loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        loss = self.criterion(preds, y)
         return loss, preds, y
 
     def training_step(
@@ -240,4 +238,4 @@ class NonRASELitModule(LightningModule):
 
 
 if __name__ == "__main__":
-    _ = NonRASELitModule(None, None, None, None)
+    _ = MSELitModule(None, None, None, None)

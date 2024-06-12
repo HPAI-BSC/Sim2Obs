@@ -6,11 +6,10 @@ from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
 
-
 torch.set_float32_matmul_precision('medium')
 
 
-class GalaxyLitModule(LightningModule):
+class BCELitModule(LightningModule):
     """
     A `LightningModule` implements 8 key methods:
 
@@ -43,11 +42,11 @@ class GalaxyLitModule(LightningModule):
     """
 
     def __init__(
-        self,
-        net: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler,
-        compile: bool,
+            self,
+            net: torch.nn.Module,
+            optimizer: torch.optim.Optimizer,
+            scheduler: torch.optim.lr_scheduler,
+            compile: bool,
     ) -> None:
         """Initialize a `LitModule`.
 
@@ -64,20 +63,18 @@ class GalaxyLitModule(LightningModule):
         self.net = net
 
         # loss function
-        self.criterion = nn.MSELoss()
+        self.criterion = nn.BCEWithLogitsLoss()
 
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
         # and Root Mean Squared Error Using Sliding Window
-        self.train_RASE = RelativeAverageSpectralError(window_size=8)
+        # self.train_RASE = RelativeAverageSpectralError(window_size=8)
         self.val_RASE = RelativeAverageSpectralError(window_size=8)
         self.test_RASE = RelativeAverageSpectralError(window_size=8)
 
-        
-        self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
+        # self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
-
 
         # for averaging loss across batches
         self.train_loss = MeanMetric()
@@ -107,7 +104,7 @@ class GalaxyLitModule(LightningModule):
         self.val_rmse_best.reset()
 
     def model_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor]
+            self, batch: Tuple[torch.Tensor, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Perform a single model step on a batch of data.
 
@@ -120,13 +117,13 @@ class GalaxyLitModule(LightningModule):
         """
         x, y = batch
         preds = self.forward(x)
-        #loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
-        y, preds = torch.sigmoid(y), torch.sigmoid(preds)
-        loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        # loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
+        #loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        loss = self.criterion(preds, y)
         return loss, preds, y
 
     def training_step(
-        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+            self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         """Perform a single training step on a batch of data from the training set.
 
@@ -139,18 +136,17 @@ class GalaxyLitModule(LightningModule):
 
         # update and log metrics
         self.train_loss(loss)
-        self.train_RASE(preds.to(torch.float32), targets.to(torch.float32))
-        self.train_rmse(preds.to(torch.float32), targets.to(torch.float32))
+        # self.train_RASE(preds.to(torch.float32), targets.to(torch.float32))
+        # self.train_rmse(preds.to(torch.float32), targets.to(torch.float32))
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
+        # self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
+        # self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
 
         # return loss or backpropagation will fail
         return loss
 
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
-        print('a')
         torch.cuda.empty_cache()
         pass
 
@@ -172,20 +168,16 @@ class GalaxyLitModule(LightningModule):
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_validation_epoch_end(self) -> None:
-        print('b')
         torch.cuda.empty_cache()
         "Lightning hook that is called when a validation epoch ends."
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
-        print('c')
         self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
-        print('d')
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/rmse_best", self.val_rmse_best.compute(), sync_dist=True, prog_bar=True)
-        print('_')
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set.
@@ -194,7 +186,6 @@ class GalaxyLitModule(LightningModule):
             labels.
         :param batch_idx: The index of the current batch.
         """
-        print('c')
         loss, preds, targets = self.model_step(batch)
 
         # update and log metrics
@@ -246,4 +237,4 @@ class GalaxyLitModule(LightningModule):
 
 
 if __name__ == "__main__":
-    _ = GalaxyLitModule(None, None, None, None)
+    _ = BCELitModule(None, None, None, None)
