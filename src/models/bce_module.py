@@ -117,7 +117,7 @@ class BCELitModule(LightningModule):
         """
         x, y = batch
         preds = self.forward(x)
-        preds, y = torch.sigmoid(preds), torch.sigmoid(y)
+        preds = torch.sigmoid(preds)
         loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
         return loss, preds, y
 
