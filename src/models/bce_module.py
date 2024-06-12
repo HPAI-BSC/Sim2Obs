@@ -6,6 +6,7 @@ from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
 
+
 torch.set_float32_matmul_precision('medium')
 
 
@@ -42,11 +43,11 @@ class BCELitModule(LightningModule):
     """
 
     def __init__(
-            self,
-            net: torch.nn.Module,
-            optimizer: torch.optim.Optimizer,
-            scheduler: torch.optim.lr_scheduler,
-            compile: bool,
+        self,
+        net: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: torch.optim.lr_scheduler,
+        compile: bool,
     ) -> None:
         """Initialize a `LitModule`.
 
@@ -63,18 +64,20 @@ class BCELitModule(LightningModule):
         self.net = net
 
         # loss function
-        #self.criterion = nn.BCEWithLogitsLoss()
+        #self.criterion = nn.MSELoss()
 
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
         # and Root Mean Squared Error Using Sliding Window
-        # self.train_RASE = RelativeAverageSpectralError(window_size=8)
+        #self.train_RASE = RelativeAverageSpectralError(window_size=8)
         self.val_RASE = RelativeAverageSpectralError(window_size=8)
         self.test_RASE = RelativeAverageSpectralError(window_size=8)
 
-        # self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
+        
+        #self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
+
 
         # for averaging loss across batches
         self.train_loss = MeanMetric()
@@ -104,7 +107,7 @@ class BCELitModule(LightningModule):
         self.val_rmse_best.reset()
 
     def model_step(
-            self, batch: Tuple[torch.Tensor, torch.Tensor]
+        self, batch: Tuple[torch.Tensor, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Perform a single model step on a batch of data.
 
@@ -117,12 +120,13 @@ class BCELitModule(LightningModule):
         """
         x, y = batch
         preds = self.forward(x)
-        preds = torch.sigmoid(preds)
+        #loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
+        y, preds = torch.sigmoid(y), torch.sigmoid(preds)
         loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
         return loss, preds, y
 
     def training_step(
-            self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
+        self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int
     ) -> torch.Tensor:
         """Perform a single training step on a batch of data from the training set.
 
@@ -135,11 +139,11 @@ class BCELitModule(LightningModule):
 
         # update and log metrics
         self.train_loss(loss)
-        # self.train_RASE(preds.to(torch.float32), targets.to(torch.float32))
-        # self.train_rmse(preds.to(torch.float32), targets.to(torch.float32))
+        #self.train_RASE(preds.to(torch.float32), targets.to(torch.float32))
+        #self.train_rmse(preds.to(torch.float32), targets.to(torch.float32))
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
-        # self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
-        # self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
+        #self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
+        #self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
 
         # return loss or backpropagation will fail
         return loss
