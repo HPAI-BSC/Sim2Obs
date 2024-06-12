@@ -1,4 +1,4 @@
-_target_: src.models.mse_module.MSELitModule
+_target_: src.models.mse_module.BCELitModule
 
 optimizer:
   _target_: torch.optim.Adam
