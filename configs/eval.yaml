@@ -3,7 +3,7 @@
 defaults:
   - _self_
   - data: galaxy # choose datamodule with `test_dataloader()` for evaluation
-  - model: unet
+  - model: attention_unet
   - logger: mlflow
   - trainer: default
   - paths: gpfs
@@ -17,5 +17,5 @@ tags: ["dev"]
 commit_tag: "commit_hash"
 
 # passing checkpoint path is necessary for evaluation # last.skpt
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
