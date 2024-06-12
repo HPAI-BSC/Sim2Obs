@@ -99,7 +99,7 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     # for predictions use trainer.predict(...)
     predictions = trainer.predict(model=model, dataloaders=datamodule.predict_dataloader(), ckpt_path=cfg.ckpt_path)
 
-    pred0, pred1, pred2 = predictions[0][0], predictions[0][1], predictions[1][0]
+    pred0, pred1, pred2 = predictions[0][0], predictions[0][1], predictions[0][2]
     preds = [pred0, pred1, pred2]
 
     for imgs, labels in datamodule.test_dataloader():
