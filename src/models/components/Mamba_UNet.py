@@ -36,7 +36,8 @@ class MambaBlock(nn.Module):
         u = x
         delta = F.softplus(u)
         A_bar = torch.diag_embed(torch.exp(-delta.unsqueeze(-1) * torch.exp(self.A)))
-        x = torch.einsum('bsd,dn->bsn', u, self.B)
+        B_bar = torch.exp(self.B) * delta.unsqueeze(-1)
+        x = torch.einsum('bsd,dn->bsn', u, B_bar)
         x = torch.einsum('bsn,bsm->bnm', x, A_bar)
         x = torch.einsum('bnm,md->bsd', x, self.C)
         x = x + u * self.D
