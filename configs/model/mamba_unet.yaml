@@ -15,8 +15,11 @@ scheduler:
 
 net:
   _target_: src.models.components.Mamba_UNet.MambaUNet
-  in_channels: 1
-  out_channels: 1
+  input_dim: 256
+  hidden_dim: 512
+  ssm_dim: 64
+  patch_size: 16
+  img_original_size: (1, 128, 128)
 
 # compile model for faster training with pytorch 2.0
 compile: false
