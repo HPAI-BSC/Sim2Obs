@@ -18,4 +18,4 @@ echo "Current directory: '$CURRENT_DIR'"
 module load singularity
 singularity exec -B /gpfs/projects/bsc70 \
                  --nv /gpfs/scratch/bsc70/hpai/storage/projects/heka/singularity/space_v1.sif \
-   bash -c 'export PROJECT_ROOT='$CURRENT_DIR' && python src/train.py'
+   bash -c 'export CUDA_LAUNCH_BLOCKING=1 && export PROJECT_ROOT='$CURRENT_DIR' && python src/train.py'
