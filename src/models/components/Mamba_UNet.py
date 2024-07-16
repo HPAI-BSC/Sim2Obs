@@ -210,7 +210,7 @@ class DownscaleBlock(nn.Module):
         self.input_dim = input_dim
         self.patch_size = patch_size
         self.img_original_size = img_original_size
-        self.vim_block = VimBlock(input_dim, hidden_dim, ssm_dim)  # Assume VIMBlock is already implemented
+        self.vim_block = VimBlock(input_dim, hidden_dim, ssm_dim) 
         self.downscale = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=3, stride=2, padding=1)
         self.patch_linear_proj = nn.Linear(patch_size ** 2, input_dim)
 
