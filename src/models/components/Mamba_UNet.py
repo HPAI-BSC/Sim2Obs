@@ -289,7 +289,7 @@ class MambaUNet(nn.Module):
         x = self.upscale1(x, True)
         x = self.upscale2(x, True)
         x = self.upscale3(x, True)
-        x = unpatch_image(x, original_size=(1, 128, 128), patch_size=16)
+        x = unpatch_image(x, original_size=self.original_size, patch_size=16)
         return x
 
 
