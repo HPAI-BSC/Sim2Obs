@@ -191,9 +191,10 @@ class VimBlock(nn.Module):
 class DownscaleBlock(nn.Module):
     def __init__(self, input_dim, hidden_dim, ssm_dim, patch_size, img_original_size):
         super().__init__()
+        self.input_dim
         self.patch_size = patch_size
         self.img_original_size = img_original_size
-        self.vim = VimBlock(input_dim, hidden_dim, ssm_dim)  # Assume VIMBlock is already implemented
+        self.vim_block = VimBlock(input_dim, hidden_dim, ssm_dim)  # Assume VIMBlock is already implemented
         self.downscale = nn.Conv2d(in_channels=1, out_channels=1, kernel_size=3, stride=2, padding=1)
         self.patch_linear_proj = nn.Linear(patch_size ** 2, input_dim)
 
@@ -202,19 +203,20 @@ class DownscaleBlock(nn.Module):
             x = unpatch_image(x, self.img_original_size, self.patch_size)
         x = self.downscale(x)
         patches = patch_image(x, self.patch_size)
-        proj_patches = patch_linear_proj(patches)
-        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=D)).to(torch.float32)
+        proj_patches = self.patch_linear_proj(patches)
+        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to(torch.float32)
         token_sequence = proj_patches + E
-        x = vim_block(token_sequence)
+        x = self.vim_block(token_sequence)
         return x
 
 
 class UpscaleBlock(nn.Module):
     def __init__(self, input_dim, hidden_dim, ssm_dim, patch_size, img_original_size):
         super().__init__()
+        self.input_dim
         self.patch_size = patch_size
         self.img_original_size = img_original_size
-        self.vim = VimBlock(input_dim, hidden_dim, ssm_dim)
+        self.vim_block = VimBlock(input_dim, hidden_dim, ssm_dim)
         self.upsample = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='nearest')
         )
@@ -227,10 +229,10 @@ class UpscaleBlock(nn.Module):
 
         upscaled = self.upsample(x)
         patches = patch_image(upscaled, self.patch_size)
-        proj_patches = patch_linear_proj(patches)
-        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=D)).to(torch.float32)
+        proj_patches = self.patch_linear_proj(patches)
+        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to(torch.float32)
         token_sequence = proj_patches + E
-        x = vim_block(token_sequence)
+        x = self.vim_block(token_sequence)
         return x
 
 
