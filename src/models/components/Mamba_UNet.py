@@ -182,8 +182,8 @@ class VimBlock(nn.Module):
             A_o = torch.diagonal(torch.exp(-Delta_o.unsqueeze(-1) * getattr(self, f'parameter_A_{direction}')), dim1=-2,
                                  dim2=-1)
 
-            print(f'A_o: {A_o.size()}')
-            print(f'B_o: {B_o.size()}')
+            #print(f'A_o: {A_o.size()}')
+            #print(f'B_o: {B_o.size()}')
 
             B_o = Delta_o * B_o
 
