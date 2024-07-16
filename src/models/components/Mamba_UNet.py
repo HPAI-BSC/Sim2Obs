@@ -188,48 +188,6 @@ class VimBlock(nn.Module):
         return Tl
 
 
-# Example usage
-D = 256  # Input dimension
-E = 512  # Hidden dimension
-N = 32  # SSM state dimension
-bs = 4  # Batch size
-c = 1  # Channels
-img_size = 128  # Img size
-patch_size = 16  # Patch size
-M = 64  # Sequence length
-
-vim_block = VimBlock(D, E, N)
-
-input_image = torch.randn(bs, c, img_size, img_size)
-patches = patch_image(input_image, patch_size)
-print(f'Patches: {patches.size()}')
-patch_linear_proj = nn.Linear(patch_size ** 2, D)
-proj_patches = patch_linear_proj(patches)
-print(f'Proj patches: {proj_patches.size()}')
-
-# Should be bs, M, D; add pos. encoding
-
-E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=D)).to(torch.float32)
-token_sequence = proj_patches + E
-
-print(f'Token sequence: {token_sequence.size()}')
-
-print(f"proj_patches dtype: {proj_patches.dtype}, device: {proj_patches.device}")
-print(f"E dtype: {E.dtype}, device: {E.device}")
-print(f"token_sequence dtype: {token_sequence.dtype}, device: {token_sequence.device}")
-
-output_tensor = vim_block(token_sequence)
-
-print(f'Input image: {input_image.size()}')
-print(f'Tken sequence: {token_sequence.size()}')
-print(f'Output tensor: {output_tensor.size()}')
-unpatched_image = unpatch_image(output_tensor, (c, img_size, img_size), patch_size)
-print(f'Unpatched image: {unpatched_image.size()}')
-
-print(f'_________________________________________')
-print(f'_________________________________________')
-
-
 class DownscaleBlock(nn.Module):
     def __init__(self, input_dim, hidden_dim, ssm_dim, patch_size, img_original_size):
         super().__init__()
