@@ -315,3 +315,7 @@ class MambaUNet(nn.Module):
         x = self.upscale3(x, True)
         x = unpatch_image(x, original_size=(1, 128, 128), patch_size=16)
         return x
+
+
+if __name__ == "__main__":
+    _ = MambaUNet()
