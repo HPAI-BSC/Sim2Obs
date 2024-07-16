@@ -2,6 +2,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import pytorch_lightning as pl
+
+class GetDevice(pl.lighting):
+    def __init__(self):
+        super(GetDevice, self).__init__()
+
+    def get_device(self):
+        return self.device
+
+
+gd = GetDevice()
+DEVICE = GetDevice.get_device()
+
+print(DEVICE)
 
 
 class SimpleSSM(nn.Module):
@@ -26,7 +40,7 @@ class SimpleSSM(nn.Module):
         x = x.transpose(1, 2)
 
         # initialize hidden state
-        h = torch.zeros(batch_size, self.n).to(self.device)
+        h = torch.zeros(batch_size, self.n).to(DEVICE)
 
         # h_prime = torch.einsum('bn,n->bn', h, A) + torch.einsum('bn,n->bn', u, B)
         # y = torch.einsum('bn,n -> bn', h, C)
@@ -204,7 +218,7 @@ class DownscaleBlock(nn.Module):
         x = self.downscale(x)
         patches = patch_image(x, self.patch_size)
         proj_patches = self.patch_linear_proj(patches)
-        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to(self.device).to(torch.float32)
+        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to(DEVICE).to(torch.float32)
         print(f"proj_patches dtype: {proj_patches.dtype}, device: {proj_patches.device}")
         print(f"E dtype: {E.dtype}, device: {E.device}")
         token_sequence = proj_patches + E
@@ -232,7 +246,7 @@ class UpscaleBlock(nn.Module):
         upscaled = self.upsample(x)
         patches = patch_image(upscaled, self.patch_size)
         proj_patches = self.patch_linear_proj(patches)
-        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to(self.device).to(torch.float32)
+        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to(DEVICE).to(torch.float32)
         token_sequence = proj_patches + E
         x = self.vim_block(token_sequence)
         return x
