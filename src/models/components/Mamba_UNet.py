@@ -230,7 +230,7 @@ class UpscaleBlock(nn.Module):
         upscaled = self.upsample(x)
         patches = patch_image(upscaled, self.patch_size)
         proj_patches = self.patch_linear_proj(patches)
-        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to(torch.float32)
+        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to('cuda:0').to(torch.float32)
         token_sequence = proj_patches + E
         x = self.vim_block(token_sequence)
         return x
