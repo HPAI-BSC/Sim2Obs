@@ -191,7 +191,7 @@ class VimBlock(nn.Module):
 class DownscaleBlock(nn.Module):
     def __init__(self, input_dim, hidden_dim, ssm_dim, patch_size, img_original_size):
         super().__init__()
-        self.input_dim
+        self.input_dim = input_dim
         self.patch_size = patch_size
         self.img_original_size = img_original_size
         self.vim_block = VimBlock(input_dim, hidden_dim, ssm_dim)  # Assume VIMBlock is already implemented
@@ -213,7 +213,7 @@ class DownscaleBlock(nn.Module):
 class UpscaleBlock(nn.Module):
     def __init__(self, input_dim, hidden_dim, ssm_dim, patch_size, img_original_size):
         super().__init__()
-        self.input_dim
+        self.input_dim = input_dim
         self.patch_size = patch_size
         self.img_original_size = img_original_size
         self.vim_block = VimBlock(input_dim, hidden_dim, ssm_dim)
