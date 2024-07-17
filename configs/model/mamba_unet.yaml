@@ -1,4 +1,4 @@
-_target_: src.models.bce_module.BCELitModule
+_target_: src.models.mamba_module.MambaLitModule
 
 optimizer:
   _target_: torch.optim.Adam
