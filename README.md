@@ -50,5 +50,5 @@ LAUNCH_MN5_ACC <sbatch launch_train.sh> mn5 test attention U-Net
 ### Local
 
 ```
-python src/train.py commit_tag=1 paths=local trainer=cpu
+python src/train.py commit_tag=1 paths=local trainer=cpu logger=csv
 ```
