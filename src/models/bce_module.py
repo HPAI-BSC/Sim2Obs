@@ -64,7 +64,7 @@ class BCELitModule(LightningModule):
         self.net = net
 
         # loss function
-        self.criterion = nn.BCEWithLogitsLoss()
+        #self.criterion = nn.BCEWithLogitsLoss()
 
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
@@ -120,10 +120,10 @@ class BCELitModule(LightningModule):
         """
         x, y = batch
         preds = self.forward(x)
-        loss = self.criterion(preds, y)
+        #loss = self.criterion(preds, y)
         #loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
-        #y, preds = torch.sigmoid(y), torch.sigmoid(preds)
-        #loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        y, preds = torch.sigmoid(y), torch.sigmoid(preds)
+        loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
         return loss, preds, y
 
     def training_step(
