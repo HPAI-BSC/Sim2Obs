@@ -117,6 +117,9 @@ class MambaLitModule(LightningModule):
         """
         x, y = batch
         preds = self.forward(x)
+        if torch.isnan(preds).any():
+            print('nans in preds')
+            preds[torch.isnan(preds)] = 0.0
         loss = self.criterion(preds, y)
         print(f'Loss_ : {loss}')
         # y, preds = torch.sigmoid(y), torch.sigmoid(preds)
