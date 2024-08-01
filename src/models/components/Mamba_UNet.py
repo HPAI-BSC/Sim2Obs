@@ -208,8 +208,10 @@ class VimBlock(nn.Module):
 
             y_o = self.SSM(A_o, B_o, C_o, x_prime)
 
+            """
             if direction == 'backward':
                 y_o = y_o.flip(1)
+            """
 
             outputs.append(y_o)
 
