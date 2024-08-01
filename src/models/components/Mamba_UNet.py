@@ -182,6 +182,8 @@ class VimBlock(nn.Module):
             A_o = torch.diagonal(torch.exp(-Delta_o.unsqueeze(-1) * getattr(self, f'parameter_A_{direction}')), dim1=-2,
                                  dim2=-1)
 
+            print(f'max: {torch.max(A_o)}, min: {torch.min(A_o)}, mean: {torch.mean(A_o)}')
+
             #print(f'A_o: {A_o.size()}')
             #print(f'B_o: {B_o.size()}')
 
