@@ -154,6 +154,25 @@ class VimBlock(nn.Module):
         # SSM
         self.SSM = SimpleSSM(E, N, d_conv=3)
 
+        self._initialize_weights()
+
+
+    def _initialize_weights(self):
+        # Initialize linear layers with orthogonal initialization
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Conv1d):
+                nn.init.orthogonal_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+        # Xavier initialization for parameters if needed
+        nn.init.xavier_uniform_(self.parameter_A_forward)
+        nn.init.xavier_uniform_(self.parameter_A_backward)
+
     def forward(self, Tl_1):
         B, M, D = Tl_1.shape
 
