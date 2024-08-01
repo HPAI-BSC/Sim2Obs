@@ -201,18 +201,12 @@ class VimBlock(nn.Module):
             A_o = torch.diagonal(torch.exp(-Delta_o.unsqueeze(-1) * getattr(self, f'parameter_A_{direction}')), dim1=-2,
                                  dim2=-1)
 
-            print(f'A_o -- max: {torch.max(A_o)}, min: {torch.min(A_o)}, mean: {torch.mean(A_o)}')
-
             #print(f'A_o: {A_o.size()}')
             #print(f'B_o: {B_o.size()}')
 
             B_o = Delta_o * B_o
 
-            print(f'B_o -- max: {torch.max(B_o)}, min: {torch.min(B_o)}, mean: {torch.mean(B_o)}')
-
             y_o = self.SSM(A_o, B_o, C_o, x_prime)
-
-            print(f'y_o -- max: {torch.max(y_o)}, min: {torch.min(y_o)}, mean: {torch.mean(y_o)}')
 
             if direction == 'backward':
                 y_o = y_o.flip(1)
