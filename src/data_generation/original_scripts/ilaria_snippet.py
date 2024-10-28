@@ -1,7 +1,6 @@
 import illustris_python as il
 import numpy as np
 
-
 # SELECT SIMULATIONS AND SET CONSTANTS
 
 H = 0.6774      # Hubble constant
