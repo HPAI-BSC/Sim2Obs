@@ -119,7 +119,7 @@ def angle(u,v):
 
 def get_transform_matrix(orig_system, n, normalized=True):
     '''
-    Function that gives the rotation matrix of a given system of reference provided the vector we want the new z-axis to point.
+    Function that gives the rotation matrix of a given system of reference provided the vector we want to be the new z-axis to point.
     See https://stackoverflow.com/questions/70271242/3d-vectors-align-a-vectors-coordinate-system-to-a-normal for reference.
 
     input:
@@ -135,11 +135,11 @@ def get_transform_matrix(orig_system, n, normalized=True):
         # unit vector
         n /= np.linalg.norm(n)
 
-    j = orig_system[:, -1]
+    k = orig_system[:, -1]
 
     # Orthogonal vector to original z-axis and the new z-axis
-    b = np.cross(j, n)
-    theta = angle(j, n) / 2  # 45 degrees
+    b = np.cross(k, n)
+    theta = angle(k, n) / 2  # 45 degrees
     print(f'  rotation angle: {theta * (180 / np.pi)}')
 
     # Quaternion components
