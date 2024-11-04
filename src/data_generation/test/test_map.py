@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from src.data_generation.src.map import create_maps, muse_bins_r, create_random_zoom, mask_interlopers
+from src.data_generation.src.map import create_maps, muse_bins_r, create_random_zoom, get_interlopers_mask, circle
 
 
 class TestMap(unittest.TestCase):
@@ -81,29 +81,27 @@ class TestMap(unittest.TestCase):
         np.testing.assert_array_equal(vel_disp_zoom1, vel_disp_zoom2)
 
     def test_mask_interlopers(self):
+        # Initialize input arrays
         self.label = np.random.rand(50, 50)  # Mock 2D array for labels
         self.vel_disp = np.random.rand(50, 50)  # Mock 2D array for velocity dispersion
         self.spos_rot = np.array([[10, 10], [20, 20], [30, 30]])  # Positions for 3 subhalos
         self.shmr = pd.DataFrame([5, 10, 15], columns=["SubhaloHalfmassRadType"])  # Radii for each subhalo
-        self.interlopers_id = [1, 2]  # IDs of subhalos considered as interlopers
+        self.interlopers_id = [0, 1]  # IDs of subhalos considered interlopers
         self.biny = np.linspace(-50, 50, 50)  # Y-coordinates for the grid
 
-        # Ensure the output arrays match the input shape
-        label_masked, vel_disp_masked = mask_interlopers(
-            self.label, self.vel_disp, self.spos_rot, self.shmr, self.interlopers_id, self.biny
-        )
-        self.assertEqual(label_masked.shape, self.label.shape)
-        self.assertEqual(vel_disp_masked.shape, self.vel_disp.shape)
+        # Run the function to get the mask
+        mask = get_interlopers_mask(self.label, self.vel_disp, self.spos_rot, self.shmr, self.interlopers_id, self.biny)
+        expected_mask = np.load('mask.npy')
 
-        # Create a mask for the positions of interlopers
-        interloper_mask = np.zeros_like(self.label, dtype=bool)
-        for index in self.interlopers_id:
-            pos = self.spos_rot[index - 1]  # Assuming IDs start from 1
-            r = self.shmr.loc[index - 1, 'SubhaloHalfmassRadType']  # Get the radius for the interloper
-            y, x = np.ogrid[-pos[0]:self.label.shape[0] - pos[0], -pos[1]:self.label.shape[1] - pos[1]]
-            mask = x ** 2 + y ** 2 <= r ** 2  # Create a circular mask
-            interloper_mask |= mask  # Combine masks
+        # Verify the mask shape matches the input
+        self.assertEqual(mask.shape, self.label.shape, "Mask shape does not match input shapes")
 
-        # Check that the regions around interlopers are masked as zero
-        self.assertTrue(np.all(label_masked[interloper_mask] == 0))
-        self.assertTrue(np.all(vel_disp_masked[interloper_mask] == 0))
+        # Ensure the mask is not entirely zero
+        self.assertFalse(np.all(mask == 0), "Mask is entirely zero, which is unexpected")
+        assert np.array_equal(mask, expected_mask)
+
+
+
+
+
+

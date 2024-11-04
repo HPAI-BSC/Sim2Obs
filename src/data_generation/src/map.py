@@ -168,6 +168,7 @@ def create_three_zoom(label_masked, vel_disp_masked, **kwargs):
     idsubhalo = kwargs["idsubhalo"]
     projection = kwargs["projection"]
     snapnum = kwargs["snapnum"]
+    mask = kwargs["mask"]
     label_masked1, vel_disp_masked1 = create_random_zoom(label_masked, vel_disp_masked)
     label_masked2, vel_disp_masked2 = create_random_zoom(label_masked, vel_disp_masked)
     label_masked3, vel_disp_masked3 = create_random_zoom(label_masked, vel_disp_masked)
@@ -183,7 +184,7 @@ def create_three_zoom(label_masked, vel_disp_masked, **kwargs):
     np.savez(NAME_TO_SAVE + f"xyz-zoom3", label_masked3)
 
 
-def mask_interlopers(label, vel_disp, spos_rot, shmr, interlopers_id, biny):
+def get_interlopers_mask(label, vel_disp, spos_rot, shmr, interlopers_id, biny):
     """
     Create a mask to identify and exclude interloper subhalos from calculations.
 
@@ -223,43 +224,35 @@ def mask_interlopers(label, vel_disp, spos_rot, shmr, interlopers_id, biny):
     bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius for the grid
     maschera = np.zeros_like(label)
 
-    X, Y = np.meshgrid(np.linspace(-r, r, bins), biny)  # Create a grid of X, Y coordinates
+    # Generate X and Y based on maschera's shape for consistency
+    rows, cols = maschera.shape
+    X, Y = np.meshgrid(
+        np.linspace(-r, r, cols),  # X coordinates matching columns in maschera
+        np.linspace(biny[0], biny[-1], rows)  # Y coordinates matching rows in maschera
+    )
 
-    '''
-    for i in interlopers_id:
-        h = spos_rot[i, 0]
-        k = spos_rot[i, 1]
-        rradius = shmr.iloc[i, 0]
-        for cc, x in enumerate(np.linspace(-r, r, bins)):
-            try:
-                maschera[cc, np.where(circle(x, biny, h, k, rradius) <= 1)[0]] = 1
-            except IndexError:  # catch the error
-                pass
-    '''
     for i in interlopers_id:
         # For each interloper get its center position (h, k) and its radius
         h = spos_rot[i, 0]
         k = spos_rot[i, 1]
         rradius = shmr.iloc[i, 0]
-        for cc in range(len(X)):
-            for dd in range(Y.shape[1]):
-                # Check if the points in the grid falls within the interloper's radius
-                if circle(X[cc, dd], Y[cc, dd], h, k, rradius) <= 1:
-                    if cc < maschera.shape[0] and dd < maschera.shape[1]:
-                        # if the point is within the radius, mask is updated to mark this region as part of the
-                        # interloper
-                        maschera[cc, dd] = 1
-                    else:
-                        logger.warning(f"Warning: Index out of bounds - cc: {cc}, dd: {dd}")
+        for cc in range(rows):
+            for dd in range(cols):
+                radius_circle = circle(X[cc, dd], Y[cc, dd], h, k, rradius)
+                if radius_circle <= 1:
+                    maschera[cc, dd] = 1
 
     # Check if the mask is just zero
     if np.all(maschera == 0):
         logger.warning('Mask is full of zeros.')
 
+    assert maschera.shape == label.shape == vel_disp.shape
+
+    maschera = maschera.astype(bool)
     # Masking interlopers
-    vel_disp_masked = np.ma.masked_array(vel_disp, mask=maschera).filled(fill_value=0)
-    label_masked = np.ma.masked_array(label, mask=maschera).filled(fill_value=0)
-    return label_masked, vel_disp_masked
+    # vel_disp_masked = np.ma.masked_array(vel_disp, mask=maschera).filled(fill_value=0)
+    # label_masked = np.ma.masked_array(label, mask=maschera).filled(fill_value=0)
+    return maschera
 
 
 def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloParticles, id_halo, id_subhalo, spos_rot,
@@ -273,11 +266,10 @@ def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloP
     for j, (label_i, vel_disp_i, biny_i) in enumerate(label_vel_biny_projections):
         projection = projections[j]
         logger.info(f"---> Masking interlopers for projection {projection}...")
-        label_masked, vel_disp_masked = mask_interlopers(label_i, vel_disp_i, spos_rot,
-                                                         shmr_h, interlopers_id, biny_i)
+        mask = get_interlopers_mask(label_i, vel_disp_i, spos_rot, shmr_h, interlopers_id, biny_i)
         logger.info("---> Saving three random zooms for icl fraction and velocity "
                     f"dispersion for proyection {projection}...")
-        create_three_zoom(label_masked, vel_disp_masked, idhalo=id_halo,
+        create_three_zoom(label_i, vel_disp_i, idhalo=id_halo, mask=mask,
                           idsubhalo=id_subhalo, projection=projection, snapnum=snapnum)
 
 
