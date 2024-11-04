@@ -1,9 +1,10 @@
 import os
 
-from api.secret_manager import SecretManager
-from api.storage import Storage
+
 from dotenv import load_dotenv
 
+from src.data_generation.api.secret_manager import SecretManager
+from src.data_generation.api.storage import Storage
 
 if __name__ == '__main__':
     load_dotenv()
