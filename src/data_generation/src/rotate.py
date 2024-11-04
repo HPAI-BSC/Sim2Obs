@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cosine
@@ -8,20 +10,15 @@ from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import get_icl_mask, logger
 
 
-def angle(u, v):
+def angle(u: np.ndarray, v: np.ndarray) -> float:
     """
     Calculate the angle between two vectors using the cosine similarity.
 
-    This function computes the angle in radians between two vectors `u` and `v`
-    using the formula derived from the cosine of the angle. The angle is computed
-    using the arccosine of the cosine similarity, which is calculated as 1 minus
-    the cosine distance between the two vectors.
-
     Parameters:
     -----------
-    u : array-like
+    u : np.ndarray
         The first vector. Must be of the same dimension as `v`.
-    v : array-like
+    v : np.ndarray
         The second vector. Must be of the same dimension as `u`.
 
     Returns:
@@ -38,26 +35,22 @@ def angle(u, v):
     return np.arccos(1 - cosine(u, v))
 
 
-def rotate_vector(v, axis, angle_):
+def rotate_vector(v: np.ndarray, axis: np.ndarray, angle_: float) -> np.ndarray:
     """
     Rotate a vector around a specified axis by a given angle.
 
-    This function rotates a 3D vector `v` around a specified rotation axis by a
-    certain angle using Rodrigues' rotation formula. The axis of rotation must
-    be a 3D vector, and the angle should be provided in degrees.
-
     Parameters:
     -----------
-    v : array-like
+    v : np.ndarray
         The 3D vector to be rotated. Must be a 1D array of length 3.
-    axis : array-like
+    axis : np.ndarray
         The 3D vector representing the axis of rotation. Must also be a 1D array of length 3.
     angle_ : float
         The angle by which to rotate the vector, in degrees.
 
     Returns:
     --------
-    numpy.ndarray
+    np.ndarray
         The rotated 3D vector as a 1D array.
 
     Note:
@@ -80,24 +73,15 @@ def rotate_vector(v, axis, angle_):
     return v_rot
 
 
-def get_transform_matrix(n, axis, normalized=True, debug=False):
+def get_transform_matrix(n: np.ndarray, axis: np.ndarray, normalized: bool = True) -> np.ndarray:
     """
     Calculate the rotation matrix that aligns a given vector with the new z-axis.
 
-    This function computes a rotation matrix that transforms a standard reference
-    frame to a new frame where the z-axis points in the direction of the specified
-    vector `n`. The function uses quaternion-based calculations to ensure a smooth
-    rotation.
-
-    Reference:
-    - [Stack Overflow: 3D Vectors - Align a vector's coordinate system](https://stackoverflow.com/questions/70271242/3d-vectors-align-a-vectors-coordinate-system-to-a-normal)
-    - [Orientation Output Specifications](https://base.movella.com/s/article/Orientation-output-specifications?language=en_US)
-
     Parameters:
     -----------
-    n : numpy.ndarray
+    n : np.ndarray
         A vector representing the new z-axis direction. Should be a 1D array of length 3.
-    axis : numpy.ndarray
+    axis : np.ndarray
         The original z-axis vector (should be a standard reference vector).
     normalized : bool, optional
         Whether the vector `n` is normalized. Defaults to True.
@@ -106,7 +90,7 @@ def get_transform_matrix(n, axis, normalized=True, debug=False):
 
     Returns:
     --------
-    numpy.ndarray
+    np.ndarray
         A 3x3 rotation matrix that transforms the original coordinate system
         to the new coordinate system aligned with the vector `n`.
 
@@ -114,10 +98,7 @@ def get_transform_matrix(n, axis, normalized=True, debug=False):
     -----
     If the vector `n` is not normalized and `normalized` is set to False,
     the function will normalize it internally before computation.
-    The function includes optional debug logging to verify the orthogonality
-    and determinant of the resulting rotation matrix.
     """
-
     if not normalized:
         # unit vector
         n /= np.linalg.norm(n)
@@ -146,37 +127,23 @@ def get_transform_matrix(n, axis, normalized=True, debug=False):
         [2 * (q1 * q3 - q0 * q2), 2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1 ** 2 + q2 ** 2)]
     ])
 
-    # Sanity checks
-    if debug:
-        is_orthogonal = np.allclose(np.dot(Q.T, Q), np.eye(3))
-        logger.debug(f"--> Is Q orthogonal? {is_orthogonal}")
-        det_Q = np.linalg.det(Q)
-        logger.debug(f"--> Determinant of Q: {det_Q}")
-        is_det_one = np.isclose(det_Q, 1.0)
-        logger.debug(f"--> Is the determinant of Q equal to 1? {is_det_one}")
-        q_norm = np.sqrt(q0**2 + q1**2 + q2**2 + q3**2)
     return Q
 
 
-def rotate_3dvec(Q, vec):
+def rotate_3dvec(Q: np.ndarray, vec: np.ndarray) -> np.ndarray:
     """
     Apply a rotation matrix to a 3-dimensional vector.
 
-    This function rotates a given 3D vector using the provided rotation matrix `Q`.
-    The rotation is performed using matrix multiplication, suitable for transforming
-    positions or directions in 3D space, such as those from simulation data.
-
     Parameters:
     -----------
-    Q : numpy.ndarray
-        A 3x3 rotation matrix. This matrix should be orthogonal and have a determinant
-        of 1, representing the rotation transformation to be applied.
-    vec : numpy.ndarray
+    Q : np.ndarray
+        A 3x3 rotation matrix.
+    vec : np.ndarray
         A 1D array or list of length 3 representing the vector to be rotated.
 
     Returns:
     --------
-    numpy.ndarray
+    np.ndarray
         The rotated 3-dimensional vector as a 1D array.
 
     Note:
@@ -188,37 +155,33 @@ def rotate_3dvec(Q, vec):
     return (Q @ vec.T).T
 
 
-def rotate_particles(subhalo_particles: SubhaloParticles, spos, rotation_degree, z, axis):
+def rotate_particles(subhalo_particles: SubhaloParticles, spos: pd.DataFrame, rotation_degree: float,
+                     z: np.ndarray, axis: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Rotate particle positions and velocities in 3D space around a specified axis.
 
-    This function applies a rotation to the positions and velocities of particles
-    using Rodrigues' rotation formula. It rotates the specified particles by a given
-    angle around a defined axis, changing their orientation in 3D space.
-
     Parameters:
     -----------
-    p : numpy.ndarray
-        An array of shape (N, 3) representing the positions of N particles in 3D space.
-    v : numpy.ndarray
-        An array of shape (N, 3) representing the velocities of N particles in 3D space.
-    spos : numpy.ndarray
-        An array of shape (M, 3) representing the positions of M subhalos or particles in 3D space.
+    subhalo_particles : SubhaloParticles
+        An instance of SubhaloParticles containing particle data.
+    spos : pd.DataFrame
+        DataFrame of shape (M, 3) representing the positions of M subhalos or particles in 3D space.
     rotation_degree : float
         The angle of rotation around the specified axis, in degrees.
-    z : numpy.ndarray
+    z : np.ndarray
         A 3-element array representing the original z-axis direction vector before rotation.
-    axis : numpy.ndarray
+    axis : np.ndarray
         A 3-element array representing the axis of rotation in 3D space.
 
     Returns:
     --------
-    tuple
-        A tuple containing three numpy.ndarray:
+    tuple[np.ndarray, np.ndarray, np.ndarray]
+        A tuple containing:
         - pos_rot: The rotated positions of the particles, of shape (N, 3).
         - vel_rot: The rotated velocities of the particles, of shape (N, 3).
         - spos_rot: The rotated positions of the subhalos or particles, of shape (M, 3).
     """
+
     new_z = rotate_vector(z, axis=axis, angle_=rotation_degree)
     Q = get_transform_matrix(new_z, z, normalized=False)
     pos_rot = np.float32(rotate_3dvec(Q, subhalo_particles.p))
@@ -227,8 +190,37 @@ def rotate_particles(subhalo_particles: SubhaloParticles, spos, rotation_degree,
     return pos_rot, vel_rot, spos_rot
 
 
-def apply_rotation(rotation_groups, subhalo_particles: SubhaloParticles, halo_context: HaloContext, df_icl: pd.DataFrame,
-                   spos_h, shmr_h, snapnum, id_halo, id_subhalo):
+def apply_rotation(rotation_groups: List, subhalo_particles: SubhaloParticles,
+                   halo_context: HaloContext, df_icl: pd.DataFrame, spos_h: pd.DataFrame,
+                   shmr_h: pd.DataFrame, snapnum: int, id_halo: int, id_subhalo: int) -> None:
+    """
+    Rotate particle positions and velocities based on specified rotation groups.
+
+    Parameters:
+    -----------
+    rotation_groups : np.ndarray
+        An array containing rotation parameters, such as degrees and rotation axes.
+    subhalo_particles : SubhaloParticles
+        An instance of SubhaloParticles containing particle data.
+    halo_context : HaloContext
+        An instance of HaloContext for context-related operations.
+    df_icl : pd.DataFrame
+        DataFrame containing information about intracluster light.
+    spos_h : pd.DataFrame
+        Array representing the positions of subhalos or particles.
+    shmr_h : pd.DataFrame
+        Array representing the subhalo mass ratios.
+    snapnum : int
+        Snapshot number for referencing data.
+    id_halo : int
+        ID of the halo being processed.
+    id_subhalo : int
+        ID of the subhalo being processed.
+
+    Returns:
+    --------
+    None
+    """
     logger.info("Rotating positions and velocities ...")
     for row in rotation_groups:
         degree_0, z, rotation_directions = row
@@ -250,4 +242,4 @@ def apply_rotation(rotation_groups, subhalo_particles: SubhaloParticles, halo_co
                 # Create a masking array for BCG and ICL (BCG==0, ICL==1)
                 type4 = get_icl_mask(df_icl, subhalo_particles.m)
                 create_maps_and_zooms(halo_context, subhalo_particles_rotated, id_halo, id_subhalo,
-                                      spos_rot, shmr_h, type4, snapnum)
+                                      spos_rot, shmr_h, type4, snapnum, rotation=f"{degree_0}_{i}")

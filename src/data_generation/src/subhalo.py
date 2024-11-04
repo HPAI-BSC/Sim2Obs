@@ -5,7 +5,26 @@ from src.data_generation.src.constants import SOLAR_MASS_CONVERSION, SNAPNUM, SC
 
 
 class SubhaloContext:
-    def __init__(self, spos, grnr, shmr, mstr, scale_factor, hubble_constant):
+    def __init__(self, spos: np.ndarray, grnr: np.ndarray, shmr: np.ndarray,
+                 mstr: np.ndarray, scale_factor: float, hubble_constant: float) -> None:
+        """
+        Initialize the SubhaloContext with properties of subhalos.
+
+        Parameters:
+        -----------
+        spos : np.ndarray
+            The positions of subhalos. Array should be of shape (N, 3) where N is the number of subhalos.
+        grnr : np.ndarray
+            The group numbers corresponding to each subhalo.
+        shmr : np.ndarray
+            The stellar half-mass radius for each subhalo.
+        mstr : np.ndarray
+            The mass of stars in each subhalo.
+        scale_factor : float
+            The scale factor to apply to subhalo positions and other properties.
+        hubble_constant : float
+            The Hubble constant used for mass conversion.
+        """
         self.spos = spos * scale_factor          # Apply scaling factor to subhalo positions
         self.shmr = shmr * scale_factor           # Apply scaling factor to shmr
         self.mstr = mstr * 1e10 / hubble_constant  # Convert to solar masses
@@ -14,7 +33,24 @@ class SubhaloContext:
 
 
 class SubhaloParticles:
-    def __init__(self, m, p, v, scale_factor=None, init=True):
+    def __init__(self, m: np.ndarray, p: np.ndarray, v: np.ndarray,
+                 scale_factor: float = None, init: bool = True) -> None:
+        """
+        Initialize the SubhaloParticles with mass, position, and velocity data.
+
+        Parameters:
+        -----------
+        m : np.ndarray
+            The mass of particles.
+        p : np.ndarray
+            The positions of particles. Should be of shape (N, 3) where N is the number of particles.
+        v : np.ndarray
+            The velocities of particles. Should also be of shape (N, 3).
+        scale_factor : float, optional
+            The scale factor to apply to positions and velocities. Defaults to None.
+        init : bool, optional
+            If True, initializes the attributes with conversion. Defaults to True.
+        """
         if init:
             self.m = m * SOLAR_MASS_CONVERSION
             self.p = p * scale_factor
@@ -25,10 +61,9 @@ class SubhaloParticles:
             self.v = v
 
 
-def get_subhalos(base_path: str, fields=None):
+def get_subhalos(base_path: str, fields: list[str] = None) -> SubhaloContext:
     """
-    Retrieve subhalo properties such as position (SubhaloPos), group number (SubhaloGrNr),
-    and stellar half-mass radius (SubhaloHalfmassRadType).
+    Retrieve subhalo properties such as position, group number, and stellar half-mass radius.
 
     This function loads subhalo information from the specified snapshot of a simulation.
     If no fields are specified, it defaults to retrieving SubhaloPos, SubhaloGrNr,
@@ -36,27 +71,25 @@ def get_subhalos(base_path: str, fields=None):
 
     Parameters:
     -----------
-    basePath : str
+    base_path : str
         The base directory path to the simulation data.
-    snapnum : int
-        The snapshot number in the simulation from which to load subhalo data.
-    fields : list of str, optional
-        A list of field names to retrieve. If not specified, the function defaults to:
+    fields : list[str], optional
+        A list of field names to retrieve. If not specified, defaults to:
         ["SubhaloPos", "SubhaloGrNr", "SubhaloHalfmassRadType", "SubhaloMassType"].
 
     Returns:
     --------
-    tuple
-        If `fields` is not provided, returns a tuple containing:
-        - spos : array
+    SubhaloContext | dict
+        If `fields` is not provided, returns a SubhaloContext object containing:
+        - spos : np.ndarray
             The positions of the subhalos.
-        - grnr : array
+        - grnr : np.ndarray
             The group numbers that each subhalo belongs to.
-        - shmr : array
+        - shmr : np.ndarray
             The stellar half-mass radius for each subhalo.
-        - mstr : array
+        - mstr : np.ndarray
             The mass of stars in each subhalo.
-        If `fields` is provided, returns an array of subhalo data corresponding to the specified fields.
+        If `fields` is provided, returns a dictionary of subhalo data corresponding to the specified fields.
     """
     if fields is None:
 
@@ -73,7 +106,7 @@ def get_subhalos(base_path: str, fields=None):
         return halos
 
 
-def get_p_subhalo(base_path: str, isubhalo: int, fields=None):
+def get_p_subhalo(base_path: str, isubhalo: int, fields: list[str] = None) -> SubhaloParticles:
     """
     Retrieve particle data for a specific subhalo, including coordinates, velocities, and masses.
 
@@ -84,29 +117,25 @@ def get_p_subhalo(base_path: str, isubhalo: int, fields=None):
 
     Parameters:
     -----------
-    basePath : str
+    base_path : str
         The base directory path to the simulation data.
-    snapnum : int
-        The snapshot number in the simulation from which to load subhalo data.
     isubhalo : int
-        The index of the subhalo from which to retrieve particle data.
-        This must be the first subhalo.
-    fields : list of str, optional
-        A list of field names to retrieve. If not specified, the function defaults
-        to retrieving ["Coordinates", "Velocities", "Masses"].
+        The index of the subhalo from which to retrieve particle data. This must be the first subhalo.
+    fields : list[str], optional
+        A list of field names to retrieve. If not specified, defaults to retrieving
+        ["Coordinates", "Velocities", "Masses"].
 
     Returns:
     --------
-    tuple
-        If `fields` is not provided, returns a tuple containing:
-        - m : array
+    SubhaloParticles | dict
+        If `fields` is not provided, returns a SubhaloParticles object containing:
+        - m : np.ndarray
             The masses of the particles in the subhalo.
-        - p : array
+        - p : np.ndarray
             The coordinates of the particles in the subhalo.
-        - v : array
+        - v : np.ndarray
             The velocities of the particles in the subhalo.
-        If `fields` is provided, returns an array of particle data corresponding to
-        the specified fields.
+        If `fields` is provided, returns a dictionary of particle data corresponding to the specified fields.
     """
     if fields is None:
         fields = ["Coordinates", "Velocities", "Masses"]

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from map import create_maps_and_zooms
+from map import create_maps_and_zooms, generate_img_dataset
 from src.data_generation.src.constants import PATH, HALO_MIN_MASS, H, SUBHALO_ERROR_ID, SUBHALO_MIN_MASS, SNAPNUM
 from src.data_generation.src.halo import get_halos
 from src.data_generation.src.rotate import apply_rotation
@@ -11,13 +11,11 @@ from src.data_generation.src.utils import setup_logger, label_particles, get_icl
 
 warnings.filterwarnings("ignore")
 
-
-
 if __name__ == '__main__':
-    rotation_groups = [[45, [0, 0, 1], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]],
-                        [120, [0, 0, 1], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]],
-                        [90, [0, 0, 1], [[1, 0, 0]]]]
 
+    rotation_groups = [[45, [0, 0, 1], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]]]
+                        #[120, [0, 0, 1], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]],
+                        #[90, [0, 0, 1], [[1, 0, 0]]]]
     logger = setup_logger()
 
     halo_context = get_halos(PATH)
@@ -61,9 +59,14 @@ if __name__ == '__main__':
                         # Create a masking array for BCG and ICL (BCG==0, ICL==1)
                         type4 = get_icl_mask(df_icl, subhalo_particles.m)
                         create_maps_and_zooms(halo_context, subhalo_particles, id_halo, id_subhalo, spos_h, shmr_h,
-                                              type4, SNAPNUM)
+                                              type4, SNAPNUM, rotation=None)
                 else:
                     logger.warning('Primary subhalo does not reach minimum mass.')
+
+    # Directory containing the .npz files
+    input_dirs = ['../data/npz/velocity_dispersion', '../data/npz/labels']
+    output_dirs = ['../data/images/velocity_dispersion', '../data/images/labels']
+    generate_img_dataset(input_dirs, output_dirs)
 
 
 

@@ -3,7 +3,8 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from src.data_generation.src.map import create_maps, muse_bins_r, create_random_zoom, get_interlopers_mask, circle
+from src.data_generation.src.map import create_maps, muse_bins_r, create_random_zoom, get_interlopers_mask
+import matplotlib.pyplot as plt
 
 
 class TestMap(unittest.TestCase):
@@ -55,30 +56,33 @@ class TestMap(unittest.TestCase):
 
         self.label_masked = np.random.rand(100, 100)  # Mock 2D array for label data
         self.vel_disp_masked = np.random.rand(100, 100)  # Mock 2D array for velocity dispersion data
+        self.mask = np.random.randint(0, 2, size=(100, 100))  # Mock 2D binary mask
 
         # Calculate the bin size and radius using muse_bins_r to set expected zoom size
         self.bins, _ = muse_bins_r(2 * 263.34, 2.02)
         self.zoom_half_size = int(self.bins / 4)  # Define half-size of the zoom window
 
-        label_zoom, vel_disp_zoom = create_random_zoom(self.label_masked, self.vel_disp_masked)
+        label_zoom, vel_disp_zoom, mask_zoom = create_random_zoom(self.label_masked, self.vel_disp_masked, self.mask)
 
         # Calculate expected shape
-        expected_shape = (34, 54)
+        expected_shape = (30, 30)
 
         # Check if output shapes match expected zoom size
         self.assertEqual(label_zoom.shape, expected_shape)
         self.assertEqual(vel_disp_zoom.shape, expected_shape)
+        self.assertEqual(mask_zoom.shape, expected_shape)  # Check shape of the mask zoom
 
         # Run the function twice with the same seed to check for reproducibility
         np.random.seed(42)
-        label_zoom1, vel_disp_zoom1 = create_random_zoom(self.label_masked, self.vel_disp_masked)
+        label_zoom1, vel_disp_zoom1, mask_zoom1 = create_random_zoom(self.label_masked, self.vel_disp_masked, self.mask)
 
         np.random.seed(42)
-        label_zoom2, vel_disp_zoom2 = create_random_zoom(self.label_masked, self.vel_disp_masked)
+        label_zoom2, vel_disp_zoom2, mask_zoom2 = create_random_zoom(self.label_masked, self.vel_disp_masked, self.mask)
 
         # Check that the outputs are identical
         np.testing.assert_array_equal(label_zoom1, label_zoom2)
         np.testing.assert_array_equal(vel_disp_zoom1, vel_disp_zoom2)
+        np.testing.assert_array_equal(mask_zoom1, mask_zoom2)
 
     def test_mask_interlopers(self):
         # Initialize input arrays
@@ -99,6 +103,9 @@ class TestMap(unittest.TestCase):
         # Ensure the mask is not entirely zero
         self.assertFalse(np.all(mask == 0), "Mask is entirely zero, which is unexpected")
         assert np.array_equal(mask, expected_mask)
+
+
+
 
 
 

@@ -1,48 +1,38 @@
+import os
+
 import numpy as np
+import pandas as pd
 from scipy import stats
+import matplotlib.pyplot as plt
 
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import logger
 
 
-def create_maps(r200_halo: float, spos_rot: np.ndarray, pos_rot: np.ndarray, vel_rot: np.array, type4: np.array):
+def create_maps(r200_halo: float, spos_rot: np.ndarray, pos_rot: np.ndarray, vel_rot: np.array, type4: np.array) -> dict:
     """
     Create 2D maps for particle properties in a halo based on their positions and velocities.
-
-    This function generates three different maps (X-Y, Y-Z, and X-Z projections) that display the
-    velocity dispersion of particles and the fraction of intracluster light (ICL) in each region of
-    the 2D space. The function also identifies interloper subhalos based on their positions within
-    a defined range.
 
     Parameters:
     -----------
     r200_halo : float
-        The R200 radius of the halo, which is used to define the vertical extent of the interloper
-        identification.
-    spos_rot : numpy.ndarray
-        An array of shape (N, 3) representing the rotated positions of subhalos in 3D space, where N
-        is the number of subhalos.
-    pos_rot : numpy.ndarray
-        An array of shape (M, 3) representing the rotated positions of particles in the primary subhalo,
-        where M is the number of particles.
-    vel_rot : numpy.ndarray
-        An array of shape (M, 3) representing the rotated velocities of particles in the primary
-        subhalo, corresponding to the positions in pos_rot.
-    type4 : numpy.ndarray
-        An array indicating the type of particles in the primary subhalo, where particles classified
-        as ICL are identified.
+        The R200 radius of the halo.
+    spos_rot : np.ndarray
+        An array of shape (N, 3) representing the rotated positions of subhalos in 3D space.
+    pos_rot : np.ndarray
+        An array of shape (M, 3) representing the rotated positions of particles.
+    vel_rot : np.ndarray
+        An array of shape (M, 3) representing the rotated velocities of particles.
+    type4 : np.ndarray
+        An array indicating the type of particles.
 
     Returns:
     --------
-    list
-        A list containing three tuples, each representing a map for the projections:
-        - Each tuple consists of:
-            - label_map: The fraction of ICL particles in the corresponding projection.
-            - vel_disp: The velocity dispersion of particles in the corresponding projection.
-            - bins: The bin edges used for creating the maps.
-    numpy.ndarray
-        An array containing the indices of interloper subhalos found within the defined spatial range.
+    dict
+        A dictionary containing:
+        - 'maps': A list of tuples, each representing a map for the projections.
+        - 'interlopers_id': An array containing the indices of interloper subhalos.
     """
     # r200_halo, spos_rot (posicion of subhalos), pos_rot and vel_rot position and velocity of particles in the
     # primary subhalo, type4 particles of primary subhalo that are ICL
@@ -53,8 +43,9 @@ def create_maps(r200_halo: float, spos_rot: np.ndarray, pos_rot: np.ndarray, vel
     # Considering as interloper any subhalo contained in a box defined by [-r, r] in the x and y directions and
     # inside [-R_200, R_200] along the z axis
 
-    interlopers_id = \
-    np.where((np.abs(spos_rot[:, 0]) < r) & (np.abs(spos_rot[:, 1]) < r) & (np.abs(spos_rot[:, 2]) < r200_halo))[0]
+    interlopers_id = np.where((np.abs(spos_rot[:, 0]) < r)
+                              & (np.abs(spos_rot[:, 1]) < r)
+                              & (np.abs(spos_rot[:, 2]) < r200_halo))[0]
 
     # removing first galaxy (central/BCG), since it's usually the central galaxy or BCG
     # TODO is it possible to have no interlopers ?
@@ -96,130 +87,132 @@ def create_maps(r200_halo: float, spos_rot: np.ndarray, pos_rot: np.ndarray, vel
     }
 
 
-def create_random_zoom(label_masked, vel_disp_masked):
+def create_random_zoom(label_masked: np.ndarray, vel_disp_masked: np.ndarray, mask: np.ndarray) \
+        -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Creates a random zoom of the masked labels and velocity dispersion maps.
 
-    This function selects a random central point in the 2D masked maps of labels
-    and velocity dispersion, and returns a smaller sub-region around that point
-    defined by a fixed size based on the number of bins calculated from the MUSE
-    observations.
-
     Parameters:
     ----------
-    label_masked : ndarray
-        A 2D array representing the masked labels of the particles or regions of interest.
+    label_masked : np.ndarray
+        A 2D array representing the masked labels.
 
-    vel_disp_masked : ndarray
-        A 2D array representing the masked velocity dispersion of the particles or regions of interest.
+    vel_disp_masked : np.ndarray
+        A 2D array representing the masked velocity dispersion.
 
     Returns:
     -------
     tuple
         A tuple containing:
-        - label_masked1 : ndarray
-            A smaller 2D array of masked labels centered around a random point.
-        - vel_disp_masked1 : ndarray
-            A smaller 2D array of masked velocity dispersion centered around the same random point.
+        - label_masked1 : np.ndarray
+            A smaller 2D array of masked labels.
+        - vel_disp_masked1 : np.ndarray
+            A smaller 2D array of masked velocity dispersion.
     """
     bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius
     xo, yo = (int(bins / 2), int(bins / 2))
     xoprime, yoprime = xo + np.random.randint(-20, 21), yo + np.random.randint(-20, 21)
-    vel_disp_masked1 = vel_disp_masked[xoprime - int(bins / 4):xoprime + int(bins / 4),
+
+    vel_disp_1 = vel_disp_masked[xoprime - int(bins / 4):xoprime + int(bins / 4),
                        yoprime - int(bins / 4): yoprime + int(bins / 4)]
-    label_masked1 = label_masked[xoprime - int(bins / 4):xoprime + int(bins / 4),
+
+    label_1 = label_masked[xoprime - int(bins / 4):xoprime + int(bins / 4),
                     yoprime - int(bins / 4): yoprime + int(bins / 4)]
-    return label_masked1, vel_disp_masked1
+
+    mask1 = mask[xoprime - int(bins / 4):xoprime + int(bins / 4),
+            yoprime - int(bins / 4):yoprime + int(bins / 4)]
+    return label_1, vel_disp_1, mask1
 
 
-def create_three_zoom(label_masked, vel_disp_masked, **kwargs):
+def create_n_zooms(label_masked: np.ndarray, vel_disp_masked: np.ndarray, **kwargs) -> None:
     """
     Creates and saves three random zooms of the masked labels and velocity dispersion maps.
 
-    This function generates three random sub-regions of the masked label and velocity
-    dispersion maps, saving each zoomed-in region to separate files. The file names
-    are constructed based on halo and subhalo identifiers, snapshot number, and projection.
-
     Parameters:
     ----------
-    label_masked : ndarray
-        A 2D array representing the masked labels of the particles or regions of interest.
+    label_masked : np.ndarray
+        A 2D array representing the masked labels.
 
-    vel_disp_masked : ndarray
-        A 2D array representing the masked velocity dispersion of the particles or regions of interest.
+    vel_disp_masked : np.ndarray
+        A 2D array representing the masked velocity dispersion.
 
     **kwargs : keyword arguments
         Additional parameters required for file naming:
         - idhalo : int
-            Identifier for the halo.
         - idsubhalo : int
-            Identifier for the subhalo.
         - projection : str
-            Projection type used in the analysis.
         - snapnum : int
-            Snapshot number for the simulation.
+        - n: int
+        - mask: np.ndarray
+        - rotation: str
 
     Returns:
     -------
     None
-        The function saves the zoomed maps as `.npz` files and does not return any value.
     """
     idhalo = kwargs["idhalo"]
     idsubhalo = kwargs["idsubhalo"]
     projection = kwargs["projection"]
     snapnum = kwargs["snapnum"]
+    n = kwargs["n"]
     mask = kwargs["mask"]
-    label_masked1, vel_disp_masked1 = create_random_zoom(label_masked, vel_disp_masked)
-    label_masked2, vel_disp_masked2 = create_random_zoom(label_masked, vel_disp_masked)
-    label_masked3, vel_disp_masked3 = create_random_zoom(label_masked, vel_disp_masked)
+    rotation = kwargs.get("rotation", None)
 
-    NAME_TO_SAVE = f"../data/npz/velocity_dispersion/halo-{idhalo}_subhalo-{idsubhalo}_snap{snapnum}_{projection}_"
-    np.savez(NAME_TO_SAVE + f"xyz-zoom1", vel_disp_masked1)
-    np.savez(NAME_TO_SAVE + f"xyz-zoom2", vel_disp_masked2)
-    np.savez(NAME_TO_SAVE + f"xyz-zoom3", vel_disp_masked3)
+    for i in range(n):
+        label_i, vel_disp_i, mask_i = create_random_zoom(label_masked, vel_disp_masked, mask)
 
-    NAME_TO_SAVE = f"../data/npz/labels/halo-{idhalo}_subhalo-{idsubhalo}_snap{snapnum}_{projection}_"
-    np.savez(NAME_TO_SAVE + f"xyz-zoom1", label_masked1)
-    np.savez(NAME_TO_SAVE + f"xyz-zoom2", label_masked2)
-    np.savez(NAME_TO_SAVE + f"xyz-zoom3", label_masked3)
+        # Expand the dimensions of the mask to match the shape of the other arrays
+        mask_expanded = np.expand_dims(mask_i, axis=-1)  # Shape: (H, W, 1)
+
+        # Expand the dimensions of vel_disp_i and label_i to make them 3D
+        vel_disp_i_expanded = np.expand_dims(vel_disp_i, axis=-1)  # Shape: (H, W, 1)
+        label_i_expanded = np.expand_dims(label_i, axis=-1)  # Shape: (H, W, 1)
+
+        # Concatenate the mask as an additional channel to the zoomed arrays
+        vel_disp_with_mask = np.concatenate((vel_disp_i_expanded, mask_expanded), axis=-1)  # Shape: (H, W, 2)
+        label_with_mask = np.concatenate((label_i_expanded, mask_expanded), axis=-1)  # Shape: (H, W, 2)
+
+        if rotation is not None:
+            path_vel = f"../data/npz/velocity_dispersion/halo-{idhalo}_subhalo-{idsubhalo}_snap{snapnum}_rotation_{rotation}_{projection}_zoom_{i}"
+            path_icl = f"../data/npz/labels/halo-{idhalo}_subhalo-{idsubhalo}_snap{snapnum}_rotation_{rotation}_{projection}_zoom_{i}"
+
+        else:
+            path_vel = f"../data/npz/velocity_dispersion/halo-{idhalo}_subhalo-{idsubhalo}_snap{snapnum}_{projection}_zoom_{i}"
+            path_icl = f"../data/npz/labels/halo-{idhalo}_subhalo-{idsubhalo}_snap{snapnum}_{projection}_zoom_{i}"
+
+        np.savez(path_vel, vel_disp_with_mask)
+        np.savez(path_icl, label_with_mask)
 
 
-def get_interlopers_mask(label, vel_disp, spos_rot, shmr, interlopers_id, biny):
+def get_interlopers_mask(label: np.ndarray, vel_disp: np.ndarray, spos_rot: np.ndarray, shmr: pd.DataFrame,
+                         interlopers_id: np.ndarray, biny: np.ndarray) -> np.ndarray:
     """
     Create a mask to identify and exclude interloper subhalos from calculations.
 
-    Interlopers are subhalos that appear close to a primary subhalo but are not physically associated
-    with it. This function generates a mask that excludes these interloper subhalos from the provided
-    label and velocity dispersion arrays based on their spatial positions and radii.
-
     Parameters:
     ----------
-    label : ndarray
-        A 2D array representing the labels of the particles or regions of interest.
+    label : np.ndarray
+        A 2D array representing the labels of the particles.
 
-    vel_disp : ndarray
-        A 2D array representing the velocity dispersion of the particles in the primary subhalo.
+    vel_disp : np.ndarray
+        A 2D array representing the velocity dispersion.
 
-    spos_rot : ndarray
+    spos_rot : np.ndarray
         A 2D array containing the spatial positions of each subhalo.
 
-    shmr : DataFrame
-        A DataFrame containing the SubhaloHalfmassRadType of subhalos within the current halo.
+    shmr : pd.DataFrame
+        A DataFrame containing the SubhaloHalfmassRadType of subhalos.
 
-    interlopers_id : list or ndarray
-        An array or list of identifiers for the interloper subhalos.
+    interlopers_id : np.ndarray
+        An array of identifiers for the interloper subhalos.
 
-    biny : ndarray
+    biny : np.ndarray
         An array representing the y-coordinates for the masking grid.
 
     Returns:
     -------
-    tuple
-        A tuple containing:
-        - label_masked : ndarray
-            A masked array of the labels, with interloper regions excluded.
-        - vel_disp_masked : ndarray
-            A masked array of the velocity dispersions, with interloper regions excluded.
+    np.ndarray
+        A boolean mask identifying interloper regions.
     """
     bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius for the grid
     maschera = np.zeros_like(label)
@@ -255,9 +248,44 @@ def get_interlopers_mask(label, vel_disp, spos_rot, shmr, interlopers_id, biny):
     return maschera
 
 
-def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloParticles, id_halo, id_subhalo, spos_rot,
-                          shmr_h, type4, snapnum):
+def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloParticles, id_halo: int,
+                          id_subhalo: int, spos_rot: np.ndarray, shmr_h: pd.DataFrame, type4: np.ndarray, snapnum: int,
+                          rotation: str
+                          ) -> None:
+    """
+    Create maps for projections xy, yz, and xz, and save random zooms for each projection.
+
+    Parameters:
+    -----------
+    halo_context : HaloContext
+        The context containing halo information, including r200.
+    subhalo_particles : SubhaloParticles
+        The particles associated with the subhalo.
+    id_halo : int
+        The ID of the halo.
+    id_subhalo : int
+        The ID of the subhalo.
+    spos_rot : np.ndarray
+        The positions of particles
+    shmr_h : pd.DataFrame
+        Stellar halo mass ratio for each particle.
+    type4 : np.ndarray
+        Masking of the particles belonging to icl
+    snapnum : int
+        Snapshot number.
+    rotation : str
+        String with the rotation degree and the iteration until completing 360º
+
+    Returns:
+    --------
+    None
+    """
     logger.info("--> Creating maps for projections xy, yz and xz...")
+
+    # Check if spos_rot is a NumPy array, if not, convert it
+    if not isinstance(spos_rot, np.ndarray):
+        spos_rot = spos_rot.to_numpy()  # Convert DataFrame to a NumPy array
+
     result = create_maps(halo_context.r200[id_halo], spos_rot, subhalo_particles.p, subhalo_particles.v, type4)
     label_vel_biny_projections = result["maps"]
     interlopers_id = result["interlopers_id"]
@@ -269,18 +297,14 @@ def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloP
         mask = get_interlopers_mask(label_i, vel_disp_i, spos_rot, shmr_h, interlopers_id, biny_i)
         logger.info("---> Saving three random zooms for icl fraction and velocity "
                     f"dispersion for proyection {projection}...")
-        create_three_zoom(label_i, vel_disp_i, idhalo=id_halo, mask=mask,
-                          idsubhalo=id_subhalo, projection=projection, snapnum=snapnum)
+        create_n_zooms(label_i, vel_disp_i, idhalo=id_halo, mask=mask,
+                       idsubhalo=id_subhalo, projection=projection, snapnum=snapnum, n=3, rotation=rotation)
 
 
-def circle(x, y, h, k, r):
+def circle(x: float, y: float, h: float, k: float, r: float) -> float:
     """
     Check if a point (x, y) lies within a circle defined by its center (h, k)
     and radius r.
-
-    This function determines the relative position of a point to a circle.
-    If the point lies within or on the boundary of the circle, it will return a value
-    indicating that condition. Angles (if used) should be in radians.
 
     Parameters:
     -----------
@@ -306,13 +330,9 @@ def circle(x, y, h, k, r):
     return ((x - h) ** 2 + (y - k) ** 2) / r ** 2
 
 
-def muse_bins_r(fov, spatial_resolution):
+def muse_bins_r(fov: float, spatial_resolution: float) -> tuple[int, float]:
     """
     Calculate the number of bins and the radius for MUSE observations.
-
-    This function computes the number of bins required to cover a specified
-    field of view (fov) based on a given spatial resolution. It also calculates
-    the radius of the field of view, which is half of the fov.
 
     Parameters:
     -----------
@@ -339,3 +359,47 @@ def muse_bins_r(fov, spatial_resolution):
     bins = int(fov / spatial_resolution)  # Number of bins along one axis
     r = fov / 2  # Radius of the field of view
     return bins, r
+
+
+def generate_img_dataset(input_dirs: list[str], output_dirs: list[str]) -> None:
+    """
+    Generate a dataset of images from .npz files in the specified input directories
+    and save them as PNG files in the corresponding output directories.
+
+    Parameters:
+    -----------
+    input_dirs : list[str]
+        A list of directories containing the .npz files.
+    output_dirs : list[str]
+        A list of directories where the generated PNG files will be saved.
+
+    Returns:
+    --------
+    None
+    """
+    assert len(input_dirs) == len(output_dirs)
+
+    for i in range(len(input_dirs)):
+        input_dir = input_dirs[i]
+        output_dir = output_dirs[i]
+
+        # Iterate through all .npz files in the input directory
+        for filename in os.listdir(input_dir):
+            if filename.endswith('.npz'):
+                file_path = os.path.join(input_dir, filename)
+
+                # Load the npz file
+                with np.load(file_path) as data:
+                    for array_name in data.files:
+                        array = data[array_name]
+
+                        if array.ndim == 3 and array.shape[2] == 2:  # Ensure the array has 3 dimensions and 2 channels
+                            # Select the first channel (or second, based on your needs)
+                            image_to_plot = array[:, :, 0]  # Ignore the third dimension
+                            # Plot and save as PNG
+                            plt.imshow(image_to_plot)
+                            plt.axis('off')  # Hide axis
+                            png_filename = os.path.splitext(filename)[0] + f'_{array_name}.png'
+                            plt.savefig(os.path.join(output_dir, png_filename), bbox_inches='tight', pad_inches=0)
+                            plt.close()  # Close the plot to free memory
+    print("Conversion complete!")

@@ -1,6 +1,8 @@
 import hashlib
 import logging
 import os
+import re
+from typing import List, Tuple
 
 import joblib
 import numpy as np
@@ -13,6 +15,9 @@ from src.data_generation.src.subhalo import SubhaloParticles
 
 
 def setup_logger():
+    """
+    Configures and returns a logger to capture debugging and information logs.
+    """
     # Configure logging
     logging.basicConfig(
         level=logging.DEBUG,  # Set the logging level to DEBUG to capture all levels
@@ -29,7 +34,8 @@ def setup_logger():
 logger = setup_logger()
 
 
-def label_particles(subhalo_particles: SubhaloParticles, halo_context: HaloContext, id_halo: int):
+def label_particles(subhalo_particles: SubhaloParticles, halo_context: HaloContext, id_halo: int) \
+        -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Classify particles as belonging to the Brightest Cluster Galaxy (BCG) or Intracluster Light (ICL).
 
@@ -103,7 +109,22 @@ def label_particles(subhalo_particles: SubhaloParticles, halo_context: HaloConte
     return df_bcg, df_icl
 
 
-def get_icl_mask(df_icl, m):
+def get_icl_mask(df_icl: pd.DataFrame, m: np.ndarray) -> np.ndarray:
+    """
+    Creates a mask array for ICL particles based on the provided DataFrame of ICL indices.
+
+    Parameters:
+    -----------
+    df_icl : pd.DataFrame
+        DataFrame containing indices of ICL particles.
+    m : np.ndarray
+        Array representing masses of the particles.
+
+    Returns:
+    --------
+    np.ndarray
+        An array of the same shape as `m` where ICL particle positions are marked with 1 and others with 0.
+    """
     type4 = np.zeros_like(m)
     if df_icl.size > 0:  # Check if df_icl is not empty
         try:
@@ -118,7 +139,7 @@ def get_icl_mask(df_icl, m):
     return type4
 
 
-def hash_image(image_path):
+def hash_image(image_path: str) -> str:
     """
     Generate a hash for an image.
 
@@ -135,16 +156,21 @@ def hash_image(image_path):
         return hashlib.md5(img_data).hexdigest()
 
 
-def find_duplicates_in_halo(image_dir, idhalo):
+def find_duplicates_in_halo(image_dir: str, idhalo: str) -> List:
     """
-    Find duplicated images in a specified directory (halo).
+    Finds duplicated images within a specified directory that match a given halo identifier.
 
-    Args:
-        image_dir (str): The directory containing the images.
-        idhalo (str): The identifier for the halo to filter images.
+    Parameters:
+    -----------
+    image_dir : str
+        The directory containing the images to check for duplicates.
+    idhalo : str
+        The halo identifier used to filter images for duplication checks.
 
     Returns:
-        list: A list of tuples, each containing the filenames of duplicated images.
+    --------
+    list
+        A list of tuples, each containing the filenames of duplicated images.
     """
     hashes = {}
     duplicates = []
@@ -162,4 +188,58 @@ def find_duplicates_in_halo(image_dir, idhalo):
                     hashes[image_hash] = filename  # Store the original filename
     return duplicates
 
+
+def compute_intrahalo_variance(input_dir: str) -> pd.DataFrame:
+    """
+    Computes the intrahalo variance for particle classifications and velocity dispersion maps
+    based on multiple zooms per subhalo within a specified directory.
+
+    Parameters:
+    -----------
+    input_dir : str
+        Directory path where the zoom data (.npz files) for each subhalo is stored.
+
+    Returns:
+    --------
+    pd.DataFrame
+        A DataFrame containing the intrahalo variances for labels and velocity dispersion per halo.
+    """
+    pattern = r"^halo-(\d+)_.*\.npz$"
+    matched_files = []
+
+    # Iterate over all files in the directory
+    for filename in os.listdir(input_dir):
+        if re.match(pattern, filename):
+            matched_files.append(filename)
+
+    maps = {}
+
+    for file in matched_files:
+        match = re.search(pattern, file)
+        halo_id = int(match.group(1))  # Extract halo ID
+        full_path_icl = os.path.join(input_dir, file)
+        full_path_vel = full_path_icl.replace('labels', 'velocity_dispersion')
+
+        if os.path.exists(full_path_icl) and os.path.exists(full_path_vel):
+            with np.load(full_path_icl) as label_data, np.load(full_path_vel) as vel_disp_data:
+                if halo_id not in maps:
+                    maps[halo_id] = {"label_zooms": [], "vel_disp_zooms": []}
+                maps[halo_id]["label_zooms"].append(label_data['arr_0'][:, :, :2])
+                maps[halo_id]["vel_disp_zooms"].append(vel_disp_data['arr_0'][:, :, :2])
+
+    df = pd.DataFrame(columns=["halo_id", "icl_variance", "vel_variance"])
+
+    for halo_id, values in maps.items():
+        # Stack zooms and calculate variance
+        label_zooms_stacked = np.stack(values["label_zooms"], axis=0)  # Shape: (n_zooms, H, W, 2)
+        vel_disp_zooms_stacked = np.stack(values["vel_disp_zooms"], axis=0)  # Shape: (n_zooms, H, W, 2)
+
+        # Compute variance across the zoom dimension (axis=0)
+        label_variance = np.var(label_zooms_stacked, axis=0).mean()  # Single variance value for labels
+        vel_disp_variance = np.var(vel_disp_zooms_stacked, axis=0).mean()  # Single variance value for velocity dispersion
+
+        # Append the row with halo ID and variances
+        df = pd.concat([df, pd.DataFrame({"halo_id": [halo_id], "icl_variance": [label_variance], "vel_variance": [vel_disp_variance]})], ignore_index=True)
+
+    return df
 
