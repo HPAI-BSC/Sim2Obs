@@ -241,5 +241,6 @@ def compute_intrahalo_variance(input_dir: str) -> pd.DataFrame:
         # Append the row with halo ID and variances
         df = pd.concat([df, pd.DataFrame({"halo_id": [halo_id], "icl_variance": [label_variance], "vel_variance": [vel_disp_variance]})], ignore_index=True)
 
+    df = df.sort_values(by="halo_id")
     return df
 
