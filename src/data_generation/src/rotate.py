@@ -224,12 +224,12 @@ def apply_rotation(rotation_groups: List, subhalo_particles: SubhaloParticles,
     logger.info("Rotating positions and velocities ...")
     for row in rotation_groups:
         degree_0, z, rotation_directions = row
-        iterations = 360 // degree_0 - 1
+        iterations = 360 // degree_0
         logger.debug(f"{iterations} rotations of {degree_0} degrees of axis: {z} over axis:"
                      f" {rotation_directions}")
 
         for rotation_axis in rotation_directions:
-            degree = degree_0
+            degree = 0
             for i in range(iterations):
                 logger.debug(f'--> Rotation: {i}, degrees: {degree}')
                 z = np.array(z)
