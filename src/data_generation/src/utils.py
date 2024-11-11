@@ -3,15 +3,20 @@ import logging
 import os
 import re
 from typing import List, Tuple
+import eagleSqlTools as sql
 
 import joblib
 import numpy as np
 import pandas as pd
 from PIL import Image
+from dotenv import load_dotenv
 
 from src.data_generation.src.constants import G
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloParticles
+
+
+load_dotenv('../.env')
 
 
 def setup_logger():
@@ -32,6 +37,13 @@ def setup_logger():
 
 
 logger = setup_logger()
+
+
+def get_connection():
+    username = os.getenv("USERNAME")
+    password = os.getenv("PASSWORD")
+    con = sql.connect(username, password)
+    return con
 
 
 def label_particles(subhalo_particles: SubhaloParticles, halo_context: HaloContext, id_halo: int) \
