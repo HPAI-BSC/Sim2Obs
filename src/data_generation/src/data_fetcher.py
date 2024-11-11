@@ -215,7 +215,7 @@ class EagleFetcher(DataFetcher):
         conn = get_connection()
         query = f"""
             SELECT
-                SH.SubGroupNumber AS subhalo_id, -- Subhalo identifier within the halo
+                SH.GroupID AS halo_id, -- Subhalo identifier within the halo
                 SUM(SH.MassType_Star) AS total_stellar_mass, -- Total stellar mass in the subhalo
                 AVG(SH.HalfMassRad_Star) AS avg_stellar_half_mass_radius, -- Average stellar half-mass radius in the subhalo
                 AVG(SH.CentreOfPotential_x) AS avg_subhalo_pos_x, -- Average X coordinate of subhalo's center
@@ -227,21 +227,22 @@ class EagleFetcher(DataFetcher):
                 SH.MassType_Star > {SUBHALO_MIN_MASS} -- Minimum subhalo stellar mass threshold
                 AND SH.SnapNum = {SNAPNUM_EAGLE} -- Snapshot for redshift ~0.3
             GROUP BY
-                SH.SubGroupNumber -- Group only by subhalo id
+                SH.GroupID -- Group only by halo id
             ORDER BY
-                SH.SubGroupNumber ASC -- Order results by subhalo id
+                SH.GroupID ASC -- Order results by subhalo id
             """
         array = sql.execute_query(conn, query)
         df = pd.DataFrame(array)
         spos = df.apply(lambda row: np.array([row['avg_subhalo_pos_x'], row['avg_subhalo_pos_y'],
                                               row['avg_subhalo_pos_z']]), axis=1).values
         spos = np.vstack(spos)
-        grnr = df['subhalo_id'].values
+        grnr = df['halo_id'].values
         shmr = df['avg_stellar_half_mass_radius'].values
         mstr = df['total_stellar_mass'].values
         subhalo_context = SubhaloContext(spos, grnr, shmr, mstr, scalf, H)
         return subhalo_context
 
+    # TODO check if this is correct
     def _get_p_subhalo(self, simulation_code: str, subhalo_id: int, scalf: float):
         conn = get_connection()
         query = f"""
@@ -252,7 +253,7 @@ class EagleFetcher(DataFetcher):
                 SH.CentreOfPotential_x AS subhalo_pos_x, -- X coordinate of subhalo's center
                 SH.CentreOfPotential_y AS subhalo_pos_y, -- Y coordinate of subhalo's center
                 SH.CentreOfPotential_z AS subhalo_pos_z, -- Z coordinate of subhalo's center
-                SH.GroupID AS group_id, -- ID of halo parent
+                SH.GroupID AS halo_id, -- ID of halo parent
                 SH.Velocity_x AS particle_vel_x,     -- X velocity of the particle
                 SH.Velocity_y AS particle_vel_y,     -- Y velocity of the particle
                 SH.Velocity_z AS particle_vel_z      -- Z velocity of the particle
