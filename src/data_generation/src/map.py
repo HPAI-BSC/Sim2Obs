@@ -5,6 +5,7 @@ import pandas as pd
 from scipy import stats
 import matplotlib.pyplot as plt
 
+from src.data_generation.src.constants import CATALOG
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import logger
@@ -141,7 +142,6 @@ def create_n_zooms(label_masked: np.ndarray, vel_disp_masked: np.ndarray, **kwar
         - idhalo : int
         - idsubhalo : int
         - projection : str
-        - snapnum : int
         - n: int
         - mask: np.ndarray
         - rotation: str
@@ -153,7 +153,6 @@ def create_n_zooms(label_masked: np.ndarray, vel_disp_masked: np.ndarray, **kwar
     idhalo = kwargs["idhalo"]
     idsubhalo = kwargs["idsubhalo"]
     projection = kwargs["projection"]
-    snapnum = kwargs["snapnum"]
     n = kwargs["n"]
     mask = kwargs["mask"]
     rotation = kwargs.get("rotation", None)
@@ -173,12 +172,12 @@ def create_n_zooms(label_masked: np.ndarray, vel_disp_masked: np.ndarray, **kwar
         label_with_mask = np.concatenate((label_i_expanded, mask_expanded), axis=-1)  # Shape: (H, W, 2)
 
         if rotation is not None:
-            path_vel = f"../data/npz/velocity_dispersion/halo-{idhalo}_subhalo-{idsubhalo}_snap{snapnum}_rotation_{rotation}_{projection}_zoom_{i}"
-            path_icl = f"../data/npz/labels/halo-{idhalo}_subhalo-{idsubhalo}_snap{snapnum}_rotation_{rotation}_{projection}_zoom_{i}"
+            path_vel = f"../data/npz/velocity_dispersion/halo-{idhalo}_subhalo-{idsubhalo}_{CATALOG}_rotation_{rotation}_{projection}_zoom_{i}"
+            path_icl = f"../data/npz/labels/halo-{idhalo}_subhalo-{idsubhalo}_{CATALOG}_rotation_{rotation}_{projection}_zoom_{i}"
 
         else:
-            path_vel = f"../data/npz/velocity_dispersion/halo-{idhalo}_subhalo-{idsubhalo}_snap{snapnum}_{projection}_zoom_{i}"
-            path_icl = f"../data/npz/labels/halo-{idhalo}_subhalo-{idsubhalo}_snap{snapnum}_{projection}_zoom_{i}"
+            path_vel = f"../data/npz/velocity_dispersion/halo-{idhalo}_subhalo-{idsubhalo}_{CATALOG}_{projection}_zoom_{i}"
+            path_icl = f"../data/npz/labels/halo-{idhalo}_subhalo-{idsubhalo}_{CATALOG}_{projection}_zoom_{i}"
 
         np.savez(path_vel, vel_disp_with_mask)
         np.savez(path_icl, label_with_mask)
@@ -249,8 +248,7 @@ def get_interlopers_mask(label: np.ndarray, vel_disp: np.ndarray, spos_rot: np.n
 
 
 def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloParticles, id_halo: int,
-                          id_subhalo: int, spos_rot: np.ndarray, shmr_h: pd.DataFrame, type4: np.ndarray, snapnum: int,
-                          rotation: str
+                          id_subhalo: int, spos_rot: np.ndarray, shmr_h: pd.DataFrame, type4: np.ndarray, rotation: str
                           ) -> None:
     """
     Create maps for projections xy, yz, and xz, and save random zooms for each projection.
@@ -271,8 +269,6 @@ def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloP
         Stellar halo mass ratio for each particle.
     type4 : np.ndarray
         Masking of the particles belonging to icl
-    snapnum : int
-        Snapshot number.
     rotation : str
         String with the rotation degree and the iteration until completing 360º
 
@@ -298,7 +294,7 @@ def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloP
         logger.info("---> Saving three random zooms for icl fraction and velocity "
                     f"dispersion for proyection {projection}...")
         create_n_zooms(label_i, vel_disp_i, idhalo=id_halo, mask=mask,
-                       idsubhalo=id_subhalo, projection=projection, snapnum=snapnum, n=3, rotation=rotation)
+                       idsubhalo=id_subhalo, projection=projection, n=3, rotation=rotation)
 
 
 def circle(x: float, y: float, h: float, k: float, r: float) -> float:

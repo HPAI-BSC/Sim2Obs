@@ -192,7 +192,7 @@ def rotate_particles(subhalo_particles: SubhaloParticles, spos: pd.DataFrame, ro
 
 def apply_rotation(rotation_groups: List, subhalo_particles: SubhaloParticles,
                    halo_context: HaloContext, df_icl: pd.DataFrame, spos_h: pd.DataFrame,
-                   shmr_h: pd.DataFrame, snapnum: int, id_halo: int, id_subhalo: int) -> None:
+                   shmr_h: pd.DataFrame, id_halo: int, id_subhalo: int) -> None:
     """
     Rotate particle positions and velocities based on specified rotation groups.
 
@@ -210,8 +210,6 @@ def apply_rotation(rotation_groups: List, subhalo_particles: SubhaloParticles,
         Array representing the positions of subhalos or particles.
     shmr_h : pd.DataFrame
         Array representing the subhalo mass ratios.
-    snapnum : int
-        Snapshot number for referencing data.
     id_halo : int
         ID of the halo being processed.
     id_subhalo : int
@@ -242,4 +240,4 @@ def apply_rotation(rotation_groups: List, subhalo_particles: SubhaloParticles,
                 # Create a masking array for BCG and ICL (BCG==0, ICL==1)
                 type4 = get_icl_mask(df_icl, subhalo_particles.m)
                 create_maps_and_zooms(halo_context, subhalo_particles_rotated, id_halo, id_subhalo,
-                                      spos_rot, shmr_h, type4, snapnum, rotation=f"{degree_0}_{i}")
+                                      spos_rot, shmr_h, type4, rotation=f"{degree_0}_{i}")
