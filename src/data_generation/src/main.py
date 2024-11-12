@@ -3,8 +3,7 @@ import pandas as pd
 import warnings
 
 from map import create_maps_and_zooms, generate_img_dataset
-from src.data_generation.src.constants import HALO_MIN_MASS, H, SUBHALO_ERROR_ID, SUBHALO_MIN_MASS, \
-    SIMULATION_CODE, CATALOG, PATH
+from src.data_generation.src.constants import HALO_MIN_MASS, H, SUBHALO_ERROR_ID, SUBHALO_MIN_MASS, ARG, CATALOG
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 from src.data_generation.src.rotate import apply_rotation
 from src.data_generation.src.utils import setup_logger, label_particles, get_icl_mask
@@ -18,8 +17,7 @@ if __name__ == '__main__':
     # rotation_groups = [[90, [0, 0, 1], [[1, 0, 0]]]]
 
     logger = setup_logger()
-    arg = SIMULATION_CODE  # or PATH when selecting Illustris
-    fetcher = DataFetcherFactory.get_data_fetcher(catalog=CATALOG, arg=arg)
+    fetcher = DataFetcherFactory.get_data_fetcher(catalog=CATALOG, arg=ARG)
 
     halo_context = fetcher.get_halos()
     logger.info(f'Number of halos in the snapshot: {len(halo_context.r200)}')

@@ -1,7 +1,7 @@
 import unittest
 from dotenv import load_dotenv
 
-from src.data_generation.src.constants import PATH, SIMULATION_CODE
+from src.data_generation.src.constants import PATH
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
@@ -12,7 +12,7 @@ load_dotenv('../.env')
 class TestFetcher(unittest.TestCase):
     def setUp(self):
         self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(catalog="illustris-300", arg=PATH)
-        self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(catalog="eagle", arg=SIMULATION_CODE)
+        self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(catalog="eagle", arg="RefL0100N1504")
 
     def test_get_halos(self):
         halo_context_1 = self.fetcher_illustris.get_halos()
