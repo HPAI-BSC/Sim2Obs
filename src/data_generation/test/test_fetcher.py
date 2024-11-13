@@ -60,3 +60,4 @@ class TestFetcher(unittest.TestCase):
         self.assertTrue(
             subhalo_particles_2.p.shape[1] == subhalo_particles_2.v.shape[1]
         )
+

@@ -83,11 +83,22 @@ class Illustris300Fetcher(DataFetcher):
                     The index of the first subhalo in each halo.
             If `fields` is provided, returns an array of halo data corresponding to the specified fields.
         """
+        # Units of measure -> [10^10𝑀⊙/ℎ, 𝑐𝑘𝑝𝑐/ℎ, 𝑐𝑘𝑝𝑐/ℎ, int]
         fields = ["Group_M_Crit200", "Group_R_Crit200", "GroupPos", "GroupFirstSub"]
         halos = il.groupcat.loadHalos(base_path, SNAPNUM_ILLUSTRIS, fields=fields)
+        halos['pos_x'], halos['pos_y'], halos['pos_z'] = np.split(halos["GroupPos"], 3, axis=1)
+        halos['pos_x'] = halos['pos_x'].flatten()
+        halos['pos_y'] = halos['pos_y'].flatten()
+        halos['pos_z'] = halos['pos_z'].flatten()
+        del halos["GroupPos"]
+        halos = pd.DataFrame.from_dict(halos)
+        halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * SOLAR_MASS_CONVERSION # 𝑀⊙/ℎ
+
+        # Filter halos by min mass
+        halos = halos[halos['Group_M_Crit200'] > HALO_MIN_MASS * H]
         r200 = halos["Group_R_Crit200"]
-        m200 = halos["Group_M_Crit200"] * SOLAR_MASS_CONVERSION
-        gpos = halos["GroupPos"]
+        m200 = halos["Group_M_Crit200"]
+        gpos = np.vstack(halos.apply(lambda row: np.array([row['pos_x'], row['pos_y'], row['pos_z']]), axis=1).values)
         fsub = halos["GroupFirstSub"]
         return HaloContext(r200, m200, gpos, fsub, SCALF_ILLUSTRIS, None)
 
@@ -118,13 +129,15 @@ class Illustris300Fetcher(DataFetcher):
                 The mass of stars in each subhalo.
             If `fields` is provided, returns a dictionary of subhalo data corresponding to the specified fields.
         """
+        # Units of measure -> [𝑐𝑘𝑝𝑐/ℎ, int, 𝑐𝑘𝑝𝑐/ℎ, 10^10𝑀⊙/ℎ]
         fields = ["SubhaloPos", "SubhaloGrNr", "SubhaloHalfmassRadType", "SubhaloMassType"]
         halos = il.groupcat.loadSubhalos(base_path, SNAPNUM_ILLUSTRIS, fields=fields)
         spos = halos["SubhaloPos"]
         grnr = halos["SubhaloGrNr"]
         shmr = halos["SubhaloHalfmassRadType"][:, 4]  # stars
-        mstr = halos["SubhaloMassType"][:, 4] * SOLAR_MASS_CONVERSION
-        return SubhaloContext(spos, grnr, shmr, mstr, SCALF_ILLUSTRIS, H)
+        mstr = halos["SubhaloMassType"][:, 4] * SOLAR_MASS_CONVERSION / H # 𝑀⊙
+
+        return SubhaloContext(spos, grnr, shmr, mstr, SCALF_ILLUSTRIS)
 
     def _get_p_subhalo(self, base_path: str, isubhalo: int) -> SubhaloParticles:
         """
@@ -154,11 +167,12 @@ class Illustris300Fetcher(DataFetcher):
                 The velocities of the particles in the subhalo.
             If `fields` is provided, returns a dictionary of particle data corresponding to the specified fields.
         """
+        # Units of measure [𝑐𝑘𝑝𝑐/ℎ, 𝑘𝑚𝑎‾√/𝑠, 10^10𝑀⊙/ℎ]
         fields = ["Coordinates", "Velocities", "Masses"]
         star_p = il.snapshot.loadSubhalo(base_path, SNAPNUM_ILLUSTRIS, isubhalo, "star", fields=fields)
         p = star_p["Coordinates"]
-        v = star_p["Velocities"] * np.sqrt(SCALF_ILLUSTRIS)
-        m = star_p["Masses"] * SOLAR_MASS_CONVERSION / H
+        v = star_p["Velocities"] * np.sqrt(SCALF_ILLUSTRIS) # 𝑘𝑚𝑎‾√/𝑠 -> kms-1
+        m = star_p["Masses"] * SOLAR_MASS_CONVERSION
 
         return SubhaloParticles(m, p, v, SCALF_ILLUSTRIS)
 
@@ -171,7 +185,7 @@ class EagleFetcher(DataFetcher):
         return self._get_halos(self.simulation_code, SCALF_EAGLE)
 
     def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
-        return self._get_subhalos(self.simulation_code, SCALF_EAGLE, H)
+        return self._get_subhalos(self.simulation_code, SCALF_EAGLE)
 
     def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
         idsubhalo = kwargs.get('idsubhalo', None)
@@ -218,6 +232,7 @@ class EagleFetcher(DataFetcher):
                 """
         # Run the query
         array = sql.execute_query(conn, query)
+        # Units of measure [m200=M⊙, r200=pkpc, gpos=cMpc]
         df = pd.DataFrame(array)
 
         # Normalize halo_id for preprocessing (same str. than Illustris),
@@ -227,17 +242,18 @@ class EagleFetcher(DataFetcher):
         halo_ids = pd.DataFrame({'halo_id': range(df['halo_id'].min(), df['halo_id'].max() + 1)})
         df = pd.merge(halo_ids, df, on='halo_id', how='left')
 
-        gpos = df.apply(lambda row: np.array([row['pos_x'], row['pos_y'], row['pos_z']]), axis=1)
+        # pkps -> ckps / h
+        gpos = df.apply(lambda row: np.array([row['pos_x'] / H, row['pos_y'] / H, row['pos_z'] / H]), axis=1)
         gpos = np.vstack(gpos)
-        r200 = df['r200'].values
-        m200 = df['m200'].values
+        r200 = df['r200'].values / H    # pkps -> ckps / h
+        m200 = df['m200'].values / H    # 𝑀⊙/ℎ
         halo_id = df['halo_id'].values
         fsub = df['max_subhalo_id'].values
 
         halo_context = HaloContext(r200, m200, gpos, fsub, scale_factor=scalf, halo_id=halo_id)
         return halo_context
 
-    def _get_subhalos(self, simulation_code: str, scalf: float, H: float) -> SubhaloContext:
+    def _get_subhalos(self, simulation_code: str, scalf: float) -> SubhaloContext:
         conn = get_connection()
         query = f"""
             SELECT
@@ -266,19 +282,21 @@ class EagleFetcher(DataFetcher):
         # Executing the join is important so we ensure that we are selecting subhalos that are child of valid halos
         array = sql.execute_query(conn, query)
         df = pd.DataFrame(array)
+        # Units of measure [avg_stellar_half_mass_radius=pkpc, total_stellar_mass=M⊙, spos=cMpc]
 
         # Normalize halo_id for preprocessing (same str. than Illustris)
         n = df.iloc[0, :]['halo_id']
         df['halo_id'] = df['halo_id'].apply(lambda x: x - n)
         df['halo_id'] = df['halo_id'].astype(int)
 
-        spos = df.apply(lambda row: np.array([row['avg_subhalo_pos_x'], row['avg_subhalo_pos_y'],
-                                              row['avg_subhalo_pos_z']]), axis=1).values
+        # pkps -> ckps / h
+        spos = df.apply(lambda row: np.array([row['avg_subhalo_pos_x'] / H, row['avg_subhalo_pos_y'] / H,
+                                              row['avg_subhalo_pos_z'] / H]), axis=1).values
         spos = np.vstack(spos)
         grnr = df['halo_id'].values
-        shmr = df['avg_stellar_half_mass_radius'].values
+        shmr = df['avg_stellar_half_mass_radius'].values / H  # pkps -> ckps / h
         mstr = df['total_stellar_mass'].values
-        subhalo_context = SubhaloContext(spos, grnr, shmr, mstr, scalf, H)
+        subhalo_context = SubhaloContext(spos, grnr, shmr, mstr, scalf)
         return subhalo_context
 
     def _get_p_subhalo(self, simulation_code: str, subhalo_id: int, scalf: float):
@@ -311,15 +329,17 @@ class EagleFetcher(DataFetcher):
             """
         array = sql.execute_query(conn, query)
         df = pd.DataFrame(array)
+        # Units of measure [stellar_mass=M⊙, positions=cMpc, velocities=kms−1]
 
         # Normalize halo_id for preprocessing (same str. than Illustris),
         n = df.iloc[0, :]['halo_id']
         df['halo_id'] = df['halo_id'].apply(lambda x: x - n)
         df['halo_id'] = df['halo_id'].astype(int)
 
-        m = df['stellar_mass'].values
-        p = df.apply(lambda row: np.array([row['subhalo_pos_x'], row['subhalo_pos_y'],
-                                           row['subhalo_pos_z']]), axis=1).values
+        m = df['stellar_mass'].values * H   # 𝑀⊙/ℎ
+        # pkps -> ckps / h
+        p = df.apply(lambda row: np.array([row['subhalo_pos_x'] / H, row['subhalo_pos_y'] / H,
+                                           row['subhalo_pos_z'] / H]), axis=1).values
         p = np.vstack(p)
         v = df.apply(lambda row: np.array([row['particle_vel_x'], row['particle_vel_y'],
                                            row['particle_vel_z']]), axis=1).values
