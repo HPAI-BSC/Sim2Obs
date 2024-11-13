@@ -19,4 +19,11 @@ H = 0.6774
 # Data extraction
 CATALOG = "eagle"           # or "illustris-300"
 ARG = "RefL0100N1504"       # or PATH when selecting Illustris
+PARTICLES_PATH = {
+    "RefL0025N0376": "/Users/martabarrosoisidoro/RefL0025N0376/snapshot_026_z000p183"
+    # TODO
+}
+
+# Illustris
 PATH = "/Users/martabarrosoisidoro/Illustris-3/output"
+

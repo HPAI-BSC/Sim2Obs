@@ -33,6 +33,12 @@ class TestFetcher(unittest.TestCase):
             halo_context_2.fsub.shape[0]
         )
 
+        # get_item
+        halo_data_1 = halo_context_1.get_item(halo_id=0)
+        halo_data_2 = halo_context_2.get_item(halo_id=26000000000000)
+        assert halo_data_1 is not None
+        assert halo_data_2 is not None
+
     def test_get_subhalos(self):
         subhalo_context_1 = self.fetcher_illustris.get_subhalos()
         subhalo_context_2 = self.fetcher_eagle.get_subhalos()
@@ -47,9 +53,15 @@ class TestFetcher(unittest.TestCase):
             subhalo_context_2.id_parents.shape[0] == subhalo_context_2.mstr.shape[0]
         )
 
+        # Get item
+        subhalo_data_1 = subhalo_context_1.get_item(subhalo_id=0)
+        subhalo_data_2 = subhalo_context_2.get_item(subhalo_id=23303)
+        assert subhalo_data_1 is not None
+        assert subhalo_data_2 is not None
+
     def test_get_p_subhalo(self):
         subhalo_particles_1 = self.fetcher_illustris.get_p_subhalo(idsubhalo=10)
-        subhalo_particles_2 = self.fetcher_eagle.get_p_subhalo(idsubhalo=10)
+        subhalo_particles_2 = self.fetcher_eagle.get_p_subhalo(idsubhalo=23303)
         self.assertIsInstance(subhalo_particles_1, SubhaloParticles)
         self.assertTrue(
             subhalo_particles_1.p.shape[0] == subhalo_particles_1.m.shape[0] == subhalo_particles_1.v.shape[0]

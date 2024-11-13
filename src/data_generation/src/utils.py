@@ -4,6 +4,7 @@ import os
 import re
 from typing import List, Tuple
 import eagleSqlTools as sql
+import h5py
 
 import joblib
 import numpy as np
@@ -44,6 +45,52 @@ def get_connection():
     password = os.getenv("PASSWORD")
     con = sql.connect(username, password)
     return con
+
+
+def read_dataset(itype, att, path, nfiles=16):
+    data = []
+    conversion_att = {
+        'Mass': {
+            'aexp': 0,
+            'hexp': -1
+        },
+        'Coordinates': {
+            'aexp': 1,
+            'hexp': -1
+        },
+        'Velocity': {
+            'aexp': 1/2,
+            'hexp': 0
+        }
+    }
+    for i in range(nfiles):
+        snapshot_name = path.split('/')[4].split('_')[-1]
+        snapshot_num = path.split('/')[4].split('_')[-2]
+        f = h5py.File(path + f'/snap_{snapshot_num}_{snapshot_name}.{i}.hdf5', 'r')
+        tmp = f[f'PartType{itype}/{att}'][...]
+        data.append(tmp)
+        cgs = f[f'PartType{itype}/{att}'].attrs.get('CGSConversionFactor')
+        if cgs is None:
+            cgs = 1
+        # Not working
+        # https://arxiv.org/pdf/1706.09899 page 5
+        #aexp = f[f'PartType{itype}/{att}'].attrs.get('aexp−scale−exponent')
+        #hexp = f[f'PartType{itype}/{att}'].attrs.get('h−scale−exponent')
+
+        a = f['Header'].attrs.get('Time')
+        h = f['Header'].attrs.get('HubbleParam')
+        f.close()
+
+    if len(tmp.shape) > 1:
+        data = np.vstack(data)
+    else:
+        data = np. concatenate(data)
+
+    if data.dtype != np.int32 and data.dtype != np.int64:
+        aexp = conversion_att.get(att, None)['aexp']
+        hexp = conversion_att.get(att, None)['hexp']
+        data = np.multiply(data, cgs * a**aexp * h**hexp, dtype='f8')
+    return data
 
 
 def label_particles(subhalo_particles: SubhaloParticles, halo_context: HaloContext, id_halo: int) \
@@ -87,9 +134,7 @@ def label_particles(subhalo_particles: SubhaloParticles, halo_context: HaloConte
 
     final_model = joblib.load('../model/Best_Model-Random-3par.pkl')
     # Define simulation parameters
-
-    R200 = halo_context.r200[id_halo]
-    M200 = halo_context.m200[id_halo]
+    R200, M200, _, _ = halo_context.get_item(id_halo)
     V200 = np.sqrt(G * M200 / R200)
 
     # Create a DataFrame with features required by the model
