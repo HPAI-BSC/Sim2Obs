@@ -21,11 +21,26 @@ class HaloContext:
             Indices of the first subhalo in each halo.
         scale_factor : float
             Scaling factor to apply to r200 and gpos.
+        halo_id: np.ndarray
+            Halo identifiers
         """
         self.r200 = r200 * scale_factor   # Apply scaling factor
         self.m200 = m200                  # Solar masses
         self.gpos = gpos * scale_factor   # Apply scaling factor to halo positions
-        self.fsub = fsub
-        self.halo_mass_min = None         # To be set later
+        self.fsub = fsub.astype(int)
         self.halo_id = halo_id
+
+    def get_item(self, halo_id):
+        position = np.where(self.halo_id == halo_id)
+        if len(position) - 1 > 0:
+            raise Exception('Error, there are repeated halo ids')
+        else:
+            position = position[0]
+            if position < len(self.r200):
+                return self.r200[position], self.m200[position], self.gpos[position], self.fsub[position][0]
+            else:
+                raise Exception('Error, the halo_id could not be found.')
+
+
+
 

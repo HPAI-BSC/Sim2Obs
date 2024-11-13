@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+
+import h5py
 from dotenv import load_dotenv
 import eagleSqlTools as sql
 import numpy as np
@@ -100,7 +102,8 @@ class Illustris300Fetcher(DataFetcher):
         m200 = halos["Group_M_Crit200"]
         gpos = np.vstack(halos.apply(lambda row: np.array([row['pos_x'], row['pos_y'], row['pos_z']]), axis=1).values)
         fsub = halos["GroupFirstSub"]
-        return HaloContext(r200, m200, gpos, fsub, SCALF_ILLUSTRIS, None)
+        halo_id = np.arange(len(r200))
+        return HaloContext(r200, m200, gpos, fsub, SCALF_ILLUSTRIS, halo_id)
 
     def _get_subhalos(self, base_path: str) -> SubhaloContext:
         """
@@ -136,8 +139,8 @@ class Illustris300Fetcher(DataFetcher):
         grnr = halos["SubhaloGrNr"]
         shmr = halos["SubhaloHalfmassRadType"][:, 4]  # stars
         mstr = halos["SubhaloMassType"][:, 4] * SOLAR_MASS_CONVERSION / H # 𝑀⊙
-
-        return SubhaloContext(spos, grnr, shmr, mstr, SCALF_ILLUSTRIS)
+        subhalo_id = np.arange(len(spos))
+        return SubhaloContext(spos, grnr, shmr, mstr, SCALF_ILLUSTRIS, subhalo_id)
 
     def _get_p_subhalo(self, base_path: str, isubhalo: int) -> SubhaloParticles:
         """
@@ -201,7 +204,7 @@ class EagleFetcher(DataFetcher):
                 WITH RankedSubhalos AS (
                     SELECT 
                         SH.GroupID AS halo_id, -- Halo ID linked to the subhalo
-                        SH.SubGroupNumber AS subhalo_id, -- Subhalo ID
+                        SH.GalaxyID AS subhalo_id, -- Subhalo ID
                         SH.MassType_Star AS stellar_mass, -- Stellar mass of the subhalo
                         ROW_NUMBER() OVER(PARTITION BY SH.GroupID ORDER BY SH.MassType_Star DESC) AS rn -- Rank subhalos by mass
                     FROM
@@ -235,19 +238,13 @@ class EagleFetcher(DataFetcher):
         # Units of measure [m200=M⊙, r200=pkpc, gpos=cMpc]
         df = pd.DataFrame(array)
 
-        # Normalize halo_id for preprocessing (same str. than Illustris),
-        n = df.iloc[0, :]['halo_id']
-        df['halo_id'] = df['halo_id'].apply(lambda x: x - n)
-        df['halo_id'] = df['halo_id'].astype(int)
-        halo_ids = pd.DataFrame({'halo_id': range(df['halo_id'].min(), df['halo_id'].max() + 1)})
-        df = pd.merge(halo_ids, df, on='halo_id', how='left')
-
         # pkps -> ckps / h
         gpos = df.apply(lambda row: np.array([row['pos_x'] / H, row['pos_y'] / H, row['pos_z'] / H]), axis=1)
         gpos = np.vstack(gpos)
         r200 = df['r200'].values / H    # pkps -> ckps / h
         m200 = df['m200'].values / H    # 𝑀⊙/ℎ
         halo_id = df['halo_id'].values
+        df['halo_id'] = df['halo_id'].astype(int)
         fsub = df['max_subhalo_id'].values
 
         halo_context = HaloContext(r200, m200, gpos, fsub, scale_factor=scalf, halo_id=halo_id)
@@ -259,11 +256,12 @@ class EagleFetcher(DataFetcher):
             SELECT
                 FOF.GroupID AS halo_id, -- Halo identifier
                 FOF.Group_M_Crit200 AS m200, -- Halo mass within R200
-                SUM(SH.MassType_Star) AS total_stellar_mass, -- Total stellar mass in the subhalo
-                AVG(SH.HalfMassRad_Star) AS avg_stellar_half_mass_radius, -- Average stellar half-mass radius in the subhalo
-                AVG(SH.CentreOfPotential_x) AS avg_subhalo_pos_x, -- Average X coordinate of subhalo's center
-                AVG(SH.CentreOfPotential_y) AS avg_subhalo_pos_y, -- Average Y coordinate of subhalo's center
-                AVG(SH.CentreOfPotential_z) AS avg_subhalo_pos_z -- Average Z coordinate of subhalo's center
+                SH.GalaxyID AS subhalo_id, -- Subhalo identifier
+                SH.MassType_Star AS total_stellar_mass, -- Total stellar mass in the subhalo
+                SH.HalfMassRad_Star AS avg_stellar_half_mass_radius, --  stellar half-mass radius in the subhalo
+                SH.CentreOfPotential_x AS avg_subhalo_pos_x, --  X coordinate of subhalo's center
+                SH.CentreOfPotential_y AS avg_subhalo_pos_y, --  Y coordinate of subhalo's center
+                SH.CentreOfPotential_z AS avg_subhalo_pos_z --  Z coordinate of subhalo's center
             FROM
                 {simulation_code}_FOF AS FOF -- Halo properties
             JOIN
@@ -273,21 +271,15 @@ class EagleFetcher(DataFetcher):
             WHERE
                 SH.MassType_Star > {SUBHALO_MIN_MASS} -- Minimum subhalo stellar mass threshold
                 AND FOF.Group_M_Crit200 > {HALO_MIN_MASS} -- Minimum halo mass threshold
-                AND SH.SnapNum = {SNAPNUM_EAGLE} -- Snapshot for redshift ~0.3
-            GROUP BY
-                FOF.GroupID, SH.GroupID, FOF.Group_M_Crit200 -- Group by halo
+                AND SH.SnapNum = {SNAPNUM_EAGLE} -- Snapshot for redshift ~0.2
             ORDER BY
-                FOF.GroupID ASC -- Order results by halo id
+                SH.GalaxyID ASC -- Order results by subhalo id
             """
         # Executing the join is important so we ensure that we are selecting subhalos that are child of valid halos
         array = sql.execute_query(conn, query)
         df = pd.DataFrame(array)
         # Units of measure [avg_stellar_half_mass_radius=pkpc, total_stellar_mass=M⊙, spos=cMpc]
-
-        # Normalize halo_id for preprocessing (same str. than Illustris)
-        n = df.iloc[0, :]['halo_id']
-        df['halo_id'] = df['halo_id'].apply(lambda x: x - n)
-        df['halo_id'] = df['halo_id'].astype(int)
+        df = df.sort_values(by='subhalo_id')
 
         # pkps -> ckps / h
         spos = df.apply(lambda row: np.array([row['avg_subhalo_pos_x'] / H, row['avg_subhalo_pos_y'] / H,
@@ -296,53 +288,9 @@ class EagleFetcher(DataFetcher):
         grnr = df['halo_id'].values
         shmr = df['avg_stellar_half_mass_radius'].values / H  # pkps -> ckps / h
         mstr = df['total_stellar_mass'].values
-        subhalo_context = SubhaloContext(spos, grnr, shmr, mstr, scalf)
+        subhalo_ids = df['subhalo_id'].values
+        subhalo_context = SubhaloContext(spos, grnr, shmr, mstr, scalf, subhalo_ids)
         return subhalo_context
 
-    def _get_p_subhalo(self, simulation_code: str, subhalo_id: int, scalf: float):
-        conn = get_connection()
-        query = f"""
-                SELECT
-                    FOF.GroupID AS halo_id, -- Halo identifier
-                    FOF.Group_M_Crit200 AS m200, -- Halo mass within R200
-                    SH.SubGroupNumber AS subhalo_id, -- Subhalo identifier within the halo
-                    SH.MassType_Star AS stellar_mass, -- Stellar mass in the subhalo
-                    SH.HalfMassRad_Star AS stellar_half_mass_radius, -- Stellar half-mass radius in the subhalo
-                    SH.CentreOfPotential_x AS subhalo_pos_x, -- X coordinate of subhalo's center
-                    SH.CentreOfPotential_y AS subhalo_pos_y, -- Y coordinate of subhalo's center
-                    SH.CentreOfPotential_z AS subhalo_pos_z, -- Z coordinate of subhalo's center
-                    SH.GroupID AS parent_halo_id, -- Renamed to avoid duplication
-                    SH.Velocity_x AS particle_vel_x, -- X velocity of the particle
-                    SH.Velocity_y AS particle_vel_y, -- Y velocity of the particle
-                    SH.Velocity_z AS particle_vel_z  -- Z velocity of the particle
-                FROM
-                    {simulation_code}_FOF AS FOF -- halo properties
-                JOIN
-                    {simulation_code}_SubHalo AS SH -- Subhalo properties
-                ON 
-                    FOF.GroupID = SH.GroupID -- Match subhalos to their parent halos
-                WHERE
-                    SH.SubGroupNumber = {subhalo_id}  -- Filter particles by the subhalo ID
-                    AND SH.SnapNum = {SNAPNUM_EAGLE} -- Snapshot for redshift ~0.3
-                    AND SH.MassType_Star > {SUBHALO_MIN_MASS} -- Minimum subhalo stellar mass threshold
-                    AND FOF.Group_M_Crit200 > {HALO_MIN_MASS} -- Minimum halo mass threshold
-            """
-        array = sql.execute_query(conn, query)
-        df = pd.DataFrame(array)
-        # Units of measure [stellar_mass=M⊙, positions=cMpc, velocities=kms−1]
-
-        # Normalize halo_id for preprocessing (same str. than Illustris),
-        n = df.iloc[0, :]['halo_id']
-        df['halo_id'] = df['halo_id'].apply(lambda x: x - n)
-        df['halo_id'] = df['halo_id'].astype(int)
-
-        m = df['stellar_mass'].values * H   # 𝑀⊙/ℎ
-        # pkps -> ckps / h
-        p = df.apply(lambda row: np.array([row['subhalo_pos_x'] / H, row['subhalo_pos_y'] / H,
-                                           row['subhalo_pos_z'] / H]), axis=1).values
-        p = np.vstack(p)
-        v = df.apply(lambda row: np.array([row['particle_vel_x'], row['particle_vel_y'],
-                                           row['particle_vel_z']]), axis=1).values
-        v = np.vstack(v)
-        subhalo_particles = SubhaloParticles(m, p, v, scalf)
-        return subhalo_particles
+    def _get_p_subhalo(self, simulation_code: str, subgroup_id: int, halo_id: int, scalf: float):
+        pass

@@ -1,9 +1,8 @@
 import numpy as np
-import pandas as pd
 import warnings
 
 from map import create_maps_and_zooms, generate_img_dataset
-from src.data_generation.src.constants import HALO_MIN_MASS, H, SUBHALO_ERROR_ID, SUBHALO_MIN_MASS, ARG, CATALOG
+from src.data_generation.src.constants import SUBHALO_ERROR_ID, SUBHALO_MIN_MASS, ARG, CATALOG
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 from src.data_generation.src.rotate import apply_rotation
 from src.data_generation.src.utils import setup_logger, label_particles, get_icl_mask
@@ -18,40 +17,42 @@ if __name__ == '__main__':
 
     logger = setup_logger()
     fetcher = DataFetcherFactory.get_data_fetcher(catalog=CATALOG, arg=ARG)
+    logger.info(f'Simulation selected: {CATALOG}')
 
     halo_context = fetcher.get_halos()
     logger.info(f'Number of halos in the snapshot: {len(halo_context.r200)}')
 
     subhalo_context = fetcher.get_subhalos()
     logger.info(f"Number of subhalos in the snapshot: {len(subhalo_context.spos)}")
-
-    subhalo_context.spos = subhalo_context.spos - halo_context.gpos[subhalo_context.id_parents]
     logger.debug(f'Number of unique halo ids inside subhalos data: {len(np.unique(subhalo_context.id_parents))}')
 
-    for id_halo in range(len(halo_context.r200)):
+    # Change the coordinate system origin to center the subhalo with respect to the halo coordinate system.
+    parent_positions = []
+    for parent_id in subhalo_context.id_parents:
+        _, _, gpos, _ = halo_context.get_item(halo_id=parent_id)
+        parent_positions.append(gpos)
+    subhalo_context.spos = subhalo_context.spos - parent_positions
+
+    for id_halo in halo_context.halo_id:
         logger.debug(" ")
         logger.debug(f'Halo id: {id_halo}')
-        id_subhalo = halo_context.fsub[id_halo]
-        id_parents = subhalo_context.id_parents
+        _, _, gpos_halo, id_subhalo = halo_context.get_item(id_halo)
+        spos_h, shmr_h, mstr_h = subhalo_context.get_items_by_halo(id_halo)
 
-        spos_h = pd.DataFrame(subhalo_context.spos)[id_parents == id_halo]
-        shmr_h = pd.DataFrame(subhalo_context.shmr)[id_parents == id_halo]
-
-        # Get mass, positions and velocities of the stars within a certain subhalo
-        if id_subhalo != SUBHALO_ERROR_ID:
-            m_subhalo = subhalo_context.mstr[id_subhalo]
+        if CATALOG == 'eagle' or (CATALOG == 'illustris-300' and id_subhalo != SUBHALO_ERROR_ID):
+            _, _, m_subhalo = subhalo_context.get_item(id_subhalo)
             # Same units 𝑀⊙
             if m_subhalo > SUBHALO_MIN_MASS:
                 subhalo_particles = None
                 try:
-                    subhalo_particles = fetcher.get_p_subhalo(isubhalo=id_subhalo)
+                    subhalo_particles = fetcher.get_p_subhalo(idsubhalo=id_subhalo)
                     logger.debug(f'Primary subhalo {id_subhalo} has {len(subhalo_particles.m)} particles.')
                 except Exception as e:
                     logger.warning(e)
-                    continue
+                    raise e
 
                 # Defining a new origin
-                subhalo_particles.p -= halo_context.gpos[id_halo]
+                subhalo_particles.p -= gpos_halo
                 _, df_icl = label_particles(subhalo_particles, halo_context, id_halo)
 
                 if len(rotation_groups) > 0:

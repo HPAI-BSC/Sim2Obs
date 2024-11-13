@@ -5,6 +5,7 @@ import pandas as pd
 from scipy import stats
 import matplotlib.pyplot as plt
 
+from src.data_generation.src.constants import CATALOG
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import logger
@@ -281,7 +282,9 @@ def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloP
     if not isinstance(spos_rot, np.ndarray):
         spos_rot = spos_rot.to_numpy()  # Convert DataFrame to a NumPy array
 
-    result = create_maps(halo_context.r200[id_halo], spos_rot, subhalo_particles.p, subhalo_particles.v, type4)
+    r200, _, _, _ = halo_context.get_item(id_halo)
+
+    result = create_maps(r200, spos_rot, subhalo_particles.p, subhalo_particles.v, type4)
     label_vel_biny_projections = result["maps"]
     interlopers_id = result["interlopers_id"]
     projections = ["xy", "yz", "xz"]

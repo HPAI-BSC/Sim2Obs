@@ -5,7 +5,7 @@ from src.data_generation.src.constants import SOLAR_MASS_CONVERSION
 
 class SubhaloContext:
     def __init__(self, spos: np.ndarray, grnr: np.ndarray, shmr: np.ndarray,
-                 mstr: np.ndarray, scale_factor: float) -> None:
+                 mstr: np.ndarray, scale_factor: float, subhalo_id: np.ndarray) -> None:
         """
         Initialize the SubhaloContext with properties of subhalos.
 
@@ -21,11 +21,32 @@ class SubhaloContext:
             The mass of stars in each subhalo.
         scale_factor : float
             The scale factor to apply to subhalo positions and other properties.
+        subhalo_id: np.ndarray
+            List with the subhalo identifiers
         """
         self.spos = spos * scale_factor           # Apply scaling factor to subhalo positions
         self.shmr = shmr * scale_factor           # Apply scaling factor to shmr
         self.mstr = mstr                          # Solar masses
         self.id_parents = grnr
+        self.subhalo_id = subhalo_id
+
+    def get_item(self, subhalo_id):
+        position = np.where(self.subhalo_id == subhalo_id)
+        if len(position) - 1 > 0:
+            raise Exception('There are repeated subhalo ids')
+        else:
+            position = position[0]
+            if position < len(self.spos):
+                return self.spos[position], self.shmr[position], self.mstr[position]
+            else:
+                raise Exception('Error, the subhalo_id could not be found.')
+
+    def get_items_by_halo(self, halo_id):
+        positions = np.where(self.id_parents == halo_id)
+        if len(positions) > 0:
+            return self.spos[positions], self.shmr[positions], self.mstr[positions]
+        else:
+            return [], [], []
 
 
 class SubhaloParticles:
