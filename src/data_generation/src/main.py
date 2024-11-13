@@ -21,49 +21,49 @@ if __name__ == '__main__':
 
     halo_context = fetcher.get_halos()
     logger.info(f'Number of halos in the snapshot: {len(halo_context.r200)}')
+
     subhalo_context = fetcher.get_subhalos()
     logger.info(f"Number of subhalos in the snapshot: {len(subhalo_context.spos)}")
+
     subhalo_context.spos = subhalo_context.spos - halo_context.gpos[subhalo_context.id_parents]
     logger.debug(f'Number of unique halo ids inside subhalos data: {len(np.unique(subhalo_context.id_parents))}')
 
     for id_halo in range(len(halo_context.r200)):
         logger.debug(" ")
         logger.debug(f'Halo id: {id_halo}')
-        if halo_context.m200[id_halo] > HALO_MIN_MASS * H:
+        id_subhalo = halo_context.fsub[id_halo]
+        id_parents = subhalo_context.id_parents
 
-            id_subhalo = halo_context.fsub[id_halo]
-            id_parents = subhalo_context.id_parents
+        spos_h = pd.DataFrame(subhalo_context.spos)[id_parents == id_halo]
+        shmr_h = pd.DataFrame(subhalo_context.shmr)[id_parents == id_halo]
 
-            spos_h = pd.DataFrame(subhalo_context.spos)[id_parents == id_halo]
-            shmr_h = pd.DataFrame(subhalo_context.shmr)[id_parents == id_halo]
+        # Get mass, positions and velocities of the stars within a certain subhalo
+        if id_subhalo != SUBHALO_ERROR_ID:
+            m_subhalo = subhalo_context.mstr[id_subhalo]
+            # Same units 𝑀⊙
+            if m_subhalo > SUBHALO_MIN_MASS:
+                subhalo_particles = None
+                try:
+                    subhalo_particles = fetcher.get_p_subhalo(isubhalo=id_subhalo)
+                    logger.debug(f'Primary subhalo {id_subhalo} has {len(subhalo_particles.m)} particles.')
+                except Exception as e:
+                    logger.warning(e)
+                    continue
 
-            # Get mass, positions and velocities of the stars within a certain subhalo
-            if id_subhalo != SUBHALO_ERROR_ID:
-                m_subhalo = subhalo_context.mstr[id_subhalo]
-                if m_subhalo > SUBHALO_MIN_MASS:
-                    subhalo_particles = None
-                    try:
-                        subhalo_particles = fetcher.get_p_subhalo(isubhalo=id_subhalo)
-                        logger.debug(f'Primary subhalo {id_subhalo} has {len(subhalo_particles.m)} particles.')
-                    except Exception as e:
-                        logger.warning(e)
-                        continue
+                # Defining a new origin
+                subhalo_particles.p -= halo_context.gpos[id_halo]
+                _, df_icl = label_particles(subhalo_particles, halo_context, id_halo)
 
-                    # Defining a new origin
-                    subhalo_particles.p -= halo_context.gpos[id_halo]
-                    _, df_icl = label_particles(subhalo_particles, halo_context, id_halo)
-
-                    if len(rotation_groups) > 0:
-                        apply_rotation(rotation_groups, subhalo_particles, halo_context, df_icl, spos_h, shmr_h,
-                                       id_halo, id_subhalo)
-                    else:
-                        # Create a masking array for BCG and ICL (BCG==0, ICL==1)
-                        type4 = get_icl_mask(df_icl, subhalo_particles.m)
-                        create_maps_and_zooms(halo_context, subhalo_particles, id_halo, id_subhalo, spos_h, shmr_h,
-                                              type4, rotation=None)
+                if len(rotation_groups) > 0:
+                    apply_rotation(rotation_groups, subhalo_particles, halo_context, df_icl, spos_h, shmr_h,
+                                   id_halo, id_subhalo)
                 else:
-                    logger.warning('Primary subhalo does not reach minimum mass.')
+                    # Create a masking array for BCG and ICL (BCG==0, ICL==1)
+                    type4 = get_icl_mask(df_icl, subhalo_particles.m)
+                    create_maps_and_zooms(halo_context, subhalo_particles, id_halo, id_subhalo, spos_h, shmr_h,
+                                          type4, rotation=None)
 
+    # TODO change this
     # Directory containing the .npz files
     input_dirs = ['../data/npz/velocity_dispersion', '../data/npz/labels']
     output_dirs = ['../data/images/velocity_dispersion', '../data/images/labels']

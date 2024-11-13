@@ -1,5 +1,4 @@
 import pandas as pd
-import seaborn as sns
 
 df_no_rotation = pd.read_csv("variance_dataset_no_rotations.csv")
 df_no_rotation = df_no_rotation.set_index("halo_id")

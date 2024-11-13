@@ -5,7 +5,6 @@ import pandas as pd
 from scipy import stats
 import matplotlib.pyplot as plt
 
-from src.data_generation.src.constants import CATALOG
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import logger

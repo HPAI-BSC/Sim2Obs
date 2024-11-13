@@ -17,20 +17,25 @@ class Illustris300Dataset(Dataset):
         img_path = os.path.join(self.image_dir, self.images[index])
         labels_path = os.path.join(self.labels_dir, self.labels[index])
         images = np.load(img_path)
-        image = images[f'arr_0'][:, :, 0]
         if self.mask_interlopers:
+            image = images[f'arr_0'][:, :, 0]
             interlopers_vel_mask = images['arr_0'][:, :, 1]  # Shape: (128, 128), boolean mask
             if np.any(interlopers_vel_mask != 0):
                 image = np.ma.masked_array(image, mask=interlopers_vel_mask).filled(fill_value=0)
+        else:
+            image = images[f'arr_0']
         # resize image to 128x128
         image = image[1:129, 1:129]
         image = torch.tensor(image)
 
         labels = np.load(labels_path)
-        label = labels[f'arr_0'][:, :, 0]
         if self.mask_interlopers:
+            label = labels[f'arr_0'][:, :, 0]
             interlopers_label_mask = labels['arr_0'][:, :, 1]
             label = np.ma.masked_array(label, mask=interlopers_label_mask).filled(fill_value=0)
+        else:
+            label = labels[f'arr_0']
+
         label = torch.tensor(label)
         # resize image to 128x128
         label = label[1:129, 1:129]
@@ -52,4 +57,3 @@ class PredictDataset(Dataset):
     def __getitem__(self, idx):
         x, _ = self.original_dataset[idx]
         return x
-
