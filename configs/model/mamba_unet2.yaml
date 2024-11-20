@@ -25,7 +25,7 @@ net:
     drop_path_rate: 0.1
     patch_norm: True
     use_checkpoint: False
-  num_classes: 1 # Num classes aka num out channels
+  num_classes: 3 # aka num out channels
   zero_head: False
   vis: False
 
