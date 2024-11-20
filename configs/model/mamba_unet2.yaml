@@ -17,7 +17,7 @@ net:
   _target_: src.models.components.Mamba_UNet2.MambaUNet
   config:
     patch_size: 4
-    in_chains: 3
+    in_chains: 1
     embed_dim: 512
     depths: [2, 2, 9, 2]
     mlp_ratio:
@@ -25,7 +25,7 @@ net:
     drop_path_rate: 0.1
     patch_norm: True
     use_checkpoint: False
-  num_classes: 3 # aka num out channels
+  num_classes: 1 # aka num out channels
   zero_head: False
   vis: False
 
