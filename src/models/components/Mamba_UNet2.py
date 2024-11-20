@@ -981,7 +981,7 @@ def check_vssm_equals_vmambadp():
     print("init miss align", miss_align)  # init miss align 0
 """
 
-
+"""
 if __name__ == "__main__":
     # check_vssm_equals_vmambadp()
     #model = VSSM().to('cuda')
@@ -989,6 +989,8 @@ if __name__ == "__main__":
     int = torch.randn(16, 1, 224, 224) #.cuda()
     out = model(int)
     print(out.shape)
+"""
+
 
 class MambaUnet(nn.Module):
     def __init__(self, config, img_size=224, num_classes=21843, zero_head=False, vis=False):
@@ -1048,6 +1050,10 @@ class MambaUnet(nn.Module):
                         del full_dict[k]
 
             msg = self.mamba_unet.load_state_dict(full_dict, strict=False)
-            # print(msg)
+            print(msg)
         else:
             print("none pretrain")
+
+
+if __name__ == "__main__":
+    _ = MambaUNet()
