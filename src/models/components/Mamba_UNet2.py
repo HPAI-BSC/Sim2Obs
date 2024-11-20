@@ -998,16 +998,16 @@ class MambaUnet(nn.Module):
         self.config = config
 
         self.mamba_unet =  VSSM(
-                                patch_size=config.MODEL.VSSM.PATCH_SIZE,
-                                in_chans=config.MODEL.VSSM.IN_CHANS,
+                                patch_size=config.patch_size,
+                                in_chans=config.in_chains,
                                 num_classes=self.num_classes,
-                                embed_dim=config.MODEL.VSSM.EMBED_DIM,
-                                depths=config.MODEL.VSSM.DEPTHS,
-                                mlp_ratio=config.MODEL.SWIN.MLP_RATIO,
-                                drop_rate=config.MODEL.DROP_RATE,
-                                drop_path_rate=config.MODEL.DROP_PATH_RATE,
-                                patch_norm=config.MODEL.SWIN.PATCH_NORM,
-                                use_checkpoint=config.TRAIN.USE_CHECKPOINT)
+                                embed_dim=config.embed_dim,
+                                depths=config.depths,
+                                mlp_ratio=config.mlp_ratio,
+                                drop_rate=config.drop_rate,
+                                drop_path_rate=config.drop_path_rate,
+                                patch_norm=config.patch_norm,
+                                use_checkpoint=config.use_checkpoint)
 
     def forward(self, x):
         if x.size()[1] == 1:
