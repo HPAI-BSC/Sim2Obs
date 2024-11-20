@@ -1018,8 +1018,10 @@ class MambaUNet(nn.Module):
     def forward(self, x):
         print('input shape')
         print(x.shape)
+        """
         if x.size()[1] == 1:
             x = x.repeat(1,3,1,1)
+        """
         logits = self.mamba_unet(x)
         return logits
 
