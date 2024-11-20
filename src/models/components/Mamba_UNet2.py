@@ -97,12 +97,15 @@ except:
         return SelectiveScanFn.apply(u, delta, A, B, C, D, z, delta_bias, delta_softplus, return_last_state)
     pass
 
+"""  
 # an alternative for mamba_ssm
+
 try:
     from selective_scan import selective_scan_fn as selective_scan_fn_v1
     from selective_scan import selective_scan_ref as selective_scan_ref_v1
 except:
     pass
+"""
 
 
 def flops_selective_scan_ref(B=1, L=256, D=768, N=16, with_D=True, with_Z=False, with_Group=True, with_complex=False):
@@ -569,7 +572,8 @@ class SS2D(nn.Module):
         return y
 
     def forward_corev1(self, x: torch.Tensor):
-        self.selective_scan = selective_scan_fn_v1
+        #self.selective_scan = selective_scan_fn_v1
+        self.selective_scan = selective_scan_fn
 
         B, C, H, W = x.shape
         L = H * W
@@ -992,9 +996,9 @@ if __name__ == "__main__":
 """
 
 
-class MambaUnet(nn.Module):
+class MambaUNet(nn.Module):
     def __init__(self, config, img_size=224, num_classes=21843, zero_head=False, vis=False):
-        super(MambaUnet, self).__init__()
+        super(MambaUNet, self).__init__()
         self.num_classes = num_classes
         self.zero_head = zero_head
         self.config = config
