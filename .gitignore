@@ -155,3 +155,4 @@ configs/local/default.yaml
 # Local folders
 local/data/
 local/output/
+temp

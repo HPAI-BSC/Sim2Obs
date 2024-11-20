@@ -42,7 +42,7 @@ class SimpleSSM(nn.Module):
         x = x.transpose(1, 2)
 
         # initialize hidden state
-        h = torch.zeros(batch_size, self.n).to('cuda:0')
+        h = torch.zeros(batch_size, self.n).to('cpu')
 
         # h_prime = torch.einsum('bn,n->bn', h, A) + torch.einsum('bn,n->bn', u, B)
         # y = torch.einsum('bn,n -> bn', h, C)
@@ -208,10 +208,8 @@ class VimBlock(nn.Module):
 
             y_o = self.SSM(A_o, B_o, C_o, x_prime)
 
-            """
             if direction == 'backward':
                 y_o = y_o.flip(1)
-            """
 
             outputs.append(y_o)
 
@@ -241,7 +239,7 @@ class DownscaleBlock(nn.Module):
         x = self.downscale(x)
         patches = patch_image(x, self.patch_size)
         proj_patches = self.patch_linear_proj(patches)
-        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to('cuda:0').to(torch.float32)
+        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to('cpu').to(torch.float32)
         token_sequence = proj_patches + E
         x = self.vim_block(token_sequence)
         return x
@@ -267,7 +265,7 @@ class UpscaleBlock(nn.Module):
         upscaled = self.upsample(x)
         patches = patch_image(upscaled, self.patch_size)
         proj_patches = self.patch_linear_proj(patches)
-        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to('cuda:0').to(torch.float32)
+        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to('cpu').to(torch.float32)
         token_sequence = proj_patches + E
         x = self.vim_block(token_sequence)
         return x
@@ -303,13 +301,21 @@ class MambaUNet(nn.Module):
                                      img_original_size=half_size(img_original_size, times=1))
 
     def forward(self, x):
+        print(x.shape)
         x = self.downscale1(x, False)
+        print(x.shape)
         x = self.downscale2(x, True)
+        print(x.shape)
         x = self.downscale3(x, True)
+        print(x.shape)
         x = self.bottleneck(x)
+        print(x.shape)
         x = self.upscale1(x, True)
+        print(x.shape)
         x = self.upscale2(x, True)
+        print(x.shape)
         x = self.upscale3(x, True)
+        print(x.shape)
         x = unpatch_image(x, original_size=self.original_size, patch_size=16)
         return x
 
