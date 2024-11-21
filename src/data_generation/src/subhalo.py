@@ -1,7 +1,5 @@
 import numpy as np
 
-from src.data_generation.src.constants import SOLAR_MASS_CONVERSION
-
 
 class SubhaloContext:
     def __init__(self, spos: np.ndarray, grnr: np.ndarray, shmr: np.ndarray,
@@ -39,7 +37,7 @@ class SubhaloContext:
             if position < len(self.spos):
                 return self.spos[position], self.shmr[position], self.mstr[position]
             else:
-                raise Exception('Error, the subhalo_id could not be found.')
+                raise Exception(f'Error, the subhalo_id={subhalo_id} could not be found.')
 
     def get_items_by_halo(self, halo_id):
         positions = np.where(self.id_parents == halo_id)

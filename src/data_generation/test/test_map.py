@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 
 from src.data_generation.src.map import create_maps, muse_bins_r, create_random_zoom, get_interlopers_mask
-import matplotlib.pyplot as plt
 
 
 class TestMap(unittest.TestCase):

@@ -1,76 +1,82 @@
-import numpy as np
+import os
 import warnings
+import hydra
+import numpy as np
+import rootutils
+from omegaconf import DictConfig
 
-from map import create_maps_and_zooms, generate_img_dataset
-from src.data_generation.src.constants import SUBHALO_ERROR_ID, SUBHALO_MIN_MASS, ARG, CATALOG
 from src.data_generation.src.data_fetcher import DataFetcherFactory
+from src.data_generation.src.map import create_maps_and_zooms
 from src.data_generation.src.rotate import apply_rotation
-from src.data_generation.src.utils import setup_logger, label_particles, get_icl_mask
+from src.data_generation.src.utils import label_particles, get_icl_mask
 
 warnings.filterwarnings("ignore")
+rootutils.setup_root(__file__, pythonpath=True)
 
-if __name__ == '__main__':
+from src import utils
 
-    rotation_groups = [[45, [0, 0, 1], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]]]
-    #[[120, [0, 0, 1], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]]]
-    # rotation_groups = [[90, [0, 0, 1], [[1, 0, 0]]]]
+log = utils.get_pylogger(__name__)
 
-    logger = setup_logger()
-    fetcher = DataFetcherFactory.get_data_fetcher(catalog=CATALOG, arg=ARG)
-    logger.info(f'Simulation selected: {CATALOG}')
+
+@hydra.main(version_base=None, config_path="../../../configs", config_name="data_generation.yaml")
+def main(cfg: DictConfig) -> None:
+    # Use Hydra configuration
+    log.info(f'Simulation selected: {cfg.catalog}')
+    fetcher = DataFetcherFactory.get_data_fetcher(cfg)
 
     halo_context = fetcher.get_halos()
-    logger.info(f'Number of halos in the snapshot: {len(halo_context.r200)}')
+    log.info(f'Number of halos in the snapshot: {len(halo_context.r200)}')
 
     subhalo_context = fetcher.get_subhalos()
-    logger.info(f"Number of subhalos in the snapshot: {len(subhalo_context.spos)}")
-    logger.debug(f'Number of unique halo ids inside subhalos data: {len(np.unique(subhalo_context.id_parents))}')
+    log.info(f"Number of subhalos in the snapshot: {len(subhalo_context.spos)}")
+    log.debug(f'Number of unique halo ids inside subhalos data: {len(np.unique(subhalo_context.id_parents))}')
 
     # Change the coordinate system origin to center the subhalo with respect to the halo coordinate system.
-    parent_positions = []
+    last_halo_id = halo_context.halo_id[-1]
     for parent_id in subhalo_context.id_parents:
-        _, _, gpos, _ = halo_context.get_item(halo_id=parent_id)
-        parent_positions.append(gpos)
-    subhalo_context.spos = subhalo_context.spos - parent_positions
+        try:
+            if parent_id <= last_halo_id:
+                _, _, gpos, _ = halo_context.get_item(halo_id=parent_id)
+                subhalo_context.spos = subhalo_context.spos - gpos
+        except Exception as e:
+            print(e)
+            continue
 
     for id_halo in halo_context.halo_id:
-        logger.debug(" ")
-        logger.debug(f'Halo id: {id_halo}')
+        log.debug(" ")
+        log.debug(f'Halo id: {id_halo}')
         _, _, gpos_halo, id_subhalo = halo_context.get_item(id_halo)
         spos_h, shmr_h, mstr_h = subhalo_context.get_items_by_halo(id_halo)
 
-        if CATALOG == 'eagle' or (CATALOG == 'illustris-300' and id_subhalo != SUBHALO_ERROR_ID):
+        if cfg.catalog.name == 'eagle' or (cfg.catalog.name == 'illustris-300' and
+                                           id_subhalo != cfg.catalog.subhalo_error_id):
+            print(id_subhalo)
             _, _, m_subhalo = subhalo_context.get_item(id_subhalo)
             # Same units 𝑀⊙
-            if m_subhalo > SUBHALO_MIN_MASS:
-                subhalo_particles = None
+            if m_subhalo > cfg.subhalo_min_mass:
                 try:
                     subhalo_particles = fetcher.get_p_subhalo(idsubhalo=id_subhalo)
-                    logger.debug(f'Primary subhalo {id_subhalo} has {len(subhalo_particles.m)} particles.')
+                    log.debug(f'Primary subhalo {id_subhalo} has {len(subhalo_particles.m)} particles.')
                 except Exception as e:
-                    logger.warning(e)
-                    raise e
+                    log.warning(e)
+                    continue
 
                 # Defining a new origin
                 subhalo_particles.p -= gpos_halo
-                _, df_icl = label_particles(subhalo_particles, halo_context, id_halo)
+                _, df_icl = label_particles(subhalo_particles, halo_context, id_halo, cfg.G)
 
-                if len(rotation_groups) > 0:
-                    apply_rotation(rotation_groups, subhalo_particles, halo_context, df_icl, spos_h, shmr_h,
-                                   id_halo, id_subhalo)
+                if len(cfg.rotation_group) > 0:
+                    apply_rotation(cfg.rotation_group, subhalo_particles, halo_context, df_icl, spos_h, shmr_h,
+                                   id_halo, id_subhalo, cfg)
                 else:
                     # Create a masking array for BCG and ICL (BCG==0, ICL==1)
                     type4 = get_icl_mask(df_icl, subhalo_particles.m)
                     create_maps_and_zooms(halo_context, subhalo_particles, id_halo, id_subhalo, spos_h, shmr_h,
-                                          type4, rotation=None)
-
-    # TODO change this
-    # Directory containing the .npz files
-    input_dirs = ['../data/npz/velocity_dispersion', '../data/npz/labels']
-    output_dirs = ['../data/images/velocity_dispersion', '../data/images/labels']
-    generate_img_dataset(input_dirs, output_dirs)
+                                          type4, cfg, rotation=None)
 
 
-
-
+if __name__ == "__main__":
+    # TODO just for local
+    os.environ['PROJECT_ROOT'] = '../../..'
+    main()
 

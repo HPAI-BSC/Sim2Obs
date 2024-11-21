@@ -1,7 +1,5 @@
 import numpy as np
 
-from src.data_generation.src.constants import SOLAR_MASS_CONVERSION
-
 
 class HaloContext:
     def __init__(self, r200: np.ndarray, m200: np.ndarray, gpos: np.ndarray, fsub: np.ndarray, scale_factor: float,
@@ -39,7 +37,7 @@ class HaloContext:
             if position < len(self.r200):
                 return self.r200[position], self.m200[position], self.gpos[position], self.fsub[position][0]
             else:
-                raise Exception('Error, the halo_id could not be found.')
+                raise Exception(f'Error, the halo_id={halo_id} could not be found.')
 
 
 
