@@ -3,11 +3,19 @@ from typing import List
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cosine
+from omegaconf import DictConfig
+import rootutils
 
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.map import create_maps_and_zooms
 from src.data_generation.src.subhalo import SubhaloParticles
-from src.data_generation.src.utils import get_icl_mask, logger
+from src.data_generation.src.utils import get_icl_mask
+
+rootutils.setup_root(__file__, pythonpath=True)
+
+from src import utils
+
+log = utils.get_pylogger(__name__)
 
 
 def angle(u: np.ndarray, v: np.ndarray) -> float:
@@ -107,7 +115,7 @@ def get_transform_matrix(n: np.ndarray, axis: np.ndarray, normalized: bool = Tru
     theta = angle(axis, n)
     angle_degree = theta * (180 / np.pi)
 
-    logger.debug(f'--> Rotation angle: {angle_degree}')
+    log.debug(f'--> Rotation angle: {angle_degree}')
 
     # Quaternion components
     q0 = np.cos(theta / 2)
@@ -190,9 +198,9 @@ def rotate_particles(subhalo_particles: SubhaloParticles, spos: pd.DataFrame, ro
     return pos_rot, vel_rot, spos_rot
 
 
-def apply_rotation(rotation_groups: List, subhalo_particles: SubhaloParticles,
+def apply_rotation(rotation_group: List, subhalo_particles: SubhaloParticles,
                    halo_context: HaloContext, df_icl: pd.DataFrame, spos_h: pd.DataFrame,
-                   shmr_h: pd.DataFrame, id_halo: int, id_subhalo: int) -> None:
+                   shmr_h: pd.DataFrame, id_halo: int, id_subhalo: int, cfg: DictConfig) -> None:
     """
     Rotate particle positions and velocities based on specified rotation groups.
 
@@ -219,17 +227,17 @@ def apply_rotation(rotation_groups: List, subhalo_particles: SubhaloParticles,
     --------
     None
     """
-    logger.info("Rotating positions and velocities ...")
-    for row in rotation_groups:
+    log.info("Rotating positions and velocities ...")
+    for row in [rotation_group]:
         degree_0, z, rotation_directions = row
         iterations = 360 // degree_0
-        logger.debug(f"{iterations} rotations of {degree_0} degrees of axis: {z} over axis:"
+        log.debug(f"{iterations} rotations of {degree_0} degrees of axis: {z} over axis:"
                      f" {rotation_directions}")
 
         for rotation_axis in rotation_directions:
             degree = 0
             for i in range(iterations):
-                logger.debug(f'--> Rotation: {i}, degrees: {degree}')
+                log.debug(f'--> Rotation: {i}, degrees: {degree}')
                 z = np.array(z)
                 rotation_axis = np.array(rotation_axis)
                 pos_rot, vel_rot, spos_rot = rotate_particles(subhalo_particles, spos_h, degree, z,
@@ -240,4 +248,4 @@ def apply_rotation(rotation_groups: List, subhalo_particles: SubhaloParticles,
                 # Create a masking array for BCG and ICL (BCG==0, ICL==1)
                 type4 = get_icl_mask(df_icl, subhalo_particles.m)
                 create_maps_and_zooms(halo_context, subhalo_particles_rotated, id_halo, id_subhalo,
-                                      spos_rot, shmr_h, type4, rotation=f"{degree_0}_{i}")
+                                      spos_rot, shmr_h, type4, cfg, rotation=f"{degree_0}_{i}")

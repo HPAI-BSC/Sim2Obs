@@ -4,11 +4,18 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 import matplotlib.pyplot as plt
+from omegaconf import DictConfig
+import rootutils
 
-from src.data_generation.src.constants import CATALOG
+
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloParticles
-from src.data_generation.src.utils import logger
+
+rootutils.setup_root(__file__, pythonpath=True)
+
+from src import utils
+
+log = utils.get_pylogger(__name__)
 
 
 def create_maps(r200_halo: float, spos_rot: np.ndarray, pos_rot: np.ndarray, vel_rot: np.array, type4: np.array) -> dict:
@@ -53,7 +60,8 @@ def create_maps(r200_halo: float, spos_rot: np.ndarray, pos_rot: np.ndarray, vel
     interlopers_id = interlopers_id[1:]
 
     if len(interlopers_id) == 0:
-        logger.warning('There is no interlopers.')
+        pass
+        log.warning('There is no interlopers.')
 
     # Create three different maps based on projections onto different coordinate planes (X-Y, Y-Z, X-Z).
     # Break up the 2D spatial plane into small regions (bins), compute the mean of the squared velocities
@@ -125,7 +133,8 @@ def create_random_zoom(label_masked: np.ndarray, vel_disp_masked: np.ndarray, ma
     return label_1, vel_disp_1, mask1
 
 
-def create_n_zooms(label_masked: np.ndarray, vel_disp_masked: np.ndarray, **kwargs) -> None:
+def create_n_zooms(feature_1: np.ndarray, feature_2: np.ndarray, feature_1_name: str, feature_2_name: str,
+                   cfg: DictConfig, **kwargs) -> None:
     """
     Creates and saves three random zooms of the masked labels and velocity dispersion maps.
 
@@ -157,27 +166,44 @@ def create_n_zooms(label_masked: np.ndarray, vel_disp_masked: np.ndarray, **kwar
     mask = kwargs["mask"]
     rotation = kwargs.get("rotation", None)
 
+    dataset_path = None
+    if os.path.exists(cfg.catalog.path):
+        if rotation is not None:
+            angle = rotation.split('_')[0]
+            dataset_path = os.path.join(cfg.catalog.path, f'rotation_{angle}')
+            if not os.path.exists(dataset_path):
+                # TODO can we executed this inside mn5 ?
+                os.mkdir(dataset_path)
+        else:
+            dataset_path = cfg.catalog.path
+
+        if not os.path.exists(os.path.join(dataset_path, feature_2_name)):
+            os.mkdir(os.path.join(dataset_path, feature_2_name))
+        if not os.path.exists(os.path.join(dataset_path, feature_1_name)):
+            os.mkdir(os.path.join(dataset_path, feature_1_name))
+
     for i in range(n):
-        label_i, vel_disp_i, mask_i = create_random_zoom(label_masked, vel_disp_masked, mask)
+        feature_1_i, feature_2_i, mask_i = create_random_zoom(feature_1, feature_2, mask)
 
         # Expand the dimensions of the mask to match the shape of the other arrays
         mask_expanded = np.expand_dims(mask_i, axis=-1)  # Shape: (H, W, 1)
 
         # Expand the dimensions of vel_disp_i and label_i to make them 3D
-        vel_disp_i_expanded = np.expand_dims(vel_disp_i, axis=-1)  # Shape: (H, W, 1)
-        label_i_expanded = np.expand_dims(label_i, axis=-1)  # Shape: (H, W, 1)
+        vel_disp_i_expanded = np.expand_dims(feature_2_i, axis=-1)  # Shape: (H, W, 1)
+        label_i_expanded = np.expand_dims(feature_1_i, axis=-1)  # Shape: (H, W, 1)
 
         # Concatenate the mask as an additional channel to the zoomed arrays
         vel_disp_with_mask = np.concatenate((vel_disp_i_expanded, mask_expanded), axis=-1)  # Shape: (H, W, 2)
         label_with_mask = np.concatenate((label_i_expanded, mask_expanded), axis=-1)  # Shape: (H, W, 2)
 
         if rotation is not None:
-            path_vel = f"../data/npz/velocity_dispersion/halo-{idhalo}_subhalo-{idsubhalo}_{CATALOG}_rotation_{rotation}_{projection}_zoom_{i}"
-            path_icl = f"../data/npz/labels/halo-{idhalo}_subhalo-{idsubhalo}_{CATALOG}_rotation_{rotation}_{projection}_zoom_{i}"
-
+            path_vel = os.path.join(dataset_path, feature_2_name, f'halo-{idhalo}_subhalo-{idsubhalo}_{cfg.catalog.name}_rotation_{rotation}_{projection}_zoom_{i}')
+            path_icl = os.path.join(dataset_path, feature_1_name, f"halo-{idhalo}_subhalo-{idsubhalo}_{cfg.catalog.name}_rotation_{rotation}_{projection}_zoom_{i}")
         else:
-            path_vel = f"../data/npz/velocity_dispersion/halo-{idhalo}_subhalo-{idsubhalo}_{CATALOG}_{projection}_zoom_{i}"
-            path_icl = f"../data/npz/labels/halo-{idhalo}_subhalo-{idsubhalo}_{CATALOG}_{projection}_zoom_{i}"
+            path_vel = os.path.join(dataset_path, feature_2_name,
+                                    f'halo-{idhalo}_subhalo-{idsubhalo}_{cfg.catalog.name}_rotation_{rotation}_{projection}_zoom_{i}')
+            path_icl = os.path.join(dataset_path, feature_1_name,
+                                    f"halo-{idhalo}_subhalo-{idsubhalo}_{cfg.catalog.name}_rotation_{rotation}_{projection}_zoom_{i}")
 
         np.savez(path_vel, vel_disp_with_mask)
         np.savez(path_icl, label_with_mask)
@@ -236,7 +262,7 @@ def get_interlopers_mask(label: np.ndarray, vel_disp: np.ndarray, spos_rot: np.n
 
     # Check if the mask is just zero
     if np.all(maschera == 0):
-        logger.warning('Mask is full of zeros.')
+        log.warning('Mask is full of zeros.')
 
     assert maschera.shape == label.shape == vel_disp.shape
 
@@ -248,8 +274,8 @@ def get_interlopers_mask(label: np.ndarray, vel_disp: np.ndarray, spos_rot: np.n
 
 
 def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloParticles, id_halo: int,
-                          id_subhalo: int, spos_rot: np.ndarray, shmr_h: pd.DataFrame, type4: np.ndarray, rotation: str
-                          ) -> None:
+                          id_subhalo: int, spos_rot: np.ndarray, shmr_h: pd.DataFrame, type4: np.ndarray,
+                          cfg: DictConfig, rotation: str) -> None:
     """
     Create maps for projections xy, yz, and xz, and save random zooms for each projection.
 
@@ -276,7 +302,7 @@ def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloP
     --------
     None
     """
-    logger.info("--> Creating maps for projections xy, yz and xz...")
+    log.info("--> Creating maps for projections xy, yz and xz...")
 
     # Check if spos_rot is a NumPy array, if not, convert it
     if not isinstance(spos_rot, np.ndarray):
@@ -291,12 +317,13 @@ def create_maps_and_zooms(halo_context: HaloContext, subhalo_particles: SubhaloP
 
     for j, (label_i, vel_disp_i, biny_i) in enumerate(label_vel_biny_projections):
         projection = projections[j]
-        logger.info(f"---> Masking interlopers for projection {projection}...")
+        log.info(f"---> Masking interlopers for projection {projection}...")
         mask = get_interlopers_mask(label_i, vel_disp_i, spos_rot, shmr_h, interlopers_id, biny_i)
-        logger.info("---> Saving three random zooms for icl fraction and velocity "
+        log.info("---> Saving three random zooms for icl fraction and velocity "
                     f"dispersion for proyection {projection}...")
-        create_n_zooms(label_i, vel_disp_i, idhalo=id_halo, mask=mask,
-                       idsubhalo=id_subhalo, projection=projection, n=3, rotation=rotation)
+        create_n_zooms(feature_1=label_i, feature_2=vel_disp_i, feature_1_name=cfg.feature_names[1],
+                       feature_2_name=cfg.feature_names[0], idhalo=id_halo, mask=mask, idsubhalo=id_subhalo,
+                       projection=projection, n=3, rotation=rotation, cfg=cfg)
 
 
 def circle(x: float, y: float, h: float, k: float, r: float) -> float:

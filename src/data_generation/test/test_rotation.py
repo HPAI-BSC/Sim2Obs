@@ -63,7 +63,7 @@ class TestRotation(unittest.TestCase):
 
         z = np.array([0, 0, 1])
         rotated_z = np.array([0, -0.70710678, 0.70710678])
-        Q = get_transform_matrix(rotated_z, z, normalized=True, debug=False)
+        Q = get_transform_matrix(rotated_z, z, normalized=True)
         print(Q)
 
         new_vector = Q @ z
@@ -74,7 +74,7 @@ class TestRotation(unittest.TestCase):
         # rotate original axis z around x-axis
         z = np.array([0, 0, 1])
         new_z = rotate_vector(z, axis=np.array([1, 0, 0]), angle_=45)
-        Q = get_transform_matrix(new_z, z, normalized=True, debug=False)
+        Q = get_transform_matrix(new_z, z, normalized=True)
 
         # Generate elliptical points
         x, y, z = generate_elliptical_cloud(num_points=100, a=10, b=5, c=3)
@@ -115,7 +115,7 @@ class TestRotation(unittest.TestCase):
         # rotate original axis z around x-axis
         z = np.array([0, 0, 1])
         new_z = rotate_vector(z, axis=np.array([0, 0, 1]), angle_=270)
-        Q = get_transform_matrix(new_z, z, normalized=True, debug=False)
+        Q = get_transform_matrix(new_z, z, normalized=True)
 
         # Generate elliptical points
         x, y, z = generate_elliptical_cloud(num_points=100, a=10, b=5, c=3)

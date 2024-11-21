@@ -1,0 +1,24 @@
+defaults:
+  - _self_
+  - paths: local
+  - catalog: eagle
+  - extras: default
+  - hydra: default
+
+# task name, determines output directory path
+task_name: "data_generation"
+
+subhalo_min_mass: 1e10    # Assuming is M⊙
+halo_min_mass: 1e13        # Assuming is M⊙
+
+rotation_45: [45, [0, 0, 1], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]]
+rotation_90: [90, [0, 0, 1], [[1, 0, 0]]]
+rotation_120: [120, [0, 0, 1], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]]
+
+solar_mass_convention: 1e10
+G: 4.30091e-6              # Gravitational constant in units of kpc Msun^-1 (km/s)^2
+H: 0.6774
+
+rotation_group: ${rotation_120}
+feature_names: ['velocity_dispersion', 'label']  # velocity dispersion -> label
+
