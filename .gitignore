@@ -156,3 +156,5 @@ configs/local/default.yaml
 local/data/
 local/output/
 temp
+
+*/sql_cookies.txt
