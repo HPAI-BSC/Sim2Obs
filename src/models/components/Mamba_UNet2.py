@@ -886,6 +886,7 @@ class VSSM(nn.Module):
         for layer in self.layers:
             x_downsample.append(x)
             x = layer(x)
+            print(f"{x.shape}")
         x = self.norm(x)  # B H W C
         return x, x_downsample
 
