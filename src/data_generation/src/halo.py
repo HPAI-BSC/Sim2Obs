@@ -87,10 +87,10 @@ class HaloContext:
         # Create a DataFrame to hold halo properties
         self.data = pd.DataFrame({
             "halo_id": halo_id,
-            "r200": r200 * scale_factor,       # Scaled radii
-            "m200": m200,                     # Solar masses
-            "gpos": list(gpos * scale_factor), # Scaled positions
-            "fsub": fsub.astype(int)          # First subhalo indices
+            "r200": r200 * scale_factor,        # Scaled radii
+            "m200": m200,                       # Solar masses
+            "gpos": list(gpos * scale_factor),  # Scaled positions
+            "fsub": fsub.astype(int)            # First subhalo indices
         })
 
         # Set 'halo_id' as the index for efficient querying
