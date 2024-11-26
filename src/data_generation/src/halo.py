@@ -1,44 +1,134 @@
 import numpy as np
+import pandas as pd
+
+
+class Halo:
+    """
+    A class to represent a Halo object with dynamically set attributes.
+
+    Attributes:
+    -----------
+    halo_id : int
+        The unique identifier for the halo.
+    fsub : int
+        The index of the primary subhalo.
+    other attributes : various
+        Any additional attributes passed during initialization.
+
+    Methods:
+    --------
+    __init__(**kwargs):
+        Initializes a Halo object by dynamically setting attributes from keyword arguments.
+    """
+    def __init__(self, **kwargs):
+        """
+        Initialize a Halo object with required attributes (`halo_id`, `fsub`) and any other attributes provided.
+
+        Parameters:
+        -----------
+        kwargs : dict
+            A dictionary of attributes to be assigned to the Halo object.
+            The required attributes 'halo_id' and 'fsub' must be included.
+
+        Raises:
+        -------
+        ValueError:
+            If any of the required attributes 'halo_id' or 'fsub' are missing.
+        """
+        required_attributes = ['halo_id', 'fsub']
+        missing_attrs = [attr for attr in required_attributes if attr not in kwargs]
+        if missing_attrs:
+            raise ValueError(f"Missing required attributes: {missing_attrs}")
+
+        # Dynamically set attributes
+        for key, value in kwargs.items():
+            if isinstance(value, list):  # Check if the value is a list
+                value = np.array(value)  # Convert the list to a numpy array
+            setattr(self, key, value)
 
 
 class HaloContext:
-    def __init__(self, r200: np.ndarray, m200: np.ndarray, gpos: np.ndarray, fsub: np.ndarray, scale_factor: float,
-                 halo_id: np.ndarray):
+    """
+    A class to manage halo data in a context, including scaled properties stored in a Pandas DataFrame.
+
+    Attributes:
+    -----------
+    data : pd.DataFrame
+        A DataFrame storing properties for different halos, with halo_id as the index.
+
+    Methods:
+    --------
+    __init__(r200, m200, gpos, fsub, scale_factor, halo_id):
+        Initializes the HaloContext object with the provided halo properties, scaling them appropriately.
+    get_item(halo_id):
+        Retrieves the properties of a specific halo by its ID.
+    halo_id:
+        Property to retrieve the halo_id column from the stored DataFrame.
+    """
+    def __init__(self, r200, m200, gpos, fsub, scale_factor, halo_id):
         """
-        Initialize a HaloContext object with scaled halo properties.
+        Initialize a HaloContext object with scaled halo properties, stored in a Pandas DataFrame.
 
         Parameters:
         -----------
         r200 : np.ndarray
-            Radii of the halos, scaled by the scale factor.
+            Array of R200 values for halos to be scaled by the scale_factor.
         m200 : np.ndarray
-            Masses of the halos, converted to solar masses.
+            Array of M200 values for halos.
         gpos : np.ndarray
-            Positions of the halos, scaled by the scale factor.
+            Array of positions for halos to be scaled by the scale_factor.
         fsub : np.ndarray
-            Indices of the first subhalo in each halo.
+            Array indicating the first subhalo indices.
         scale_factor : float
-            Scaling factor to apply to r200 and gpos.
-        halo_id: np.ndarray
-            Halo identifiers
+            The scaling factor to be applied to r200 and gpos.
+        halo_id : np.ndarray
+            Array of unique halo IDs.
         """
-        self.r200 = r200 * scale_factor   # Apply scaling factor
-        self.m200 = m200                  # Solar masses
-        self.gpos = gpos * scale_factor   # Apply scaling factor to halo positions
-        self.fsub = fsub.astype(int)
-        self.halo_id = halo_id
+        # Create a DataFrame to hold halo properties
+        self.data = pd.DataFrame({
+            "halo_id": halo_id,
+            "r200": r200 * scale_factor,       # Scaled radii
+            "m200": m200,                     # Solar masses
+            "gpos": list(gpos * scale_factor), # Scaled positions
+            "fsub": fsub.astype(int)          # First subhalo indices
+        })
 
-    def get_item(self, halo_id):
-        position = np.where(self.halo_id == halo_id)
-        if len(position) - 1 > 0:
-            raise Exception('Error, there are repeated halo ids')
-        else:
-            position = position[0]
-            if position < len(self.r200):
-                return self.r200[position], self.m200[position], self.gpos[position], self.fsub[position][0]
-            else:
-                raise Exception(f'Error, the halo_id={halo_id} could not be found.')
+        # Set 'halo_id' as the index for efficient querying
+        self.data.set_index("halo_id", inplace=True, drop=False)
 
+    def get_item(self, halo_id) -> Halo:
+        """
+        Retrieve the properties for a specific halo ID and return a corresponding Halo object.
 
+        Parameters:
+        -----------
+        halo_id : int
+            The halo ID to query.
 
+        Returns:
+        --------
+        Halo
+            A Halo object containing the properties of the specified halo.
 
+        Raises:
+        -------
+        Exception:
+            If the provided halo_id is not found in the DataFrame.
+        """
+        try:
+            halo_data = self.data.loc[halo_id].to_dict()
+            return Halo(**halo_data)
+        except KeyError:
+            raise Exception(f"Halo ID {halo_id} not found.")
+
+    @property
+    def halo_id(self):
+        """
+        Retrieve the halo_id column from the DataFrame.
+
+        Returns:
+        --------
+        pd.Series
+            A Series containing the halo_id values.
+        """
+        return self.data["halo_id"]

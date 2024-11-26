@@ -1,7 +1,75 @@
 import numpy as np
+import pandas as pd
+
+
+class SubHalo:
+    """
+    A class to represent a SubHalo object with dynamically set attributes.
+
+    Attributes:
+    -----------
+    subhalo_id : int
+        The unique identifier for the subhalo.
+    id_parents : int
+        The ID of the parent halo to which the subhalo belongs.
+    other attributes : various
+        Any additional attributes passed during initialization.
+
+    Methods:
+    --------
+    __init__(**kwargs):
+        Initializes a SubHalo object by dynamically setting attributes from keyword arguments.
+    """
+    def __init__(self, **kwargs):
+        """
+        Initialize a SubHalo object with required attributes (`subhalo_id`, `id_parents`) and any other attributes provided.
+
+        Parameters:
+        -----------
+        kwargs : dict
+            A dictionary of attributes to be assigned to the SubHalo object.
+            The required attributes 'subhalo_id' and 'id_parents' must be included.
+
+        Raises:
+        -------
+        ValueError:
+            If any of the required attributes 'subhalo_id' or 'id_parents' are missing.
+        """
+        required_attributes = ['subhalo_id', 'id_parents']
+
+        missing_attrs = [attr for attr in required_attributes if attr not in kwargs]
+        if missing_attrs:
+            raise ValueError(f"Missing required attributes: {missing_attrs}")
+
+        # Dynamically set attributes
+        for key, value in kwargs.items():
+            if isinstance(value, list):  # Check if the value is a list
+                value = np.array(value)  # Convert the list to a numpy array
+            setattr(self, key, value)
 
 
 class SubhaloContext:
+    """
+    A class to manage subhalo data in a context, stored in a Pandas DataFrame with properties such as positions, masses, and radii.
+
+    Attributes:
+    -----------
+    data : pd.DataFrame
+        A DataFrame storing properties for different subhalos, with multi-index `id_parents` and `subhalo_id`.
+
+    Methods:
+    --------
+    __init__(spos, grnr, shmr, mstr, scale_factor, subhalo_id):
+        Initializes the SubhaloContext with the provided subhalo properties, scaling them appropriately.
+    get_item(subhalo_id, halo_id=None):
+        Retrieves the properties of a specific subhalo by its ID and optional halo ID.
+    get_items_by_halo(halo_id):
+        Retrieves all subhalos associated with a specific halo ID.
+    id_parents:
+        Property to retrieve the `id_parents` column from the stored DataFrame.
+    subhalo_id:
+        Property to retrieve the `subhalo_id` column from the stored DataFrame.
+    """
     def __init__(self, spos: np.ndarray, grnr: np.ndarray, shmr: np.ndarray,
                  mstr: np.ndarray, scale_factor: float, subhalo_id: np.ndarray) -> None:
         """
@@ -20,34 +88,122 @@ class SubhaloContext:
         scale_factor : float
             The scale factor to apply to subhalo positions and other properties.
         subhalo_id: np.ndarray
-            List with the subhalo identifiers
+            List with the subhalo identifiers.
         """
-        self.spos = spos * scale_factor           # Apply scaling factor to subhalo positions
-        self.shmr = shmr * scale_factor           # Apply scaling factor to shmr
-        self.mstr = mstr                          # Solar masses
-        self.id_parents = grnr
-        self.subhalo_id = subhalo_id
+        # Create a DataFrame
+        self.data = pd.DataFrame({
+            "id_parents": grnr,  # Halo IDs
+            "subhalo_id": subhalo_id,  # Subhalo IDs
+            "spos": list(spos * scale_factor),  # Scaled positions
+            "shmr": list(shmr * scale_factor),  # Scaled half-mass radius
+            "mstr": list(mstr)  # Stellar mass
+        })
 
-    def get_item(self, subhalo_id):
-        position = np.where(self.subhalo_id == subhalo_id)
-        if len(position) - 1 > 0:
-            raise Exception('There are repeated subhalo ids')
-        else:
-            position = position[0]
-            if position < len(self.spos):
-                return self.spos[position], self.shmr[position], self.mstr[position]
+        # Set a multi-index for efficient querying
+        self.data.set_index(["id_parents", "subhalo_id"], inplace=True, drop=False)
+
+    def get_item(self, subhalo_id, halo_id=None) -> SubHalo:
+        """
+        Retrieve a subhalo's properties given its subhalo ID and optional halo ID.
+
+        Parameters:
+        -----------
+        subhalo_id : int
+            The subhalo ID to query.
+        halo_id : int, optional
+            The halo ID to query. If not provided, all subhalos with the specified `subhalo_id` are returned.
+
+        Returns:
+        --------
+        SubHalo
+            A SubHalo object containing the properties of the specified subhalo.
+
+        Raises:
+        -------
+        Exception:
+            If the provided `subhalo_id` (and `halo_id` if given) is not found in the DataFrame.
+        """
+        try:
+            # Query using the multi-index
+            if halo_id is not None:
+                result = self.data.loc[(halo_id, subhalo_id)].to_dict()
+                return SubHalo(**result)
             else:
-                raise Exception(f'Error, the subhalo_id={subhalo_id} could not be found.')
+                # For Illustris-like single-index lookup, query all matching rows
+                result = self.data.xs(subhalo_id, level="subhalo_id", drop_level=False).to_dict()
+            return SubHalo(**result)
+        except KeyError:
+            raise Exception(f"Subhalo not found for halo_id={halo_id}, subhalo_id={subhalo_id}.")
 
-    def get_items_by_halo(self, halo_id):
-        positions = np.where(self.id_parents == halo_id)
-        if len(positions) > 0:
-            return self.spos[positions], self.shmr[positions], self.mstr[positions]
-        else:
-            return [], [], []
+    # TODO modify this
+    def get_items_by_halo(self, halo_id) -> pd.DataFrame:
+        """
+        Retrieve all subhalos associated with a specific halo ID.
+
+        Parameters:
+        -----------
+        halo_id : int
+            The halo ID to query.
+
+        Returns:
+        --------
+        pd.DataFrame
+            A DataFrame containing all subhalos for the given `halo_id`.
+
+        Raises:
+        -------
+        Exception:
+            If no subhalos are found for the given `halo_id`.
+        """
+        try:
+            return self.data.loc[halo_id]
+        except KeyError:
+            raise Exception(f"No subhalos found for halo_id={halo_id}.")
+
+    # Properties for direct access to columns
+    @property
+    def id_parents(self) -> pd.Series:
+        """
+        Retrieve the `id_parents` column from the DataFrame.
+
+        Returns:
+        --------
+        pd.Series
+            A Series containing the parent halo IDs.
+        """
+        return self.data["id_parents"]
+
+    @property
+    def subhalo_id(self) -> pd.Series:
+        """
+        Retrieve the `subhalo_id` column from the DataFrame.
+
+        Returns:
+        --------
+        pd.Series
+            A Series containing the subhalo IDs.
+        """
+        return self.data["subhalo_id"]
 
 
 class SubhaloParticles:
+    """
+    A class to manage the particles of a subhalo, including their mass, position, and velocity data.
+
+    Attributes:
+    -----------
+    m : np.ndarray
+        The mass of particles.
+    p : np.ndarray
+        The positions of particles.
+    v : np.ndarray
+        The velocities of particles.
+
+    Methods:
+    --------
+    __init__(m, p, v, scale_factor=None, init=True):
+        Initializes the SubhaloParticles object with particle mass, position, and velocity data.
+    """
     def __init__(self, m: np.ndarray, p: np.ndarray, v: np.ndarray,
                  scale_factor: float = None, init: bool = True) -> None:
         """
