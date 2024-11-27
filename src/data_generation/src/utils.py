@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from dotenv import load_dotenv
+from scipy.spatial.distance import cosine
 
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloParticles
@@ -340,3 +341,224 @@ def compute_intrahalo_variance_ilaria(input_dir: str) -> pd.DataFrame:
 
     df = df.sort_values(by="halo_id")
     return df
+
+
+def angle(u: np.ndarray, v: np.ndarray) -> float:
+    """
+    Calculate the angle between two vectors using the cosine similarity.
+
+    Parameters:
+    -----------
+    u : np.ndarray
+        The first vector. Must be of the same dimension as `v`.
+    v : np.ndarray
+        The second vector. Must be of the same dimension as `u`.
+
+    Returns:
+    --------
+    float
+        The angle in radians between the vectors `u` and `v`.
+
+    Note:
+    -----
+    The input vectors `u` and `v` should be normalized (unit vectors) for
+    accurate angle calculations. If the vectors are not normalized, the returned
+    angle may not accurately represent the angle between them.
+    """
+    return np.arccos(1 - cosine(u, v))
+
+
+def rotate_vector(v: np.ndarray, axis: np.ndarray, angle_: float) -> np.ndarray:
+    """
+    Rotate a vector around a specified axis by a given angle.
+
+    Parameters:
+    -----------
+    v : np.ndarray
+        The 3D vector to be rotated. Must be a 1D array of length 3.
+    axis : np.ndarray
+        The 3D vector representing the axis of rotation. Must also be a 1D array of length 3.
+    angle_ : float
+        The angle by which to rotate the vector, in degrees.
+
+    Returns:
+    --------
+    np.ndarray
+        The rotated 3D vector as a 1D array.
+
+    Note:
+    -----
+    The function assumes that both the input vector `v` and the rotation axis
+    `axis` are 3D vectors (1D arrays with length 3). The angle is converted
+    from degrees to radians for the calculations.
+    """
+    # Normalize the rotation axis
+    u = axis / np.linalg.norm(axis)
+
+    # Convert angle to radians
+    theta = np.radians(angle_)
+
+    # Calculate components of Rodrigues' rotation formula
+    v_rot = (v * np.cos(theta) +
+             np.cross(u, v) * np.sin(theta) +
+             u * (np.dot(u, v) * (1 - np.cos(theta))))
+
+    return v_rot
+
+
+def get_transform_matrix(n: np.ndarray, axis: np.ndarray, normalized: bool = True) -> np.ndarray:
+    """
+    Calculate the rotation matrix that aligns a given vector with the new z-axis.
+
+    Parameters:
+    -----------
+    n : np.ndarray
+        A vector representing the new z-axis direction. Should be a 1D array of length 3.
+    axis : np.ndarray
+        The original z-axis vector (should be a standard reference vector).
+    normalized : bool, optional
+        Whether the vector `n` is normalized. Defaults to True.
+    debug : bool, optional
+        If True, enables debug logging for internal calculations. Defaults to False.
+
+    Returns:
+    --------
+    np.ndarray
+        A 3x3 rotation matrix that transforms the original coordinate system
+        to the new coordinate system aligned with the vector `n`.
+
+    Note:
+    -----
+    If the vector `n` is not normalized and `normalized` is set to False,
+    the function will normalize it internally before computation.
+    """
+    if not normalized:
+        # unit vector
+        n /= np.linalg.norm(n)
+
+    b = np.cross(axis, n)
+    theta = angle(axis, n)
+    angle_degree = theta * (180 / np.pi)
+
+    #log.debug(f'--> Rotation angle: {angle_degree}')
+
+    # Quaternion components
+    q0 = np.cos(theta / 2)
+    q1, q2, q3 = np.sin(theta / 2) * b
+
+    '''
+    Q_wrong = np.array([
+        [q0 ** 2 + q1 ** 2 - q2 ** 2 - q3 ** 2, 2 * (q1 * q2 + q0 * q3), 2 * (q1 * q3 - q0 * q2)],
+        [2 * (q2 * q1 - q0 * q3), q0 ** 2 - q1 ** 2 - q3 ** 2 + q2 ** 2, 2 * (q3 * q2 + q0 * q1)],
+        [2 * (q3 * q1 + q0 * q2), 2 * (q2 * q3 - q0 * q1), q0 ** 2 - q1 ** 2 + q3 ** 2 - q2 ** 2]
+    ])
+    '''
+
+    Q = np.array([
+        [1 - 2 * (q2 ** 2 + q3 ** 2), 2 * (q1 * q2 - q0 * q3), 2 * (q1 * q3 + q0 * q2)],
+        [2 * (q1 * q2 + q0 * q3), 1 - 2 * (q1 ** 2 + q3 ** 2), 2 * (q2 * q3 - q0 * q1)],
+        [2 * (q1 * q3 - q0 * q2), 2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1 ** 2 + q2 ** 2)]
+    ])
+
+    return Q
+
+
+def rotate_3dvec(Q: np.ndarray, vec: np.ndarray) -> np.ndarray:
+    """
+    Apply a rotation matrix to a 3-dimensional vector.
+
+    Parameters:
+    -----------
+    Q : np.ndarray
+        A 3x3 rotation matrix.
+    vec : np.ndarray
+        A 1D array or list of length 3 representing the vector to be rotated.
+
+    Returns:
+    --------
+    np.ndarray
+        The rotated 3-dimensional vector as a 1D array.
+
+    Note:
+    -----
+    Ensure that the input vector `vec` is a 1D array or list of length 3.
+    The rotation matrix `Q` should be properly constructed and validated
+    before applying this function to ensure correct results.
+    """
+    return (Q @ vec.T).T
+
+
+def circle(x: float, y: float, h: float, k: float, r: float) -> float:
+    """
+    Check if a point (x, y) lies within a circle defined by its center (h, k)
+    and radius r.
+
+    Parameters:
+    -----------
+    x : float
+        The x-coordinate of the point to check.
+    y : float
+        The y-coordinate of the point to check.
+    h : float
+        The x-coordinate of the center of the circle.
+    k : float
+        The y-coordinate of the center of the circle.
+    r : float
+        The radius of the circle.
+
+    Returns:
+    --------
+    float
+        A value representing the square of the distance from the point (x, y)
+        to the center of the circle (h, k) divided by the square of the radius
+        (r). If this value is less than or equal to 1, the point lies within
+        or on the circle.
+    """
+    return ((x - h) ** 2 + (y - k) ** 2) / r ** 2
+
+
+def muse_bins_r(fov: float, spatial_resolution: float) -> tuple[int, float]:
+    """
+    Calculate the number of bins and the radius for MUSE observations.
+
+    Parameters:
+    -----------
+    fov : float
+        The field of view in kiloparsecs (kpc).
+    spatial_resolution : float
+        The spatial resolution in kiloparsecs (kpc) that defines the size of each bin.
+
+    Returns:
+    --------
+    tuple
+        A tuple containing:
+        - bins : int
+            The number of bins along one axis calculated as the quotient of
+            the field of view divided by the spatial resolution.
+        - r : float
+            The radius of the field of view, computed as half of the fov.
+
+    Note:
+    -----
+    The function assumes that both `fov` and `spatial_resolution` are positive
+    values and that the spatial resolution is less than or equal to the field of view.
+    """
+    bins = int(fov / spatial_resolution)  # Number of bins along one axis
+    r = fov / 2  # Radius of the field of view
+    return bins, r
+
+
+def setup_output_directories(catalog_path: str, rotation_angle, input_feature_name: str, output_feature_name: str):
+    if os.path.exists(catalog_path):
+        if rotation_angle is not None:
+            dataset_path = os.path.join(catalog_path, f'rotation_{rotation_angle}')
+            if not os.path.exists(dataset_path):
+                # TODO can we executed this inside mn5 ?
+                os.mkdir(dataset_path)
+        else:
+            dataset_path = catalog_path
+        if not os.path.exists(os.path.join(dataset_path, output_feature_name)):
+            os.mkdir(os.path.join(dataset_path, output_feature_name))
+        if not os.path.exists(os.path.join(dataset_path, input_feature_name)):
+            os.mkdir(os.path.join(dataset_path, input_feature_name))
+

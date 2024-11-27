@@ -132,3 +132,5 @@ class HaloContext:
             A Series containing the halo_id values.
         """
         return self.data["halo_id"]
+
+    # TODO add the rest of the properties ?

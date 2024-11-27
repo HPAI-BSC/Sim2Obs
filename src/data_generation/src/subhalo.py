@@ -44,6 +44,7 @@ class SubHalo:
         # Dynamically set attributes
         for key, value in kwargs.items():
             if isinstance(value, list):  # Check if the value is a list
+                # Check dimensions
                 value = np.array(value)  # Convert the list to a numpy array
             setattr(self, key, value)
 
@@ -90,12 +91,18 @@ class SubhaloContext:
         subhalo_id: np.ndarray
             List with the subhalo identifiers.
         """
+        spos = spos * scale_factor
+        shmr = shmr * scale_factor
+
+        if spos.shape[1] == 3:
+            spos = [spos[i] for i in range(spos.shape[0])]
+
         # Create a DataFrame
         self.data = pd.DataFrame({
             "id_parents": grnr,  # Halo IDs
             "subhalo_id": subhalo_id,  # Subhalo IDs
-            "spos": list(spos * scale_factor),  # Scaled positions
-            "shmr": list(shmr * scale_factor),  # Scaled half-mass radius
+            "spos": list(spos),  # Scaled positions
+            "shmr": list(shmr),  # Scaled half-mass radius
             "mstr": list(mstr)  # Stellar mass
         })
 

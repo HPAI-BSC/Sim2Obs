@@ -37,6 +37,27 @@ class TestFeature(unittest.TestCase):
         self.assertEqual(result.shape, (4, 1))
         self.assertTrue(np.all(np.isin(result, [0, 1])))  # Check if it's a binary mask
 
+    def test_ICLProcessor_generate_maps(self):
+        processor = ICLProcessor(cfg=self.cfg)
+
+        # Create mock data for Halo and particles
+        halo = Halo(halo_id=1, r200=500, m200=1e12, gpos=np.array([0, 0, 0]), fsub=0)
+        particle_velocity = np.array([
+            [-76.38, -498.77, -215.50],
+            [-80.00, -450.00, -200.00],
+            [-70.00, -470.00, -220.00],
+            [-76.38, -498.77, -215.50]
+        ])
+        particle_position = np.array([
+            [100, 200, 300],
+            [400, 500, 600],
+            [700, 800, 900],
+            [400, 500, 600]
+        ])
+
+        result = processor.process(halo, particle_velocity, particle_position)
+        # processor.generate_map()
+
     def test_VelocityDispersionProcessor_process(self):
         processor = VelocityDispersionProcessor()
         particle_velocity = np.array([

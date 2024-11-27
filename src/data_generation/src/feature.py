@@ -1,18 +1,13 @@
 from abc import ABC, abstractmethod
-import rootutils
+from typing import List
 
 import numpy as np
 import pandas as pd
 import joblib
 from omegaconf import DictConfig
-
+from scipy import stats
 
 from src.data_generation.src.halo import Halo
-from src import utils
-
-
-rootutils.setup_root(__file__, pythonpath=True)
-log = utils.get_pylogger(__name__)
 
 
 class FeatureProcessor(ABC):
@@ -38,6 +33,22 @@ class FeatureProcessor(ABC):
         """
         pass
 
+    @abstractmethod
+    def generate_map(self, particle_positions: np.ndarray, bins: int, ranging: tuple, axis: tuple) -> tuple:
+        """
+        Generate a 2D map for the feature based on particle positions.
+
+        Args:
+            particle_positions (np.ndarray): Positions of particles.
+            bins (int): Number of bins for the map.
+            ranging (tuple): Range for the 2D map.
+            axis (tuple): Axes to project (e.g., (0, 1) for x-y plane).
+
+        Returns:
+            tuple: A tuple containing the map and additional data like bin edges.
+        """
+        pass
+
 
 class VelocityDispersionProcessor(FeatureProcessor):
     """
@@ -52,7 +63,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
     """
     def __init__(self):
         self.name = 'VelocityDispersion'
-        self.value = None
+        self.value = []
 
     # TODO review this computation
     def process(self, particle_velocity: np.ndarray) -> np.ndarray:
@@ -75,8 +86,27 @@ class VelocityDispersionProcessor(FeatureProcessor):
         v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
         # Computing the delta vel. from each particle in comparison to the mean-vel.
         velocity_disp = np.sqrt(((particle_velocity - v_cm) ** 2).sum(axis=1))
-        log.info(f'Computed velocity dispersion for {len(particle_velocity)} particles.')
+        # log.info(f'Computed velocity dispersion for {len(particle_velocity)} particles.')
         return velocity_disp
+
+    def generate_map(self, particle_positions: np.ndarray, bins: int, ranging: tuple, axis: tuple) -> tuple:
+        i, j = axis
+        if len(self.value) == 0:
+            raise Exception('FeatureProcessor value is empty, call first process method.')
+
+        if isinstance(self.value, List):
+            self.value = np.array(self.value)
+
+        pos_rot = particle_positions
+        # TODO check this part is working
+        input_ij, binx, biny, _ = stats.binned_statistic_2d(
+            pos_rot[:, i], pos_rot[:, j],
+            (self.value[:, 2]) ** 2,  # Access the relevant feature
+            statistic="mean", bins=bins, range=ranging
+        )
+        input_ij = np.sqrt(input_ij / 3)
+        input_ij[np.isnan(input_ij)] = 0
+        return input_ij, binx, biny
 
 
 class ICLProcessor(FeatureProcessor):
@@ -97,7 +127,7 @@ class ICLProcessor(FeatureProcessor):
         self.name = 'IntraClusterLight'
         self.model_path = '../model/Best_Model-Random-3par.pkl'
         self.cfg = cfg
-        self.value = None
+        self.value = []
 
     # Subhalo particles, halo
     def process(self, halo: Halo, particle_velocity: np.ndarray, particle_position: np.ndarray) -> np.ndarray:
@@ -115,7 +145,7 @@ class ICLProcessor(FeatureProcessor):
         Raises:
             ValueError: If the scaled particle data is empty.
         """
-        log.info(f'Processing ICL for Halo ID {halo.halo_id}.')
+        # log.info(f'Processing ICL for Halo ID {halo.halo_id}.')
         v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
         # Computing the Euclidean distance from the new origin to each particle
         distance = np.sqrt((particle_position ** 2).sum(axis=1))
@@ -153,10 +183,29 @@ class ICLProcessor(FeatureProcessor):
             # if particle belongs to ICL=1, otherwise BCG=0
             icl_mask[ids] = 1
         else:
-            log.warning("No particles predicted as ICL.")
+            # log.warning("No particles predicted as ICL.")
             raise ValueError("icl_mask is empty; no masking applied.")
-        log.info(f'Generated ICL mask for {len(icl_mask)} particles.')
+        # log.info(f'Generated ICL mask for {len(icl_mask)} particles.')
         return icl_mask
+
+    def generate_map(self, particle_positions: np.ndarray, bins: int, ranging: tuple, axis: tuple) -> tuple:
+        i, j = axis
+        pos_rot = particle_positions
+
+        # TODO check this part is working
+        output_ij, binx, biny, _ = stats.binned_statistic_2d(
+            pos_rot[:, i], pos_rot[:, j],
+            self.value,  # Access the ICL feature data
+            statistic="sum", bins=bins, range=ranging
+        )
+        output_count_ij, _, _, _ = stats.binned_statistic_2d(
+            pos_rot[:, i], pos_rot[:, j],
+            self.value,  # Access the ICL feature count
+            statistic="count", bins=bins, range=ranging
+        )
+        output_ij = output_ij / output_count_ij
+        output_ij[np.isnan(output_ij)] = 0
+        return output_ij, binx, biny
 
 
 class FeatureProcessorFactory:
@@ -193,5 +242,5 @@ class FeatureProcessorFactory:
 
         if feature not in feature_processors:
             raise ValueError(f"Invalid feature name {feature} provided")
-        log.info(f"Feature processor '{feature}' created.")
+        # log.info(f"Feature processor '{feature}' created.")
         return feature_processors[feature]
