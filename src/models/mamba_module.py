@@ -155,6 +155,9 @@ class MambaLitModule(LightningModule):
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
         torch.cuda.empty_cache()
+        print('hey')
+        print(self.train_loss)
+        a = bg
         pass
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
