@@ -880,14 +880,11 @@ class VSSM(nn.Module):
 
     # Encoder and Bottleneck
     def forward_features(self, x):
-        print(f'before patch_embed: {x.shape}')
         x = self.patch_embed(x)
-        print(f'after patch_embed: {x.shape}')
 
         x_downsample = []
         for i,layer in enumerate(self.layers):
             x_downsample.append(x)
-            print(f"before layer {i}: {x.shape}")
             x = layer(x)
         x = self.norm(x)  # B H W C
         return x, x_downsample
