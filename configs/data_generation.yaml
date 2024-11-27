@@ -18,6 +18,7 @@ rotation_120: [120, [0, 0, 1], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]]
 solar_mass_convention: 1e10
 G: 4.30091e-6              # Gravitational constant in units of kpc Msun^-1 (km/s)^2
 H: 0.6774
+n_zooms: 3
 
 rotation_group: ${rotation_120}
 feature_names: ['velocity_dispersion', 'label']  # velocity dispersion -> label
