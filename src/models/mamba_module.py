@@ -139,8 +139,6 @@ class MambaLitModule(LightningModule):
         """
         loss, preds, targets = self.model_step(batch)
 
-        print(loss)
-
         # update and log metrics
         self.train_loss(loss)
         # self.train_RASE(preds.to(torch.float32), targets.to(torch.float32))
@@ -154,6 +152,7 @@ class MambaLitModule(LightningModule):
 
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
+        print(self.train_loss)
         torch.cuda.empty_cache()
         pass
 
