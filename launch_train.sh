@@ -15,14 +15,8 @@
 CURRENT_DIR=$(pwd)
 echo "Current directory: '$CURRENT_DIR'"
 
-# Check if we're in a Git repository
-if git rev-parse --is-inside-work-tree 2>/dev/null; then
-    COMMIT_HASH=$(git rev-parse --short HEAD)
-    echo "Commit hash --: '$COMMIT_HASH'"
-else
-    echo "Not inside a Git repository. Cannot get commit hash."
-    exit 1
-fi
+COMMIT_HASH=$(basename "$CURRENT_DIR")
+echo "Commit hash: '$COMMIT_HASH'"
 
 # Update the commit_tag in config.yaml using sed
 sed -i "s/^commit_tag: .*/commit_tag: \"$COMMIT_HASH\"/" configs/train.yaml
