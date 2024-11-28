@@ -152,7 +152,6 @@ class MambaLitModule(LightningModule):
 
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
-        print(self.train_loss)
         torch.cuda.empty_cache()
         pass
 
@@ -178,6 +177,7 @@ class MambaLitModule(LightningModule):
         "Lightning hook that is called when a validation epoch ends."
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
+        print(f"Val rase: {rase}, val rmse: {rmse}")
         self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
