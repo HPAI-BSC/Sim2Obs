@@ -16,7 +16,6 @@ CURRENT_DIR=$(pwd)
 echo "Current directory: '$CURRENT_DIR'"
 
 COMMIT_HASH=$(basename "$CURRENT_DIR")
-echo "Commit hash: '$COMMIT_HASH'"
 
 # Update the commit_tag in config.yaml using sed
 sed -i "s/^commit_tag: .*/commit_tag: \"$COMMIT_HASH\"/" configs/train.yaml
