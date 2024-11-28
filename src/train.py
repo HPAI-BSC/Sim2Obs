@@ -60,21 +60,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info("Instantiating loggers...")
     logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
-    print(logger)
-    if logger and isinstance(logger[0], MLFlowLogger):
-        tracking_uri = "file:/gpfs/projects/bsc70/space/logs/mlflow/mlruns"  # Replace with your desired path
-        mlflow.set_tracking_uri(tracking_uri)
-        print(f"Mlflow logger")
-        mlflow_logger = logger[0]
-        print("MLflow Logger Attributes:")
-        for attr in dir(mlflow_logger):
-            if not attr.startswith('_'):
-                try:
-                    print(f"{attr}: {getattr(mlflow_logger, attr)}")
-                except Exception as e:
-                    print(f"{attr}: Unable to retrieve value - {e}")
-    else:
-        print("No mlflow logger")
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
     trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)

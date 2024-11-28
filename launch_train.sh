@@ -15,6 +15,12 @@
 CURRENT_DIR=$(pwd)
 echo "Current directory: '$CURRENT_DIR'"
 
+COMMIT_HASH=$(git rev-parse --short HEAD)
+echo "Commit hash: '$COMMIT_HASH"
+
+# Update the commit_tag in config.yaml using sed
+sed -i "s/^commit_tag: .*/commit_tag: \"$COMMIT_HASH\"/" configs/train.yaml
+
 module load singularity
 singularity exec -B /gpfs/projects/bsc70 \
                  --nv /gpfs/projects/bsc70/space/singularity/space_v3.sif \
