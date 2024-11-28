@@ -62,6 +62,8 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
     print(logger)
     if logger and isinstance(logger[0], MLFlowLogger):
+        tracking_uri = "file:/gpfs/projects/bsc70/space/logs/mlflow/mlruns"  # Replace with your desired path
+        mlflow.set_tracking_uri(tracking_uri)
         print(f"Mlflow logger")
         mlflow_logger = logger[0]
         print("MLflow Logger Attributes:")
