@@ -63,6 +63,11 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     print(logger)
     if logger and isinstance(logger[0], MLFlowLogger):
         print(f"Mlflow logger")
+        mlflow_logger = logger[0]
+        print(f"MLflow Experiment Name: {mlflow_logger.experiment_name}")
+        print(f"MLflow Tracking URI: {mlflow_logger.tracking_uri}")
+        print(f"MLflow Run ID: {mlflow_logger.run_id}")
+        print(f"MLflow Experiment ID: {mlflow_logger.experiment_id}")
     else:
         print("No mlflow logger")
 
