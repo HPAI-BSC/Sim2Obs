@@ -64,10 +64,13 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if logger and isinstance(logger[0], MLFlowLogger):
         print(f"Mlflow logger")
         mlflow_logger = logger[0]
-        print(f"MLflow Experiment Name: {mlflow_logger.experiment_name}")
-        print(f"MLflow Tracking URI: {mlflow_logger.tracking_uri}")
-        print(f"MLflow Run ID: {mlflow_logger.run_id}")
-        print(f"MLflow Experiment ID: {mlflow_logger.experiment_id}")
+        print("MLflow Logger Attributes:")
+        for attr in dir(mlflow_logger):
+            if not attr.startswith('_'):
+                try:
+                    print(f"{attr}: {getattr(mlflow_logger, attr)}")
+                except Exception as e:
+                    print(f"{attr}: Unable to retrieve value - {e}")
     else:
         print("No mlflow logger")
 
