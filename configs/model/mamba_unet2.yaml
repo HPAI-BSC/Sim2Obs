@@ -3,7 +3,7 @@ _target_: src.models.mamba_module.MambaLitModule
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.0001
+  lr: 0.00001
   weight_decay: 0
 
 scheduler:
@@ -18,7 +18,7 @@ net:
   config:
     patch_size: 4
     in_chains: 1
-    embed_dim: 1024
+    embed_dim: 256
     depths: [2, 2, 9, 2]
     mlp_ratio:
     drop_rate: 0.1
