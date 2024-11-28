@@ -19,7 +19,7 @@ net:
     patch_size: 4
     in_chains: 1
     embed_dim: 256
-    depths: [2, 2, 9, 2]
+    depths: [2, 2, 2, 2]
     mlp_ratio:
     drop_rate: 0.1
     drop_path_rate: 0.1
