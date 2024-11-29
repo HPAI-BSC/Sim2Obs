@@ -73,9 +73,9 @@ class MambaLitModule(LightningModule):
 
         self.net = net
 
-        # loss function
+        # loss function -- computed below
         #self.criterion = nn.BCEWithLogitsLoss()
-        self.criterion = RMSELoss()
+        #self.criterion = RMSELoss()
 
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
@@ -131,9 +131,9 @@ class MambaLitModule(LightningModule):
         preds = self.forward(x)
         if torch.isnan(preds).any():
             preds[torch.isnan(preds)] = 0.0
-        loss = self.criterion(preds, y)
-        # y, preds = torch.sigmoid(y), torch.sigmoid(preds)
-        # loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        #loss = self.criterion(preds, y)
+        y, preds = torch.sigmoid(y), torch.sigmoid(preds)
+        loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
         return loss, preds, y
 
     def training_step(
