@@ -151,7 +151,7 @@ class Illustris300Fetcher(DataFetcher):
 
         # Units of measure -> [10^10𝑀⊙/ℎ, 𝑐𝑘𝑝𝑐/ℎ, 𝑐𝑘𝑝𝑐/ℎ, int]
         fields = ["Group_M_Crit200", "Group_R_Crit200", "GroupPos", "GroupFirstSub"]
-        path = self.cfg.cata#log.path + '/output'
+        path = self.cfg.catalog.path + '/output'
 
         if not os.path.exists(path):
             #log.error(f"The path {path} does not exist.")
@@ -159,26 +159,20 @@ class Illustris300Fetcher(DataFetcher):
 
         halos = il.groupcat.loadHalos(path, self.cfg.catalog.snapnum, fields=fields)
         if len(halos) > 0:
-            halos['pos_x'], halos['pos_y'], halos['pos_z'] = np.split(halos["GroupPos"], 3, axis=1)
-            halos['pos_x'] = halos['pos_x'].flatten()
-            halos['pos_y'] = halos['pos_y'].flatten()
-            halos['pos_z'] = halos['pos_z'].flatten()
-            del halos["GroupPos"]
+            halos['GroupPos'] = [halos['GroupPos'][i] for i in range(halos['GroupPos'].shape[0])]
             halos = pd.DataFrame.from_dict(halos)
+            halos['halo_id'] = np.arange(len(halos['Group_M_Crit200']))
             halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * self.cfg.solar_mass_convention # 𝑀⊙/ℎ
-
             # Filter halos by min mass
             halos = halos[halos['Group_M_Crit200'] > self.cfg.halo_min_mass * self.cfg.H]
-            r200 = halos["Group_R_Crit200"].values
-            m200 = halos["Group_M_Crit200"].values
-            gpos = np.vstack(halos.apply(lambda row: np.array([row['pos_x'], row['pos_y'], row['pos_z']]), axis=1).values)
-            fsub = halos["GroupFirstSub"].values
-            halo_id = np.arange(len(r200))
+
+            column_map = {'halo_id': 'halo_id', 'r200': 'Group_R_Crit200', 'm200': 'Group_M_Crit200',
+                          'gpos': 'GroupPos', 'fsub': 'GroupFirstSub'}
+            return HaloContext(halos, self.cfg.catalog.scalf, column_map)
             #log.debug("Halo data fetched successfully.")
         else:
             #log.warning("No halos found.")
-            r200 = m200 = gpos = fsub = halo_id = np.ndarray([])
-        return HaloContext(r200, m200, gpos, fsub, self.cfg.catalog.scalf, halo_id)
+            return HaloContext(pd.DataFrame(data=[]), self.cfg.catalog.scalf, {})
 
     def _get_subhalos(self) -> SubhaloContext:
         """
@@ -199,18 +193,19 @@ class Illustris300Fetcher(DataFetcher):
             #log.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
-        halos = il.groupcat.loadSubhalos(path, self.cfg.catalog.snapnum, fields=fields)
-        if len(halos) > 0:
-            spos = halos["SubhaloPos"]
-            grnr = halos["SubhaloGrNr"]
-            shmr = halos["SubhaloHalfmassRadType"][:, 4]  # stars
-            mstr = halos["SubhaloMassType"][:, 4] * self.cfg.solar_mass_convention / self.cfg.H # 𝑀⊙
-            subhalo_id = np.arange(len(spos))
+        subhalos = il.groupcat.loadSubhalos(path, self.cfg.catalog.snapnum, fields=fields)
+        if len(subhalos) > 0:
+            subhalos['spos'] = subhalos['SubhaloPos']
+            subhalos['SubhaloHalfmassRadType'] = subhalos["SubhaloHalfmassRadType"][:, 4]  # stars
+            subhalos['SubhaloMassType'] = subhalos["SubhaloMassType"][:, 4] * self.cfg.solar_mass_convention / self.cfg.H # 𝑀⊙
+            subhalos['subhalo_id'] = np.arange(len(subhalos['spos']))
+            column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "SubhaloGrNr",
+                          "shmr": "SubhaloHalfmassRadType", "mstr": "SubhaloMassType"}
+            return SubhaloContext(subhalos, self.cfg.catalog.scalf, column_map)
             #log.debug("Subhalo data fetched successfully.")
         else:
             #log.warning("No subhalos found.")
-            spos = grnr = shmr = mstr = subhalo_id = np.ndarray([])
-        return SubhaloContext(spos, grnr, shmr, mstr, self.cfg.catalog.scalf, subhalo_id)
+            return SubhaloContext(pd.DataFrame(data=[]), self.cfg.catalog.scalf, {})
 
     def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
         """
@@ -365,19 +360,16 @@ class EagleFetcher(DataFetcher):
         if len(df) > 0:
             df = df.sort_values(by='halo_id')
             # pkps -> ckps / h
-            gpos = df.apply(lambda row: np.array([row['pos_x'] / self.cfg.H, row['pos_y'] / self.cfg.H, row['pos_z'] / self.cfg.H]), axis=1)
-            gpos = np.vstack(gpos)
-            r200 = df['r200'].values / self.cfg.H    # pkps -> ckps / h
-            m200 = df['m200'].values / self.cfg.H    # 𝑀⊙/ℎ
-            halo_id = df['halo_id'].values
+            df['gpos'] = df.apply(lambda row: np.array([row['pos_x'] / self.cfg.H, row['pos_y'] / self.cfg.H, row['pos_z'] / self.cfg.H]), axis=1)
+            df['r200'] = df['r200'].values / self.cfg.H    # pkps -> ckps / h
+            df['m200'] = df['m200'].values / self.cfg.H    # 𝑀⊙/ℎ
             df['halo_id'] = df['halo_id'].astype(int)
-            fsub = df['subhalo_id'].values
-            halo_context = HaloContext(r200, m200, gpos, fsub, scale_factor=self.cfg.catalog.scalf, halo_id=halo_id)
+            column_map = {'halo_id': 'halo_id', 'r200': 'r200', 'm200': 'm200', 'gpos': 'gpos', 'fsub': 'subhalo_id'}
+            halo_context = HaloContext(df, scale_factor=self.cfg.catalog.scalf, column_map=column_map)
             #log.debug("Halo data fetched successfully.")
         else:
             #log.warning("No halo data found in Eagle database.")
-            halo_context = HaloContext(np.ndarray([]), np.ndarray([]), np.ndarray([]), np.ndarray([]),
-                                       scale_factor=self.cfg.catalog.scalf, halo_id=np.ndarray([]))
+            halo_context = HaloContext(pd.DataFrame(data=[]), scale_factor=self.cfg.catalog.scalf, column_map={})
         return halo_context
 
     def _get_subhalos(self) -> SubhaloContext:
@@ -420,24 +412,20 @@ class EagleFetcher(DataFetcher):
         # Units of measure [avg_stellar_half_mass_radius=pkpc, total_stellar_mass=M⊙, spos=cMpc]
         if len(df) > 0:
             df = df.sort_values(by='subhalo_id')
-
             # pkps -> ckps / h
-            spos = df.apply(lambda row: np.array([row['subhalo_pos_x'] / self.cfg.H, row['subhalo_pos_y'] / self.cfg.H,
-                                                  row['subhalo_pos_z'] / self.cfg.H]), axis=1).values
-            spos = np.vstack(spos)
-            grnr = df['halo_id'].values
-            shmr = df['stellar_half_mass_radius'].values / self.cfg.H  # pkps -> ckps / h
-            mstr = df['total_stellar_mass'].values
-            subhalo_ids = df['subhalo_id'].values
-            subhalo_context = SubhaloContext(spos, grnr, shmr, mstr, self.cfg.catalog.scalf, subhalo_ids)
+            df['spos'] = df.apply(lambda row: np.array([row['subhalo_pos_x'] / self.cfg.H,
+                                                        row['subhalo_pos_y'] / self.cfg.H,
+                                                        row['subhalo_pos_z'] / self.cfg.H]), axis=1)
+            df['stellar_half_mass_radius'] = df['stellar_half_mass_radius'].values / self.cfg.H  # pkps -> ckps / h
+            column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "halo_id",
+                          "shmr": "stellar_half_mass_radius", "mstr": "total_stellar_mass"}
+            subhalo_context = SubhaloContext(df, self.cfg.catalog.scalf, column_map)
             #log.debug("Subhalo data fetched successfully.")
         else:
             #log.warning("No subhalo data found in Eagle database.")
-            subhalo_context = SubhaloContext(np.ndarray([]), np.ndarray([]), np.ndarray([]),
-                                             np.ndarray([]), self.cfg.catalog.scalf, np.ndarray([]))
+            subhalo_context = SubhaloContext(pd.DataFrame(data=[]), self.cfg.catalog.scalf, {})
         return subhalo_context
 
-    # TODO contact to eagle to inform about this error
     def _get_p_subhalo(self, subgroup_id: int, halo_id: int):
         """
         Fetches particle data for a specific subhalo from the Eagle simulation.

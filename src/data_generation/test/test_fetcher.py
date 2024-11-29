@@ -44,7 +44,7 @@ class TestFetcher(unittest.TestCase):
         self.assertIsInstance(halo_context_2, HaloContext)
 
         # get_item
-        halo_data_2 = halo_context_2.get_item(halo_id=halo_context_2.halo_id.iloc[0])
+        halo_data_2 = halo_context_2.get_item(halo_id=halo_context_2.halo_id[0])
         assert halo_data_2 is not None
 
     def test_get_subhalos_illustris(self):
@@ -60,7 +60,7 @@ class TestFetcher(unittest.TestCase):
         self.assertIsInstance(subhalo_context_2, SubhaloContext)
 
         # Get item
-        subhalo_data_2 = subhalo_context_2.get_item(subhalo_id=subhalo_context_2.subhalo_id.iloc[0])
+        subhalo_data_2 = subhalo_context_2.get_item(subhalo_id=subhalo_context_2.subhalo_id[0])
         assert subhalo_data_2 is not None
 
     def test_get_p_subhalo_illustris(self):
@@ -87,9 +87,9 @@ class TestFetcher(unittest.TestCase):
                 self.cfg_eagle.catalog['simulation_code'] = sim
                 self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle)
                 halos = self.fetcher_eagle.get_halos()
-                print(f'-- Number of halos: {len(halos.m200)}')
+                print(f'-- Number of halos: {len(halos.data["m200"])}')
                 subhalos = self.fetcher_eagle.get_subhalos()
-                print(f'-- Number of subhalos: {len(subhalos.mstr)}')
+                print(f'-- Number of subhalos: {len(subhalos.data["mstr"])}')
                 # _ = self.fetcher_eagle.get_p_subhalo(idsubhalo=10)
             except Exception as e:
                 print(e)
