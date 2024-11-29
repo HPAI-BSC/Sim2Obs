@@ -5,6 +5,7 @@ import rootutils
 from lightning import LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
+import torch
 
 import matplotlib.pyplot as plt
 
@@ -35,6 +36,11 @@ log = utils.get_pylogger(__name__)
 def plot_predictions(predictions, ground_truths, output_path):
     if len(predictions) != len(ground_truths):
         raise ValueError("Predictions and ground truths must have the same length")
+
+    if isinstance(predictions, torch.Tensor):
+        predictions = predictions.detach().cpu().numpy()
+    if isinstance(ground_truths, torch.Tensor):
+        ground_truths = ground_truths.detach().cpu().numpy()
 
     # Create a grid of subplots
     fig, axes = plt.subplots(2, len(predictions), figsize=(len(predictions) * 4, 2 * 4))
