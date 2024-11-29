@@ -9,6 +9,14 @@ import torch.nn as nn
 torch.set_float32_matmul_precision('medium')
 
 
+class RMSELoss(nn.Module):
+    def __init__(self):
+        super(RMSELoss, self).__init__()
+
+    def forward(self, yhat, y):
+        return torch.sqrt(torch.mean((yhat - y) ** 2))
+
+
 class MambaLitModule(LightningModule):
     """
     A `LightningModule` implements 8 key methods:
@@ -66,7 +74,8 @@ class MambaLitModule(LightningModule):
         self.net = net
 
         # loss function
-        self.criterion = nn.BCEWithLogitsLoss()
+        #self.criterion = nn.BCEWithLogitsLoss()
+        self.criterion = RMSELoss()
 
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
