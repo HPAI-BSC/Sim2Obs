@@ -80,7 +80,7 @@ unique_halo_ids = tmp['SubGroupNumber'].unique()
 tmp_filtered = tmp[(tmp['SubGroupNumber'] == subhalo_id) & (tmp['GroupNumber'] == group_number)]
 tmp_filtered = tmp_filtered.head(n)
 velocity = np.vstack(tmp_filtered['velocity'].values)
-subhalo_particles = SubhaloParticles(tmp_filtered['mass'], tmp_filtered['coords'], velocity,
-                                     cfg_eagle.catalog.scalf)
+positions = np.vstack(tmp_filtered['coords'].values)
+subhalo_particles = SubhaloParticles(tmp_filtered['mass'], positions, velocity, cfg_eagle.catalog.scalf)
 with open('data/eagle/subhalo_particles_0.pkl', 'wb') as f:
     pickle.dump(subhalo_particles, f)

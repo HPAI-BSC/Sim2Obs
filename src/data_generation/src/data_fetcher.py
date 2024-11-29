@@ -468,9 +468,8 @@ class EagleFetcher(DataFetcher):
         tmp = pd.DataFrame(data)
         data_filtered = tmp[(tmp['GroupNumber'] == group_number) & (tmp['SubGroupNumber'] == subgroup_id)]
         velocity = np.vstack(data_filtered['velocity'].values)
-        subhalo_particles = SubhaloParticles(data_filtered['mass'].values, data_filtered['coords'].values,
-                                             velocity,
-                                             self.cfg.catalog.scalf)
+        positions = np.vstack(data_filtered['coords'].values)
+        subhalo_particles = SubhaloParticles(data_filtered['mass'].values, positions, velocity, self.cfg.catalog.scalf)
         #log.debug("Particle data fetched successfully.")
         return subhalo_particles
 
