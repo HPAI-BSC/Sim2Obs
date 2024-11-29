@@ -53,7 +53,6 @@ def plot_predictions(predictions, ground_truths, output_path):
         else:
             gt = np.transpose(pred, (1, 2, 0))
         print(pred.shape, gt.shape)
-        print(type(pred), type(gt))
         axes[0, i].imshow(pred)
         axes[0, i].axis('off')
         axes[0, i].set_title(f'Prediction {i}')
