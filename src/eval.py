@@ -42,6 +42,8 @@ def plot_predictions(predictions, ground_truths, output_path):
     # Plot each image in a subplot
     i = 0
     for pred, gt in zip(predictions, ground_truths):
+        print(pred.shape, gt.shape)
+        print(type(pred), type(gt))
         axes[0, i].imshow(pred.permute(1, 2, 0))
         axes[0, i].axis('off')
         axes[0, i].set_title(f'Prediction {i}')
