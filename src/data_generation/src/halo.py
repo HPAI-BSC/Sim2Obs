@@ -58,42 +58,58 @@ class HaloContext:
 
     Methods:
     --------
-    __init__(r200, m200, gpos, fsub, scale_factor, halo_id):
+    __init__(properties, scale_factor, column_map):
         Initializes the HaloContext object with the provided halo properties, scaling them appropriately.
     get_item(halo_id):
         Retrieves the properties of a specific halo by its ID.
     halo_id:
         Property to retrieve the halo_id column from the stored DataFrame.
     """
-    def __init__(self, r200, m200, gpos, fsub, scale_factor, halo_id):
+    def __init__(self, properties: pd.DataFrame, scale_factor, column_map):
         """
         Initialize a HaloContext object with scaled halo properties, stored in a Pandas DataFrame.
 
         Parameters:
         -----------
-        r200 : np.ndarray
-            Array of R200 values for halos to be scaled by the scale_factor.
-        m200 : np.ndarray
-            Array of M200 values for halos.
-        gpos : np.ndarray
-            Array of positions for halos to be scaled by the scale_factor.
-        fsub : np.ndarray
-            Array indicating the first subhalo indices.
+        properties : dict or pd.DataFrame
+            Dictionary or DataFrame containing the halo properties (e.g., r200, m200, positions, etc.).
         scale_factor : float
-            The scaling factor to be applied to r200 and gpos.
-        halo_id : np.ndarray
-            Array of unique halo IDs.
+            The scaling factor to be applied to specific properties like positions and radii.
+        column_map : dict
+            Dictionary defining the mapping of expected fields to the keys/columns in `properties`.
+            Example:
+                {
+                    "halo_id": "halo_id",
+                    "r200": "Group_R_Crit200",
+                    "m200": "Group_M_Crit200",
+                    "gpos": "GroupPos",
+                    "fsub": "GroupFirstSub"
+                }
         """
-        # Create a DataFrame to hold halo properties
-        self.data = pd.DataFrame({
-            "halo_id": halo_id,
-            "r200": r200 * scale_factor,        # Scaled radii
-            "m200": m200,                       # Solar masses
-            "gpos": list(gpos * scale_factor),  # Scaled positions
-            "fsub": fsub.astype(int)            # First subhalo indices
-        })
+        if not isinstance(properties, pd.DataFrame):
+            raise Exception(f"Halo properties must be a pd.DataFrame instead of {type(properties)}")
 
-        # Set 'halo_id' as the index for efficient querying
+        required_fields = ["halo_id", "r200", "m200", "gpos", "fsub"]
+        for field in required_fields:
+            if field not in column_map:
+                raise ValueError(f"Missing required field '{field}' in column_map.")
+
+        # Map and process data
+        data = {
+            "halo_id": properties[column_map["halo_id"]],
+            "r200": properties[column_map["r200"]] * scale_factor,
+            "m200": properties[column_map["m200"]],
+            "gpos": list(properties[column_map["gpos"]].apply(lambda x: x * scale_factor)),
+            "fsub": properties[column_map["fsub"]].astype(int)
+        }
+
+        # Add any additional fields dynamically
+        for key, col_name in column_map.items():
+            if key not in required_fields:
+                data[key] = properties[col_name]
+
+        # Create a DataFrame and set index
+        self.data = pd.DataFrame(data)
         self.data.set_index("halo_id", inplace=True, drop=False)
 
     def get_item(self, halo_id) -> Halo:
@@ -131,6 +147,4 @@ class HaloContext:
         pd.Series
             A Series containing the halo_id values.
         """
-        return self.data["halo_id"]
-
-    # TODO add the rest of the properties ?
+        return self.data["halo_id"].tolist()
