@@ -18,5 +18,5 @@ commit_tag: "commit_hash"
 
 # passing checkpoint path is necessary for evaluation # last.skpt
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/853910da/output/checkpoints/853910da/last.ckpt
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d633f349/output/checkpoints/d633f349/last.ckpt
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
