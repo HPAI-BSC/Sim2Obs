@@ -74,8 +74,8 @@ class MambaLitModule(LightningModule):
         self.net = net
 
         # loss function
-        self.criterion = nn.BCEWithLogitsLoss()
-        #self.criterion = RMSELoss()
+        #self.criterion = nn.BCEWithLogitsLoss()
+        self.criterion = RMSELoss()
 
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
