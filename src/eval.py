@@ -6,6 +6,7 @@ from lightning import LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 import torch
+import numpy as np
 
 import matplotlib.pyplot as plt
 
@@ -44,16 +45,20 @@ def plot_predictions(predictions, ground_truths, output_path):
     i = 0
     for pred, gt in zip(predictions, ground_truths):
         if isinstance(pred, torch.Tensor):
-            pred = pred.detach().cpu().numpy()
+            pred = pred.permute(1, 2, 0).detach().cpu().numpy()
+        else:
+            pred = np.transpose(pred, (1, 2, 0))
         if isinstance(gt, torch.Tensor):
-            gt = gt.detach().cpu().numpy()
+            gt = gt.permute(1, 2, 0).detach().cpu().numpy()
+        else:
+            gt = np.transpose(pred, (1, 2, 0))
         print(pred.shape, gt.shape)
         print(type(pred), type(gt))
-        axes[0, i].imshow(pred.permute(1, 2, 0))
+        axes[0, i].imshow(pred)
         axes[0, i].axis('off')
         axes[0, i].set_title(f'Prediction {i}')
 
-        axes[1, i].imshow(gt.permute(1, 2, 0))
+        axes[1, i].imshow(gt)
         axes[1, i].axis('off')
         axes[1, i].set_title(f'Ground truth {i}')
         i += 1
