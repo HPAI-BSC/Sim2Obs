@@ -103,6 +103,11 @@ class SubhaloContext:
             "mstr": list(properties[column_map["mstr"]])  # Stellar mass
         })
 
+        # Add any additional fields dynamically
+        for key, col_name in column_map.items():
+            if key not in required_fields:
+                self.data[key] = properties[col_name]
+
         # Set a multi-index for efficient querying
         self.data.set_index(["id_parents", "subhalo_id"], inplace=True, drop=False)
 
