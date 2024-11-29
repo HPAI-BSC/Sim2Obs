@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pandas.core.frame
 
 
 class SubHalo:
@@ -60,7 +61,7 @@ class SubhaloContext:
 
     Methods:
     --------
-    __init__(spos, grnr, shmr, mstr, scale_factor, subhalo_id):
+    __init__(properties, scale_factor, column_map):
         Initializes the SubhaloContext with the provided subhalo properties, scaling them appropriately.
     get_item(subhalo_id, halo_id=None):
         Retrieves the properties of a specific subhalo by its ID and optional halo ID.
@@ -71,39 +72,35 @@ class SubhaloContext:
     subhalo_id:
         Property to retrieve the `subhalo_id` column from the stored DataFrame.
     """
-    def __init__(self, spos: np.ndarray, grnr: np.ndarray, shmr: np.ndarray,
-                 mstr: np.ndarray, scale_factor: float, subhalo_id: np.ndarray) -> None:
+    def __init__(self, properties: pd.DataFrame, scale_factor: float, column_map) -> None:
         """
         Initialize the SubhaloContext with properties of subhalos.
 
         Parameters:
         -----------
-        spos : np.ndarray
-            The positions of subhalos. Array should be of shape (N, 3) where N is the number of subhalos.
-        grnr : np.ndarray
-            The group numbers corresponding to each subhalo.
-        shmr : np.ndarray
-            The stellar half-mass radius for each subhalo.
-        mstr : np.ndarray
-            The mass of stars in each subhalo.
+        properties : dict or pd.DataFrame
+            Dictionary or DataFrame containing the subhalo properties.
         scale_factor : float
-            The scale factor to apply to subhalo positions and other properties.
-        subhalo_id: np.ndarray
-            List with the subhalo identifiers.
+            The scaling factor to be applied to specific properties like positions and radii.
+        column_map : dict
+            Dictionary defining the mapping of expected fields to the keys/columns in `properties`.
         """
-        spos = spos * scale_factor
-        shmr = shmr * scale_factor
 
-        if spos.shape[1] == 3:
-            spos = [spos[i] for i in range(spos.shape[0])]
+        required_fields = ["subhalo_id", "spos", "id_parents", "shmr", "mstr"]
+        for field in required_fields:
+            if field not in column_map:
+                raise ValueError(f"Missing required field '{field}' in column_map.")
+
+        properties[column_map["shmr"]] = properties[column_map["shmr"]] * scale_factor
+        properties[column_map["spos"]] = [spos_i * scale_factor for spos_i in properties[column_map["spos"]]]
 
         # Create a DataFrame
         self.data = pd.DataFrame({
-            "id_parents": grnr,  # Halo IDs
-            "subhalo_id": subhalo_id,  # Subhalo IDs
-            "spos": list(spos),  # Scaled positions
-            "shmr": list(shmr),  # Scaled half-mass radius
-            "mstr": list(mstr)  # Stellar mass
+            "id_parents": properties[column_map["id_parents"]],  # Halo IDs
+            "subhalo_id": properties[column_map["subhalo_id"]],  # Subhalo IDs
+            "spos": properties[column_map["spos"]],  # Scaled positions
+            "shmr": list(properties[column_map["shmr"]]),  # Scaled half-mass radius
+            "mstr": list(properties[column_map["mstr"]])  # Stellar mass
         })
 
         # Set a multi-index for efficient querying
@@ -178,7 +175,7 @@ class SubhaloContext:
         pd.Series
             A Series containing the parent halo IDs.
         """
-        return self.data["id_parents"]
+        return self.data["id_parents"].tolist()
 
     @property
     def subhalo_id(self) -> pd.Series:
@@ -190,7 +187,7 @@ class SubhaloContext:
         pd.Series
             A Series containing the subhalo IDs.
         """
-        return self.data["subhalo_id"]
+        return self.data["subhalo_id"].tolist()
 
 
 class SubhaloParticles:

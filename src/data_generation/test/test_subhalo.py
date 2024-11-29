@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import pandas as pd
 
 from src.data_generation.src.subhalo import SubhaloContext, SubHalo, SubhaloParticles
 
@@ -11,21 +12,17 @@ class TestSubHalo(unittest.TestCase):
         """
         # Sample data for SubhaloContext
         self.scale_factor = 0.5
-        self.spos = np.array([[100, 200, 300], [400, 500, 600]])
-        self.grnr = np.array([1, 1])
-        self.shmr = np.array([10, 20])
-        self.mstr = np.array([1e9, 2e9])
-        self.subhalo_id = np.array([101, 102])
+        df = pd.DataFrame(data=[])
+        df['spos'] = list(np.array([[100, 200, 300], [400, 500, 600]]))
+        df['grnr'] = np.array([1, 1])
+        df['shmr'] = np.array([10, 20])
+        df['mstr'] = np.array([1e9, 2e9])
+        df['subhalo_id'] = np.array([101, 102])
 
         # Initialize SubhaloContext
-        self.context = SubhaloContext(
-            spos=self.spos,
-            grnr=self.grnr,
-            shmr=self.shmr,
-            mstr=self.mstr,
-            scale_factor=self.scale_factor,
-            subhalo_id=self.subhalo_id
-        )
+        self.context = SubhaloContext(df,
+            scale_factor=self.scale_factor, column_map={'subhalo_id': 'subhalo_id', 'spos': 'spos',
+                                                        'id_parents': 'grnr', 'shmr': 'shmr', 'mstr': 'mstr'})
 
     def test_subhalo_initialization(self):
         """
