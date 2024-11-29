@@ -83,11 +83,12 @@ class VelocityDispersionProcessor(FeatureProcessor):
         if particle_velocity.size == 0:
             raise ValueError("SubhaloParticles cannot have 'v' (velocity) empty.")
 
-        v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
+        # TODO clarify this computation
+        # v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
         # Computing the delta vel. from each particle in comparison to the mean-vel.
-        velocity_disp = np.sqrt(((particle_velocity - v_cm) ** 2).sum(axis=1))
+        # velocity_disp = np.sqrt(((particle_velocity - v_cm) ** 2).sum(axis=1))
         # log.info(f'Computed velocity dispersion for {len(particle_velocity)} particles.')
-        return velocity_disp
+        return particle_velocity
 
     def generate_map(self, particle_positions: np.ndarray, bins: int, ranging: tuple, axis: tuple) -> tuple:
         i, j = axis
@@ -178,7 +179,7 @@ class ICLProcessor(FeatureProcessor):
         # Extract indices of particles predicted to be part of the ICL
         ids = np.where(final_predictions == 0)[0]
         rows, _ = particle_velocity.shape
-        icl_mask = np.zeros((rows, 1))
+        icl_mask = np.zeros((rows, ))
         if ids.size > 0:
             # if particle belongs to ICL=1, otherwise BCG=0
             icl_mask[ids] = 1
@@ -190,8 +191,11 @@ class ICLProcessor(FeatureProcessor):
 
     def generate_map(self, particle_positions: np.ndarray, bins: int, ranging: tuple, axis: tuple) -> tuple:
         i, j = axis
+        if len(self.value) == 0:
+            raise Exception('FeatureProcessor value is empty, call first process method.')
         pos_rot = particle_positions
 
+        assert pos_rot[:, i].size == pos_rot[:, j].size == len(self.value)
         # TODO check this part is working
         output_ij, binx, biny, _ = stats.binned_statistic_2d(
             pos_rot[:, i], pos_rot[:, j],
