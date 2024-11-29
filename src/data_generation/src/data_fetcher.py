@@ -298,14 +298,14 @@ class EagleFetcher(DataFetcher):
             A context object containing particle data.
         """
         subgroup_id = kwargs.get('subhalo_id', None)
-        halo_id = kwargs.get('halo_id')
+        halo_id = kwargs.get('group_number')
 
         if subgroup_id is None:
             #log.error("subhalo_id must be provided in kwargs")
             raise ValueError("subgroup_id must be provided in kwargs")
         if halo_id is None:
             #log.error("halo_id must be provided in kwargs")
-            raise ValueError("halo_id must be provided in kwargs")
+            raise ValueError("group_number must be provided in kwargs")
 
         #log.info(f"Fetching particle data for subhalo: {subgroup_id}")
         return self._get_p_subhalo(subgroup_id, halo_id)
@@ -329,6 +329,7 @@ class EagleFetcher(DataFetcher):
                     FOF.GroupCentreOfPotential_x AS pos_x,          -- X coordinate of halo's center
                     FOF.GroupCentreOfPotential_y AS pos_y,          -- Y coordinate of halo's center
                     FOF.GroupCentreOfPotential_z AS pos_z,          -- Z coordinate of halo's center
+                    SH.GroupNumber AS group_number,                 -- ID FoF, for linking particles
                     SH.SubGroupNumber AS subhalo_id,                 -- ID of the subhalo
                     SH.MassType_Star AS subhalo_mass                -- Mass of the subhalo
                 FROM 
@@ -338,6 +339,7 @@ class EagleFetcher(DataFetcher):
                         SELECT 
                             SH.GroupID,
                             SH.SubGroupNumber,
+                            SH.GroupNumber, 
                             SH.MassType_Star
                         FROM 
                             {self.cfg.catalog.simulation_code}_Subhalo AS SH
@@ -364,7 +366,8 @@ class EagleFetcher(DataFetcher):
             df['r200'] = df['r200'].values / self.cfg.H    # pkps -> ckps / h
             df['m200'] = df['m200'].values / self.cfg.H    # 𝑀⊙/ℎ
             df['halo_id'] = df['halo_id'].astype(int)
-            column_map = {'halo_id': 'halo_id', 'r200': 'r200', 'm200': 'm200', 'gpos': 'gpos', 'fsub': 'subhalo_id'}
+            column_map = {'halo_id': 'halo_id', 'r200': 'r200', 'm200': 'm200', 'gpos': 'gpos', 'fsub': 'subhalo_id',
+                          'group_number': 'group_number'}
             halo_context = HaloContext(df, scale_factor=self.cfg.catalog.scalf, column_map=column_map)
             #log.debug("Halo data fetched successfully.")
         else:
@@ -387,6 +390,7 @@ class EagleFetcher(DataFetcher):
             SELECT
                 FOF.GroupID AS halo_id, -- Halo identifier
                 FOF.Group_M_Crit200 AS m200, -- Halo mass within R200
+                SH.GroupNumber AS group_number, -- ID FoF, for linking particles
                 SH.SubGroupNumber AS subhalo_id, -- Subgroup
                 SH.MassType_Star AS total_stellar_mass, -- Total stellar mass in the subhalo
                 SH.HalfMassRad_Star AS stellar_half_mass_radius, --  stellar half-mass radius in the subhalo
@@ -418,7 +422,8 @@ class EagleFetcher(DataFetcher):
                                                         row['subhalo_pos_z'] / self.cfg.H]), axis=1)
             df['stellar_half_mass_radius'] = df['stellar_half_mass_radius'].values / self.cfg.H  # pkps -> ckps / h
             column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "halo_id",
-                          "shmr": "stellar_half_mass_radius", "mstr": "total_stellar_mass"}
+                          "shmr": "stellar_half_mass_radius", "mstr": "total_stellar_mass",
+                          "group_number": "group_number"}
             subhalo_context = SubhaloContext(df, self.cfg.catalog.scalf, column_map)
             #log.debug("Subhalo data fetched successfully.")
         else:
@@ -426,7 +431,7 @@ class EagleFetcher(DataFetcher):
             subhalo_context = SubhaloContext(pd.DataFrame(data=[]), self.cfg.catalog.scalf, {})
         return subhalo_context
 
-    def _get_p_subhalo(self, subgroup_id: int, halo_id: int):
+    def _get_p_subhalo(self, subgroup_id: int, group_number: int):
         """
         Fetches particle data for a specific subhalo from the Eagle simulation.
 
@@ -449,18 +454,20 @@ class EagleFetcher(DataFetcher):
         if not os.path.exists(path):
             #log.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
-
-        gns = read_dataset(itype, 'GroupNumber', path)
-        sgns = read_dataset(itype, 'SubGroupNumber', path)
-        mask = np.logical_and(gns == halo_id, sgns == subgroup_id)
-
         data = {
-            'mass': read_dataset(itype, 'Mass', path)[mask],
-            'coords': read_dataset(itype, 'Coordinates', path)[mask],
-            'velocity': read_dataset(itype, 'Velocity', path)[mask]
+            'mass': read_dataset(itype, 'Mass', path),
+            'coords': read_dataset(itype, 'Coordinates', path),
+            'velocity': read_dataset(itype, 'Velocity', path),
+            'GroupNumber': read_dataset(itype, 'GroupNumber', path),
+            'SubGroupNumber': read_dataset(itype, 'SubGroupNumber', path)
         }
 
-        subhalo_particles = SubhaloParticles(data['mass'], data['coords'], data['velocity'], self.cfg.catalog.scalf)
+        data['coords'] = [data['coords'][i] for i in range(data['coords'].shape[0])]
+        data['velocity'] = [data['velocity'][i] for i in range(data['velocity'].shape[0])]
+        tmp = pd.DataFrame(data)
+        data_filtered = tmp[(tmp['GroupNumber'] == group_number) & (tmp['SubGroupNumber'] == subgroup_id)]
+        subhalo_particles = SubhaloParticles(data_filtered['mass'], data_filtered['coords'], data_filtered['velocity'],
+                                             self.cfg.catalog.scalf)
         #log.debug("Particle data fetched successfully.")
         return subhalo_particles
 

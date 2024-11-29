@@ -70,7 +70,7 @@ class TestFetcher(unittest.TestCase):
     def test_get_p_subhalo_eagle(self):
         self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
         self.cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
-        subhalo_particles_2 = self.fetcher_eagle.get_p_subhalo(subhalo_id=0, halo_id=620)
+        subhalo_particles_2 = self.fetcher_eagle.get_p_subhalo(subhalo_id=0, group_number=2)
         self.assertIsInstance(subhalo_particles_2, SubhaloParticles)
 
     def test_eagle_simulation_codes(self):
