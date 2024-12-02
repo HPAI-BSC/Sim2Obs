@@ -339,11 +339,14 @@ class FinalPatchExpand_X4(nn.Module):
         self.norm = norm_layer(self.output_dim)
 
     def forward(self, x):
+        print(f"final patch expand 1: {x.shape}")
         x = self.expand(x)
+        print(f"final patch expand 2: {x.shape}")
         B, H, W, C = x.shape
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
                       c=C // (self.dim_scale ** 2))
         x = self.norm(x)
+        print(f"final patch expand 3: {x.shape}")
 
         return x
 
@@ -880,6 +883,7 @@ class VSSM(nn.Module):
 
     # Encoder and Bottleneck
     def forward_features(self, x):
+        print(f"-> {x.shape}")
         x = self.patch_embed(x)
 
         x_downsample = []
@@ -889,6 +893,7 @@ class VSSM(nn.Module):
             x = layer(x)
         x = self.norm(x) # B H W C
         print(f"--> {x.shape}")
+        print(x_downsample)
         return x, x_downsample
 
     # def forward_backbone(self, x):
@@ -1005,7 +1010,7 @@ class MambaUNet(nn.Module):
         self.zero_head = zero_head
         self.config = config
 
-        self.mamba_unet =  VSSM(
+        self.mamba_unet = VSSM(
                                 patch_size=config.patch_size,
                                 in_chans=config.in_chains,
                                 num_classes=self.num_classes,
