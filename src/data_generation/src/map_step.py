@@ -38,8 +38,6 @@ class MapStep(PipelineStep):
             'rotation_angle': cfg.rotation_group[0]
         }
 
-    # TODO to be tested
-    # TODO change input param
     @staticmethod
     def _create_maps(cosmos_data: CosmosData, input_feature: FeatureProcessor,
                      output_feature: FeatureProcessor) -> List:
@@ -75,7 +73,7 @@ class MapStep(PipelineStep):
         # Considering as interloper any subhalo contained in a box defined by [-r, r] in the x and y directions and
         # inside [-R_200, R_200] along the z axis
 
-        spos = np.array(cosmos_data.subhalos.data['spos'].tolist())
+        spos = np.array(cosmos_data.subhalos['spos'].tolist())
 
         mask = (
                 (spos[:, 0] < r) &  # x condition
@@ -83,7 +81,7 @@ class MapStep(PipelineStep):
                 (spos[:, 2] < cosmos_data.halo.r200)  # z condition
         )
 
-        interlopers_id = cosmos_data.subhalos.data['subhalo_id'][mask]
+        interlopers_id = cosmos_data.subhalos['subhalo_id'][mask]
 
         # removing first galaxy (central/BCG), since it's usually the central galaxy or BCG
         # TODO is it possible to have no interlopers ?
@@ -252,5 +250,6 @@ class MapStep(PipelineStep):
             output_feature.map = map_f_o
             self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, cosmos_data, input_feature,
                                      output_feature)
+        yield None
 
 

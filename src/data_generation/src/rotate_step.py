@@ -92,9 +92,9 @@ class RotateStep(PipelineStep):
                 rotation_axis = np.array(rotation_axis)
 
                 # Update cosmos data, subhalos data and subhalo particle positions
-                spos = np.array(cosmos_data.subhalos.data['spos'].tolist())
+                spos = np.array(cosmos_data.subhalos['spos'].tolist())
                 subhalos_spos = self._rotate(rotation_axis, degree, spos)
-                cosmos_data.subhalos.data['spos'] = list([spos[i] for i in range(subhalos_spos.shape[0])])
+                cosmos_data.subhalos['spos'] = list([spos[i] for i in range(subhalos_spos.shape[0])])
 
                 cosmos_data.subhalo_particles_positions = (
                     self._rotate(rotation_axis, degree, cosmos_data.subhalo_particle_positions))
