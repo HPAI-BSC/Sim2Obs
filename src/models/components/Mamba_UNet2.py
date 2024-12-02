@@ -339,12 +339,14 @@ class FinalPatchExpand_X4(nn.Module):
         self.norm = norm_layer(self.output_dim)
 
     def forward(self, x):
+        print('dim, dim_scale, out_dim', self.dim, self.dim_scale, self.output_dim)
         print(f"final patch expand 1: {x.shape}")
         x = self.expand(x)
         print(f"final patch expand 2: {x.shape}")
         B, H, W, C = x.shape
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
                       c=C // (self.dim_scale ** 2))
+        print(f"final patch expand 2.5: {x.shape}")
         x = self.norm(x)
         print(f"final patch expand 3: {x.shape}")
 
