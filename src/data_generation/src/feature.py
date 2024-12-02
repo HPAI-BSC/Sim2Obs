@@ -63,6 +63,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
     """
     def __init__(self):
         self.name = 'VelocityDispersion'
+        self.map = []
         self.value = []
 
     # TODO review this computation
@@ -128,6 +129,7 @@ class ICLProcessor(FeatureProcessor):
         self.name = 'IntraClusterLight'
         self.model_path = '../model/Best_Model-Random-3par.pkl'
         self.cfg = cfg
+        self.map = []
         self.value = []
 
     def _predict(self, v_delta: np.ndarray, distance: np.ndarray, halo: Halo):

@@ -26,18 +26,23 @@ class TestFeature(unittest.TestCase):
         with open("data/eagle/halo_0.pkl", "rb") as file:
             self.halo_eagle = pickle.load(file)
 
-        # Initialize Hydra and load configuration
         with initialize(config_path="../../../configs"):
-            cfg = compose(config_name="data_generation.yaml")
+            self.cfg_illustris = compose(config_name="data_generation.yaml")
+            self.cfg_eagle = compose(config_name="data_generation.yaml")
+
+        with initialize(config_path="../../../configs"):
+            self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
+            self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
+            self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
+            self.cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
 
         os.environ['PROJECT_ROOT'] = '../../..'
-
-        self.icl_processor = ICLProcessor(cfg)
-        self.vel_disp_processor = VelocityDispersionProcessor()
 
     @patch('src.data_generation.src.halo.Halo')
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
     def test_ICLProcessor_process(self, mock_halo, mock_subhalo_particles):
+        self.icl_processor = ICLProcessor(self.cfg_illustris)
+
         # Illustris
         mock_halo_instance = self.halo_illustris
         mock_halo.return_value = self.halo_illustris
@@ -53,6 +58,7 @@ class TestFeature(unittest.TestCase):
         assert_array_equal(result, expected_mask)
 
         # Eagle
+        self.icl_processor = ICLProcessor(self.cfg_eagle)
         mock_halo_instance = self.halo_eagle
         mock_halo.return_value = mock_halo_instance
         mock_subhalo_particles_instance = self.subhalo_particles_eagle
@@ -67,13 +73,14 @@ class TestFeature(unittest.TestCase):
 
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
     def test_ICLProcessor_generate_maps(self, mock_subhalo_particles):
+        self.icl_processor = ICLProcessor(self.cfg_illustris)
         mock_subhalo_particles_instance = self.subhalo_particles_illustris
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
         # Defined by Ilaria
         bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius
         ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
-        # Todo check this is the right format
+
         self.icl_processor.value = np.ones((100, ), dtype=int)  # ICL mask
         # Axis x-y
         icl_map, _, biny = self.icl_processor.generate_map(particle_positions=mock_subhalo_particles_instance.p,
@@ -81,6 +88,8 @@ class TestFeature(unittest.TestCase):
         assert (len(icl_map)) == bins
 
         # Eagle
+        self.icl_processor = ICLProcessor(self.cfg_eagle)
+        self.icl_processor.value = np.ones((100, ), dtype=int)  # ICL mask
         mock_subhalo_particles_instance = self.subhalo_particles_eagle
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
         icl_map, _, biny = self.icl_processor.generate_map(particle_positions=mock_subhalo_particles_instance.p,
@@ -89,6 +98,8 @@ class TestFeature(unittest.TestCase):
 
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
     def test_VelocityDispersionProcessor_process(self, mock_subhalo_particles):
+        self.vel_disp_processor = VelocityDispersionProcessor()
+
         # Illustris
         mock_subhalo_particles_instance = self.subhalo_particles_illustris
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
@@ -116,6 +127,8 @@ class TestFeature(unittest.TestCase):
 
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
     def test_VelocityDispersionProcessor_generate_maps(self, mock_subhalo_particles):
+        self.vel_disp_processor = VelocityDispersionProcessor()
+
         mock_subhalo_particles_instance = self.subhalo_particles_illustris
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
