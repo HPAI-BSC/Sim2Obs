@@ -867,8 +867,8 @@ class VSSM(nn.Module):
         print(self.patch_size)
         if self.final_upsample == "expand_first":
             print("---final upsample expand_first---")
-            #self.up = FinalPatchExpand_X4(dim_scale=4, dim=self.embed_dim)
-            self.up = PatchExpand(dim=self.embed_dim, dim_scale=1)
+            print(self.embed_dim)
+            self.up = FinalPatchExpand_X4(dim_scale=4, dim=self.embed_dim)
             self.output = nn.Conv2d(in_channels=self.embed_dim, out_channels=self.num_classes, kernel_size=1,
                                     bias=False)
 
@@ -931,16 +931,23 @@ class VSSM(nn.Module):
         if self.final_upsample == "expand_first":
             B, H, W, C = x.shape
             x = self.up(x)
+            print(f"up_x4: {x.shape}")
             x = x.view(B, 4 * H, 4 * W, -1)
+            print(f"up_x4: {x.shape}")
             x = x.permute(0, 3, 1, 2)  # B,C,H,W
+            print(f"up_x4: {x.shape}")
             x = self.output(x)
 
         return x
 
     def forward(self, x):
+        print(f"forward 1: {x.shape}")
         x, x_downsample = self.forward_features(x)
+        print(f"forward 2: {x.shape}")
         x = self.forward_up_features(x, x_downsample)
+        print(f"forward 3: {x.shape}")
         x = self.up_x4(x)
+        print(f"forward 4: {x.shape}")
         return x
 
     def flops(self, shape=(3, 224, 224)):
