@@ -342,6 +342,7 @@ class FinalPatchExpand_X4(nn.Module):
         self.expand = nn.Linear(dim, 16 * dim, bias=False)
         self.output_dim = dim
         self.norm = norm_layer(self.output_dim)
+        self.compress = nn.Linear(16 * dim, dim, bias=False)
 
     def forward(self, x):
         print('dim, dim_scale, out_dim', self.dim, self.dim_scale, self.output_dim)
@@ -349,8 +350,12 @@ class FinalPatchExpand_X4(nn.Module):
         x = self.expand(x)
         print(f"final patch expand 2: {x.shape}")
         B, H, W, C = x.shape
+        print(f"c --> {C}")
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
                       c=C // (self.dim_scale ** 2))
+        if self.dim_scale == 1:
+            # In this case we need to compress, cause p1 and p2 == 1
+            x = self.compress(x)
         print(f"final patch expand 2.5: {x.shape}")
         x = self.norm(x)
         print(f"final patch expand 3: {x.shape}")
