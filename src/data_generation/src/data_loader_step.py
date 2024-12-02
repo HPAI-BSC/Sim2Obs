@@ -62,7 +62,7 @@ class DataLoader:
         try:
             subhalo_particles = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, halo_id=halo_id)
             # log.debug(f"Loading particles for subhalo_id: {subhalo_id}, particles count: {len(subhalo_particles.m)}")
-            yield subhalo_particles
+            return subhalo_particles
         except Exception as e:
-            pass
+            print(f'Error with: subhalo_id{subhalo_id}, halo_id:{halo_id}')
             #log.warning(f"Error fetching subhalo data for id {subhalo_id}: {e}")
