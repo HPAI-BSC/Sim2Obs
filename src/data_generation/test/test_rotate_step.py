@@ -71,7 +71,7 @@ class TestRotateStep(unittest.TestCase):
 
         vel_value = self.vel_disp_processor.process(self.subhalo_particles_illustris.v)
         self.vel_disp_processor.value = vel_value
-        result = list(self.rotate_step.process(self.vel_disp_processor, self.cosmos))
+        result = list(self.rotate_step.process(self.vel_disp_processor, None, self.cosmos))
         num_iterations = (360 // self.rotate_step.rotation_angle) * len(self.rotate_step.rotation_directions)
         self.assertEqual(len(result), num_iterations)
 
@@ -93,7 +93,7 @@ class TestRotateStep(unittest.TestCase):
 
         vel_value = self.vel_disp_processor.process(self.subhalo_particles_illustris.v)
         self.vel_disp_processor.value = vel_value
-        result = list(self.rotate_step.process(self.vel_disp_processor, self.cosmos))
+        result = list(self.rotate_step.process(self.vel_disp_processor, None, self.cosmos))
         num_iterations = (360 // self.rotate_step.rotation_angle) * len(self.rotate_step.rotation_directions)
         self.assertEqual(len(result), num_iterations)
 

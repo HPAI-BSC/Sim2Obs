@@ -62,7 +62,9 @@ class RotateStep(PipelineStep):
         X_rot = np.float32(rotate_3dvec(Q, X))
         return X_rot
 
-    def process(self, input_feature: FeatureProcessor, cosmos_data: CosmosData):
+    # todo UPDATE TEST
+    def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
+                cosmos_data: CosmosData):
         """
         Rotates the data in the cosmos dataset and updates the features accordingly.
 
