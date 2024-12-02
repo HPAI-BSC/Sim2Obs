@@ -1,3 +1,8 @@
+"""
+Original code: https://github.com/ziyangwang007/Mamba-UNet
+"""
+
+
 # coding=utf-8
 from __future__ import absolute_import
 from __future__ import division
@@ -860,10 +865,10 @@ class VSSM(nn.Module):
 
         print(self.final_upsample)
         print(self.patch_size)
-        self.final_upsample = 'other'
         if self.final_upsample == "expand_first":
             print("---final upsample expand_first---")
-            self.up = FinalPatchExpand_X4(dim_scale=4, dim=self.embed_dim)
+            #self.up = FinalPatchExpand_X4(dim_scale=4, dim=self.embed_dim)
+            #self.up = PatchExpand()
             self.output = nn.Conv2d(in_channels=self.embed_dim, out_channels=self.num_classes, kernel_size=1,
                                     bias=False)
 
