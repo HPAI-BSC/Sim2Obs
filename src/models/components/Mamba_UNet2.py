@@ -860,7 +860,7 @@ class VSSM(nn.Module):
         print(self.patch_size)
         if self.final_upsample == "expand_first":
             print("---final upsample expand_first---")
-            self.up = FinalPatchExpand_X4(dim_scale=6, dim=self.embed_dim)
+            self.up = FinalPatchExpand_X4(dim_scale=4, dim=self.embed_dim)
             self.output = nn.Conv2d(in_channels=self.embed_dim, out_channels=self.num_classes, kernel_size=1,
                                     bias=False)
 
