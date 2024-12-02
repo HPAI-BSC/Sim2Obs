@@ -937,7 +937,10 @@ class VSSM(nn.Module):
             B, H, W, C = x.shape
             x = self.up(x)
             print(f"up_x4: {x.shape}")
-            x = x.view(B, 4 * H, 4 * W, -1)
+            if self.patch_size == 1:
+                pass
+            else:
+                x = x.view(B, 4 * H, 4 * W, -1)
             print(f"up_x4: {x.shape}")
             x = x.permute(0, 3, 1, 2)  # B,C,H,W
             print(f"up_x4: {x.shape}")
