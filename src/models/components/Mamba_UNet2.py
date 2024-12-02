@@ -858,6 +858,7 @@ class VSSM(nn.Module):
 
         print(self.final_upsample)
         print(self.patch_size)
+        self.final_upsample = 'other'
         if self.final_upsample == "expand_first":
             print("---final upsample expand_first---")
             self.up = FinalPatchExpand_X4(dim_scale=4, dim=self.embed_dim)
