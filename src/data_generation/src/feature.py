@@ -130,6 +130,56 @@ class ICLProcessor(FeatureProcessor):
         self.cfg = cfg
         self.value = []
 
+    def _predict(self, v_delta: np.ndarray, distance: np.ndarray, halo: Halo):
+        """
+        Predict whether particles belong to the IntraCluster Light (ICL) or the Brightest Cluster Galaxy (BCG).
+
+        This method uses a pre-trained machine learning model to classify particles based on their velocity
+        and distance from the center of the halo. It calculates features such as the scaled velocity,
+        scaled distance, and log-scaled halo mass, which are then passed to the model for classification.
+
+        Args:
+            v_delta (np.ndarray): The velocity difference (in 3D space) between each particle and the halo's
+                                   center-of-mass velocity.
+            distance (np.ndarray): The Euclidean distance of each particle from the center of the halo.
+            halo (Halo): The halo object containing parameters like `m200` and `r200`, which are used to compute
+                         scaling factors for velocity and distance.
+
+        Returns:
+            np.ndarray: An array of predictions where each value indicates the predicted class for a particle:
+                        0 for ICL (IntraCluster Light) and 1 for BCG (Brightest Cluster Galaxy).
+
+        Raises:
+            ValueError: If the scaled particle data is empty or contains only missing values, the method raises
+                        an exception indicating that the prediction cannot be made.
+        """
+
+        final_model = joblib.load(self.model_path)
+        # Define simulation parameters
+        V200 = np.sqrt(self.cfg.G * halo.m200 / halo.r200)
+
+        # Create a DataFrame with features required by the model
+        # Features are: log-scaled distance (r/R200), scaled velocity (modulo_v/V200), and log-scaled halo mass (M200)
+        Data = pd.DataFrame({
+            'distance': np.log10(distance / halo.r200),  # Log-scaled distance
+            'velocity': v_delta / V200,  # Scaled velocity
+            'm200': [np.log10(halo.m200 * 1e-14)] * len(v_delta)
+            # Log-scaled halo mass (m200, constant for all particles)
+        })
+
+        # Replace any infinite values in the DataFrame with NaN, then drop all rows with NaN values
+        Data = Data.replace([np.inf, -np.inf], np.nan).dropna(axis=0)
+
+        if Data.size == 0:
+            raise ValueError("Scaled particle data is empty, it's likely that your particle data has a "
+                             "considerable number of missing values")
+
+        # Use the trained model to make predictions on the data
+        # The model predicts whether each particle belongs to BCG (label 1) or ICL (label 0)
+        # log.info("Labeling particles ...")
+        final_predictions = final_model.predict(Data.to_numpy())
+        return final_predictions
+
     # Subhalo particles, halo
     def process(self, halo: Halo, particle_velocity: np.ndarray, particle_position: np.ndarray) -> np.ndarray:
         """
@@ -147,35 +197,13 @@ class ICLProcessor(FeatureProcessor):
             ValueError: If the scaled particle data is empty.
         """
         # log.info(f'Processing ICL for Halo ID {halo.halo_id}.')
+
         v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
         # Computing the Euclidean distance from the new origin to each particle
         distance = np.sqrt((particle_position ** 2).sum(axis=1))
         # Computing the delta vel. from each particle in comparison to the mean-vel.
         v_delta = np.sqrt(((particle_velocity - v_cm) ** 2).sum(axis=1))
-
-        final_model = joblib.load(self.model_path)
-        # Define simulation parameters
-        V200 = np.sqrt(self.cfg.G * halo.m200 / halo.r200)
-
-        # Create a DataFrame with features required by the model
-        # Features are: log-scaled distance (r/R200), scaled velocity (modulo_v/V200), and log-scaled halo mass (M200)
-        Data = pd.DataFrame({
-            'distance': np.log10(distance / halo.r200),  # Log-scaled distance
-            'velocity': v_delta / V200,  # Scaled velocity
-            'm200': [np.log10(halo.m200 * 1e-14)] * len(v_delta)  # Log-scaled halo mass (m200, constant for all particles)
-        })
-
-        # Replace any infinite values in the DataFrame with NaN, then drop all rows with NaN values
-        Data = Data.replace([np.inf, -np.inf], np.nan).dropna(axis=0)
-
-        if Data.size == 0:
-            raise ValueError("Scaled particle data is empty, it's likely that your particle data has a "
-                             "considerable number of missing values")
-
-        # Use the trained model to make predictions on the data
-        # The model predicts whether each particle belongs to BCG (label 1) or ICL (label 0)
-        # log.info("Labeling particles ...")
-        final_predictions = final_model.predict(Data.to_numpy())
+        final_predictions = self._predict(v_delta, distance, halo)
         # Extract indices of particles predicted to be part of the ICL
         ids = np.where(final_predictions == 0)[0]
         rows, _ = particle_velocity.shape
