@@ -64,9 +64,6 @@ class MambaLitModule(LightningModule):
         """
         super().__init__()
 
-        print(f"Current Logger: {self.logger}")
-        print(f"Logger Type: {type(self.logger)}")
-
         # this line allows to access init params with 'self.hparams' attribute
         # also ensures init params will be stored in ckpt
         self.save_hyperparameters(logger=False)
@@ -128,26 +125,13 @@ class MambaLitModule(LightningModule):
             - A tensor of target labels.
         """
         x, y = batch
-
-        with torch.profiler.profile(
-                activities=[
-                    torch.profiler.ProfilerActivity.CPU,
-                    torch.profiler.ProfilerActivity.CUDA],
-                on_trace_ready=torch.profiler.tensorboard_trace_handler('./log'),
-                record_shapes=True,
-                profile_memory=True,
-                with_stack=True
-        ) as prof:
-            preds = self.forward(x)
-
-        #preds = self.forward(x)
+        preds = self.forward(x)
         if torch.isnan(preds).any():
             preds[torch.isnan(preds)] = 0.0
         #loss = self.criterion(preds, y)
         y, preds = torch.sigmoid(y), torch.sigmoid(preds)
         loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
 
-        print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
         return loss, preds, y
 
     def training_step(

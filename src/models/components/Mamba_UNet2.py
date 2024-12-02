@@ -345,20 +345,14 @@ class FinalPatchExpand_X4(nn.Module):
         self.compress = nn.Linear(16 * dim, dim, bias=False)
 
     def forward(self, x):
-        print('dim, dim_scale, out_dim', self.dim, self.dim_scale, self.output_dim)
-        print(f"final patch expand 1: {x.shape}")
         x = self.expand(x)
-        print(f"final patch expand 2: {x.shape}")
         B, H, W, C = x.shape
-        print(f"c --> {C}")
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
                       c=C // (self.dim_scale ** 2))
         if self.dim_scale == 1:
             # In this case we need to compress, cause p1 and p2 == 1
             x = self.compress(x)
-        print(f"final patch expand 2.5: {x.shape}")
         x = self.norm(x)
-        print(f"final patch expand 3: {x.shape}")
 
         return x
 
@@ -949,13 +943,9 @@ class VSSM(nn.Module):
         return x
 
     def forward(self, x):
-        print(f"forward 1: {x.shape}")
         x, x_downsample = self.forward_features(x)
-        print(f"forward 2: {x.shape}")
         x = self.forward_up_features(x, x_downsample)
-        print(f"forward 3: {x.shape}")
         x = self.up_x4(x)
-        print(f"forward 4: {x.shape}")
         return x
 
     def flops(self, shape=(3, 224, 224)):
