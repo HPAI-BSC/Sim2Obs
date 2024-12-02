@@ -857,7 +857,7 @@ class VSSM(nn.Module):
 
         if self.final_upsample == "expand_first":
             print("---final upsample expand_first---")
-            self.up = FinalPatchExpand_X4(dim_scale=1, dim=self.embed_dim)
+            self.up = FinalPatchExpand_X4(dim_scale=self.patch_embed, dim=self.embed_dim)
             self.output = nn.Conv2d(in_channels=self.embed_dim, out_channels=self.num_classes, kernel_size=1,
                                     bias=False)
 
@@ -893,7 +893,6 @@ class VSSM(nn.Module):
             x = layer(x)
         x = self.norm(x) # B H W C
         print(f"--> {x.shape}")
-        print(x_downsample)
         return x, x_downsample
 
     # def forward_backbone(self, x):
