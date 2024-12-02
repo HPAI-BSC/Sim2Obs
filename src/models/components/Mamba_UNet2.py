@@ -884,9 +884,11 @@ class VSSM(nn.Module):
 
         x_downsample = []
         for i,layer in enumerate(self.layers):
+            print(x.shape)
             x_downsample.append(x)
             x = layer(x)
-        x = self.norm(x)  # B H W C
+        x = self.norm(x) # B H W C
+        print(f"--> {x.shape}")
         return x, x_downsample
 
     # def forward_backbone(self, x):
