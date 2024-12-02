@@ -1,12 +1,7 @@
 from typing import Generator
-import rootutils
 
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 from omegaconf import DictConfig
-from src import utils
-
-rootutils.setup_root(__file__, pythonpath=True)
-log = utils.get_pylogger(__name__)
 
 
 class DataLoader:
@@ -31,7 +26,7 @@ class DataLoader:
             The configuration object containing parameters for the data fetching process.
         """
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg)
-        log.info("DataLoader initialized with the provided configuration.")
+        # log.info("DataLoader initialized with the provided configuration.")
 
     def load_halo_data(self) -> Generator[tuple, None, None]:
         """
@@ -45,7 +40,7 @@ class DataLoader:
         halo_context = self.fetcher.get_halos()
         subhalo_context = self.fetcher.get_subhalos()
         for id_halo in halo_context.halo_id:
-            log.debug(f"Loading data for halo_id: {id_halo}")
+            # log.debug(f"Loading data for halo_id: {id_halo}")
             halo_df = halo_context.get_item(id_halo)
             subhalo_df = subhalo_context.get_items_by_halo(id_halo)
             yield halo_df, subhalo_df
@@ -66,7 +61,8 @@ class DataLoader:
         """
         try:
             subhalo_particles = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, halo_id=halo_id)
-            log.debug(f"Loading particles for subhalo_id: {subhalo_id}, particles count: {len(subhalo_particles.m)}")
+            # log.debug(f"Loading particles for subhalo_id: {subhalo_id}, particles count: {len(subhalo_particles.m)}")
             yield subhalo_particles
         except Exception as e:
-            log.warning(f"Error fetching subhalo data for id {subhalo_id}: {e}")
+            pass
+            #log.warning(f"Error fetching subhalo data for id {subhalo_id}: {e}")
