@@ -6,4 +6,4 @@ train_val_test_split: [.85, .05, .10]
 resize_shape: [128, 128]
 random_seed:  0
 num_workers: 4
-pin_memory: True
+pin_memory: False
