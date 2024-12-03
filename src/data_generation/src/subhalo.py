@@ -194,6 +194,36 @@ class SubhaloContext:
         """
         return self.data["subhalo_id"].tolist()
 
+    @classmethod
+    def empty_instance(cls):
+        """
+        Returns an empty instance of the SubhaloContext object with default empty values.
+        """
+        # Provide empty or default values for the required fields
+        # For instance, we create an empty DataFrame and set scale_factor to 1.0
+        empty_properties = {
+            "subhalo_id": [],
+            "spos": [],
+            "id_parents": [],
+            "shmr": [],
+            "mstr": []
+        }
+
+        # Assuming the column map is the same as the one required in __init__
+        empty_column_map = {
+            "subhalo_id": "subhalo_id",
+            "spos": "spos",
+            "id_parents": "id_parents",
+            "shmr": "shmr",
+            "mstr": "mstr"
+        }
+
+        # Creating an empty DataFrame
+        empty_df = pd.DataFrame(empty_properties)
+
+        # Call the constructor with empty or default values
+        return cls(properties=empty_df, scale_factor=1.0, column_map=empty_column_map)
+
 
 class SubhaloParticles:
     """

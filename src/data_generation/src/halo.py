@@ -46,6 +46,10 @@ class Halo:
                 value = np.array(value)  # Convert the list to a numpy array
             setattr(self, key, value)
 
+    @classmethod
+    def empty_instance(cls):
+        return cls(halo_id=None, fsub=None)  # You can adjust these default values as needed
+
 
 class HaloContext:
     """
