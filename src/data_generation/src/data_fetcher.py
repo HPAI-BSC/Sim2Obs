@@ -15,7 +15,7 @@ from src.data_generation.src.utils import get_connection, read_dataset, setup_lo
 load_dotenv('../.env')
 
 
-logger = setup_logger("DataLoader")
+logger = setup_logger("DataFetcher")
 
 
 class DataFetcher(ABC):
