@@ -7,17 +7,20 @@ from omegaconf import DictConfig
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.pipeline_step import PipelineStep
+from src.data_generation.src.rotate_step import RotateStep
 from src.data_generation.src.utils import muse_bins_r, circle, setup_output_directories, setup_logger
 
 logger = setup_logger("MapStep")
 
 
 class MapStep(PipelineStep):
+    name = 'map_step'
+
     def __init__(self, cfg: DictConfig):
         self.map_configuration = self._build_map_configuration(cfg)
 
-    @staticmethod
-    def _build_map_configuration(cfg: DictConfig) -> dict:
+    @classmethod
+    def _build_map_configuration(cls, cfg: DictConfig) -> dict:
         """
         Builds the configuration for the mapping step.
 
@@ -27,17 +30,32 @@ class MapStep(PipelineStep):
         Returns:
             dict: A dictionary containing mapping configuration.
         """
-        required_keys = ['path', 'name', 'n_zooms']
+        if cls.name not in [e['name'] for e in cfg.pipeline]:
+            raise ValueError('Error, To execute a map step you must specify the map step in the pipeline of'
+                             ' the configuration.')
+
+        map_step_dict = next((step for step in cfg.pipeline if step.name == cls.name), None)
+
+        if 'n_zooms' not in map_step_dict:
+            raise ValueError('Error, n_zooms can not be found in the map step of the pipeline.')
+
+        required_keys = ['path', 'name']
         for key in required_keys:
             if key not in cfg:
                 if key not in cfg.get('catalog', {}):
-                    raise ValueError(f"Missing required configuration key: {key}")
+                    raise ValueError(f"Error, missing required configuration key: {key}")
+
+        # Check if there are a previous rotate_step
+        rotate_step_dict = next((step for step in cfg.pipeline if step.name == RotateStep.name), None)
+        rotation_angle = None
+        if rotate_step_dict is not None:
+            rotation_angle, _, _ = rotate_step_dict.rotation_group
 
         return {
             'root_path': cfg.catalog.path,
-            'number_zooms': cfg.n_zooms,
+            'number_zooms': map_step_dict.n_zooms,
             'catalog_name': cfg.catalog.name,
-            'rotation_angle': cfg.rotation_group[0]
+            'rotation_angle': rotation_angle
         }
 
     @staticmethod
