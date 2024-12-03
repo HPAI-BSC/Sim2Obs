@@ -20,7 +20,7 @@ class TestRotateStep(unittest.TestCase):
             self.halo_illustris = pickle.load(file)
 
         with open("data/illustris/subhalo_context_0.pkl", "rb") as file:
-            self.subhalo_context_illustris = pickle.load(file)
+            self.subhalo_context_illustris = pickle.load(file).data
 
         with open("data/illustris/subhalo_any_0.pkl", "rb") as file:
             self.subhalo_illustris = pickle.load(file)
@@ -33,7 +33,7 @@ class TestRotateStep(unittest.TestCase):
             self.halo_eagle = pickle.load(file)
 
         with open("data/eagle/subhalo_context_0.pkl", "rb") as file:
-            self.subhalo_context_eagle = pickle.load(file)
+            self.subhalo_context_eagle = pickle.load(file).data
 
         with open("data/eagle/subhalo_any_0.pkl", "rb") as file:
             self.subhalo_eagle = pickle.load(file)
@@ -69,9 +69,11 @@ class TestRotateStep(unittest.TestCase):
                                  self.subhalo_illustris.subhalo_id,
                                  mock_subhalo_particles.return_value)
 
-        vel_value = self.vel_disp_processor.process(self.subhalo_particles_illustris.v)
+        vel_value = self.vel_disp_processor.process(particle_velocity=self.subhalo_particles_illustris.v)
         self.vel_disp_processor.value = vel_value
-        result = list(self.rotate_step.process(self.vel_disp_processor, self.cosmos))
+        result = list(self.rotate_step.process(input_feature=self.vel_disp_processor,
+                                               output_feature=None,
+                                               cosmos_data=self.cosmos))
         num_iterations = (360 // self.rotate_step.rotation_angle) * len(self.rotate_step.rotation_directions)
         self.assertEqual(len(result), num_iterations)
 
@@ -91,9 +93,11 @@ class TestRotateStep(unittest.TestCase):
                                  self.subhalo_eagle.subhalo_id,
                                  mock_subhalo_particles.return_value)
 
-        vel_value = self.vel_disp_processor.process(self.subhalo_particles_illustris.v)
+        vel_value = self.vel_disp_processor.process(particle_velocity=self.subhalo_particles_illustris.v)
         self.vel_disp_processor.value = vel_value
-        result = list(self.rotate_step.process(self.vel_disp_processor, self.cosmos))
+        result = list(self.rotate_step.process(input_feature=self.vel_disp_processor,
+                                               output_feature=None,
+                                               cosmos_data=self.cosmos))
         num_iterations = (360 // self.rotate_step.rotation_angle) * len(self.rotate_step.rotation_directions)
         self.assertEqual(len(result), num_iterations)
 

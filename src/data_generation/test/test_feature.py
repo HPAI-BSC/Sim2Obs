@@ -50,8 +50,9 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
         expected_mask = np.ones((100, ), dtype=int)  # ICL mask
 
-        result = self.icl_processor.process(mock_halo_instance, mock_subhalo_particles_instance.v,
-                                            mock_subhalo_particles_instance.p)
+        result = self.icl_processor.process(halo=mock_halo_instance,
+                                            particle_velocity=mock_subhalo_particles_instance.v,
+                                            particle_position=mock_subhalo_particles_instance.p)
 
         self.assertEqual(result.shape, (100, ))
         self.assertTrue(np.all(np.isin(result, [0, 1])))  # Check if it's a binary mask
@@ -64,8 +65,9 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles_instance = self.subhalo_particles_eagle
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
-        result = self.icl_processor.process(mock_halo_instance, mock_subhalo_particles_instance.v,
-                                            mock_subhalo_particles_instance.p)
+        result = self.icl_processor.process(halo=mock_halo_instance,
+                                            particle_velocity=mock_subhalo_particles_instance.v,
+                                            particle_position=mock_subhalo_particles_instance.p)
 
         self.assertEqual(result.shape, (100, ))
         self.assertTrue(np.all(np.isin(result, [0, 1])))  # Check if it's a binary mask
@@ -104,7 +106,7 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles_instance = self.subhalo_particles_illustris
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
-        result = self.vel_disp_processor.process(mock_subhalo_particles_instance.v)
+        result = self.vel_disp_processor.process(particle_velocity=mock_subhalo_particles_instance.v)
 
         self.assertEqual(result.shape, (100, 3))
         self.assertTrue(np.issubdtype(result.dtype, np.floating))
@@ -113,7 +115,7 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles_instance = self.subhalo_particles_eagle
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
-        result = self.vel_disp_processor.process(mock_subhalo_particles_instance.v)
+        result = self.vel_disp_processor.process(particle_velocity=mock_subhalo_particles_instance.v)
 
         self.assertEqual(result.shape, (100, 3))
         self.assertTrue(np.issubdtype(result.dtype, np.floating))
@@ -123,7 +125,7 @@ class TestFeature(unittest.TestCase):
         particle_velocity = np.array([])
 
         with self.assertRaises(ValueError):
-            processor.process(particle_velocity)
+            processor.process(particle_velocity=particle_velocity)
 
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
     def test_VelocityDispersionProcessor_generate_maps(self, mock_subhalo_particles):
@@ -132,7 +134,7 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles_instance = self.subhalo_particles_illustris
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
-        self.vel_disp_processor.value = self.vel_disp_processor.process(mock_subhalo_particles_instance.v)
+        self.vel_disp_processor.value = self.vel_disp_processor.process(particle_velocity=mock_subhalo_particles_instance.v)
 
         # Defined by Ilaria
         bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius
@@ -145,7 +147,7 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles_instance = self.subhalo_particles_eagle
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
-        self.vel_disp_processor.value = self.vel_disp_processor.process(mock_subhalo_particles_instance.v)
+        self.vel_disp_processor.value = self.vel_disp_processor.process(particle_velocity=mock_subhalo_particles_instance.v)
         vel_map, _, biny = self.vel_disp_processor.generate_map(mock_subhalo_particles_instance.p, bins,
                                                                 ranging, axis=(0, 1))
         assert (len(vel_map)) == bins

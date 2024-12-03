@@ -23,7 +23,7 @@ class TestMapStep(unittest.TestCase):
             self.halo_illustris = pickle.load(file)
 
         with open("data/illustris/subhalo_context_0.pkl", "rb") as file:
-            self.subhalo_context_illustris = pickle.load(file)
+            self.subhalo_context_illustris = pickle.load(file).data
 
         # Eagle objs
         with open("data/eagle/subhalo_particles_0.pkl", "rb") as file:
@@ -33,7 +33,7 @@ class TestMapStep(unittest.TestCase):
             self.halo_eagle = pickle.load(file)
 
         with open("data/eagle/subhalo_context_0.pkl", "rb") as file:
-            self.subhalo_context_eagle = pickle.load(file)
+            self.subhalo_context_eagle = pickle.load(file).data
 
         with open("data/eagle/subhalo_any_0.pkl", "rb") as file:
             self.subhalo_eagle = pickle.load(file)
@@ -67,13 +67,14 @@ class TestMapStep(unittest.TestCase):
                                  self.subhalo_illustris.subhalo_id,
                                  mock_subhalo_particle_positions.return_value)
 
-        vel_value = self.vel_disp_processor.process(mock_subhalo_particle_velocity.return_value)
+        vel_value = self.vel_disp_processor.process(particle_velocity=mock_subhalo_particle_velocity.return_value)
         self.vel_disp_processor.value = vel_value
 
-        icl_value = self.icl_processor.process(mock_halo.return_value, mock_subhalo_particle_velocity.return_value,
-                                               mock_subhalo_particle_positions.return_value)
+        icl_value = self.icl_processor.process(halo=mock_halo.return_value,
+                                               particle_velocity=mock_subhalo_particle_velocity.return_value,
+                                               particle_position=mock_subhalo_particle_positions.return_value)
         self.icl_processor.value = icl_value
-        self.map_step.process(self.vel_disp_processor, self.icl_processor, self.cosmos)
+        _ = list(self.map_step.process(self.vel_disp_processor, self.icl_processor, self.cosmos))
 
         if self.map_step.map_configuration['rotation_angle'] is not None:
             path = os.path.join(self.map_step.map_configuration['root_path'],
@@ -106,13 +107,14 @@ class TestMapStep(unittest.TestCase):
                                  self.subhalo_illustris.subhalo_id,
                                  mock_subhalo_particle_positions.return_value)
 
-        vel_value = self.vel_disp_processor.process(mock_subhalo_particle_velocity.return_value)
+        vel_value = self.vel_disp_processor.process(particle_velocity=mock_subhalo_particle_velocity.return_value)
         self.vel_disp_processor.value = vel_value
 
-        icl_value = self.icl_processor.process(mock_halo.return_value, mock_subhalo_particle_velocity.return_value,
-                                               mock_subhalo_particle_positions.return_value)
+        icl_value = self.icl_processor.process(halo=mock_halo.return_value,
+                                               particle_velocity=mock_subhalo_particle_velocity.return_value,
+                                               particle_position=mock_subhalo_particle_positions.return_value)
         self.icl_processor.value = icl_value
-        self.map_step.process(self.vel_disp_processor, self.icl_processor, self.cosmos)
+        _ = list(self.map_step.process(self.vel_disp_processor, self.icl_processor, self.cosmos))
 
         if self.map_step.map_configuration['rotation_angle'] is not None:
             path = os.path.join(self.map_step.map_configuration['root_path'],

@@ -67,7 +67,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
         self.value = []
 
     # TODO review this computation
-    def process(self, particle_velocity: np.ndarray) -> np.ndarray:
+    def process(self, **kwargs) -> np.ndarray:
         """
         Calculate the velocity dispersion of particles.
 
@@ -80,6 +80,10 @@ class VelocityDispersionProcessor(FeatureProcessor):
         Raises:
             ValueError: If the input particle_velocity is empty.
         """
+        if 'particle_velocity' not in kwargs:
+            raise Exception('VelocityDispersion needs particle_velocity as input parameter.')
+
+        particle_velocity = kwargs['particle_velocity']
 
         if particle_velocity.size == 0:
             raise ValueError("SubhaloParticles cannot have 'v' (velocity) empty.")
@@ -183,7 +187,7 @@ class ICLProcessor(FeatureProcessor):
         return final_predictions
 
     # Subhalo particles, halo
-    def process(self, halo: Halo, particle_velocity: np.ndarray, particle_position: np.ndarray) -> np.ndarray:
+    def process(self, **kwargs) -> np.ndarray:
         """
         Process the IntraCluster Light (ICL) for a given halo and its particles.
 
@@ -199,6 +203,13 @@ class ICLProcessor(FeatureProcessor):
             ValueError: If the scaled particle data is empty.
         """
         # log.info(f'Processing ICL for Halo ID {halo.halo_id}.')
+
+        if not {'halo', 'particle_velocity', 'particle_position'}.issubset(kwargs):
+            raise Exception("Missing required keys: 'halo', 'particle_velocity', or 'particle_position' in kwargs")
+
+        halo = kwargs['halo']
+        particle_velocity = kwargs['particle_velocity']
+        particle_position = kwargs['particle_position']
 
         v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
         # Computing the Euclidean distance from the new origin to each particle

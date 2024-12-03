@@ -21,5 +21,7 @@ H: 0.6774
 n_zooms: 3
 
 rotation_group: ${rotation_120}
-feature_names: ['velocity_dispersion', 'label']  # velocity dispersion -> label
+feature_names:
+  - 'velocity_dispersion'
+  - 'icl'  # velocity dispersion -> label
 
