@@ -27,8 +27,11 @@ class TestFetcher(unittest.TestCase):
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
-        self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris)
-        self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle)
+        required_keys = ['subhalo_min_mass', 'halo_min_mass', 'solar_mass_convention', 'G', 'H']
+        data_loader_dict = next((step for step in self.cfg_illustris.pipeline if step.name == 'data_loader'), None)
+        attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
+        self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
+        self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
 
     def test_get_halos_illustris(self):
         halo_context_1 = self.fetcher_illustris.get_halos()

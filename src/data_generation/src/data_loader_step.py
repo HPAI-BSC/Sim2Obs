@@ -24,6 +24,8 @@ class DataLoader(PipelineStep):
     fetcher : DataFetcher
         An instance of a data fetcher responsible for fetching the required data.
     """
+    name = 'data_loader'
+
     def __init__(self, cfg: DictConfig):
         """
         Initializes the DataLoader with the provided configuration.
@@ -33,8 +35,23 @@ class DataLoader(PipelineStep):
         cfg : DictConfig
             The configuration object containing parameters for the data fetching process.
         """
-        self.fetcher = DataFetcherFactory.get_data_fetcher(cfg)
+        attr_list = self._build_data_loader_configuration(cfg)
+        self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
         logger.info("DataLoader initialized with the provided configuration.")
+
+    @classmethod
+    def _build_data_loader_configuration(cls, cfg: DictConfig) -> dict:
+        if cls.name not in [e['name'] for e in cfg.pipeline]:
+            raise ValueError('Error, To execute a data_loader you must specify the map step in the pipeline of'
+                             ' the configuration.')
+
+        data_loader_dict = next((step for step in cfg.pipeline if step.name == cls.name), None)
+
+        required_keys = ['subhalo_min_mass', 'halo_min_mass', 'solar_mass_convention', 'G', 'H']
+        for key in required_keys:
+            if key not in data_loader_dict:
+                raise ValueError(f"Error, missing required configuration key: {key}")
+        return data_loader_dict
 
     def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
                 cosmos_data: CosmosData, g: List[Tuple], next_step: Optional[Callable[[List[Tuple]], Any]]):

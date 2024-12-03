@@ -52,7 +52,20 @@ class FeatureProcessor(ABC):
         """
         pass
 
-    @abstractmethod
+    @staticmethod
+    def _build_configuration(cfg: DictConfig, required_keys: list) -> dict:
+        if 'data_loader' not in [e['name'] for e in cfg.pipeline]:
+            raise ValueError('Error, To execute a data_loader you must specify the map step in the pipeline of'
+                             ' the configuration.')
+
+        data_loader_dict = next((step for step in cfg.pipeline if step.name == 'data_loader'), None)
+        for key in required_keys:
+            if key not in data_loader_dict:
+                raise ValueError(f"Error, missing required configuration key: {key}")
+        subset_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
+        return subset_dict
+
+    @classmethod
     def get_empty(cls) -> np.ndarray:
         """
         Get an empty or default value for the feature.
@@ -187,6 +200,10 @@ class ICLProcessor(FeatureProcessor):
         self.map = []
         self.value = []
 
+        attr_list = self._build_configuration(cfg, ['G'])
+        for key, value in attr_list.items():
+            setattr(self, key, value)
+
     def _predict(self, v_delta: np.ndarray, distance: np.ndarray, halo: Halo):
         """
         Predict whether particles belong to the IntraCluster Light (ICL) or the Brightest Cluster Galaxy (BCG).
@@ -213,7 +230,7 @@ class ICLProcessor(FeatureProcessor):
 
         final_model = joblib.load(self.model_path)
         # Define simulation parameters
-        V200 = np.sqrt(self.cfg.G * halo.m200 / halo.r200)
+        V200 = np.sqrt(self.G * halo.m200 / halo.r200)
 
         # Create a DataFrame with features required by the model
         # Features are: log-scaled distance (r/R200), scaled velocity (modulo_v/V200), and log-scaled halo mass (M200)
