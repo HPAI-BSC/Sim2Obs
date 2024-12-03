@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from dotenv import load_dotenv
+from scipy.spatial.distance import cosine
+
 
 
 # TODO
@@ -36,6 +38,7 @@ def setup_logger(name: str) -> logging.Logger:
     console_handler = logging.StreamHandler()
     file_handler = logging.FileHandler(f"{name}.log")
 
+    # Updated format string to ensure line number is not included
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
     console_handler.setFormatter(formatter)
@@ -288,6 +291,32 @@ def compute_intrahalo_variance_ilaria(input_dir: str) -> pd.DataFrame:
 
     df = df.sort_values(by="halo_id")
     return df
+
+
+
+def angle(u: np.ndarray, v: np.ndarray) -> float:
+    """
+    Calculate the angle between two vectors using the cosine similarity.
+
+    Parameters:
+    -----------
+    u : np.ndarray
+        The first vector. Must be of the same dimension as `v`.
+    v : np.ndarray
+        The second vector. Must be of the same dimension as `u`.
+
+    Returns:
+    --------
+    float
+        The angle in radians between the vectors `u` and `v`.
+
+    Note:
+    -----
+    The input vectors `u` and `v` should be normalized (unit vectors) for
+    accurate angle calculations. If the vectors are not normalized, the returned
+    angle may not accurately represent the angle between them.
+    """
+    return np.arccos(1 - cosine(u, v))
 
 
 def rotate_vector(v: np.ndarray, axis: np.ndarray, angle_: float) -> np.ndarray:
