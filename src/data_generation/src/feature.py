@@ -8,6 +8,9 @@ from omegaconf import DictConfig
 from scipy import stats
 
 from src.data_generation.src.halo import Halo
+from src.data_generation.src.utils import setup_logger
+
+logger = setup_logger("FeatureProcessor")
 
 
 class FeatureProcessor(ABC):
@@ -59,7 +62,8 @@ class VelocityDispersionProcessor(FeatureProcessor):
 
     Attributes:
         name (str): The name of the feature ('VelocityDispersion').
-        value (None): Placeholder for storing computed value.
+        map ([]): Velocity Dispersion map.
+        value ([]): Placeholder for storing computed value.
     """
     def __init__(self):
         self.name = 'VelocityDispersion'
@@ -72,39 +76,66 @@ class VelocityDispersionProcessor(FeatureProcessor):
         Calculate the velocity dispersion of particles.
 
         Args:
-            particle_velocity (np.ndarray): The velocities of the particles.
+            **kwargs: Keyword arguments, expected to include the necessary data for processing, in this case
+            the velocities of the particles.
 
         Returns:
-            np.ndarray: The velocity dispersion for each particle.
+            np.ndarray: The velocity for each particle.
 
         Raises:
             ValueError: If the input particle_velocity is empty.
         """
         if 'particle_velocity' not in kwargs:
+            logger.error('VelocityDispersion needs particle_velocity as input parameter.')
             raise Exception('VelocityDispersion needs particle_velocity as input parameter.')
 
         particle_velocity = kwargs['particle_velocity']
 
         if particle_velocity.size == 0:
+            logger.error("SubhaloParticles cannot have 'v' (velocity) empty.")
             raise ValueError("SubhaloParticles cannot have 'v' (velocity) empty.")
 
-        # TODO clarify this computation
-        # v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
-        # Computing the delta vel. from each particle in comparison to the mean-vel.
-        # velocity_disp = np.sqrt(((particle_velocity - v_cm) ** 2).sum(axis=1))
-        # log.info(f'Computed velocity dispersion for {len(particle_velocity)} particles.')
+        logger.info(f'Computed velocity dispersion for {len(particle_velocity)} particles.')
         return particle_velocity
 
     def generate_map(self, particle_positions: np.ndarray, bins: int, ranging: tuple, axis: tuple) -> tuple:
+        """
+        Generate a 2D map of processed particle features using binned statistics.
+
+        This method calculates a 2D histogram-like map of a feature derived from particle data.
+        It uses the positions of particles and bins them into a grid, computing the mean of a
+        specific feature for each grid cell. The resulting feature values are processed further
+        to compute their normalized root mean square (RMS).
+
+        Args:
+            particle_positions (np.ndarray): A 2D array of shape (N, 3) representing the positions
+                of particles in 3D space, where N is the number of particles.
+            bins (int): The number of bins to use along each axis for the grid.
+            ranging (tuple): A tuple of two tuples defining the range for binning along each axis,
+                e.g., ((xmin, xmax), (ymin, ymax)).
+            axis (tuple): A tuple of two integers indicating which axes to use for the 2D grid
+                (e.g., (0, 1) for x and y).
+
+        Returns:
+            tuple: A tuple containing:
+                - input_ij (np.ndarray): A 2D array representing the grid of processed feature values.
+                - binx (np.ndarray): The bin edges along the first axis.
+                - biny (np.ndarray): The bin edges along the second axis.
+
+        Raises:
+            Exception: If the `self.value` attribute is empty, indicating that the `process`
+                method needs to be called before generating the map.
+        """
+
         i, j = axis
         if len(self.value) == 0:
+            logger.error('FeatureProcessor value is empty, call first process method.')
             raise Exception('FeatureProcessor value is empty, call first process method.')
 
         if isinstance(self.value, List):
             self.value = np.array(self.value)
 
         pos_rot = particle_positions
-        # TODO check this part is working
         input_ij, binx, biny, _ = stats.binned_statistic_2d(
             pos_rot[:, i], pos_rot[:, j],
             (self.value[:, 2]) ** 2,  # Access the relevant feature
@@ -177,12 +208,14 @@ class ICLProcessor(FeatureProcessor):
         Data = Data.replace([np.inf, -np.inf], np.nan).dropna(axis=0)
 
         if Data.size == 0:
+            logger.error("Scaled particle data is empty, it's likely that your particle data has a "
+                         "considerable number of missing values")
             raise ValueError("Scaled particle data is empty, it's likely that your particle data has a "
                              "considerable number of missing values")
 
         # Use the trained model to make predictions on the data
         # The model predicts whether each particle belongs to BCG (label 1) or ICL (label 0)
-        # log.info("Labeling particles ...")
+        logger.info("Labeling particles ...")
         final_predictions = final_model.predict(Data.to_numpy())
         return final_predictions
 
@@ -202,14 +235,15 @@ class ICLProcessor(FeatureProcessor):
         Raises:
             ValueError: If the scaled particle data is empty.
         """
-        # log.info(f'Processing ICL for Halo ID {halo.halo_id}.')
-
         if not {'halo', 'particle_velocity', 'particle_position'}.issubset(kwargs):
+            logger.error("Missing required keys: 'halo', 'particle_velocity', or 'particle_position' in kwargs")
             raise Exception("Missing required keys: 'halo', 'particle_velocity', or 'particle_position' in kwargs")
 
         halo = kwargs['halo']
         particle_velocity = kwargs['particle_velocity']
         particle_position = kwargs['particle_position']
+
+        logger.info(f'Processing ICL for Halo ID {halo.halo_id}.')
 
         v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
         # Computing the Euclidean distance from the new origin to each particle
@@ -225,14 +259,44 @@ class ICLProcessor(FeatureProcessor):
             # if particle belongs to ICL=1, otherwise BCG=0
             icl_mask[ids] = 1
         else:
-            # log.warning("No particles predicted as ICL.")
+            logger.warning('No particles predicted as ICL.')
             raise ValueError("icl_mask is empty; no masking applied.")
-        # log.info(f'Generated ICL mask for {len(icl_mask)} particles.')
+
+        logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
         return icl_mask
 
     def generate_map(self, particle_positions: np.ndarray, bins: int, ranging: tuple, axis: tuple) -> tuple:
+        """
+        Generate a 2D map of particle feature data using binned statistics.
+
+        This method computes a 2D map by summing particle features within a grid defined
+        by specified bins and axis ranges. The summed feature values are normalized by
+        the count of particles in each bin to provide an average value for each grid cell.
+
+        Args:
+            particle_positions (np.ndarray): A 2D array of shape (N, 3) representing the positions
+                of particles in 3D space, where N is the number of particles.
+            bins (int): The number of bins to use along each axis for the grid.
+            ranging (tuple): A tuple of two tuples defining the range for binning along each axis,
+                e.g., ((xmin, xmax), (ymin, ymax)).
+            axis (tuple): A tuple of two integers indicating which axes to use for the 2D grid
+                (e.g., (0, 1) for x and y).
+
+        Returns:
+            tuple: A tuple containing:
+                - output_ij (np.ndarray): A 2D array representing the grid of averaged feature values.
+                - binx (np.ndarray): The bin edges along the first axis.
+                - biny (np.ndarray): The bin edges along the second axis.
+
+        Raises:
+            Exception: If the `self.value` attribute is empty, indicating that the `process`
+                method needs to be called before generating the map.
+            AssertionError: If the size of the input data along the specified axes and the length
+                of `self.value` do not match.
+        """
         i, j = axis
         if len(self.value) == 0:
+            logger.error('FeatureProcessor value is empty, call first process method.')
             raise Exception('FeatureProcessor value is empty, call first process method.')
         pos_rot = particle_positions
 
@@ -287,5 +351,5 @@ class FeatureProcessorFactory:
 
         if feature not in feature_processors:
             raise ValueError(f"Invalid feature name {feature} provided")
-        # log.info(f"Feature processor '{feature}' created.")
+        logger.info(f"Feature processor '{feature}' created.")
         return feature_processors[feature]

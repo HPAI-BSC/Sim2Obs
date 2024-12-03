@@ -34,12 +34,14 @@ halo = None
 halo_context = None
 
 if len(halos) > 0:
+    scalf = cfg_illustris.catalog.scalf,
     if halos['GroupPos'].shape[1] == 3:
-        gpos = [halos['GroupPos'][i] for i in range(halos['GroupPos'].shape[0])]
+        gpos = [halos['GroupPos'][i] * scalf for i in range(halos['GroupPos'].shape[0])]
         halos['GroupPos'] = gpos
 
     halos = pd.DataFrame.from_dict(halos)
     halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * cfg_illustris.solar_mass_convention  # 𝑀⊙/ℎ
+    halos['Group_R_Crit200'] = halos['Group_R_Crit200'] * scalf
     halos = halos[halos['Group_M_Crit200'] > cfg_illustris.halo_min_mass * cfg_illustris.H]
     halos['halo_id'] = np.arange(len(halos))
 
@@ -48,7 +50,7 @@ if len(halos) > 0:
     column_map = {'halo_id': 'halo_id', 'r200': 'Group_R_Crit200', 'm200': 'Group_M_Crit200', 'gpos': 'GroupPos',
                   'fsub': 'GroupFirstSub'}
 
-    halo_context = HaloContext(halos, cfg_illustris.catalog.scalf, column_map)
+    halo_context = HaloContext(halos, column_map)
     halo = Halo(
         halo_id=halos.loc[0, 'halo_id'],
         r200=halos.loc[0, 'Group_R_Crit200'],
@@ -144,16 +146,18 @@ unique_halo_ids = df['halo_id'].unique()
 
 if len(df) > 0:
     df = df.sort_values(by='halo_id')
-    # pkps -> ckps / h
-    gpos = df.apply(lambda row: np.array([row['pos_x'] / cfg_eagle.H, row['pos_y'] / cfg_eagle.H, row['pos_z'] / cfg_eagle.H]), axis=1)
+    # pkps -> kps / h
+    scalf = cfg_eagle.catalog.scalf
+    gpos = df.apply(lambda row: np.array([row['pos_x'] * scalf / cfg_eagle.H,
+                                          row['pos_y'] * scalf / cfg_eagle.H,
+                                          row['pos_z'] * scalf / cfg_eagle.H]), axis=1)
     df['gpos'] = gpos
     df['r200'] = df['r200'] / cfg_eagle.H    # pkps -> ckps / h
     df['m200'] = df['m200'] / cfg_eagle.H    # 𝑀⊙/ℎ
     df['halo_id'] = df['halo_id'].astype(int)
     df = df[(df['subhalo_id'] == 0) & (df['group_number'] == 2)]
-    # df = df.iloc[0, :].to_frame().T
     column_map = {'halo_id': 'halo_id', 'r200': 'r200', 'm200': 'm200', 'gpos': 'gpos', 'fsub': 'subhalo_id'}
-    halo_context = HaloContext(df, cfg_eagle.catalog.scalf, column_map)
+    halo_context = HaloContext(df, column_map)
     idx = df.index.values[0]
     halo = Halo(
         halo_id=df.loc[idx, 'halo_id'],
