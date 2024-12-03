@@ -2,7 +2,6 @@ import os
 import shutil
 import unittest
 
-import numpy as np
 from hydra import initialize, compose
 
 from src.data_generation.src.data_loader_step import DataLoader
@@ -41,11 +40,7 @@ class TestPipeline(unittest.TestCase):
                     shutil.rmtree(path)
 
     def test_run_illustris(self):
-        rotate_step = RotateStep(
-            rotation_angle=120,
-            z=np.array([0, 0, 1]),
-            rotation_directions=np.array([[1, 0, 0]])
-        )
+        rotate_step = RotateStep(self.cfg_illustris)
         self.map_step = MapStep(self.cfg_illustris)
         self.map_step.map_configuration['root_path'] = '../test/data/illustris'
         data_loader = DataLoader(self.cfg_illustris)
@@ -54,11 +49,7 @@ class TestPipeline(unittest.TestCase):
         self.pipeline_illustris.run(n=1)
 
     def test_run_eagle(self):
-        rotate_step = RotateStep(
-            rotation_angle=120,
-            z=np.array([0, 0, 1]),
-            rotation_directions=np.array([[1, 0, 0]])
-        )
+        rotate_step = RotateStep(self.cfg_eagle)
         self.map_step = MapStep(self.cfg_eagle)
         self.map_step.map_configuration['root_path'] = '../test/data/eagle'
         data_loader = DataLoader(self.cfg_eagle)
