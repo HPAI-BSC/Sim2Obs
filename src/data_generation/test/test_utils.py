@@ -14,7 +14,7 @@ class TestUtils(unittest.TestCase):
     def test_get_particle_data(self):
         # https://arxiv.org/pdf/1706.09899
         itype = 4   # PartType
-        path = '../../../local/data/eagle/RefL0025N0376'
+        path = '../../../local/data/eagle/RefL0050N0752'
         gn = 620
         sgn = 0
         gns = read_dataset(itype, 'GroupNumber', path)
