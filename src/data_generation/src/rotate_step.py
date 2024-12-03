@@ -3,7 +3,9 @@ import numpy as np
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.utils import rotate_vector, get_transform_matrix, rotate_3dvec
+from src.data_generation.src.utils import rotate_vector, get_transform_matrix, rotate_3dvec, setup_logger
+
+logger = setup_logger("RotateStep")
 
 
 class RotateStep(PipelineStep):
@@ -62,7 +64,6 @@ class RotateStep(PipelineStep):
         X_rot = np.float32(rotate_3dvec(Q, X))
         return X_rot
 
-    # todo UPDATE TEST
     def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
                 cosmos_data: CosmosData):
         """
@@ -84,11 +85,11 @@ class RotateStep(PipelineStep):
             A tuple containing the updated cosmos_data and input_feature after the rotation is applied.
         """
         iterations = 360 // int(self.rotation_angle)
-        # log.debug(f"Total iterations: {iterations} with rotation angle: {self.rotation_angle} degrees.")
+        logger.debug(f"Total iterations: {iterations} with rotation angle: {self.rotation_angle} degrees.")
         for rotation_axis in self.rotation_directions:
             degree = 0
             for i in range(iterations):
-                # log.debug(f"Rotation iteration {i + 1}/{iterations}: rotating by {degree} degrees.")
+                logger.debug(f"Rotation iteration {i + 1}/{iterations}: rotating by {degree} degrees.")
                 rotation_axis = np.array(rotation_axis)
 
                 # Update cosmos data, subhalos data and subhalo particle positions
@@ -100,8 +101,8 @@ class RotateStep(PipelineStep):
                     self._rotate(rotation_axis, degree, cosmos_data.subhalo_particle_positions))
 
                 input_feature.value = self._rotate(rotation_axis, degree, input_feature.value)
-                # log.debug(f"Rotation metadata updated: {cosmos_data.metadata['rotation']}")
+                logger.debug(f"Rotation metadata updated: {cosmos_data.metadata['rotation']}")
                 cosmos_data.metadata['rotation'] = {'has_rotated': 1, 'angle': degree}
                 degree += self.rotation_angle
                 yield cosmos_data, input_feature
-            # log.info("Rotation process completed.")
+            logger.info("Rotation process completed.")

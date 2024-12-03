@@ -7,7 +7,9 @@ from omegaconf import DictConfig
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.utils import muse_bins_r, circle, setup_output_directories
+from src.data_generation.src.utils import muse_bins_r, circle, setup_output_directories, setup_logger
+
+logger = setup_logger("MapStep")
 
 
 class MapStep(PipelineStep):
@@ -41,6 +43,17 @@ class MapStep(PipelineStep):
     @staticmethod
     def _create_maps(cosmos_data: CosmosData, input_feature: FeatureProcessor,
                      output_feature: FeatureProcessor) -> List:
+        """
+        Generates projection maps for both input and output features.
+
+        Args:
+            cosmos_data (CosmosData): Cosmos data containing subhalo and particle information.
+            input_feature (FeatureProcessor): Feature processor for input data.
+            output_feature (FeatureProcessor): Feature processor for output data.
+
+        Returns:
+            List: A list of tuples containing the generated maps for each projection.
+        """
         bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius
         ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
 
@@ -68,6 +81,15 @@ class MapStep(PipelineStep):
 
     @staticmethod
     def _get_interlopers_id(cosmos_data: CosmosData):
+        """
+        Identifies the interloper subhalos within the given data.
+
+        Args:
+            cosmos_data (CosmosData): Cosmos data containing subhalo information.
+
+        Returns:
+            np.ndarray: Array of subhalo IDs identified as interlopers.
+        """
         bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius
 
         # Considering as interloper any subhalo contained in a box defined by [-r, r] in the x and y directions and
@@ -88,8 +110,7 @@ class MapStep(PipelineStep):
         interlopers_id = interlopers_id.iloc[1:]
 
         if len(interlopers_id) == 0:
-            pass
-            #log.warning('There is no interlopers.')
+            logger.warning(f'There is no interlopers for particles linked to {cosmos_data.subhalo_id}')
         return interlopers_id
 
     @staticmethod
@@ -99,23 +120,17 @@ class MapStep(PipelineStep):
 
         Parameters:
         ----------
-        label : np.ndarray
-            A 2D array representing the labels of the particles.
+        cosmos_data : CosmosData
+            The data containing subhalos and particle positions.
 
-        vel_disp : np.ndarray
-            A 2D array representing the velocity dispersion.
-
-        spos_rot : np.ndarray
-            A 2D array containing the spatial positions of each subhalo.
-
-        shmr : pd.DataFrame
-            A DataFrame containing the SubhaloHalfmassRadType of subhalos.
+        map_shape : tuple
+            The shape of the map to be created (height, width).
 
         interlopers_id : np.ndarray
-            An array of identifiers for the interloper subhalos.
+            Array of identifiers for the interloper subhalos.
 
         biny : np.ndarray
-            An array representing the y-coordinates for the masking grid.
+            Array representing the y-coordinates for the masking grid.
 
         Returns:
         -------
@@ -146,8 +161,7 @@ class MapStep(PipelineStep):
 
         # Check if the mask is just zero
         if np.all(interlopers_mask == 0):
-            pass
-            #log.warning('Mask is full of zeros.')
+            logger.warning('Mask is full of zeros.')
         interlopers_mask = interlopers_mask.astype(bool)
         return interlopers_mask
 
@@ -159,20 +173,25 @@ class MapStep(PipelineStep):
 
         Parameters:
         ----------
-        label_masked : np.ndarray
-            A 2D array representing the masked labels.
+        input_feature : FeatureProcessor
+            The input feature processor.
 
-        vel_disp_masked : np.ndarray
-            A 2D array representing the masked velocity dispersion.
+        output_feature : FeatureProcessor
+            The output feature processor.
+
+        interlopers_mask : np.ndarray
+            The mask identifying interloper regions.
 
         Returns:
         -------
         tuple
             A tuple containing:
-            - label_masked1 : np.ndarray
-                A smaller 2D array of masked labels.
-            - vel_disp_masked1 : np.ndarray
-                A smaller 2D array of masked velocity dispersion.
+            - input_feature_zoom : np.ndarray
+                A smaller 2D array of the input feature.
+            - output_feature_zoom : np.ndarray
+                A smaller 2D array of the output feature.
+            - mask_zoom : np.ndarray
+                The zoomed-in mask.
         """
         bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius
         xo, yo = (int(bins / 2), int(bins / 2))
@@ -190,6 +209,17 @@ class MapStep(PipelineStep):
 
     def _create_n_zooms(self, projection_str: str, cosmos_data: CosmosData, input_feature: FeatureProcessor,
                         output_feature: FeatureProcessor, interlopers_mask: np.ndarray) -> None:
+        """
+        Creates multiple zoomed-in regions of the maps for a given projection.
+
+        Args:
+            projection_str (str): The name of the projection (e.g., "xy", "yz", "xz").
+            cosmos_data (CosmosData): The cosmos data containing subhalo and particle information.
+            input_feature (FeatureProcessor): The input feature processor.
+            output_feature (FeatureProcessor): The output feature processor.
+            interlopers_mask (np.ndarray): Mask of interloper regions.
+        """
+        logger.info(f'Generating {self.map_configuration["number_zooms"]} zooms for projection {projection_str}...')
 
         def get_path(feature_name, halo_id_, subhalo_id_, projection_, i_):
             if self.map_configuration['rotation_angle'] is not None:
@@ -227,19 +257,32 @@ class MapStep(PipelineStep):
                                   projection_str, i)
             output_path = get_path(output_feature.name, cosmos_data.halo.halo_id, cosmos_data.subhalo_id,
                                    projection_str, i)
-
-            if os.path.exists(input_path):
-                print()
             np.savez(input_path, input_feature_with_mask)
             np.savez(output_path, output_feature_with_mask)
+        logger.info(f'Finished generating zooms for projection {projection_str}')
 
     def _process_projection(self, feature_size, interlopers_id: np.ndarray, biny_i, projection: str,
                             cosmos_data: CosmosData, input_feature: FeatureProcessor, output_feature: FeatureProcessor):
+        """
+        Processes each projection (XY, YZ, XZ) for the given data, generating maps and saving zoomed-in versions.
+
+        Args:
+            cosmos_data (CosmosData): The data to be used for generating projections.
+            input_feature (FeatureProcessor): The processor for input features.
+            output_feature (FeatureProcessor): The processor for output features.
+        """
         interlopers_mask = self._get_interlopers_mask(cosmos_data, feature_size, interlopers_id, biny_i)
         self._create_n_zooms(projection, cosmos_data, input_feature, output_feature, interlopers_mask)
 
-    # TODO see how to generalize this type4
     def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor, cosmos_data: CosmosData):
+        """
+        Main method to process projections for the given cosmos data.
+
+        Args:
+            cosmos_data (CosmosData): The cosmos data containing subhalo and particle information.
+            input_feature (FeatureProcessor): The input feature processor.
+            output_feature (FeatureProcessor): The output feature processor.
+        """
         interlopers_id = self._get_interlopers_id(cosmos_data)
         io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
         projections = ["xy", "yz", "xz"]
@@ -250,6 +293,7 @@ class MapStep(PipelineStep):
             output_feature.map = map_f_o
             self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, cosmos_data, input_feature,
                                      output_feature)
+        logger.info('Map generation done.')
         yield None
 
 
