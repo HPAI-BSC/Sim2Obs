@@ -862,11 +862,8 @@ class VSSM(nn.Module):
         self.norm = norm_layer(self.num_features)
         self.norm_up = norm_layer(self.embed_dim)
 
-        print(self.final_upsample)
-        print(self.patch_size)
         if self.final_upsample == "expand_first":
             print("---final upsample expand_first---")
-            print(self.embed_dim)
             self.up = FinalPatchExpand_X4(dim_scale=self.patch_size, dim=self.embed_dim)
             self.output = nn.Conv2d(in_channels=self.embed_dim, out_channels=self.num_classes, kernel_size=1,
                                     bias=False)
@@ -893,16 +890,13 @@ class VSSM(nn.Module):
 
     # Encoder and Bottleneck
     def forward_features(self, x):
-        print(f"-> {x.shape}")
         x = self.patch_embed(x)
 
         x_downsample = []
         for i,layer in enumerate(self.layers):
-            print(x.shape)
             x_downsample.append(x)
             x = layer(x)
         x = self.norm(x) # B H W C
-        print(f"--> {x.shape}")
         return x, x_downsample
 
     # def forward_backbone(self, x):
@@ -930,14 +924,11 @@ class VSSM(nn.Module):
         if self.final_upsample == "expand_first":
             B, H, W, C = x.shape
             x = self.up(x)
-            print(f"up_x4: {x.shape}")
             if self.patch_size == 1:
                 pass
             else:
                 x = x.view(B, 4 * H, 4 * W, -1)
-            print(f"up_x4: {x.shape}")
             x = x.permute(0, 3, 1, 2)  # B,C,H,W
-            print(f"up_x4: {x.shape}")
             x = self.output(x)
 
         return x
