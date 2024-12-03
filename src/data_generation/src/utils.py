@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import re
 from typing import List, Tuple
@@ -15,9 +16,26 @@ from scipy.spatial.distance import cosine
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloParticles
 
-# TODO change this
+# TODO
 load_dotenv('../.env')
 
+
+def setup_logger(name):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+
+    console_handler = logging.StreamHandler()
+    file_handler = logging.FileHandler(f"{name}.log")
+
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    console_handler.setFormatter(formatter)
+    file_handler.setFormatter(formatter)
+
+    logger.addHandler(console_handler)
+    logger.addHandler(file_handler)
+
+    return logger
 
 def get_connection():
     username = os.getenv("USERNAME")

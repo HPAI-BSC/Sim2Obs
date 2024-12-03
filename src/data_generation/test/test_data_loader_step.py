@@ -43,15 +43,11 @@ class TestDataLoaderStep(unittest.TestCase):
 
     def test_load_subhalo_particles_illustris(self):
         self.dataLoader = DataLoader(self.cfg_illustris)
-        result = list(self.dataLoader.load_subhalo_particles_data(subhalo_id=0))
-
-        for particles in result:
-            self.assertIsInstance(particles, SubhaloParticles)
+        particles = self.dataLoader.load_subhalo_particles_data(subhalo_id=0)
+        self.assertIsInstance(particles, SubhaloParticles)
 
     def test_load_subhalo_particles_eagle(self):
         self.dataLoader = DataLoader(self.cfg_eagle)
-        result = list(self.dataLoader.load_subhalo_particles_data(subhalo_id=0, halo_id=620))
-
-        for particles in result:
-            self.assertIsInstance(particles, SubhaloParticles)
+        particles = self.dataLoader.load_subhalo_particles_data(subhalo_id=0, halo_id=15755)
+        self.assertIsInstance(particles, SubhaloParticles)
 
