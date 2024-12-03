@@ -13,7 +13,6 @@ from src.data_generation.src.utils import get_connection
 
 load_dotenv('../.env')
 
-
 # Initialize Hydra and load configuration
 with initialize(config_path="../../../configs"):
     cfg_illustris = compose(config_name="data_generation.yaml")
@@ -24,6 +23,8 @@ with initialize(config_path="../../../configs"):
     cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
     cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
     cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
+
+attr = next((step for step in cfg_illustris.pipeline if step.name == 'data_loader'), None)
 
 os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -40,9 +41,9 @@ if len(halos) > 0:
         halos['GroupPos'] = gpos
 
     halos = pd.DataFrame.from_dict(halos)
-    halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * cfg_illustris.solar_mass_convention  # 𝑀⊙/ℎ
+    halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * attr.solar_mass_convention  # 𝑀⊙/ℎ
     halos['Group_R_Crit200'] = halos['Group_R_Crit200'] * scalf
-    halos = halos[halos['Group_M_Crit200'] > cfg_illustris.halo_min_mass * cfg_illustris.H]
+    halos = halos[halos['Group_M_Crit200'] > attr.halo_min_mass * attr.H]
     halos['halo_id'] = np.arange(len(halos))
 
     # keep the first halo
@@ -74,7 +75,7 @@ if len(subhalos) > 0:
         subhalos['SubhaloPos'] = gpos
 
     subhalos["SubhaloHalfmassRadType"] = subhalos["SubhaloHalfmassRadType"][:, 4]  # stars
-    subhalos["SubhaloMassType"] = subhalos["SubhaloMassType"][:, 4] * cfg_illustris.solar_mass_convention / cfg_illustris.H  # 𝑀⊙
+    subhalos["SubhaloMassType"] = subhalos["SubhaloMassType"][:, 4] * attr.solar_mass_convention / attr.H  # 𝑀⊙
     subhalo_id = np.arange(len(subhalos["SubhaloMassType"]))
 
     subhalos = pd.DataFrame(subhalos)
@@ -130,12 +131,12 @@ query = f"""
                     SH.MassType_Star = (
                         SELECT MAX(SH2.MassType_Star) -- Ensure it's the largest subhalo by mass
                         FROM {cfg_eagle.catalog.simulation_code}_Subhalo AS SH2
-                        WHERE SH2.GroupID = SH.GroupID AND SH.MassType_Star > {cfg_eagle.subhalo_min_mass}
+                        WHERE SH2.GroupID = SH.GroupID AND SH.MassType_Star > {attr.subhalo_min_mass}
                         AND SH.SnapNum = {cfg_eagle.catalog.snapnum} 
                     )
             ) AS SH ON FOF.GroupID = SH.GroupID
         WHERE 
-            FOF.Group_M_Crit200 > {cfg_eagle.halo_min_mass}  -- Minimum halo mass threshold
+            FOF.Group_M_Crit200 > {attr.halo_min_mass}  -- Minimum halo mass threshold
             AND FOF.SnapNum = {cfg_eagle.catalog.snapnum} -- Snapshot for redshift ~0.2
         """
 # Run the query
@@ -148,12 +149,12 @@ if len(df) > 0:
     df = df.sort_values(by='halo_id')
     # pkps -> kps / h
     scalf = cfg_eagle.catalog.scalf
-    gpos = df.apply(lambda row: np.array([row['pos_x'] * scalf / cfg_eagle.H,
-                                          row['pos_y'] * scalf / cfg_eagle.H,
-                                          row['pos_z'] * scalf / cfg_eagle.H]), axis=1)
+    gpos = df.apply(lambda row: np.array([row['pos_x'] * scalf / attr.H,
+                                          row['pos_y'] * scalf / attr.H,
+                                          row['pos_z'] * scalf / attr.H]), axis=1)
     df['gpos'] = gpos
-    df['r200'] = df['r200'] / cfg_eagle.H    # pkps -> ckps / h
-    df['m200'] = df['m200'] / cfg_eagle.H    # 𝑀⊙/ℎ
+    df['r200'] = df['r200'] / (attr.H * scalf)    # pkps -> ckps / h
+    df['m200'] = df['m200'] / attr.H    # 𝑀⊙/ℎ
     df['halo_id'] = df['halo_id'].astype(int)
     df = df[(df['subhalo_id'] == 0) & (df['group_number'] == 2)]
     column_map = {'halo_id': 'halo_id', 'r200': 'r200', 'm200': 'm200', 'gpos': 'gpos', 'fsub': 'subhalo_id'}
@@ -191,8 +192,8 @@ query = f"""
             ON 
                 FOF.GroupID = SH.GroupID -- Match subhalos to their parent halos
             WHERE
-                SH.MassType_Star > {cfg_eagle.subhalo_min_mass} -- Minimum subhalo stellar mass threshold
-                AND FOF.Group_M_Crit200 > {cfg_eagle.halo_min_mass} -- Minimum halo mass threshold
+                SH.MassType_Star > {attr.subhalo_min_mass} -- Minimum subhalo stellar mass threshold
+                AND FOF.Group_M_Crit200 > {attr.halo_min_mass} -- Minimum halo mass threshold
                 AND SH.SnapNum = {cfg_eagle.catalog.snapnum} -- Snapshot for redshift ~0.2
             ORDER BY
                 SH.SubGroupNumber ASC -- Order results by subhalo id
@@ -204,11 +205,11 @@ df = pd.DataFrame(array)
 if len(df) > 0:
     df = df.sort_values(by=['group_number', 'subhalo_id'])
 
-    # pkps -> ckps / h
-    spos = df.apply(lambda row: np.array([row['subhalo_pos_x'] / cfg_eagle.H, row['subhalo_pos_y'] / cfg_eagle.H,
-                                          row['subhalo_pos_z'] / cfg_eagle.H]), axis=1).values
+    # pkps -> kps / h
+    spos = df.apply(lambda row: np.array([row['subhalo_pos_x'] / attr.H, row['subhalo_pos_y'] / attr.H,
+                                          row['subhalo_pos_z'] / attr.H]), axis=1).values
     df['spos'] = spos
-    df['stellar_half_mass_radius'] = df['stellar_half_mass_radius'].values / cfg_eagle.H  # pkps -> ckps / h
+    df['stellar_half_mass_radius'] = df['stellar_half_mass_radius'].values / attr.H  # pkps -> ckps / h
     df = df[(df['group_number'] == 2) & (df['subhalo_id'] == 0)]
     column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "halo_id",
                   "shmr": "stellar_half_mass_radius", "mstr": "total_stellar_mass", "group_number": "group_number"}

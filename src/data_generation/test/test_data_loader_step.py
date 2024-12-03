@@ -1,5 +1,5 @@
-import os
 import unittest
+from dotenv import load_dotenv
 
 import numpy as np
 from hydra import initialize, compose
@@ -10,6 +10,8 @@ from src.data_generation.src.data_loader_step import DataLoader
 from src.data_generation.src.feature import VelocityDispersionProcessor, ICLProcessor, FeatureProcessor
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles, SubhaloContext
+
+load_dotenv('../.env')
 
 
 class TestDataLoaderStep(unittest.TestCase):
@@ -24,7 +26,6 @@ class TestDataLoaderStep(unittest.TestCase):
 
         self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
         self.cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
-        os.environ['PROJECT_ROOT'] = '../../..'
 
     def test_load_halo_data_illustris(self):
         self.dataLoader = DataLoader(self.cfg_illustris)

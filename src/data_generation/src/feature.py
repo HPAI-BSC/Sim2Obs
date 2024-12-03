@@ -1,3 +1,4 @@
+import os
 from abc import ABC, abstractmethod
 from typing import List
 
@@ -6,11 +7,13 @@ import pandas as pd
 import joblib
 from omegaconf import DictConfig
 from scipy import stats
+from dotenv import load_dotenv
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("FeatureProcessor")
+load_dotenv('../.env')
 
 
 class FeatureProcessor(ABC):
@@ -195,7 +198,11 @@ class ICLProcessor(FeatureProcessor):
     """
     def __init__(self, cfg: DictConfig):
         self.name = 'IntraClusterLight'
-        self.model_path = '../model/Best_Model-Random-3par.pkl'
+
+        project_root = os.getenv('PROJECT_ROOT')
+        if not project_root:
+            raise EnvironmentError("PROJECT_ROOT is not set in the environment variables.")
+        self.model_path = os.path.join(project_root, 'src/data_generation/model/Best_Model-Random-3par.pkl')
         self.cfg = cfg
         self.map = []
         self.value = []
@@ -227,7 +234,6 @@ class ICLProcessor(FeatureProcessor):
             ValueError: If the scaled particle data is empty or contains only missing values, the method raises
                         an exception indicating that the prediction cannot be made.
         """
-
         final_model = joblib.load(self.model_path)
         # Define simulation parameters
         V200 = np.sqrt(self.G * halo.m200 / halo.r200)

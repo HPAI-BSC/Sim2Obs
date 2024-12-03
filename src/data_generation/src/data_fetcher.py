@@ -1,7 +1,6 @@
 import os.path
 from abc import ABC, abstractmethod
 
-from dotenv import load_dotenv
 import eagleSqlTools as sql
 import numpy as np
 import pandas as pd
@@ -11,8 +10,6 @@ from omegaconf import DictConfig
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import get_connection, read_dataset, setup_logger
-
-load_dotenv('../.env')
 
 
 logger = setup_logger("DataFetcher")
