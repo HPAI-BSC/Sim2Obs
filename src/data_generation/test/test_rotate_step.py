@@ -57,12 +57,6 @@ class TestRotateStep(unittest.TestCase):
         self.mock_output_feature = MagicMock()
         self.mock_output_feature.value = np.array([[0.0, 0.0, 0.0]])
 
-        self.rotate_step = RotateStep(
-            rotation_angle=45,
-            z=np.array([0, 0, 1]),
-            rotation_directions=np.array([[1, 0, 0], [0, 1, 0]])
-        )
-
     def mock_generator(self) -> Generator:
         """Mock generator to simulate data_loader.process."""
         yield self.mock_input_feature, self.mock_output_feature, self.mock_cosmos_data
@@ -71,6 +65,7 @@ class TestRotateStep(unittest.TestCase):
     @patch('src.data_generation.src.subhalo.SubhaloContext')
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
     def test_rotation_process_illustris(self, mock_halo, mock_subhalo_context, mock_subhalo_particles):
+        self.rotate_step = RotateStep(self.cfg_illustris)
         mock_halo.return_value = self.halo_illustris
         mock_subhalo_particles.return_value = self.subhalo_particles_illustris.p
         mock_subhalo_context.return_value = self.subhalo_context_illustris
@@ -98,6 +93,7 @@ class TestRotateStep(unittest.TestCase):
     @patch('src.data_generation.src.subhalo.SubhaloContext')
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
     def test_rotation_process_eagle(self, mock_halo, mock_subhalo_context, mock_subhalo_particles):
+        self.rotate_step = RotateStep(self.cfg_eagle)
         mock_halo.return_value = self.halo_eagle
         mock_subhalo_particles.return_value = self.subhalo_particles_eagle.p
         mock_subhalo_context.return_value = self.subhalo_context_eagle

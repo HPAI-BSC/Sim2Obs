@@ -1,4 +1,5 @@
-from typing import Generator, Callable
+from typing import Generator, Callable, Tuple
+from omegaconf import DictConfig
 
 import numpy as np
 
@@ -26,7 +27,9 @@ class RotateStep(PipelineStep):
     rotation_directions : np.ndarray
         A set of axes along which the rotation is applied.
     """
-    def __init__(self, rotation_angle: float, z: np.ndarray, rotation_directions: np.ndarray):
+    name = 'rotate_step'
+
+    def __init__(self, cfg: DictConfig):
         """
         Initializes the RotateStep object.
 
@@ -39,9 +42,31 @@ class RotateStep(PipelineStep):
         rotation_directions : np.ndarray
             A set of rotation axes for the objects.
         """
-        self.rotation_angle = rotation_angle
-        self.z = z
-        self.rotation_directions = rotation_directions
+        self.rotation_angle, self.z, self.rotation_directions = self._build_configuration(cfg)
+
+    @classmethod
+    def _build_configuration(cls, cfg: DictConfig) -> Tuple:
+        """
+        Builds the configuration for the mapping step.
+
+        Args:
+            cfg (DictConfig): Configuration object.
+
+        Returns:
+            Tuple: A tuple containing rotate step configuration.
+        """
+
+        if cls.name not in [e['name'] for e in cfg.pipeline]:
+            raise ValueError('Error, To execute a rotation step you must specify the rotation step in the pipeline of'
+                             ' the configuration.')
+
+        rotate_step_dict = next((step for step in cfg.pipeline if step.name == cls.name), None)
+
+        if rotate_step_dict is None:
+            raise ValueError('The step rotate_step could not be found in the pipeline, make sure it is properly defined'
+                             'in the pipeline of the configuration file.')
+
+        return rotate_step_dict.rotation_group
 
     def _rotate(self, axis, degree, X):
         """
