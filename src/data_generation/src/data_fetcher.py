@@ -1,6 +1,5 @@
 import os.path
 from abc import ABC, abstractmethod
-import rootutils
 
 from dotenv import load_dotenv
 import eagleSqlTools as sql
@@ -11,14 +10,12 @@ from omegaconf import DictConfig
 
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
-from src.data_generation.src.utils import get_connection, read_dataset
-#from src import utils
+from src.data_generation.src.utils import get_connection, read_dataset, setup_logger
 
 load_dotenv('../.env')
 
 
-#rootutils.setup_root(__file__, pythonpath=True)
-#log = utils.get_pylogger(__name__)
+logger = setup_logger("DataLoader")
 
 
 class DataFetcher(ABC):
@@ -66,7 +63,7 @@ class DataFetcherFactory:
         DataFetcher
             The appropriate data fetcher instance for the specified catalog.
         """
-        #log.debug(f"Fetching data fetcher for catalog: {cfg.catalog.name}")
+        logger.debug(f"Fetching data fetcher for catalog: {cfg.catalog.name}")
         if cfg.catalog.name == "illustris-300":
             return Illustris300Fetcher(cfg)
         elif cfg.catalog.name == "eagle":
@@ -89,7 +86,7 @@ class Illustris300Fetcher(DataFetcher):
             Configuration object containing catalog settings.
         """
         self.cfg = cfg
-        #log.info(f"Illustris300Fetcher initialized with config: {cfg}")
+        logger.info(f"Illustris300Fetcher initialized with config: {cfg}")
 
     def get_halos(self, *args, **kwargs) -> HaloContext:
         """
@@ -100,7 +97,7 @@ class Illustris300Fetcher(DataFetcher):
         HaloContext
             A context object containing halo data.
         """
-        #log.info("Fetching halo data...")
+        logger.info("Fetching halo data...")
         return self._get_halos()
 
     def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
@@ -112,7 +109,7 @@ class Illustris300Fetcher(DataFetcher):
         SubhaloContext
             A context object containing subhalo data.
         """
-        #log.info("Fetching subhalo data...")
+        logger.info("Fetching subhalo data...")
         return self._get_subhalos()
 
     def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
@@ -132,10 +129,10 @@ class Illustris300Fetcher(DataFetcher):
         subhalo_id = kwargs.get('subhalo_id', None)
 
         if subhalo_id is None:
-            #log.error("subhalo_id must be provided in kwargs")
+            logger.error("subhalo_id must be provided in kwargs")
             raise ValueError("subhalo_id must be provided in kwargs")
 
-        #log.info(f"Fetching particle data for subhalo: {subhalo_id}")
+        logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
         return self._get_p_subhalo(subhalo_id)
 
     def _get_halos(self) -> HaloContext:
@@ -147,19 +144,21 @@ class Illustris300Fetcher(DataFetcher):
         HaloContext
             A context object containing halo data such as mass, radius, position, and subhalo index.
         """
-        #log.debug("Fetching halos from Illustris-300...")
+        logger.debug("Fetching halos from Illustris-300...")
 
         # Units of measure -> [10^10𝑀⊙/ℎ, 𝑐𝑘𝑝𝑐/ℎ, 𝑐𝑘𝑝𝑐/ℎ, int]
         fields = ["Group_M_Crit200", "Group_R_Crit200", "GroupPos", "GroupFirstSub"]
         path = self.cfg.catalog.path + '/output'
 
         if not os.path.exists(path):
-            #log.error(f"The path {path} does not exist.")
+            logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
         halos = il.groupcat.loadHalos(path, self.cfg.catalog.snapnum, fields=fields)
         if len(halos) > 0:
-            halos['GroupPos'] = [halos['GroupPos'][i] for i in range(halos['GroupPos'].shape[0])]
+            scalf = self.cfg.catalog.scalf
+            halos['GroupPos'] = [halos['GroupPos'][i] * scalf for i in range(halos['GroupPos'].shape[0])]
+            halos['Group_R_Crit200'] = halos['Group_R_Crit200'] * scalf
             halos = pd.DataFrame.from_dict(halos)
             halos['halo_id'] = np.arange(len(halos['Group_M_Crit200']))
             halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * self.cfg.solar_mass_convention # 𝑀⊙/ℎ
@@ -168,11 +167,11 @@ class Illustris300Fetcher(DataFetcher):
 
             column_map = {'halo_id': 'halo_id', 'r200': 'Group_R_Crit200', 'm200': 'Group_M_Crit200',
                           'gpos': 'GroupPos', 'fsub': 'GroupFirstSub'}
-            return HaloContext(halos, self.cfg.catalog.scalf, column_map)
-            #log.debug("Halo data fetched successfully.")
+            logger.debug("Halo data fetched successfully.")
+            return HaloContext(halos, column_map)
         else:
-            #log.warning("No halos found.")
-            return HaloContext(pd.DataFrame(data=[]), self.cfg.catalog.scalf, {})
+            logger.warning("No halos found.")
+            return HaloContext(pd.DataFrame(data=[]), {})
 
     def _get_subhalos(self) -> SubhaloContext:
         """
@@ -183,14 +182,14 @@ class Illustris300Fetcher(DataFetcher):
         SubhaloContext
             A context object containing subhalo data.
         """
-        #log.debug("Fetching subhalos from Illustris-300...")
+        logger.debug("Fetching subhalos from Illustris-300...")
 
         # Units of measure -> [𝑐𝑘𝑝𝑐/ℎ, int, 𝑐𝑘𝑝𝑐/ℎ, 10^10𝑀⊙/ℎ]
         fields = ["SubhaloPos", "SubhaloGrNr", "SubhaloHalfmassRadType", "SubhaloMassType"]
         path = self.cfg.catalog.path + '/output'
 
         if not os.path.exists(path):
-            #log.error(f"The path {path} does not exist.")
+            logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
         subhalos = il.groupcat.loadSubhalos(path, self.cfg.catalog.snapnum, fields=fields)
@@ -201,10 +200,10 @@ class Illustris300Fetcher(DataFetcher):
             subhalos['subhalo_id'] = np.arange(len(subhalos['spos']))
             column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "SubhaloGrNr",
                           "shmr": "SubhaloHalfmassRadType", "mstr": "SubhaloMassType"}
+            logger.debug("Subhalo data fetched successfully.")
             return SubhaloContext(subhalos, self.cfg.catalog.scalf, column_map)
-            #log.debug("Subhalo data fetched successfully.")
         else:
-            #log.warning("No subhalos found.")
+            logger.warning("No subhalos found.")
             return SubhaloContext(pd.DataFrame(data=[]), self.cfg.catalog.scalf, {})
 
     def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
@@ -221,14 +220,14 @@ class Illustris300Fetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data such as mass, coordinates, and velocities.
         """
-        #log.debug(f"Fetching particle data for subhalo: {subhalo_id}")
+        logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
 
         # Units of measure [𝑐𝑘𝑝𝑐/ℎ, 𝑘𝑚𝑎‾√/𝑠, 10^10𝑀⊙/ℎ]
         fields = ["Coordinates", "Velocities", "Masses"]
         path = self.cfg.catalog.path + '/output'
 
         if not os.path.exists(path):
-            #log.error(f"The path {path} does not exist.")
+            logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
         star_p = il.snapshot.loadSubhalo(path, self.cfg.catalog.snapnum, subhalo_id, "star", fields=fields)
@@ -236,9 +235,9 @@ class Illustris300Fetcher(DataFetcher):
             p = star_p["Coordinates"]
             v = star_p["Velocities"] * np.sqrt(self.cfg.catalog.scalf) # 𝑘𝑚𝑎‾√/𝑠 -> kms-1
             m = star_p["Masses"] * self.cfg.solar_mass_convention
-            #log.debug("Particle data fetched successfully.")
+            logger.debug("Particle data fetched successfully.")
         else:
-            #log.warning(f"No particle data found for subhalo {subhalo_id}.")
+            logger.warning(f"No particle data found for subhalo {subhalo_id}.")
             p = v = m = np.ndarray([])
         return SubhaloParticles(m, p, v, self.cfg.catalog.scalf)
 
@@ -257,7 +256,7 @@ class EagleFetcher(DataFetcher):
             Configuration object containing catalog settings.
         """
         self.cfg = cfg
-        #log.info(f"EagleFetcher initialized with config: {cfg}")
+        logger.info(f"EagleFetcher initialized with config: {cfg}")
 
     def get_halos(self, *args, **kwargs) -> HaloContext:
         """
@@ -268,7 +267,7 @@ class EagleFetcher(DataFetcher):
         HaloContext
             A context object containing halo data.
         """
-        #log.info("Fetching halo data for Eagle catalog...")
+        logger.info("Fetching halo data for Eagle catalog...")
         return self._get_halos()
 
     def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
@@ -280,7 +279,7 @@ class EagleFetcher(DataFetcher):
         SubhaloContext
             A context object containing subhalo data.
         """
-        #log.info("Fetching subhalo data for Eagle catalog...")
+        logger.info("Fetching subhalo data for Eagle catalog...")
         return self._get_subhalos()
 
     def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
@@ -301,13 +300,13 @@ class EagleFetcher(DataFetcher):
         halo_id = kwargs.get('group_number')
 
         if subgroup_id is None:
-            #log.error("subhalo_id must be provided in kwargs")
+            logger.error("subhalo_id must be provided in kwargs")
             raise ValueError("subgroup_id must be provided in kwargs")
         if halo_id is None:
-            #log.error("halo_id must be provided in kwargs")
+            logger.error("halo_id must be provided in kwargs")
             raise ValueError("group_number must be provided in kwargs")
 
-        #log.info(f"Fetching particle data for subhalo: {subgroup_id}")
+        logger.info(f"Fetching particle data for subhalo: {subgroup_id}")
         return self._get_p_subhalo(subgroup_id, halo_id)
 
     def _get_halos(self) -> HaloContext:
@@ -319,7 +318,7 @@ class EagleFetcher(DataFetcher):
         HaloContext
             A context object containing halo data.
         """
-        #log.debug("Fetching halos from Eagle...")
+        logger.debug("Fetching halos from Eagle...")
         conn = get_connection()
         query = f"""
                 SELECT 
@@ -357,22 +356,25 @@ class EagleFetcher(DataFetcher):
                 """
         # Run the query
         array = sql.execute_query(conn, query)
-        # Units of measure [m200=M⊙, r200=pkpc, gpos=cMpc]
+        # Units of measure [m200=M⊙, r200=kpc/h, gpos=cMpc]
         df = pd.DataFrame(array)
         if len(df) > 0:
             df = df.sort_values(by='halo_id')
             # pkps -> ckps / h
-            df['gpos'] = df.apply(lambda row: np.array([row['pos_x'] / self.cfg.H, row['pos_y'] / self.cfg.H, row['pos_z'] / self.cfg.H]), axis=1)
-            df['r200'] = df['r200'].values / self.cfg.H    # pkps -> ckps / h
+            scalf = self.cfg.catalog.scalf
+            df['gpos'] = df.apply(lambda row: np.array([(row['pos_x'] * scalf) / self.cfg.H,
+                                                        (row['pos_y'] * scalf) / self.cfg.H,
+                                                        (row['pos_z'] * scalf) / self.cfg.H]), axis=1)
+            df['r200'] = df['r200'].values / (self.cfg.H * self.cfg.catalog.scalf)    # pkps -> kps / h
             df['m200'] = df['m200'].values / self.cfg.H    # 𝑀⊙/ℎ
             df['halo_id'] = df['halo_id'].astype(int)
             column_map = {'halo_id': 'halo_id', 'r200': 'r200', 'm200': 'm200', 'gpos': 'gpos', 'fsub': 'subhalo_id',
                           'group_number': 'group_number'}
-            halo_context = HaloContext(df, scale_factor=self.cfg.catalog.scalf, column_map=column_map)
-            #log.debug("Halo data fetched successfully.")
+            halo_context = HaloContext(df, column_map=column_map)
+            logger.debug("Halo data fetched successfully.")
         else:
-            #log.warning("No halo data found in Eagle database.")
-            halo_context = HaloContext(pd.DataFrame(data=[]), scale_factor=self.cfg.catalog.scalf, column_map={})
+            logger.warning("No halo data found in Eagle database.")
+            halo_context = HaloContext(pd.DataFrame(data=[]), column_map={})
         return halo_context
 
     def _get_subhalos(self) -> SubhaloContext:
@@ -384,7 +386,7 @@ class EagleFetcher(DataFetcher):
         SubhaloContext
             A context object containing subhalo data.
         """
-        #log.debug("Fetching subhalos from Eagle...")
+        logger.debug("Fetching subhalos from Eagle...")
         conn = get_connection()
         query = f"""
             SELECT
@@ -425,9 +427,9 @@ class EagleFetcher(DataFetcher):
                           "shmr": "stellar_half_mass_radius", "mstr": "total_stellar_mass",
                           "group_number": "group_number"}
             subhalo_context = SubhaloContext(df, self.cfg.catalog.scalf, column_map)
-            #log.debug("Subhalo data fetched successfully.")
+            logger.debug("Subhalo data fetched successfully.")
         else:
-            #log.warning("No subhalo data found in Eagle database.")
+            logger.warning("No subhalo data found in Eagle database.")
             subhalo_context = SubhaloContext(pd.DataFrame(data=[]), self.cfg.catalog.scalf, {})
         return subhalo_context
 
@@ -447,12 +449,12 @@ class EagleFetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data such as mass, coordinates, and velocities.
         """
-        #log.debug(f"Fetching particle data for subhalo: {subgroup_id}")
+        logger.debug(f"Fetching particle data for subhalo: {subgroup_id}")
         itype = 4  # PartType
         path = self.cfg.catalog.path
 
         if not os.path.exists(path):
-            #log.error(f"The path {path} does not exist.")
+            logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
         data = {
             'mass': read_dataset(itype, 'Mass', path),
@@ -467,9 +469,16 @@ class EagleFetcher(DataFetcher):
 
         tmp = pd.DataFrame(data)
         data_filtered = tmp[(tmp['GroupNumber'] == group_number) & (tmp['SubGroupNumber'] == subgroup_id)]
+
+        if len(data_filtered) == 0:
+            logger.error(f'Error, there is not particle data for GroupNumber={group_number} and '
+                         f'SubGroupNumber={subgroup_id}')
+            raise ValueError(f'Error, there is not particle data for GroupNumber={group_number} and'
+                             f' SubGroupNumber={subgroup_id}')
+
         velocity = np.vstack(data_filtered['velocity'].values)
         positions = np.vstack(data_filtered['coords'].values)
         subhalo_particles = SubhaloParticles(data_filtered['mass'].values, positions, velocity, self.cfg.catalog.scalf)
-        #log.debug("Particle data fetched successfully.")
+        logger.debug("Particle data fetched successfully.")
         return subhalo_particles
 

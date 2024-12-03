@@ -65,7 +65,7 @@ class HaloContext:
     halo_id:
         Property to retrieve the halo_id column from the stored DataFrame.
     """
-    def __init__(self, properties: pd.DataFrame, scale_factor, column_map):
+    def __init__(self, properties: pd.DataFrame, column_map):
         """
         Initialize a HaloContext object with scaled halo properties, stored in a Pandas DataFrame.
 
@@ -97,9 +97,9 @@ class HaloContext:
         # Map and process data
         data = {
             "halo_id": properties[column_map["halo_id"]],
-            "r200": properties[column_map["r200"]] * scale_factor,
+            "r200": properties[column_map["r200"]],
             "m200": properties[column_map["m200"]],
-            "gpos": list(properties[column_map["gpos"]].apply(lambda x: x * scale_factor)),
+            "gpos": list(properties[column_map["gpos"]]),
             "fsub": properties[column_map["fsub"]].astype(int)
         }
 
