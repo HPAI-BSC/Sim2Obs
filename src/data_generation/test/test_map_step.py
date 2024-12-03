@@ -2,7 +2,10 @@ import os
 import pickle
 import shutil
 import unittest
-from unittest.mock import patch, Mock
+from typing import Generator
+from unittest.mock import patch, MagicMock
+from scipy import stats
+
 from hydra import initialize, compose
 
 from src.data_generation.src.cosmos import CosmosData
@@ -49,84 +52,119 @@ class TestMapStep(unittest.TestCase):
             self.cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
 
         os.environ['PROJECT_ROOT'] = '../../..'
+        self.remove_folder = True
+
+    def tearDown(self):
+        if self.map_step.map_configuration['rotation_angle'] is not None:
+            path = os.path.join(self.map_step.map_configuration['root_path'],
+                                f'rotation_{self.map_step.map_configuration["rotation_angle"]}')
+        else:
+            path = os.path.join(self.map_step.map_configuration['root_path'],
+                                self.mock_input_feature.name)
+        if self.remove_folder:
+            if os.path.exists(path):
+                shutil.rmtree(path)
+                if self.map_step.map_configuration['rotation_angle'] is None:
+                    path = os.path.join(self.map_step.map_configuration['root_path'],
+                                        self.mock_output_feature.name)
+                    shutil.rmtree(path)
+
+    def mock_generator(self) -> Generator:
+        """Mock generator to simulate data_loader.process."""
+        yield self.mock_input_feature, self.mock_output_feature, self.mock_cosmos_data
 
     @patch('src.data_generation.src.halo.Halo')
     @patch('src.data_generation.src.subhalo.SubhaloContext')
-    def test_map_process_illustris(self, mock_halo, mock_subhalo_context):
-        self.icl_processor = ICLProcessor(self.cfg_illustris)
-        self.vel_disp_processor = VelocityDispersionProcessor()
-        self.map_step = MapStep(self.cfg_illustris)
+    @patch('src.data_generation.src.subhalo.SubhaloParticles')
+    @patch('src.data_generation.src.feature.VelocityDispersionProcessor')
+    @patch('src.data_generation.src.feature.ICLProcessor')
+    def test_map_process_illustris(self, mock_halo, mock_subhalo_context, mock_subhalo_particles,
+                                   mock_input_feature, mock_output_feature):
+        mock_input_feature.return_value = VelocityDispersionProcessor()
+        mock_input_feature.name = 'feature1'
+        mock_input_feature.generate_map = MagicMock(
+            side_effect=lambda particle_positions, bins, ranging, axis: stats.binned_statistic_2d(
+                particle_positions[:, axis[0]], particle_positions[:, axis[1]],
+                particle_positions[:, 2],  # Example feature
+                statistic="mean", bins=bins, range=ranging
+            )[:3]  # Return the first three elements (map, binx, biny)
+        )
+        self.mock_input_feature = mock_input_feature
+
+        mock_output_feature.return_value = ICLProcessor(self.cfg_illustris)
+        mock_output_feature.name = 'feature2'
+        mock_output_feature.generate_map = MagicMock(
+            side_effect=lambda particle_positions, bins, ranging, axis: stats.binned_statistic_2d(
+                particle_positions[:, axis[0]], particle_positions[:, axis[1]],
+                particle_positions[:, 2],  # Example feature
+                statistic="sum", bins=bins, range=ranging
+            )[:3]  # Return the first three elements (map, binx, biny)
+        )
+        self.mock_output_feature = mock_output_feature
 
         mock_halo.return_value = self.halo_illustris
-        mock_subhalo_particle_positions = Mock()
-        mock_subhalo_particle_positions.return_value = self.subhalo_particles_illustris.p
-        mock_subhalo_particle_velocity = Mock()
-        mock_subhalo_particle_velocity.return_value = self.subhalo_particles_illustris.v
+        mock_subhalo_particles.return_value = self.subhalo_particles_illustris.p
         mock_subhalo_context.return_value = self.subhalo_context_illustris
-        self.cosmos = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
-                                 self.subhalo_illustris.subhalo_id,
-                                 mock_subhalo_particle_positions.return_value)
+        self.mock_cosmos_data = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
+                                           self.subhalo_illustris.subhalo_id,
+                                           mock_subhalo_particles.return_value)
+        self.map_step = MapStep(self.cfg_illustris)
+        self.map_step.map_configuration['root_path'] = '../test/data/illustris'
 
-        vel_value = self.vel_disp_processor.process(particle_velocity=mock_subhalo_particle_velocity.return_value)
-        self.vel_disp_processor.value = vel_value
+        generator = self.map_step.process(
+            input_feature=self.mock_input_feature,
+            output_feature=self.mock_output_feature,
+            cosmos_data=self.mock_cosmos_data,
+            g=self.mock_generator(),
+            next_step=None
+        )
 
-        icl_value = self.icl_processor.process(halo=mock_halo.return_value,
-                                               particle_velocity=mock_subhalo_particle_velocity.return_value,
-                                               particle_position=mock_subhalo_particle_positions.return_value)
-        self.icl_processor.value = icl_value
-        _ = list(self.map_step.process(self.vel_disp_processor, self.icl_processor, self.cosmos))
-
-        if self.map_step.map_configuration['rotation_angle'] is not None:
-            path = os.path.join(self.map_step.map_configuration['root_path'],
-                                f'rotation_{self.map_step.map_configuration["rotation_angle"]}')
-        else:
-            path = os.path.join(self.map_step.map_configuration['root_path'],
-                                self.vel_disp_processor.name)
-
-        shutil.rmtree(path)
-
-        if self.map_step.map_configuration['rotation_angle'] is None:
-            path = os.path.join(self.map_step.map_configuration['root_path'],
-                                self.icl_processor.name)
-            shutil.rmtree(path)
+        _ = list(generator)
 
     @patch('src.data_generation.src.halo.Halo')
     @patch('src.data_generation.src.subhalo.SubhaloContext')
-    def test_map_process_eagle(self, mock_halo, mock_subhalo_context):
-        self.icl_processor = ICLProcessor(self.cfg_eagle)
-        self.vel_disp_processor = VelocityDispersionProcessor()
-        self.map_step = MapStep(self.cfg_eagle)
+    @patch('src.data_generation.src.subhalo.SubhaloParticles')
+    @patch('src.data_generation.src.feature.VelocityDispersionProcessor')
+    @patch('src.data_generation.src.feature.ICLProcessor')
+    def test_map_process_eagle(self, mock_halo, mock_subhalo_context, mock_subhalo_particles,
+                                   mock_input_feature, mock_output_feature):
+        mock_input_feature.return_value = VelocityDispersionProcessor()
+        mock_input_feature.name = 'feature1'
+        mock_input_feature.generate_map = MagicMock(
+            side_effect=lambda particle_positions, bins, ranging, axis: stats.binned_statistic_2d(
+                particle_positions[:, axis[0]], particle_positions[:, axis[1]],
+                particle_positions[:, 2],  # Example feature
+                statistic="mean", bins=bins, range=ranging
+            )[:3]  # Return the first three elements (map, binx, biny)
+        )
+        self.mock_input_feature = mock_input_feature
+
+        mock_output_feature.return_value = ICLProcessor(self.cfg_eagle)
+        mock_output_feature.name = 'feature2'
+        mock_output_feature.generate_map = MagicMock(
+            side_effect=lambda particle_positions, bins, ranging, axis: stats.binned_statistic_2d(
+                particle_positions[:, axis[0]], particle_positions[:, axis[1]],
+                particle_positions[:, 2],  # Example feature
+                statistic="sum", bins=bins, range=ranging
+            )[:3]  # Return the first three elements (map, binx, biny)
+        )
+        self.mock_output_feature = mock_output_feature
 
         mock_halo.return_value = self.halo_eagle
-        mock_subhalo_particle_positions = Mock()
-        mock_subhalo_particle_positions.return_value = self.subhalo_particles_eagle.p
-        mock_subhalo_particle_velocity = Mock()
-        mock_subhalo_particle_velocity.return_value = self.subhalo_particles_eagle.v
-        mock_subhalo_context.return_value = self.subhalo_context_illustris
-        self.cosmos = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
-                                 self.subhalo_illustris.subhalo_id,
-                                 mock_subhalo_particle_positions.return_value)
+        mock_subhalo_particles.return_value = self.subhalo_particles_eagle.p
+        mock_subhalo_context.return_value = self.subhalo_context_eagle
+        self.mock_cosmos_data = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
+                                           self.subhalo_eagle.subhalo_id,
+                                           mock_subhalo_particles.return_value)
+        self.map_step = MapStep(self.cfg_illustris)
+        self.map_step.map_configuration['root_path'] = '../test/data/eagle'
 
-        vel_value = self.vel_disp_processor.process(particle_velocity=mock_subhalo_particle_velocity.return_value)
-        self.vel_disp_processor.value = vel_value
+        generator = self.map_step.process(
+            input_feature=self.mock_input_feature,
+            output_feature=self.mock_output_feature,
+            cosmos_data=self.mock_cosmos_data,
+            g=self.mock_generator(),
+            next_step=None
+        )
 
-        icl_value = self.icl_processor.process(halo=mock_halo.return_value,
-                                               particle_velocity=mock_subhalo_particle_velocity.return_value,
-                                               particle_position=mock_subhalo_particle_positions.return_value)
-        self.icl_processor.value = icl_value
-        _ = list(self.map_step.process(self.vel_disp_processor, self.icl_processor, self.cosmos))
-
-        if self.map_step.map_configuration['rotation_angle'] is not None:
-            path = os.path.join(self.map_step.map_configuration['root_path'],
-                                f'rotation_{self.map_step.map_configuration["rotation_angle"]}')
-        else:
-            path = os.path.join(self.map_step.map_configuration['root_path'],
-                                self.vel_disp_processor.name)
-
-        shutil.rmtree(path)
-
-        if self.map_step.map_configuration['rotation_angle'] is None:
-            path = os.path.join(self.map_step.map_configuration['root_path'],
-                                self.icl_processor.name)
-            shutil.rmtree(path)
-
+        _ = list(generator)

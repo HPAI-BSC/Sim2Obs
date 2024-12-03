@@ -1,3 +1,5 @@
+from typing import Generator, Callable
+
 import numpy as np
 
 from src.data_generation.src.cosmos import CosmosData
@@ -65,7 +67,7 @@ class RotateStep(PipelineStep):
         return X_rot
 
     def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
-                cosmos_data: CosmosData):
+                cosmos_data: CosmosData, g: Generator, next_step: Callable[[Generator], Generator]):
         """
         Rotates the data in the cosmos dataset and updates the features accordingly.
 
@@ -76,33 +78,55 @@ class RotateStep(PipelineStep):
         -----------
         input_feature : FeatureProcessor
             The feature processor object that holds the features to be rotated.
+        output_feature : FeatureProcessor
+            The feature processor object that holds the features to be updated after rotation.
         cosmos_data : CosmosData
             The data object that contains the positions, velocities, and metadata of the cosmos data.
+        g : Generator
+            The generator that yields data for processing, likely from a pipeline or data stream.
+        next_step : Callable[[Generator], Generator]
+            A lambda expression representing the next step in the pipeline that will process the data
+            after this step completes. The lambda receives a generator and returns another generator.
 
         Yields:
         -------
         tuple
-            A tuple containing the updated cosmos_data and input_feature after the rotation is applied.
+            A tuple containing the updated input_feature, output_feature, and cosmos_data after the rotation is applied.
+
+        Notes:
+        ------
+        The method applies a series of rotations in specified directions and angles, updating the positions and velocities
+        in the cosmos data, as well as updating the rotation-related metadata.
         """
-        iterations = 360 // int(self.rotation_angle)
-        logger.debug(f"Total iterations: {iterations} with rotation angle: {self.rotation_angle} degrees.")
-        for rotation_axis in self.rotation_directions:
-            degree = 0
-            for i in range(iterations):
-                logger.debug(f"Rotation iteration {i + 1}/{iterations}: rotating by {degree} degrees.")
-                rotation_axis = np.array(rotation_axis)
+        for _ in g:
+            try:
+                logger.debug(f'Performing rotations for halo: {cosmos_data.halo.halo_id}')
+                iterations = 360 // int(self.rotation_angle)
+                logger.debug(f"Total iterations: {iterations} with rotation angle: {self.rotation_angle} degrees.")
+                for rotation_axis in self.rotation_directions:
+                    degree = 0
+                    for i in range(iterations):
+                        logger.debug(f"Rotation iteration {i + 1}/{iterations}: rotating by {degree} degrees.")
+                        rotation_axis = np.array(rotation_axis)
 
-                # Update cosmos data, subhalos data and subhalo particle positions
-                spos = np.array(cosmos_data.subhalos['spos'].tolist())
-                subhalos_spos = self._rotate(rotation_axis, degree, spos)
-                cosmos_data.subhalos['spos'] = list([spos[i] for i in range(subhalos_spos.shape[0])])
+                        # Update cosmos data, subhalos data and subhalo particle positions
+                        spos = np.array(cosmos_data.subhalos['spos'].tolist())
+                        subhalos_spos = self._rotate(rotation_axis, degree, spos)
+                        cosmos_data.subhalos['spos'] = list([spos[i] for i in range(subhalos_spos.shape[0])])
 
-                cosmos_data.subhalo_particles_positions = (
-                    self._rotate(rotation_axis, degree, cosmos_data.subhalo_particle_positions))
+                        cosmos_data.subhalo_particles_positions = (
+                            self._rotate(rotation_axis, degree, cosmos_data.subhalo_particle_positions))
 
-                input_feature.value = self._rotate(rotation_axis, degree, input_feature.value)
-                logger.debug(f"Rotation metadata updated: {cosmos_data.metadata['rotation']}")
-                cosmos_data.metadata['rotation'] = {'has_rotated': 1, 'angle': degree}
-                degree += self.rotation_angle
-                yield cosmos_data, input_feature
-            logger.info("Rotation process completed.")
+                        input_feature.value = self._rotate(rotation_axis, degree, input_feature.value)
+                        cosmos_data.metadata['rotation'] = {'has_rotated': 1, 'angle': degree}
+                        logger.debug(f"Rotation metadata updated: {cosmos_data.metadata['rotation']}")
+
+                        if next_step is not None:
+                            yield from next_step(g)
+                        else:
+                            yield input_feature, output_feature, cosmos_data
+                        degree += self.rotation_angle
+                    logger.info("Rotation process completed.")
+            except Exception as e:
+                logger.error(f"Failed to execute rotations for halo {cosmos_data.halo.halo_id}: {e}")
+                continue

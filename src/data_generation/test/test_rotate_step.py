@@ -1,12 +1,13 @@
 import os
 import pickle
 import unittest
+from typing import Generator
+
 from hydra import initialize, compose
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import numpy as np
 
 from src.data_generation.src.cosmos import CosmosData
-from src.data_generation.src.feature import ICLProcessor, VelocityDispersionProcessor
 from src.data_generation.src.rotate_step import RotateStep
 
 
@@ -50,59 +51,75 @@ class TestRotateStep(unittest.TestCase):
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
+        self.mock_input_feature = MagicMock()
+        self.mock_input_feature.value = np.array([[1.0, 1.0, 1.0]])
+
+        self.mock_output_feature = MagicMock()
+        self.mock_output_feature.value = np.array([[0.0, 0.0, 0.0]])
+
         self.rotate_step = RotateStep(
             rotation_angle=45,
             z=np.array([0, 0, 1]),
             rotation_directions=np.array([[1, 0, 0], [0, 1, 0]])
         )
 
+    def mock_generator(self) -> Generator:
+        """Mock generator to simulate data_loader.process."""
+        yield self.mock_input_feature, self.mock_output_feature, self.mock_cosmos_data
+
     @patch('src.data_generation.src.halo.Halo')
     @patch('src.data_generation.src.subhalo.SubhaloContext')
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
     def test_rotation_process_illustris(self, mock_halo, mock_subhalo_context, mock_subhalo_particles):
-        self.icl_processor = ICLProcessor(self.cfg_illustris)
-        self.vel_disp_processor = VelocityDispersionProcessor()
         mock_halo.return_value = self.halo_illustris
         mock_subhalo_particles.return_value = self.subhalo_particles_illustris.p
         mock_subhalo_context.return_value = self.subhalo_context_illustris
-        self.cosmos = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
+        self.mock_cosmos_data = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
                                  self.subhalo_illustris.subhalo_id,
                                  mock_subhalo_particles.return_value)
 
-        vel_value = self.vel_disp_processor.process(particle_velocity=self.subhalo_particles_illustris.v)
-        self.vel_disp_processor.value = vel_value
-        result = list(self.rotate_step.process(input_feature=self.vel_disp_processor,
-                                               output_feature=None,
-                                               cosmos_data=self.cosmos))
+        # Call the rotate_step.process with the mock generator
+        generator = self.rotate_step.process(
+            input_feature=self.mock_input_feature,
+            output_feature=self.mock_output_feature,
+            cosmos_data=self.mock_cosmos_data,
+            g=self.mock_generator(),
+            next_step=None
+        )
+
+        result = list(generator)
+
         num_iterations = (360 // self.rotate_step.rotation_angle) * len(self.rotate_step.rotation_directions)
         self.assertEqual(len(result), num_iterations)
-
-        self.assertEqual(self.cosmos.metadata['rotation']['has_rotated'], True)
-        self.assertEqual(self.cosmos.metadata['rotation']['angle'], 360 - self.rotate_step.rotation_angle)
+        self.assertEqual(self.mock_cosmos_data.metadata['rotation']['has_rotated'], True)
+        self.assertEqual(self.mock_cosmos_data.metadata['rotation']['angle'], 360 - self.rotate_step.rotation_angle)
 
     @patch('src.data_generation.src.halo.Halo')
     @patch('src.data_generation.src.subhalo.SubhaloContext')
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
     def test_rotation_process_eagle(self, mock_halo, mock_subhalo_context, mock_subhalo_particles):
-        self.icl_processor = ICLProcessor(self.cfg_eagle)
-        self.vel_disp_processor = VelocityDispersionProcessor()
-        mock_halo.return_value.return_value = self.halo_eagle
+        mock_halo.return_value = self.halo_eagle
         mock_subhalo_particles.return_value = self.subhalo_particles_eagle.p
         mock_subhalo_context.return_value = self.subhalo_context_eagle
-        self.cosmos = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
-                                 self.subhalo_eagle.subhalo_id,
-                                 mock_subhalo_particles.return_value)
+        self.mock_cosmos_data = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
+                                           self.subhalo_eagle.subhalo_id,
+                                           mock_subhalo_particles.return_value)
 
-        vel_value = self.vel_disp_processor.process(particle_velocity=self.subhalo_particles_illustris.v)
-        self.vel_disp_processor.value = vel_value
-        result = list(self.rotate_step.process(input_feature=self.vel_disp_processor,
-                                               output_feature=None,
-                                               cosmos_data=self.cosmos))
+        # Call the rotate_step.process with the mock generator
+        generator = self.rotate_step.process(
+            input_feature=self.mock_input_feature,
+            output_feature=self.mock_output_feature,
+            cosmos_data=self.mock_cosmos_data,
+            g=self.mock_generator(),
+            next_step=None
+        )
+
+        result = list(generator)
+
         num_iterations = (360 // self.rotate_step.rotation_angle) * len(self.rotate_step.rotation_directions)
         self.assertEqual(len(result), num_iterations)
-
-        self.assertEqual(self.cosmos.metadata['rotation']['has_rotated'], True)
-        self.assertEqual(self.cosmos.metadata['rotation']['angle'], 360 - self.rotate_step.rotation_angle)
+        self.assertEqual(self.mock_cosmos_data.metadata['rotation']['has_rotated'], True)
+        self.assertEqual(self.mock_cosmos_data.metadata['rotation']['angle'], 360 - self.rotate_step.rotation_angle)
 
 
 

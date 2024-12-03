@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Generator, Callable
 
 import numpy as np
 from omegaconf import DictConfig
@@ -274,26 +274,56 @@ class MapStep(PipelineStep):
         interlopers_mask = self._get_interlopers_mask(cosmos_data, feature_size, interlopers_id, biny_i)
         self._create_n_zooms(projection, cosmos_data, input_feature, output_feature, interlopers_mask)
 
-    def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor, cosmos_data: CosmosData):
+    def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
+                cosmos_data: CosmosData, g: Generator, next_step: Callable[[Generator], Generator]):
         """
-        Main method to process projections for the given cosmos data.
+        Main method to process projections for the given cosmos data, generating maps and processing them.
 
-        Args:
-            cosmos_data (CosmosData): The cosmos data containing subhalo and particle information.
-            input_feature (FeatureProcessor): The input feature processor.
-            output_feature (FeatureProcessor): The output feature processor.
+        This method generates projection maps ("xy", "yz", "xz") for the cosmos data and processes them
+        accordingly. It updates the input and output feature processors with the generated maps, and applies
+        specific transformations based on the map projections.
+
+        Parameters:
+        -----------
+        input_feature : FeatureProcessor
+            The feature processor object that holds the input features for projection.
+        output_feature : FeatureProcessor
+            The feature processor object that holds the output features after projection.
+        cosmos_data : CosmosData
+            The data object that contains the halo and subhalo information, including positions and velocities.
+        g : Generator
+            The generator that yields the data to be processed.
+        next_step : Callable[[Generator], Generator]
+            A lambda expression representing the next step in the pipeline, which processes the data
+            after the map generation step. The lambda receives a generator and returns another generator.
+
+        Yields:
+        -------
+        tuple
+            A tuple containing the updated input_feature, output_feature, and cosmos_data after map generation and processing.
+
+        Notes:
+        ------
+        This method generates three different map projections, processes them, and updates the features and metadata accordingly.
         """
-        interlopers_id = self._get_interlopers_id(cosmos_data)
-        io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
-        projections = ["xy", "yz", "xz"]
+        for _ in g:
+            try:
+                logger.debug(f"Generating maps for halo: {cosmos_data.halo.halo_id}")
+                interlopers_id = self._get_interlopers_id(cosmos_data)
+                io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
+                projections = ["xy", "yz", "xz"]
 
-        for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
-            projection_name = projections[j]
-            input_feature.map = map_f_i
-            output_feature.map = map_f_o
-            self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, cosmos_data, input_feature,
-                                     output_feature)
-        logger.info('Map generation done.')
-        yield None
-
-
+                for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
+                    projection_name = projections[j]
+                    input_feature.map = map_f_i
+                    output_feature.map = map_f_o
+                    self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, cosmos_data,
+                                             input_feature, output_feature)
+                logger.info(f'Map generation done for {cosmos_data.halo.halo_id}.')
+                if next_step is not None:
+                    yield from next_step(g)
+                else:
+                    yield input_feature, output_feature, cosmos_data
+            except Exception as e:
+                logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
+                continue
