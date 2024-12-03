@@ -52,6 +52,16 @@ class FeatureProcessor(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_empty(cls) -> np.ndarray:
+        """
+        Get an empty or default value for the feature.
+
+        Returns:
+            np.ndarray: An empty or default value for the feature.
+        """
+        pass
+
 
 class VelocityDispersionProcessor(FeatureProcessor):
     """
@@ -144,6 +154,16 @@ class VelocityDispersionProcessor(FeatureProcessor):
         input_ij = np.sqrt(input_ij / 3)
         input_ij[np.isnan(input_ij)] = 0
         return input_ij, binx, biny
+
+    @classmethod
+    def get_empty(cls) -> np.ndarray:
+        """
+        Return an empty value for velocity dispersion (an empty array).
+
+        Returns:
+            np.ndarray: Empty array for velocity dispersion.
+        """
+        return np.array([])
 
 
 class ICLProcessor(FeatureProcessor):
@@ -315,6 +335,16 @@ class ICLProcessor(FeatureProcessor):
         output_ij = output_ij / output_count_ij
         output_ij[np.isnan(output_ij)] = 0
         return output_ij, binx, biny
+
+    @classmethod
+    def get_empty(cls) -> np.ndarray:
+        """
+        Return an empty value for ICL (an empty array).
+
+        Returns:
+            np.ndarray: Empty array for ICL.
+        """
+        return np.array([])
 
 
 class FeatureProcessorFactory:
