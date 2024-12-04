@@ -344,18 +344,11 @@ class ICLProcessor(FeatureProcessor):
         pos_rot = particle_positions
 
         assert pos_rot[:, i].size == pos_rot[:, j].size == len(self.value)
-        # TODO check this part is working
         output_ij, binx, biny, _ = stats.binned_statistic_2d(
             pos_rot[:, i], pos_rot[:, j],
             self.value,  # Access the ICL feature data
-            statistic="sum", bins=bins, range=ranging
+            statistic="mean", bins=bins, range=ranging
         )
-        output_count_ij, _, _, _ = stats.binned_statistic_2d(
-            pos_rot[:, i], pos_rot[:, j],
-            self.value,  # Access the ICL feature count
-            statistic="count", bins=bins, range=ranging
-        )
-        output_ij = output_ij / output_count_ij
         output_ij[np.isnan(output_ij)] = 0
         return output_ij, binx, biny
 
