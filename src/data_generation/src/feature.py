@@ -161,10 +161,14 @@ class VelocityDispersionProcessor(FeatureProcessor):
         if isinstance(self.value, List):
             self.value = np.array(self.value)
 
+        components = {0, 1, 2}
+        missing_component = components - set(axis)
+        k = next(iter(missing_component))
+
         pos_rot = particle_positions
         input_ij, binx, biny, _ = stats.binned_statistic_2d(
             pos_rot[:, i], pos_rot[:, j],
-            (self.value[:, 2]) ** 2,  # Access the relevant feature
+            (self.value[:, k]) ** 2,  # Access the relevant feature
             statistic="mean", bins=bins, range=ranging
         )
         input_ij = np.sqrt(input_ij / 3)
