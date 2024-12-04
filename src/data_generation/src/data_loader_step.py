@@ -81,9 +81,12 @@ class DataLoader(PipelineStep):
             logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_df)} subhalos.")
             subhalo_id = halo.fsub
             halo_id = halo.halo_id
-            group_number = halo.group_number
             try:
-                subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id, halo_id=group_number)
+                if hasattr(halo, 'group_number'):
+                    subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id,
+                                                                          halo_id=halo.group_number)
+                else:
+                    subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id, halo_id=halo_id)
 
                 if subhalo_particles is None:
                     raise ValueError(f"Invalid data for subhalo_id: {subhalo_id}, halo_id: {halo_id}")
