@@ -1,0 +1,16 @@
+digraph "packages" {
+rankdir=BT
+charset="utf-8"
+"src" [color="black", label=<src>, shape="box", style="solid"];
+"src.cosmos" [color="black", label=<src.cosmos>, shape="box", style="solid"];
+"src.data_fetcher" [color="black", label=<src.data_fetcher>, shape="box", style="solid"];
+"src.data_loader_step" [color="black", label=<src.data_loader_step>, shape="box", style="solid"];
+"src.feature" [color="black", label=<src.feature>, shape="box", style="solid"];
+"src.halo" [color="black", label=<src.halo>, shape="box", style="solid"];
+"src.map_step" [color="black", label=<src.map_step>, shape="box", style="solid"];
+"src.pipeline" [color="black", label=<src.pipeline>, shape="box", style="solid"];
+"src.pipeline_step" [color="black", label=<src.pipeline_step>, shape="box", style="solid"];
+"src.rotate_step" [color="black", label=<src.rotate_step>, shape="box", style="solid"];
+"src.subhalo" [color="black", label=<src.subhalo>, shape="box", style="solid"];
+"src.utils" [color="black", label=<src.utils>, shape="box", style="solid"];
+}
