@@ -299,17 +299,17 @@ class EagleFetcher(DataFetcher):
             A context object containing particle data.
         """
         subgroup_id = kwargs.get('subhalo_id', None)
-        halo_id = kwargs.get('group_number')
+        group_number = kwargs.get('group_number')
 
         if subgroup_id is None:
             logger.error("subhalo_id must be provided in kwargs")
             raise ValueError("subgroup_id must be provided in kwargs")
-        if halo_id is None:
+        if group_number is None:
             logger.error("halo_id must be provided in kwargs")
             raise ValueError("group_number must be provided in kwargs")
 
-        logger.info(f"Fetching particle data for subhalo: {subgroup_id}")
-        return self._get_p_subhalo(subgroup_id, halo_id)
+        logger.info(f"Fetching particle data for subhalo: {subgroup_id}, Group_number: {group_number}")
+        return self._get_p_subhalo(subgroup_id, group_number)
 
     def _get_halos(self) -> HaloContext:
         """
@@ -451,10 +451,8 @@ class EagleFetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data such as mass, coordinates, and velocities.
         """
-        logger.debug(f"Fetching particle data for subhalo: {subgroup_id}")
         itype = 4  # PartType
         path = self.catalog.path
-
         if not os.path.exists(path):
             logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
@@ -477,10 +475,11 @@ class EagleFetcher(DataFetcher):
                          f'SubGroupNumber={subgroup_id}')
             raise ValueError(f'Error, there is not particle data for GroupNumber={group_number} and'
                              f' SubGroupNumber={subgroup_id}')
+        else:
+            logger.debug("Particle data fetched successfully.")
 
         velocity = np.vstack(data_filtered['velocity'].values)
         positions = np.vstack(data_filtered['coords'].values)
         subhalo_particles = SubhaloParticles(data_filtered['mass'].values, positions, velocity, self.catalog.scalf)
-        logger.debug("Particle data fetched successfully.")
         return subhalo_particles
 
