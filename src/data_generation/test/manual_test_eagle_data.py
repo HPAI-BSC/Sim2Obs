@@ -1,17 +1,9 @@
 import os
-import unittest
 from dotenv import load_dotenv
-
-import numpy as np
 from hydra import initialize, compose
 import pandas as pd
 
-from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_fetcher import DataFetcherFactory
-from src.data_generation.src.data_loader_step import DataLoader
-from src.data_generation.src.feature import VelocityDispersionProcessor, ICLProcessor, FeatureProcessor
-from src.data_generation.src.halo import Halo
-from src.data_generation.src.subhalo import SubhaloParticles, SubhaloContext
 from src.data_generation.src.utils import read_dataset
 
 load_dotenv('../.env')
