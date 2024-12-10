@@ -22,7 +22,7 @@ From: nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
 
     apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/7fa2af80.pub
 
-    pip3 install illustris_python git+https://github.com/illustristng/illustris_python@b7bc432e994ce057f30ee135ca9d43654d60f14d
+    pip3 install git+https://github.com/illustristng/illustris_python@b7bc432e994ce057f30ee135ca9d43654d60f14d
     pip3 install antlr4-python3-runtime==4.9.3
     pip3 install attr==0.3.1
     pip3 install attrs==23.1.0
