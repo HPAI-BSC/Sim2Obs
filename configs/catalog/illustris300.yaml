@@ -1,7 +1,7 @@
 name: illustris-300
 subhalo_error_id: 4294967295
-snapnum: 84      # redshift 0.2
-scalf: 0.8333    # redshift 0.2
-
-# TODO remove output and add it into the path in the code
+snapnum: 84       # redshift 0.2
+scalf: 0.8333     # redshift 0.2
+fov: 526.68   # 2 * 263.34 kpc
+spatial_resolution: 2.02 # kpc
 path: ${paths.datasets_dir}/illustris300
