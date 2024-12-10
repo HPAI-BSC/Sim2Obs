@@ -7,13 +7,18 @@ import pandas as pd
 import joblib
 from omegaconf import DictConfig
 from scipy import stats
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("FeatureProcessor")
-load_dotenv('../.env')
+
+dotenv_path = find_dotenv('../.env')
+if dotenv_path:
+    load_dotenv(dotenv_path)
+else:
+    print(".env file not found, skipping load.")
 
 
 class FeatureProcessor(ABC):

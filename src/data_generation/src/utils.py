@@ -9,13 +9,16 @@ import h5py
 import numpy as np
 import pandas as pd
 from PIL import Image
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from scipy.spatial.distance import cosine
 
 
-
-# TODO
-load_dotenv('../.env')
+# This will search for the .env file and load it if found
+dotenv_path = find_dotenv('../.env')
+if dotenv_path:
+    load_dotenv(dotenv_path)
+else:
+    print(".env file not found, skipping load.")
 
 
 def setup_logger(name: str) -> logging.Logger:

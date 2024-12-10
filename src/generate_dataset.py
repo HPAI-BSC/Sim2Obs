@@ -1,7 +1,7 @@
 import os
 from typing import Any, List
 import hydra
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from omegaconf import DictConfig
 
 from src.data_generation.src.data_loader_step import DataLoader
@@ -10,9 +10,11 @@ from src.data_generation.src.pipeline import Pipeline
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.rotate_step import RotateStep
 
-
-load_dotenv('data_generation/.env')
-
+dotenv_path = find_dotenv('data_generation/.env')
+if dotenv_path:
+    load_dotenv(dotenv_path)
+else:
+    print(".env file not found, skipping load.")
 
 def get_pipeline_steps(cfg: DictConfig) -> List[PipelineStep]:
     if 'pipeline' not in cfg:
