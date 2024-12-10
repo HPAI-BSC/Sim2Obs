@@ -1,4 +1,3 @@
-import os
 from typing import Any, List
 import hydra
 from dotenv import load_dotenv, find_dotenv
@@ -15,6 +14,7 @@ if dotenv_path:
     load_dotenv(dotenv_path)
 else:
     print(".env file not found, skipping load.")
+
 
 def get_pipeline_steps(cfg: DictConfig) -> List[PipelineStep]:
     if 'pipeline' not in cfg:
@@ -44,3 +44,4 @@ def main(cfg: DictConfig) -> Any:
     pipeline = Pipeline(cfg=cfg, steps=steps)
     # Execute the pipeline and capture the first 5 iterations
     result = pipeline.run()
+    print(result)
