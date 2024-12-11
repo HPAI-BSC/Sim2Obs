@@ -15,7 +15,7 @@ if __name__ == '__main__':
     with initialize(config_path="../../../configs"):
         cfg_eagle = compose(config_name="data_generation.yaml")
         local_config = compose(config_name="paths/local.yaml")
-        cfg_eagle.paths = local_config
+        cfg_eagle.paths = local_config.paths
         cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
         cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
         cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
