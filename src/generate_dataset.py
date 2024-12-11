@@ -47,3 +47,7 @@ def main(cfg: DictConfig) -> Any:
     # Execute the pipeline and capture the first 5 iterations
     result = pipeline.run()
     print(result)
+
+
+if __name__ == "__main__":
+    main()
