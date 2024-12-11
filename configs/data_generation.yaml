@@ -1,6 +1,6 @@
 defaults:
   - _self_
-  - paths: local
+  - paths: gpfs
   - catalog: illustris300
   - extras: default
   - hydra: default

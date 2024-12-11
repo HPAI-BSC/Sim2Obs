@@ -11,7 +11,7 @@ from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloContext
 from src.data_generation.src.utils import setup_logger
 
-logger = setup_logger("RotateStep")
+logger = setup_logger("Pipeline")
 
 
 class Pipeline:
