@@ -44,8 +44,9 @@ class TestMapStep(unittest.TestCase):
         with initialize(config_path="../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
-
-        with initialize(config_path="../../../configs"):
+            local_config = compose(config_name="paths/local.yaml")
+            self.cfg_eagle.paths = local_config
+            self.cfg_illustris.paths = local_config
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
             self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'

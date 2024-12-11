@@ -17,8 +17,9 @@ load_dotenv('../.env')
 with initialize(config_path="../../../configs"):
     cfg_illustris = compose(config_name="data_generation.yaml")
     cfg_eagle = compose(config_name="data_generation.yaml")
-
-with initialize(config_path="../../../configs"):
+    local_config = compose(config_name="paths/local.yaml")
+    cfg_eagle.paths = local_config
+    cfg_illustris.paths = local_config
     cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
     cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
     cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
