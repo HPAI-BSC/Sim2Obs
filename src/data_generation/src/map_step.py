@@ -130,7 +130,8 @@ class MapStep(PipelineStep):
         interlopers_id = interlopers_id.iloc[1:]
 
         if len(interlopers_id) == 0:
-            logger.warning(f'There is no interlopers for particles linked to {cosmos_data.subhalo_id}')
+            pass
+            # logger.warning(f'There is no interlopers for particles linked to {cosmos_data.subhalo_id}')
         return interlopers_id
 
     def _get_interlopers_mask(self, cosmos_data: CosmosData, map_shape, interlopers_id: np.ndarray, biny: np.ndarray) -> np.ndarray:
@@ -235,7 +236,7 @@ class MapStep(PipelineStep):
             output_feature (FeatureProcessor): The output feature processor.
             interlopers_mask (np.ndarray): Mask of interloper regions.
         """
-        logger.info(f'Generating {self.map_configuration["number_zooms"]} zooms for projection {projection_str}...')
+        # logger.info(f'Generating {self.map_configuration["number_zooms"]} zooms for projection {projection_str}...')
 
         def get_path(feature_name, halo_id_, subhalo_id_, projection_, i_):
             if self.map_configuration['rotation_angle'] is not None:
