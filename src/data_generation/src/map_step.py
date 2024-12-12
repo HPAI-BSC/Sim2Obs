@@ -102,7 +102,7 @@ class MapStep(PipelineStep):
         ]
         return maps
 
-    def _get_interlopers_id(self, cosmos_data: CosmosData):
+    def _get_interlopers_id(self, cosmos_data: CosmosData) -> np.ndarray:
         """
         Identifies the interloper subhalos within the given data.
 
@@ -132,7 +132,7 @@ class MapStep(PipelineStep):
         if len(interlopers_id) == 0:
             pass
             # logger.warning(f'There is no interlopers for particles linked to {cosmos_data.subhalo_id}')
-        return interlopers_id
+        return interlopers_id.to_numpy()
 
     def _get_interlopers_mask(self, cosmos_data: CosmosData, map_shape, interlopers_id: np.ndarray, biny: np.ndarray) -> np.ndarray:
         """
