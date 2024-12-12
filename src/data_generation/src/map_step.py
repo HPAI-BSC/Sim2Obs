@@ -180,7 +180,8 @@ class MapStep(PipelineStep):
 
         # Check if the mask is just zero
         if np.all(interlopers_mask == 0):
-            logger.warning('Mask is full of zeros.')
+            pass
+            #logger.warning('Mask is full of zeros.')
         interlopers_mask = interlopers_mask.astype(bool)
         return interlopers_mask
 
@@ -276,7 +277,7 @@ class MapStep(PipelineStep):
                                    projection_str, i)
             np.savez(input_path, input_feature_with_mask)
             np.savez(output_path, output_feature_with_mask)
-        logger.info(f'Finished generating zooms for projection {projection_str}')
+        #logger.info(f'Finished generating zooms for projection {projection_str}')
 
     def _process_projection(self, feature_size, interlopers_id: np.ndarray, biny_i, projection: str,
                             cosmos_data: CosmosData, input_feature: FeatureProcessor, output_feature: FeatureProcessor):
@@ -325,7 +326,7 @@ class MapStep(PipelineStep):
         """
         for _ in g:
             try:
-                logger.debug(f"Generating maps for halo: {cosmos_data.halo.halo_id}")
+                #logger.debug(f"Generating maps for halo: {cosmos_data.halo.halo_id}")
                 interlopers_id = self._get_interlopers_id(cosmos_data)
                 io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
                 projections = ["xy", "yz", "xz"]
@@ -336,11 +337,11 @@ class MapStep(PipelineStep):
                     output_feature.map = map_f_o
                     self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, cosmos_data,
                                              input_feature, output_feature)
-                logger.info(f'Map generation done for {cosmos_data.halo.halo_id}.')
+                #logger.info(f'Map generation done for {cosmos_data.halo.halo_id}.')
                 if next_step is not None:
                     yield from next_step(g)
                 else:
                     yield input_feature, output_feature, cosmos_data
             except Exception as e:
-                logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
+                #logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
                 continue

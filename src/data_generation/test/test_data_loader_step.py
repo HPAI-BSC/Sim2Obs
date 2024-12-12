@@ -68,19 +68,21 @@ class TestDataLoaderStep(unittest.TestCase):
                                  subhalos=subhalos,
                                  subhalo_particle_positions=np.array([]))
         generator = data_loader.process(input_feature, output_feature, cosmos_data, g=halo_subhalo_list, next_step=None)
-        result = None
+        results = []
         try:
-            result = next(generator)
+            for result in generator:
+                results.append(result)
         except StopIteration:
             pass  # You can assert here if you expect no more items
-        self.assertNotEqual(result, None)
-        self.assertIsInstance(result[0], FeatureProcessor)  # Assert the input_feature
-        self.assertIsInstance(result[1], FeatureProcessor)  # Assert the output_feature
-        self.assertIsInstance(result[2], CosmosData)  # Assert the cosmos_data
-        self.assertNotEqual(len(result[0].value), 0)
-        self.assertNotEqual(len(result[1].value), 0)
-        self.assertNotEqual(len(result[2].subhalo_particle_positions), 0)
-        self.assertNotEqual(len(result[2].subhalos), 0)
+
+        self.assertNotEqual(results, [])
+        self.assertIsInstance(results[0][0], FeatureProcessor)  # Assert the input_feature
+        self.assertIsInstance(results[0][1], FeatureProcessor)  # Assert the output_feature
+        self.assertIsInstance(results[0][2], CosmosData)  # Assert the cosmos_data
+        self.assertNotEqual(len(results[0][0].value), 0)
+        self.assertNotEqual(len(results[0][1].value), 0)
+        self.assertNotEqual(len(results[0][2].subhalo_particle_positions), 0)
+        self.assertNotEqual(len(results[0][2].subhalos), 0)
 
     def test_process_eagle(self):
         data_loader = DataLoader(self.cfg_eagle)
@@ -94,19 +96,21 @@ class TestDataLoaderStep(unittest.TestCase):
                                  subhalos=subhalos,
                                  subhalo_particle_positions=np.array([]))
         generator = data_loader.process(input_feature, output_feature, cosmos_data, g=halo_subhalo_list, next_step=None)
-        result = None
+        results = []
         try:
-            result = next(generator)
+            for result in generator:
+                results.append(result)
         except StopIteration:
             pass  # You can assert here if you expect no more items
-        self.assertNotEqual(result, None)
-        self.assertIsInstance(result[0], FeatureProcessor)  # Assert the input_feature
-        self.assertIsInstance(result[1], FeatureProcessor)  # Assert the output_feature
-        self.assertIsInstance(result[2], CosmosData)  # Assert the cosmos_data
-        self.assertNotEqual(len(result[0].value), 0)
-        self.assertNotEqual(len(result[1].value), 0)
-        self.assertNotEqual(len(result[2].subhalo_particle_positions), 0)
-        self.assertNotEqual(len(result[2].subhalos), 0)
+
+        self.assertNotEqual(results, [])
+        self.assertIsInstance(results[0][0], FeatureProcessor)  # Assert the input_feature
+        self.assertIsInstance(results[0][1], FeatureProcessor)  # Assert the output_feature
+        self.assertIsInstance(results[0][2], CosmosData)  # Assert the cosmos_data
+        self.assertNotEqual(len(results[0][0].value), 0)
+        self.assertNotEqual(len(results[0][1].value), 0)
+        self.assertNotEqual(len(results[0][2].subhalo_particle_positions), 0)
+        self.assertNotEqual(len(results[0][2].subhalos), 0)
 
 
 

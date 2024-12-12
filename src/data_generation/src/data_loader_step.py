@@ -1,4 +1,6 @@
 from typing import Tuple, List, Optional, Callable, Any
+import os
+from tqdm import tqdm
 
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_fetcher import DataFetcherFactory
@@ -10,6 +12,8 @@ from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("DataLoader")
+
+os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 
 class DataLoader(PipelineStep):
@@ -76,57 +80,57 @@ class DataLoader(PipelineStep):
         Tuple
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
+        with tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar:
+            for halo, subhalo_df in g:
+                logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_df)} subhalos.")
+                subhalo_id = halo.fsub
+                halo_id = halo.halo_id
+                try:
+                    if hasattr(halo, 'group_number'):
+                        subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id,
+                                                                              halo_id=halo.group_number)
+                    else:
+                        subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id, halo_id=halo_id)
 
-        for halo, subhalo_df in g:
-            logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_df)} subhalos.")
-            subhalo_id = halo.fsub
-            halo_id = halo.halo_id
-            try:
-                if hasattr(halo, 'group_number'):
-                    subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id,
-                                                                          halo_id=halo.group_number)
+                    if subhalo_particles is None:
+                        raise ValueError(f"Invalid data for subhalo_id: {subhalo_id}, halo_id: {halo_id}")
+
+                    if any(x is None for x in [subhalo_particles.p, subhalo_particles.v, subhalo_particles.m]):
+                        raise ValueError("Missing particle data (positions, velocities, or masses).")
+                except Exception as e:
+                    pbar.update(1)  # Ensure progress bar updates even for skipped halos
+                    logger.error(f"Failed to load particle data for halo {halo_id}: {e}")
+                    continue
+
+                logger.debug(f"Processing input features for halo {halo_id}")
+                i_value = input_feature.process(
+                    halo=halo,
+                    particle_velocity=subhalo_particles.v,
+                    particle_position=subhalo_particles.p)
+                input_feature.value = i_value
+
+                logger.debug(f"Processing output features for halo {halo_id}")
+                o_value = output_feature.process(
+                    halo=halo,
+                    particle_velocity=subhalo_particles.v,
+                    particle_position=subhalo_particles.p)
+                output_feature.value = o_value
+
+                tmp = CosmosData(halo, subhalo_df, subhalo_id, subhalo_particles.p)
+                cosmos_data.halo = tmp.halo
+                cosmos_data.subhalos = tmp.subhalos
+                cosmos_data.subhalo_id = tmp.subhalo_id
+                cosmos_data.subhalo_particle_positions = tmp.subhalo_particle_positions
+                cosmos_data.metadata = tmp.metadata
+                if next_step is not None:
+                    yield from next_step(g)
                 else:
-                    subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id, halo_id=halo_id)
+                    yield input_feature, output_feature, cosmos_data
 
-                if subhalo_particles is None:
-                    raise ValueError(f"Invalid data for subhalo_id: {subhalo_id}, halo_id: {halo_id}")
-
-                if any(x is None for x in [subhalo_particles.p, subhalo_particles.v, subhalo_particles.m]):
-                    raise ValueError("Missing particle data (positions, velocities, or masses).")
-            except Exception as e:
-                logger.error(f"Failed to load particle data for halo {halo_id}: {e}")
-                continue
-
-            logger.debug(f"Processing input features for halo {halo_id}")
-            i_value = input_feature.process(
-                halo=halo,
-                particle_velocity=subhalo_particles.v,
-                particle_position=subhalo_particles.p)
-            input_feature.value = i_value
-
-            logger.debug(f"Processing output features for halo {halo_id}")
-            o_value = output_feature.process(
-                halo=halo,
-                particle_velocity=subhalo_particles.v,
-                particle_position=subhalo_particles.p)
-            output_feature.value = o_value
-
-            tmp = CosmosData(halo, subhalo_df, subhalo_id, subhalo_particles.p)
-            cosmos_data.halo = tmp.halo
-            cosmos_data.subhalos = tmp.subhalos
-            cosmos_data.subhalo_id = tmp.subhalo_id
-            cosmos_data.subhalo_particle_positions = tmp.subhalo_particle_positions
-            cosmos_data.metadata = tmp.metadata
-
-            if next_step is not None:
-                yield from next_step(g)
-            else:
-                yield input_feature, output_feature, cosmos_data
-
-            logger.info(f"Finished processing halo {halo_id}.")
+                pbar.update(1)  # Update the progress bar for each successfully processed halo
+                logger.info(f"Finished processing halo {halo_id}.")
         logger.info("Pipeline processing completed.")
 
-    # TODO TO REVIEW
     def load_halo_data(self) -> List[Tuple]:
         """
         Loads halo data and yields each halo's ID along with its associated data.
@@ -138,6 +142,10 @@ class DataLoader(PipelineStep):
         """
         halo_context = self.fetcher.get_halos()
         subhalo_context = self.fetcher.get_subhalos()
+        n_halos = halo_context.data['halo_id'].nunique()
+        n_subhalos = subhalo_context.data['subhalo_id'].nunique()
+        logger.info(f'Number of halos: {n_halos}')
+        logger.info(f'Number of subhalos: {n_subhalos}')
         result = []
         for id_halo in halo_context.halo_id:
             logger.debug(f"Loading data for halo_id: {id_halo}")
