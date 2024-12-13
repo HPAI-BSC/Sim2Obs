@@ -46,6 +46,7 @@ class DataLoader(PipelineStep):
         attr_list = self._build_data_loader_configuration(cfg)
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
         current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.cfg = cfg
         self.path = cfg.paths.datasets_dir + f'/data_loader_particles_step_{current_datetime}.txt'
         self.path_f = cfg.paths.datasets_dir + f'/data_loader_feature_init_step_{current_datetime}.txt'
         logger.info("DataLoader initialized with the provided configuration.")
@@ -133,6 +134,7 @@ class DataLoader(PipelineStep):
                     particle_position=subhalo_particles.p)
                 output_feature.value = o_value
                 profiler.disable()
+                print(os.path.exists(self.cfg.paths.datasets_dir))
                 with open(self.path_f) as f:
                     stats = pstats.Stats(profiler, stream=f)
                     stats.strip_dirs()
