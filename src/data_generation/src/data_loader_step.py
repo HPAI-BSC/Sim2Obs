@@ -135,7 +135,7 @@ class DataLoader(PipelineStep):
                 output_feature.value = o_value
                 profiler.disable()
                 print(os.path.exists(self.cfg.paths.datasets_dir))
-                with open(self.path_f) as f:
+                with open(self.path_f, "w") as f:
                     stats = pstats.Stats(profiler, stream=f)
                     stats.strip_dirs()
                     stats.sort_stats("cumulative")
