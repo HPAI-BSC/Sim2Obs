@@ -44,7 +44,7 @@ def main(cfg: DictConfig) -> Any:
     print(f'Launching pipeline: {steps}')
     pipeline = Pipeline(cfg=cfg, steps=steps)
     # Execute the pipeline and capture the first 5 iterations
-    result = pipeline.run()
+    result = pipeline.run(n=1)
     print(result)
 
 

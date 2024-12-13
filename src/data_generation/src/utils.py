@@ -390,8 +390,6 @@ def get_transform_matrix(n: np.ndarray, axis: np.ndarray, normalized: bool = Tru
     theta = angle(axis, n)
     angle_degree = theta * (180 / np.pi)
 
-    #log.debug(f'--> Rotation angle: {angle_degree}')
-
     # Quaternion components
     q0 = np.cos(theta / 2)
     q1, q2, q3 = np.sin(theta / 2) * b

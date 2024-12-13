@@ -1,6 +1,8 @@
 from typing import Tuple, List, Optional, Callable, Any
 import os
 from tqdm import tqdm
+import cProfile
+import pstats
 
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_fetcher import DataFetcherFactory
@@ -80,6 +82,8 @@ class DataLoader(PipelineStep):
         Tuple
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
+        profiler = cProfile.Profile()
+        profiler.enable()
         with tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar:
             for halo, subhalo_df in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_df)} subhalos.")
@@ -129,6 +133,12 @@ class DataLoader(PipelineStep):
 
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo_id}.")
+        profiler.disable()
+        with open("profile_data_loader.txt", "w") as f:
+            stats = pstats.Stats(profiler, stream=f)
+            stats.strip_dirs()
+            stats.sort_stats("cumulative")
+            stats.print_stats()
         logger.info("Pipeline processing completed.")
 
     def load_halo_data(self) -> List[Tuple]:
