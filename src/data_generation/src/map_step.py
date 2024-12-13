@@ -26,7 +26,7 @@ class MapStep(PipelineStep):
         fov = self.map_configuration['fov']
         spatial_resolution = self.map_configuration['spatial_resolution']
         self.bins, self.r = muse_bins_r(fov, spatial_resolution)
-        self.path = cfg.path.datasets_dir + f'/map_step_{datetime}.txt'
+        self.path = cfg.paths.datasets_dir + f'/map_step_{datetime}.txt'
 
     @classmethod
     def _build_map_configuration(cls, cfg: DictConfig) -> dict:
