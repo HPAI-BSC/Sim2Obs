@@ -46,6 +46,7 @@ class DataLoader(PipelineStep):
         attr_list = self._build_data_loader_configuration(cfg)
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
         self.path = cfg.paths.datasets_dir + f'/data_loader_particles_step_{datetime}.txt'
+        self.path_f = cfg.paths.datasets_dir + f'/data_loader_feature_init_step_{datetime}.txt'
         logger.info("DataLoader initialized with the provided configuration.")
 
     @classmethod
@@ -116,6 +117,8 @@ class DataLoader(PipelineStep):
                     continue
 
                 logger.debug(f"Processing input features for halo {halo_id}")
+                profiler = cProfile.Profile()
+                profiler.enable()
                 i_value = input_feature.process(
                     halo=halo,
                     particle_velocity=subhalo_particles.v,
@@ -128,6 +131,12 @@ class DataLoader(PipelineStep):
                     particle_velocity=subhalo_particles.v,
                     particle_position=subhalo_particles.p)
                 output_feature.value = o_value
+                profiler.disable()
+                with open(self.path_f) as f:
+                    stats = pstats.Stats(profiler, stream=f)
+                    stats.strip_dirs()
+                    stats.sort_stats("cumulative")
+                    stats.print_stats()
 
                 tmp = CosmosData(halo, subhalo_df, subhalo_id, subhalo_particles.p)
                 cosmos_data.halo = tmp.halo
