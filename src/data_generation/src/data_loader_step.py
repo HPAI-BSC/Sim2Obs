@@ -1,3 +1,4 @@
+import sys
 from typing import Tuple, List, Optional, Callable, Any
 import os
 from tqdm import tqdm
@@ -134,11 +135,10 @@ class DataLoader(PipelineStep):
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo_id}.")
         profiler.disable()
-        with open("profile_data_loader.txt", "w") as f:
-            stats = pstats.Stats(profiler, stream=f)
-            stats.strip_dirs()
-            stats.sort_stats("cumulative")
-            stats.print_stats()
+        stats = pstats.Stats(profiler, stream=sys.stdout)
+        stats.strip_dirs()
+        stats.sort_stats("cumulative")
+        stats.print_stats()
         logger.info("Pipeline processing completed.")
 
     def load_halo_data(self) -> List[Tuple]:

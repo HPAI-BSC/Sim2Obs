@@ -1,3 +1,4 @@
+import sys
 from typing import Generator, Callable, Tuple
 from omegaconf import DictConfig
 import cProfile
@@ -154,8 +155,7 @@ class RotateStep(PipelineStep):
                 logger.error(f"Failed to execute rotations for halo {cosmos_data.halo.halo_id}: {e}")
                 continue
         profiler.disable()
-        with open("profile_rotate.txt", "w") as f:
-            stats = pstats.Stats(profiler, stream=f)
-            stats.strip_dirs()
-            stats.sort_stats("cumulative")
-            stats.print_stats()
+        stats = pstats.Stats(profiler, stream=sys.stdout)
+        stats.strip_dirs()
+        stats.sort_stats("cumulative")
+        stats.print_stats()

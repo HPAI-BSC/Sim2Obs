@@ -1,4 +1,5 @@
 import os
+import sys
 from typing import List, Generator, Callable
 
 import numpy as np
@@ -349,8 +350,7 @@ class MapStep(PipelineStep):
                 #logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
                 continue
         profiler.disable()
-        with open("profile_map.txt", "w") as f:
-            stats = pstats.Stats(profiler, stream=f)
-            stats.strip_dirs()
-            stats.sort_stats("cumulative")
-            stats.print_stats()
+        stats = pstats.Stats(profiler, stream=sys.stdout)
+        stats.strip_dirs()
+        stats.sort_stats("cumulative")
+        stats.print_stats()
