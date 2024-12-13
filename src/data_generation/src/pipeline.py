@@ -68,7 +68,7 @@ class Pipeline:
         data_loader = DataLoader(self.cfg)
         halo_subhalo_list = data_loader.load_halo_data()
         profiler.disable()
-        path = self.cfg.paths.datasets_dir + f'/pipeline_{datetime}.txt'
+        path = self.cfg.paths.datasets_dir + f'/pipeline_{datetime.now()}.txt'
         with open(path, "w") as f:
             stats = pstats.Stats(profiler, stream=f)
             stats.strip_dirs()
