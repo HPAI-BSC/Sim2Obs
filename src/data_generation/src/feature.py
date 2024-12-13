@@ -211,10 +211,10 @@ class ICLProcessor(FeatureProcessor):
         project_root = os.getenv('PROJECT_ROOT')
         if not project_root:
             raise EnvironmentError("PROJECT_ROOT is not set in the environment variables.")
-        self.model_path = os.path.join(project_root, 'src/data_generation/model/Best_Model-Random-3par.pkl')
         self.cfg = cfg
         self.map = []
         self.value = []
+        self.model = joblib.load(os.path.join(project_root, 'src/data_generation/model/Best_Model-Random-3par.pkl'))
 
         attr_list = self._build_configuration(cfg, ['G'])
         for key, value in attr_list.items():
@@ -243,7 +243,6 @@ class ICLProcessor(FeatureProcessor):
             ValueError: If the scaled particle data is empty or contains only missing values, the method raises
                         an exception indicating that the prediction cannot be made.
         """
-        final_model = joblib.load(self.model_path)
         # Define simulation parameters
         V200 = np.sqrt(self.G * halo.m200 / halo.r200)
 
@@ -268,7 +267,7 @@ class ICLProcessor(FeatureProcessor):
         # Use the trained model to make predictions on the data
         # The model predicts whether each particle belongs to BCG (label 1) or ICL (label 0)
         logger.info("Labeling particles ...")
-        final_predictions = final_model.predict(Data.to_numpy())
+        final_predictions = self.model.predict(Data.to_numpy())
         return final_predictions
 
     # Subhalo particles, halo
