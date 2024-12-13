@@ -46,7 +46,8 @@ class RotateStep(PipelineStep):
             A set of rotation axes for the objects.
         """
         self.rotation_angle, self.z, self.rotation_directions = self._build_configuration(cfg)
-        self.path = cfg.paths.datasets_dir + f'/rotate_step_{datetime.now()}.txt'
+        current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.path = cfg.paths.datasets_dir + f'/rotate_step_{current_datetime}.txt'
 
 
     @classmethod

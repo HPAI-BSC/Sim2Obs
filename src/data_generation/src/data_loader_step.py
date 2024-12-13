@@ -45,8 +45,9 @@ class DataLoader(PipelineStep):
         """
         attr_list = self._build_data_loader_configuration(cfg)
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
-        self.path = cfg.paths.datasets_dir + f'/data_loader_particles_step_{datetime.now()}.txt'
-        self.path_f = cfg.paths.datasets_dir + f'/data_loader_feature_init_step_{datetime.now()}.txt'
+        current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.path = cfg.paths.datasets_dir + f'/data_loader_particles_step_{current_datetime}.txt'
+        self.path_f = cfg.paths.datasets_dir + f'/data_loader_feature_init_step_{current_datetime}.txt'
         logger.info("DataLoader initialized with the provided configuration.")
 
     @classmethod
