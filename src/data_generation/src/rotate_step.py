@@ -1,8 +1,9 @@
-import sys
-from typing import Generator, Callable, Tuple
-from omegaconf import DictConfig
 import cProfile
 import pstats
+from datetime import datetime
+from typing import Generator, Callable, Tuple
+from omegaconf import DictConfig
+
 import numpy as np
 
 from src.data_generation.src.cosmos import CosmosData
@@ -45,6 +46,8 @@ class RotateStep(PipelineStep):
             A set of rotation axes for the objects.
         """
         self.rotation_angle, self.z, self.rotation_directions = self._build_configuration(cfg)
+        self.path = cfg.path.datasets_dir + f'/rotate_step_{datetime}.txt'
+
 
     @classmethod
     def _build_configuration(cls, cfg: DictConfig) -> Tuple:
@@ -127,6 +130,7 @@ class RotateStep(PipelineStep):
         """
         profiler = cProfile.Profile()
         profiler.enable()
+        logger.info('Starting rotations...')
         for _ in g:
             try:
                 iterations = 360 // int(self.rotation_angle)
@@ -155,7 +159,8 @@ class RotateStep(PipelineStep):
                 logger.error(f"Failed to execute rotations for halo {cosmos_data.halo.halo_id}: {e}")
                 continue
         profiler.disable()
-        stats = pstats.Stats(profiler, stream=sys.stdout)
-        stats.strip_dirs()
-        stats.sort_stats("cumulative")
-        stats.print_stats()
+        with open(self.path, "w") as f:
+            stats = pstats.Stats(profiler, stream=f)
+            stats.strip_dirs()
+            stats.sort_stats("cumulative")
+            stats.print_stats()

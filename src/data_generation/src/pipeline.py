@@ -1,3 +1,6 @@
+import cProfile
+import pstats
+from datetime import datetime
 from typing import Any
 
 import numpy as np
@@ -54,6 +57,8 @@ class Pipeline:
         Any
             The output from each pipeline step for the provided data.
         """
+        profiler = cProfile.Profile()
+        profiler.enable()
         feature_input, feature_output = self.cfg.feature_names
         logger.info(f"Initializing feature processors: {feature_input}, {feature_output}")
         input_feature = FeatureProcessorFactory.get_feature(feature_input, cfg=self.cfg)
@@ -62,6 +67,13 @@ class Pipeline:
         logger.info("Starting data loading and processing...")
         data_loader = DataLoader(self.cfg)
         halo_subhalo_list = data_loader.load_halo_data()
+        profiler.disable()
+        path = self.cfg.path.datasets_dir + f'/pipeline_{datetime}.txt'
+        with open(path, "w") as f:
+            stats = pstats.Stats(profiler, stream=f)
+            stats.strip_dirs()
+            stats.sort_stats("cumulative")
+            stats.print_stats()
 
         if n is not None:
             halo_subhalo_list = halo_subhalo_list[:n]

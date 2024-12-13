@@ -1,5 +1,6 @@
 import os
 import sys
+from datetime import datetime
 from typing import List, Generator, Callable
 
 import numpy as np
@@ -25,6 +26,7 @@ class MapStep(PipelineStep):
         fov = self.map_configuration['fov']
         spatial_resolution = self.map_configuration['spatial_resolution']
         self.bins, self.r = muse_bins_r(fov, spatial_resolution)
+        self.path = cfg.path.datasets_dir + f'/map_step_{datetime}.txt'
 
     @classmethod
     def _build_map_configuration(cls, cfg: DictConfig) -> dict:
@@ -328,6 +330,7 @@ class MapStep(PipelineStep):
         """
         profiler = cProfile.Profile()
         profiler.enable()
+        logger.info('Starting maps...')
         for _ in g:
             try:
                 #logger.debug(f"Generating maps for halo: {cosmos_data.halo.halo_id}")
@@ -350,7 +353,8 @@ class MapStep(PipelineStep):
                 #logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
                 continue
         profiler.disable()
-        stats = pstats.Stats(profiler, stream=sys.stdout)
-        stats.strip_dirs()
-        stats.sort_stats("cumulative")
-        stats.print_stats()
+        with open(self.path, "w") as f:
+            stats = pstats.Stats(profiler, stream=f)
+            stats.strip_dirs()
+            stats.sort_stats("cumulative")
+            stats.print_stats()

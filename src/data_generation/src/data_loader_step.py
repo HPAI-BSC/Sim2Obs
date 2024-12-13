@@ -1,4 +1,5 @@
 import sys
+from datetime import datetime
 from typing import Tuple, List, Optional, Callable, Any
 import os
 from tqdm import tqdm
@@ -44,6 +45,7 @@ class DataLoader(PipelineStep):
         """
         attr_list = self._build_data_loader_configuration(cfg)
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
+        self.path = cfg.path.datasets_dir + f'/data_loader_particles_step_{datetime}.txt'
         logger.info("DataLoader initialized with the provided configuration.")
 
     @classmethod
@@ -83,8 +85,6 @@ class DataLoader(PipelineStep):
         Tuple
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
-        profiler = cProfile.Profile()
-        profiler.enable()
         with tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar:
             for halo, subhalo_df in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_df)} subhalos.")
@@ -95,7 +95,15 @@ class DataLoader(PipelineStep):
                         subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id,
                                                                               halo_id=halo.group_number)
                     else:
+                        profiler = cProfile.Profile()
+                        profiler.enable()
                         subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id, halo_id=halo_id)
+                        profiler.disable()
+                        with open(self.path, "w") as f:
+                            stats = pstats.Stats(profiler, stream=f)
+                            stats.strip_dirs()
+                            stats.sort_stats("cumulative")
+                            stats.print_stats()
 
                     if subhalo_particles is None:
                         raise ValueError(f"Invalid data for subhalo_id: {subhalo_id}, halo_id: {halo_id}")
@@ -134,12 +142,6 @@ class DataLoader(PipelineStep):
 
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo_id}.")
-        profiler.disable()
-        stats = pstats.Stats(profiler, stream=sys.stdout)
-        stats.strip_dirs()
-        stats.sort_stats("cumulative")
-        stats.print_stats()
-        logger.info("Pipeline processing completed.")
 
     def load_halo_data(self) -> List[Tuple]:
         """
