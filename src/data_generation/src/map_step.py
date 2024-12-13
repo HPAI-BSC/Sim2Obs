@@ -1,6 +1,4 @@
 import os
-import sys
-from datetime import datetime
 from typing import List, Generator, Callable
 
 import numpy as np
@@ -26,8 +24,7 @@ class MapStep(PipelineStep):
         fov = self.map_configuration['fov']
         spatial_resolution = self.map_configuration['spatial_resolution']
         self.bins, self.r = muse_bins_r(fov, spatial_resolution)
-        current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.path = cfg.paths.datasets_dir + f'/map_step_{current_datetime}.txt'
+        self.path = cfg.paths.datasets_dir + f'/map_step.txt'
 
     @classmethod
     def _build_map_configuration(cls, cfg: DictConfig) -> dict:

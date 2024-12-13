@@ -1,5 +1,3 @@
-import sys
-from datetime import datetime
 from typing import Tuple, List, Optional, Callable, Any
 import os
 from tqdm import tqdm
@@ -45,10 +43,9 @@ class DataLoader(PipelineStep):
         """
         attr_list = self._build_data_loader_configuration(cfg)
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
-        current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.cfg = cfg
-        self.path = cfg.paths.datasets_dir + f'/data_loader_particles_step_{current_datetime}.txt'
-        self.path_f = cfg.paths.datasets_dir + f'/data_loader_feature_init_step_{current_datetime}.txt'
+        self.path = cfg.paths.datasets_dir + f'/data_loader_particles_step.txt'
+        self.path_f = cfg.paths.datasets_dir + f'/data_loader_feature_init_step.txt'
         logger.info("DataLoader initialized with the provided configuration.")
 
     @classmethod

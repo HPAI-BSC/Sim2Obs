@@ -1,6 +1,5 @@
 import cProfile
 import pstats
-from datetime import datetime
 from typing import Generator, Callable, Tuple
 from omegaconf import DictConfig
 
@@ -46,8 +45,7 @@ class RotateStep(PipelineStep):
             A set of rotation axes for the objects.
         """
         self.rotation_angle, self.z, self.rotation_directions = self._build_configuration(cfg)
-        current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.path = cfg.paths.datasets_dir + f'/rotate_step_{current_datetime}.txt'
+        self.path = cfg.paths.datasets_dir + f'/rotate_step.txt'
 
 
     @classmethod
