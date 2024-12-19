@@ -1,8 +1,7 @@
+import time
 from typing import Tuple, List, Optional, Callable, Any
 import os
 from tqdm import tqdm
-import cProfile
-import pstats
 
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_fetcher import DataFetcherFactory
@@ -44,9 +43,6 @@ class DataLoader(PipelineStep):
         attr_list = self._build_data_loader_configuration(cfg)
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
         self.cfg = cfg
-        self.path = cfg.paths.datasets_dir + f'/../logs/data_loader_particles_step.txt'
-        self.path_f = cfg.paths.datasets_dir + f'/../logs/data_loader_feature_init_step.txt'
-        logger.info("DataLoader initialized with the provided configuration.")
 
     @classmethod
     def _build_data_loader_configuration(cls, cfg: DictConfig) -> dict:
@@ -88,6 +84,7 @@ class DataLoader(PipelineStep):
         with tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar:
             for halo, subhalo_df in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_df)} subhalos.")
+                start_time = time.time()
                 subhalo_id = halo.fsub
                 halo_id = halo.halo_id
                 try:
@@ -95,15 +92,7 @@ class DataLoader(PipelineStep):
                         subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id,
                                                                               halo_id=halo.group_number)
                     else:
-                        profiler = cProfile.Profile()
-                        profiler.enable()
                         subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id, halo_id=halo_id)
-                        profiler.disable()
-                        with open(self.path, "w") as f:
-                            stats = pstats.Stats(profiler, stream=f)
-                            stats.strip_dirs()
-                            stats.sort_stats("tottime")
-                            stats.print_stats()
 
                     if subhalo_particles is None:
                         raise ValueError(f"Invalid data for subhalo_id: {subhalo_id}, halo_id: {halo_id}")
@@ -115,27 +104,17 @@ class DataLoader(PipelineStep):
                     logger.error(f"Failed to load particle data for halo {halo_id}: {e}")
                     continue
 
-                logger.debug(f"Processing input features for halo {halo_id}")
-                profiler = cProfile.Profile()
-                profiler.enable()
                 i_value = input_feature.process(
                     halo=halo,
                     particle_velocity=subhalo_particles.v,
                     particle_position=subhalo_particles.p)
                 input_feature.value = i_value
 
-                logger.debug(f"Processing output features for halo {halo_id}")
                 o_value = output_feature.process(
                     halo=halo,
                     particle_velocity=subhalo_particles.v,
                     particle_position=subhalo_particles.p)
                 output_feature.value = o_value
-                profiler.disable()
-                with open(self.path_f, "w") as f:
-                    stats = pstats.Stats(profiler, stream=f)
-                    stats.strip_dirs()
-                    stats.sort_stats("tottime")
-                    stats.print_stats()
 
                 tmp = CosmosData(halo, subhalo_df, subhalo_id, subhalo_particles.p)
                 cosmos_data.halo = tmp.halo
@@ -143,13 +122,15 @@ class DataLoader(PipelineStep):
                 cosmos_data.subhalo_id = tmp.subhalo_id
                 cosmos_data.subhalo_particle_positions = tmp.subhalo_particle_positions
                 cosmos_data.metadata = tmp.metadata
+
                 if next_step is not None:
                     yield from next_step(g)
                 else:
                     yield input_feature, output_feature, cosmos_data
 
+                elapsed_time = time.time() - start_time
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
-                logger.info(f"Finished processing halo {halo_id}.")
+                logger.info(f"Finished processing halo {halo_id} with time: {elapsed_time}")
 
     def load_halo_data(self) -> List[Tuple]:
         """
@@ -164,11 +145,11 @@ class DataLoader(PipelineStep):
         subhalo_context = self.fetcher.get_subhalos()
         n_halos = halo_context.data['halo_id'].nunique()
         n_subhalos = subhalo_context.data['subhalo_id'].nunique()
-        logger.info(f'Number of halos: {n_halos}')
-        logger.info(f'Number of subhalos: {n_subhalos}')
+        #logger.info(f'Number of halos: {n_halos}')
+        #logger.info(f'Number of subhalos: {n_subhalos}')
         result = []
         for id_halo in halo_context.halo_id:
-            logger.debug(f"Loading data for halo_id: {id_halo}")
+            #logger.debug(f"Loading data for halo_id: {id_halo}")
             halo_df = halo_context.get_item(id_halo)
             subhalo_df = subhalo_context.get_items_by_halo(id_halo)
             result.append((halo_df, subhalo_df))
@@ -190,7 +171,7 @@ class DataLoader(PipelineStep):
         """
         try:
             subhalo_particles = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, group_number=halo_id)
-            logger.debug(f"Loading particles for subhalo_id: {subhalo_id}, particles count: {len(subhalo_particles.m)}")
+            #logger.debug(f"Loading particles for subhalo_id: {subhalo_id}, particles count: {len(subhalo_particles.m)}")
             return subhalo_particles
         except Exception as e:
             logger.warning(f"Error fetching subhalo data for id {subhalo_id}: {e}")

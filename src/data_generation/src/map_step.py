@@ -3,8 +3,6 @@ from typing import List, Generator, Callable
 
 import numpy as np
 from omegaconf import DictConfig
-import cProfile
-import pstats
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.pipeline_step import PipelineStep
@@ -326,8 +324,6 @@ class MapStep(PipelineStep):
         ------
         This method generates three different map projections, processes them, and updates the features and metadata accordingly.
         """
-        profiler = cProfile.Profile()
-        profiler.enable()
         logger.info('Starting maps...')
         for _ in g:
             try:
@@ -350,9 +346,3 @@ class MapStep(PipelineStep):
             except Exception as e:
                 #logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
                 continue
-        profiler.disable()
-        with open(self.path, "w") as f:
-            stats = pstats.Stats(profiler, stream=f)
-            stats.strip_dirs()
-            stats.sort_stats("tottime")
-            stats.print_stats()

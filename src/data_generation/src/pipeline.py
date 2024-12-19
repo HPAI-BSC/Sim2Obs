@@ -28,7 +28,6 @@ class Pipeline:
         steps : list of PipelineStep
             A list of processing steps to be applied sequentially to the data.
         """
-        logger.info("Initializing pipeline...")
         self.cfg = cfg
         self.data_loader = DataLoader(cfg)
         self.steps = steps
@@ -57,10 +56,10 @@ class Pipeline:
             The output from each pipeline step for the provided data.
         """
         feature_input, feature_output = self.cfg.feature_names
-        logger.info(f"Initializing feature processors: {feature_input}, {feature_output}")
+        #logger.info(f"Initializing feature processors: {feature_input}, {feature_output}")
         input_feature = FeatureProcessorFactory.get_feature(feature_input, cfg=self.cfg)
         output_feature = FeatureProcessorFactory.get_feature(feature_output, cfg=self.cfg)
-        logger.info("Starting data loading and processing...")
+        #logger.info("Starting data loading and processing...")
         data_loader = DataLoader(self.cfg)
         halo_subhalo_list = data_loader.load_halo_data()
 
@@ -69,9 +68,6 @@ class Pipeline:
 
         steps = self.steps
         if len(steps) != 0:
-            profiler = cProfile.Profile()
-            profiler.enable()
-
             halo = Halo.empty_instance()
             subhalos = SubhaloContext.empty_instance()
             cosmos_data = CosmosData(halo=halo,
@@ -80,15 +76,6 @@ class Pipeline:
                                      subhalo_particle_positions=np.array([]))
             result = self.build_pipeline(steps, halo_subhalo_list, cosmos_data, input_feature, output_feature)
             output = list(result)
-
-            profiler.disable()
-            path = self.cfg.paths.datasets_dir + f'/../logs/pipeline.txt'
-            with open(path, "w") as f:
-                stats = pstats.Stats(profiler, stream=f)
-                stats.strip_dirs()
-                stats.sort_stats("tottime")
-                stats.print_stats()
-
             return output
         else:
             logger.error("Error, please provide an non empty pipeline, steps cannot be an empty list.")
