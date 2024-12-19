@@ -80,17 +80,17 @@ class Pipeline:
                                      subhalo_particle_positions=np.array([]))
             result = self.build_pipeline(steps, halo_subhalo_list, cosmos_data, input_feature, output_feature)
             output = list(result)
+
+            profiler.disable()
+            path = self.cfg.paths.datasets_dir + f'/../logs/pipeline.txt'
+            with open(path, "w") as f:
+                stats = pstats.Stats(profiler, stream=f)
+                stats.strip_dirs()
+                stats.sort_stats("tottime")
+                stats.print_stats()
+
             return output
         else:
             logger.error("Error, please provide an non empty pipeline, steps cannot be an empty list.")
         logger.info("Pipeline processing completed.")
-
-        profiler.disable()
-        path = self.cfg.paths.datasets_dir + f'/../logs/pipeline.txt'
-        with open(path, "w") as f:
-            stats = pstats.Stats(profiler, stream=f)
-            stats.strip_dirs()
-            stats.sort_stats("tottime")
-            stats.print_stats()
-
         return None
