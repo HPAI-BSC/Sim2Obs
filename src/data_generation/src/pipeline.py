@@ -56,9 +56,6 @@ class Pipeline:
         Any
             The output from each pipeline step for the provided data.
         """
-        profiler = cProfile.Profile()
-        profiler.enable()
-
         feature_input, feature_output = self.cfg.feature_names
         logger.info(f"Initializing feature processors: {feature_input}, {feature_output}")
         input_feature = FeatureProcessorFactory.get_feature(feature_input, cfg=self.cfg)
@@ -72,6 +69,9 @@ class Pipeline:
 
         steps = self.steps
         if len(steps) != 0:
+            profiler = cProfile.Profile()
+            profiler.enable()
+
             halo = Halo.empty_instance()
             subhalos = SubhaloContext.empty_instance()
             cosmos_data = CosmosData(halo=halo,
