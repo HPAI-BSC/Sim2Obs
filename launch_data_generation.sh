@@ -17,6 +17,6 @@ echo "Current directory: '$CURRENT_DIR'"
 COMMIT_HASH=$(basename "$CURRENT_DIR")
 
 module load singularity
-singularity exec -B /gpfs/projects/bsc70 \
-                 --nv /gpfs/projects/bsc70/space/singularity/space_data_generation.sif \
+singularity exec -B /gpfs/scratch/bsc70/hpai/storage/projects \
+                 --nv /gpfs/scratch/bsc70/hpai/storage/projects/space/singularity/space_data_generation.sif \
    bash -c 'export PROJECT_ROOT='$CURRENT_DIR' && export PYTHONPATH=$PYTHONPATH:$PROJECT_ROOT && cd $PROJECT_ROOT && python src/generate_dataset.py'
