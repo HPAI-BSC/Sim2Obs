@@ -214,7 +214,8 @@ class ICLProcessor(FeatureProcessor):
         self.cfg = cfg
         self.map = []
         self.value = []
-        self.model = joblib.load(os.path.join(project_root, 'src/data_generation/model/Best_Model-Random-3par.pkl'))
+        self.model = joblib.load(os.path.join(project_root, 'src/data_generation/model/Best_Model-Random-3par_de.pkl'),
+                                 mmap_mode='r')
 
         attr_list = self._build_configuration(cfg, ['G'])
         for key, value in attr_list.items():
