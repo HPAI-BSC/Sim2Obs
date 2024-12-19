@@ -1,6 +1,6 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
-data_dir: ${paths.datasets_dir}/ilarias_dataset_v0/Velocity_Dispersion
-target_maskdir: ${paths.datasets_dir}/ilarias_dataset_v0/Labels
+data_dir: ${paths.datasets_dir}/datasets/ilarias_dataset_v0/Velocity_Dispersion
+target_maskdir: ${paths.datasets_dir}/datasets/ilarias_dataset_v0/Labels
 batch_size: 8
 train_val_test_split: [.85, .05, .10]
 resize_shape: [128, 128]
