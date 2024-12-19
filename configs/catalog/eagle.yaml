@@ -6,5 +6,5 @@ fov: 537.62   # 2 * 268.81 kpc
 spatial_resolution: 2.02 # kpc
 
 #   TODO SEE HOW TO AUMOTATE THIS, not working with interpolation
-path: ${paths.datasets_dir}/datasets/eagle/RefL0100N1504
+path: ${paths.datasets_dir}/eagle/RefL0100N1504
 

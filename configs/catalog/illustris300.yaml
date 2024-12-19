@@ -4,4 +4,4 @@ snapnum: 84       # redshift 0.2
 scalf: 0.8333     # redshift 0.2
 fov: 526.68   # 2 * 263.34 kpc
 spatial_resolution: 2.02 # kpc
-path: ${paths.datasets_dir}/datasets/illustris300
+path: ${paths.datasets_dir}/illustris300
