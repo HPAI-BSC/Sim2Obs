@@ -86,7 +86,7 @@ class Pipeline:
         logger.info("Pipeline processing completed.")
 
         profiler.disable()
-        path = self.cfg.paths.datasets_dir + f'/logs/pipeline.txt'
+        path = self.cfg.paths.datasets_dir + f'../logs/pipeline.txt'
         with open(path, "w") as f:
             stats = pstats.Stats(profiler, stream=f)
             stats.strip_dirs()
