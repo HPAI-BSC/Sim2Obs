@@ -324,7 +324,7 @@ class MapStep(PipelineStep):
         ------
         This method generates three different map projections, processes them, and updates the features and metadata accordingly.
         """
-        logger.info('Starting maps...')
+        #logger.info('Starting maps...')
         for _ in g:
             try:
                 #logger.debug(f"Generating maps for halo: {cosmos_data.halo.halo_id}")
