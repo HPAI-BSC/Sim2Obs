@@ -45,7 +45,7 @@ class RotateStep(PipelineStep):
             A set of rotation axes for the objects.
         """
         self.rotation_angle, self.z, self.rotation_directions = self._build_configuration(cfg)
-        self.path = cfg.paths.datasets_dir + f'/rotate_step.txt'
+        self.path = cfg.paths.datasets_dir + f'/logs/rotate_step.txt'
 
 
     @classmethod
@@ -161,5 +161,5 @@ class RotateStep(PipelineStep):
         with open(self.path, "w") as f:
             stats = pstats.Stats(profiler, stream=f)
             stats.strip_dirs()
-            stats.sort_stats("cumulative")
+            stats.sort_stats("tottime")
             stats.print_stats()
