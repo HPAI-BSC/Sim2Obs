@@ -325,9 +325,9 @@ class MapStep(PipelineStep):
         ------
         This method generates three different map projections, processes them, and updates the features and metadata accordingly.
         """
-        for _ in g:
-            start_time = time.time()
+        for halo, _ in g:
             try:
+                start_time = time.time()
                 interlopers_id = self._get_interlopers_id(cosmos_data)
                 io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
                 projections = ["xy", "yz", "xz"]
@@ -338,6 +338,8 @@ class MapStep(PipelineStep):
                     output_feature.map = map_f_o
                     self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, cosmos_data,
                                              input_feature, output_feature)
+                elapsed_time = time.time() - start_time
+                logger.info(f"Map step time for halo {halo.halo_id} with time: {elapsed_time}")
                 if next_step is not None:
                     yield from next_step(g)
                 else:
@@ -345,7 +347,4 @@ class MapStep(PipelineStep):
             except Exception as e:
                 logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
                 continue
-
-            elapsed_time = time.time() - start_time
-            logger.info(f"Map step time for halo {cosmos_data.halo.halo_id} with time: {elapsed_time}")
 

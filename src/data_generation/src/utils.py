@@ -38,8 +38,11 @@ def setup_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
+    # Ensure no previous handlers are attached
+    if logger.hasHandlers():
+        logger.handlers.clear()
+
     console_handler = logging.StreamHandler()
-    file_handler = logging.FileHandler(f"{name}.log")
 
     # Updated format string to ensure line number is not included
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')

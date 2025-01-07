@@ -235,7 +235,7 @@ class Illustris300Fetcher(DataFetcher):
             p = star_p["Coordinates"]
             v = star_p["Velocities"] * np.sqrt(self.catalog.scalf) # 𝑘𝑚𝑎‾√/𝑠 -> kms-1
             m = star_p["Masses"] * self.solar_mass_convention
-            logger.debug("Particle data fetched successfully.")
+            logger.debug(f"Particle data fetched successfully, {len(p)} particles retrieved")
         else:
             logger.warning(f"No particle data found for subhalo {subhalo_id}.")
             p = v = m = np.ndarray([])
@@ -476,7 +476,7 @@ class EagleFetcher(DataFetcher):
             raise ValueError(f'Error, there is not particle data for GroupNumber={group_number} and'
                              f' SubGroupNumber={subgroup_id}')
         else:
-            logger.debug("Particle data fetched successfully.")
+            logger.debug(f"Particle data fetched successfully, {len(data_filtered)} particles retrieved.")
 
         velocity = np.vstack(data_filtered['velocity'].values)
         positions = np.vstack(data_filtered['coords'].values)

@@ -126,7 +126,7 @@ class DataLoader(PipelineStep):
                 cosmos_data.metadata = tmp.metadata
 
                 if next_step is not None:
-                    yield from next_step(g)
+                    yield from next_step([(halo, subhalo_df)])
                 else:
                     yield input_feature, output_feature, cosmos_data
 

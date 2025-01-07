@@ -126,11 +126,12 @@ class RotateStep(PipelineStep):
         The method applies a series of rotations in specified directions and angles, updating the positions and velocities
         in the cosmos data, as well as updating the rotation-related metadata.
         """
-        for _ in g:
+        for halo, subhalo_df in g:
+            logger.info(f"Processing rotations for halo {halo.halo_id} ...")
             start_time = time.time()
             try:
                 iterations = 360 // int(self.rotation_angle)
-                for rotation_axis in self.rotation_directions:
+                for rt_i, rotation_axis in enumerate(self.rotation_directions):
                     degree = 0
                     for i in range(iterations):
                         rotation_axis = np.array(rotation_axis)
@@ -147,7 +148,9 @@ class RotateStep(PipelineStep):
                         cosmos_data.metadata['rotation'] = {'has_rotated': 1, 'angle': degree}
 
                         if next_step is not None:
-                            yield from next_step(g)
+                            logger.info(f"Generating maps for halo {halo.halo_id}, iteration={i}/{iterations-1},"
+                                        f" rotation_axis={rt_i}/{len(self.rotation_directions)-1}")
+                            yield from next_step([(halo, subhalo_df)],)
                         else:
                             yield input_feature, output_feature, cosmos_data
                         degree += self.rotation_angle
@@ -156,6 +159,6 @@ class RotateStep(PipelineStep):
                 continue
 
             elapsed_time = time.time() - start_time
-            logger.info(f"Rotate step time for halo {cosmos_data.halo.halo_id} with time: {elapsed_time}")
+            logger.info(f"Rotate step time for halo {halo.halo_id} with time: {elapsed_time}")
 
 
