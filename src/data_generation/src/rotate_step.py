@@ -1,3 +1,4 @@
+import time
 from typing import Generator, Callable, Tuple
 from omegaconf import DictConfig
 
@@ -125,8 +126,8 @@ class RotateStep(PipelineStep):
         The method applies a series of rotations in specified directions and angles, updating the positions and velocities
         in the cosmos data, as well as updating the rotation-related metadata.
         """
-        #logger.info('Starting rotations...')
         for _ in g:
+            start_time = time.time()
             try:
                 iterations = 360 // int(self.rotation_angle)
                 for rotation_axis in self.rotation_directions:
@@ -153,3 +154,8 @@ class RotateStep(PipelineStep):
             except Exception as e:
                 logger.error(f"Failed to execute rotations for halo {cosmos_data.halo.halo_id}: {e}")
                 continue
+
+            elapsed_time = time.time() - start_time
+            logger.info(f"Rotate step time for halo {cosmos_data.halo.halo_id} with time: {elapsed_time}")
+
+

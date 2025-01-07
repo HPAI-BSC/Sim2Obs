@@ -56,10 +56,8 @@ class Pipeline:
             The output from each pipeline step for the provided data.
         """
         feature_input, feature_output = self.cfg.feature_names
-        #logger.info(f"Initializing feature processors: {feature_input}, {feature_output}")
         input_feature = FeatureProcessorFactory.get_feature(feature_input, cfg=self.cfg)
         output_feature = FeatureProcessorFactory.get_feature(feature_output, cfg=self.cfg)
-        #logger.info("Starting data loading and processing...")
         data_loader = DataLoader(self.cfg)
         halo_subhalo_list = data_loader.load_halo_data()
 

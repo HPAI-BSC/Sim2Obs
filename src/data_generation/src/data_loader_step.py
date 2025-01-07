@@ -102,6 +102,8 @@ class DataLoader(PipelineStep):
                 except Exception as e:
                     pbar.update(1)  # Ensure progress bar updates even for skipped halos
                     logger.error(f"Failed to load particle data for halo {halo_id}: {e}")
+                    elapsed_time = time.time() - start_time
+                    logger.info(f"Finished processing halo {halo_id} with time: {elapsed_time}")
                     continue
 
                 i_value = input_feature.process(
