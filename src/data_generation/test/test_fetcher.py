@@ -1,6 +1,7 @@
 import os
 import unittest
 
+import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 from hydra import initialize, compose
@@ -59,6 +60,33 @@ class TestFetcher(unittest.TestCase):
         subhalo_data_1 = subhalo_context_1.get_item(subhalo_id=0)
         assert subhalo_data_1 is not None
 
+    def test_filter_halos_illustris(self):
+        halo_context_1 = self.fetcher_illustris.get_halos()
+        print(len(halo_context_1.data))
+        conditions = [('m200', '>', self.fetcher_illustris.halo_min_mass * self.fetcher_illustris.H)]
+        halo_context_1 = self.fetcher_illustris.filter_halos(halo_context_1, conditions)
+        self.assertEqual(len(halo_context_1.data), 83)
+
+    def test_filter_subhalos_illustris(self):
+        subhalo_context_1 = self.fetcher_illustris.get_subhalos()
+        print(len(subhalo_context_1.data))
+        conditions = [('mstr', '>', self.fetcher_illustris.subhalo_min_mass)]
+        subhalo_context_1 = self.fetcher_illustris.filter_subhalos(subhalo_context_1, conditions)
+        self.assertEqual(len(subhalo_context_1.data), 2598)
+
+    def test_check_halo_subhalo_info(self):
+        subhalo_context_1 = self.fetcher_illustris.get_subhalos()
+        subhalo_context_1.data.reset_index(inplace=True, drop=True)
+
+        def count_subhalos(group):
+            halo_id = group['id_parents'].head(n=1).iloc[0]
+            subhalos = len(group)
+            return pd.Series([halo_id, subhalos])
+
+        tmp = subhalo_context_1.data.groupby('id_parents').apply(lambda g: count_subhalos(g))
+        total = np.sum(tmp[1])
+        print(tmp)
+
     def test_get_subhalos_eagle(self):
         subhalo_context_2 = self.fetcher_eagle.get_subhalos()
         self.assertIsInstance(subhalo_context_2, SubhaloContext)
@@ -66,6 +94,20 @@ class TestFetcher(unittest.TestCase):
         # Get item
         subhalo_data_2 = subhalo_context_2.get_item(subhalo_id=subhalo_context_2.subhalo_id[0])
         assert subhalo_data_2 is not None
+
+    def test_filter_halos_eagle(self):
+        halo_context_1 = self.fetcher_eagle.get_halos()
+        print(len(halo_context_1.data))
+        conditions = [('m200', '>', self.fetcher_eagle.halo_min_mass)]
+        halo_context_1 = self.fetcher_eagle.filter_halos(halo_context_1, conditions)
+        self.assertEqual(len(halo_context_1.data), 150)
+
+    def test_filter_subhalos_eagle(self):
+        subhalo_context_1 = self.fetcher_eagle.get_subhalos()
+        print(len(subhalo_context_1.data))
+        conditions = [('mstr', '>', self.fetcher_eagle.subhalo_min_mass)]
+        subhalo_context_1 = self.fetcher_eagle.filter_subhalos(subhalo_context_1, conditions)
+        self.assertEqual(len(subhalo_context_1.data), 1082)
 
     def test_get_p_subhalo_illustris(self):
         subhalo_particles_1 = self.fetcher_illustris.get_p_subhalo(subhalo_id=10)

@@ -1,3 +1,4 @@
+import operator
 import os.path
 from abc import ABC, abstractmethod
 
@@ -13,6 +14,15 @@ from src.data_generation.src.utils import get_connection, read_dataset, setup_lo
 
 
 logger = setup_logger("DataFetcher")
+
+operators = {
+    '>': operator.gt,
+    '>=': operator.ge,
+    '<': operator.lt,
+    '<=': operator.le,
+    '==': operator.eq,
+    '!=': operator.ne
+}
 
 
 class DataFetcher(ABC):
@@ -39,6 +49,32 @@ class DataFetcher(ABC):
         Abstract method to fetch particle data for a subhalo.
         """
         pass
+
+    @staticmethod
+    def filter_halos(halo_context: HaloContext, conditions) -> HaloContext:
+        mask = pd.Series(True, index=halo_context.data.index)
+        for feature, symbol, value in conditions:
+            if feature not in halo_context.data:
+                raise Exception(f'Error, feature "{feature}" is not present in the halo dataframe with columns:'
+                                f' {halo_context.data.columns}')
+            mask &= operators[symbol](halo_context.data[feature], value)
+
+        halo_context.data = halo_context.data[mask]
+        return halo_context
+    @staticmethod
+    def filter_subhalos(subhalo_context: SubhaloContext, conditions) -> SubhaloContext:
+        """
+        Abstract method to filter subhalos by a set of conditions
+        """
+        mask = pd.Series(True, index=subhalo_context.data.index)
+        for feature, symbol, value in conditions:
+            if feature not in subhalo_context.data:
+                raise Exception(f'Error, feature "{feature}" is not present in the subhalo dataframe with columns:'
+                                f' {subhalo_context.data.columns}')
+            mask &= operators[symbol](subhalo_context.data[feature], value)
+
+        subhalo_context.data = subhalo_context.data[mask]
+        return subhalo_context
 
 
 class DataFetcherFactory:
@@ -162,9 +198,6 @@ class Illustris300Fetcher(DataFetcher):
             halos = pd.DataFrame.from_dict(halos)
             halos['halo_id'] = np.arange(len(halos['Group_M_Crit200']))
             halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * self.solar_mass_convention # 𝑀⊙/ℎ
-            # Filter halos by min mass
-            halos = halos[halos['Group_M_Crit200'] > self.halo_min_mass * self.H]
-
             column_map = {'halo_id': 'halo_id', 'r200': 'Group_R_Crit200', 'm200': 'Group_M_Crit200',
                           'gpos': 'GroupPos', 'fsub': 'GroupFirstSub'}
             logger.debug("Halo data fetched successfully.")
@@ -197,6 +230,7 @@ class Illustris300Fetcher(DataFetcher):
             subhalos['spos'] = subhalos['SubhaloPos']
             subhalos['SubhaloHalfmassRadType'] = subhalos["SubhaloHalfmassRadType"][:, 4]  # stars
             subhalos['SubhaloMassType'] = subhalos["SubhaloMassType"][:, 4] * self.solar_mass_convention / self.H # 𝑀⊙
+
             subhalos['subhalo_id'] = np.arange(len(subhalos['spos']))
             column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "SubhaloGrNr",
                           "shmr": "SubhaloHalfmassRadType", "mstr": "SubhaloMassType"}
