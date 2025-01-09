@@ -28,4 +28,3 @@ class TestUtils(unittest.TestCase):
         }
 
         print(len(data))
-

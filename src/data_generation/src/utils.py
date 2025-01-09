@@ -192,6 +192,7 @@ def find_duplicates_in_halo(image_dir: str, idhalo: str) -> List:
                     hashes[image_hash] = filename  # Store the original filename
     return duplicates
 
+
 # TODO update
 def compute_intrahalo_variance(input_dir: str, feature_1_name: str, feature_2_name: str) -> pd.DataFrame:
     """
@@ -293,7 +294,6 @@ def compute_intrahalo_variance_ilaria(input_dir: str) -> pd.DataFrame:
 
     df = df.sort_values(by="halo_id")
     return df
-
 
 
 def angle(u: np.ndarray, v: np.ndarray) -> float:
