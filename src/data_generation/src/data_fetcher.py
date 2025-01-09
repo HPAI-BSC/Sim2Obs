@@ -134,7 +134,8 @@ class Illustris300Fetcher(DataFetcher):
             A context object containing halo data.
         """
         logger.info("Fetching halo data...")
-        return self._get_halos()
+        halo_context = self._get_halos()
+        return halo_context
 
     def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
         """
@@ -146,7 +147,8 @@ class Illustris300Fetcher(DataFetcher):
             A context object containing subhalo data.
         """
         logger.info("Fetching subhalo data...")
-        return self._get_subhalos()
+        subhalo_context = self._get_subhalos()
+        return subhalo_context
 
     def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
         """

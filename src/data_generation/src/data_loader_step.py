@@ -1,6 +1,8 @@
 import time
 from typing import Tuple, List, Optional, Callable, Any
 import os
+
+import pandas as pd
 from tqdm import tqdm
 
 from src.data_generation.src.cosmos import CosmosData
@@ -44,6 +46,14 @@ class DataLoader(PipelineStep):
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
         self.cfg = cfg
 
+    def _get_default_conditions(self):
+        data_loader_dict = next((step for step in self.cfg.pipeline if step.name == 'data_loader'), None)
+        halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'])]
+        if self.cfg.catalog.name == 'illustris-300':
+            halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'] * data_loader_dict['H'])]
+        subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'])]
+        return halo_conditions, subhalo_conditions
+
     @classmethod
     def _build_data_loader_configuration(cls, cfg: DictConfig) -> dict:
         if cls.name not in [e['name'] for e in cfg.pipeline]:
@@ -81,9 +91,12 @@ class DataLoader(PipelineStep):
         Tuple
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
+        halo_subhalo_df = pd.DataFrame(data=[], columns=['halo_id', 'subhalos_num'])
         with tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar:
             for halo, subhalo_df in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_df)} subhalos.")
+                tmp = pd.DataFrame([[halo.halo_id, len(subhalo_df)]],  columns=['halo_id', 'subhalos_num'])
+                halo_subhalo_df = pd.concat([halo_subhalo_df, tmp])
                 start_time = time.time()
                 subhalo_id = halo.fsub
                 halo_id = halo.halo_id
@@ -133,8 +146,9 @@ class DataLoader(PipelineStep):
                 elapsed_time = time.time() - start_time
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo_id} with time: {elapsed_time}")
+        halo_subhalo_df.to_csv(self.cfg.paths.datasets_dir + f'/halo_subhalo.csv')
 
-    def load_halo_data(self) -> List[Tuple]:
+    def load_halo_data(self, halo_conditions: List = [], subhalo_conditions: List = []) -> List[Tuple]:
         """
         Loads halo data and yields each halo's ID along with its associated data.
 
@@ -145,13 +159,18 @@ class DataLoader(PipelineStep):
         """
         halo_context = self.fetcher.get_halos()
         subhalo_context = self.fetcher.get_subhalos()
-        n_halos = halo_context.data['halo_id'].nunique()
-        n_subhalos = subhalo_context.data['subhalo_id'].nunique()
-        #logger.info(f'Number of halos: {n_halos}')
-        #logger.info(f'Number of subhalos: {n_subhalos}')
+
+        if len(halo_conditions) == 0:
+            halo_conditions, _ = self._get_default_conditions()
+        if len(subhalo_conditions) == 0:
+            _, subhalo_conditions = self._get_default_conditions()
+
+        # Apply min mass conditions
+        halo_context = self.fetcher.filter_halos(halo_context, halo_conditions)
+        subhalo_context = self.fetcher.filter_subhalos(subhalo_context, subhalo_conditions)
+
         result = []
         for id_halo in halo_context.halo_id:
-            #logger.debug(f"Loading data for halo_id: {id_halo}")
             halo_df = halo_context.get_item(id_halo)
             subhalo_df = subhalo_context.get_items_by_halo(id_halo)
             result.append((halo_df, subhalo_df))
@@ -173,7 +192,6 @@ class DataLoader(PipelineStep):
         """
         try:
             subhalo_particles = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, group_number=halo_id)
-            #logger.debug(f"Loading particles for subhalo_id: {subhalo_id}, particles count: {len(subhalo_particles.m)}")
             return subhalo_particles
         except Exception as e:
             logger.warning(f"Error fetching subhalo data for id {subhalo_id}: {e}")
