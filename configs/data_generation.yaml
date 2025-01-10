@@ -18,8 +18,8 @@ rotation_120: [ 120, [ 0, 0, 1 ], [ [ 1, 0, 0 ], [ 0, 1, 0 ], [ 0, 0, 1 ] ] ]
 
 pipeline:
   - name: data_loader
-    subhalo_min_mass: 1e10    # Assuming is M⊙
-    halo_min_mass: 1e13        # Assuming is M⊙
+    subhalo_min_mass: 1e10    #  M⊙ x h
+    halo_min_mass: 1e13        # M⊙ / h
     solar_mass_convention: 1e10
     G: 4.30091e-6              # Gravitational constant in units of kpc Msun^-1 (km/s)^2
     H: 0.6774

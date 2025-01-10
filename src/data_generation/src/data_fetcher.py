@@ -232,12 +232,12 @@ class Illustris300Fetcher(DataFetcher):
             subhalos['spos'] = subhalos['SubhaloPos']
             subhalos['SubhaloHalfmassRadType'] = subhalos["SubhaloHalfmassRadType"][:, 4]  # stars
             subhalos['SubhaloMassType'] = subhalos["SubhaloMassType"][:, 4] * self.solar_mass_convention / self.H # 𝑀⊙
-
             subhalos['subhalo_id'] = np.arange(len(subhalos['spos']))
             column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "SubhaloGrNr",
                           "shmr": "SubhaloHalfmassRadType", "mstr": "SubhaloMassType"}
             logger.debug("Subhalo data fetched successfully.")
-            return SubhaloContext(subhalos, self.catalog.scalf, column_map)
+            subhalo_context = SubhaloContext(subhalos, self.catalog.scalf, column_map)
+            return subhalo_context
         else:
             logger.warning("No subhalos found.")
             return SubhaloContext(pd.DataFrame(data=[]), self.catalog.scalf, {})

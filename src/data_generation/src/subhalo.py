@@ -43,6 +43,9 @@ class SubHalo:
 
         # Dynamically set attributes
         for key, value in kwargs.items():
+            if isinstance(value, dict):
+                value = list(value.values())[0]
+
             if isinstance(value, list):  # Check if the value is a list
                 # Check dimensions
                 value = np.array(value)  # Convert the list to a numpy array

@@ -48,10 +48,13 @@ class DataLoader(PipelineStep):
 
     def _get_default_conditions(self):
         data_loader_dict = next((step for step in self.cfg.pipeline if step.name == 'data_loader'), None)
-        halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'])]
         if self.cfg.catalog.name == 'illustris-300':
-            halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'] * data_loader_dict['H'])]
-        subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'])]
+            halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'])] # M⊙ / h
+            subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'] / data_loader_dict['H'])] # M⊙
+        elif self.cfg.catalog.name == 'eagle':
+            # TODO fix this
+            halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'])]
+            subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'])]
         return halo_conditions, subhalo_conditions
 
     @classmethod
