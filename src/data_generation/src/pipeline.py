@@ -33,7 +33,7 @@ class Pipeline:
         self.steps = steps
 
     def build_pipeline(self, steps, g, cosmos_data: CosmosData, input_feature: FeatureProcessor,
-                       output_feature: FeatureProcessor):
+                       output_feature: FeatureProcessor, **kwargs):
 
         if not steps:  # Base case: no steps left to apply
             return g
@@ -43,8 +43,8 @@ class Pipeline:
 
         # Apply the current step, passing the generator and extra_param
         return current_step.process(input_feature, output_feature, cosmos_data,
-                                    g, lambda g: self.build_pipeline(steps[1:], g, cosmos_data, input_feature,
-                                                                     output_feature))
+                                    g, lambda g, **kwargs: self.build_pipeline(steps[1:], g, cosmos_data, input_feature,
+                                                                     output_feature, **kwargs), **kwargs)
 
     def run(self, n=None) -> Any:
         """

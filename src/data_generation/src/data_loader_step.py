@@ -72,7 +72,8 @@ class DataLoader(PipelineStep):
         return data_loader_dict
 
     def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
-                cosmos_data: CosmosData, g: List[Tuple], next_step: Optional[Callable[[List[Tuple]], Any]]):
+                cosmos_data: CosmosData, g: List[Tuple], next_step: Optional[Callable[[List[Tuple]], Any]],
+                **kwargs):
         """
         Processes the input and output features, updating the cosmos data for each halo and subhalo in the graph.
 

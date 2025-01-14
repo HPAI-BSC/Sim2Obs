@@ -226,8 +226,9 @@ class MapStep(PipelineStep):
                 yoprime - int(self.bins / 4):yoprime + int(self.bins / 4)]
         return input_feature_zoom, output_feature_zoom, mask_zoom
 
-    def _create_n_zooms(self, projection_str: str, cosmos_data: CosmosData, input_feature: FeatureProcessor,
-                        output_feature: FeatureProcessor, interlopers_mask: np.ndarray) -> None:
+    def _create_n_zooms(self, projection_str: str, rotation_axis: str, rotation_iteration: int, cosmos_data: CosmosData,
+                        input_feature: FeatureProcessor, output_feature: FeatureProcessor,
+                        interlopers_mask: np.ndarray) -> None:
         """
         Creates multiple zoomed-in regions of the maps for a given projection.
 
@@ -240,16 +241,17 @@ class MapStep(PipelineStep):
         """
         # logger.info(f'Generating {self.map_configuration["number_zooms"]} zooms for projection {projection_str}...')
 
-        def get_path(feature_name, halo_id_, subhalo_id_, projection_, i_):
+        def get_path(feature_name, halo_id_, subhalo_id_, projection_, rotation_axis_, rotation_iteration_, i_):
             if self.map_configuration['rotation_angle'] is not None:
                 path = os.path.join(self.map_configuration['root_path'],
                                     f'rotation_{self.map_configuration["rotation_angle"]}',
                                     feature_name,
-                                    f'halo-{halo_id_}_subhalo-{subhalo_id_}_{projection_}_zoom_{i_}')
+                                    f'halo_{halo_id_}_subhalo_{subhalo_id_}_axis_{rotation_axis_}_'
+                                    f'it_{rotation_iteration_}_{projection_}_zoom_{i_}')
             else:
                 path = os.path.join(self.map_configuration['root_path'],
                                     feature_name,
-                                    f'halo-{halo_id_}_subhalo-{subhalo_id_}_{projection_}_zoom_{i_}')
+                                    f'halo_{halo_id_}_subhalo_{subhalo_id_}_{projection_}_zoom_{i_}')
             return path
 
         setup_output_directories(self.map_configuration['root_path'],
@@ -272,16 +274,18 @@ class MapStep(PipelineStep):
             input_feature_with_mask = np.concatenate((input_featute_i_expanded, mask_expanded), axis=-1)  # Shape: (H, W, 2)
             output_feature_with_mask = np.concatenate((output_feature_i_expanded, mask_expanded), axis=-1)  # Shape: (H, W, 2)
 
+            # Add rotation axis
             input_path = get_path(input_feature.name, cosmos_data.halo.halo_id, cosmos_data.subhalo_id,
-                                  projection_str, i)
+                                  projection_str, rotation_axis, rotation_iteration, i)
             output_path = get_path(output_feature.name, cosmos_data.halo.halo_id, cosmos_data.subhalo_id,
-                                   projection_str, i)
+                                   projection_str, rotation_axis, rotation_iteration, i)
             np.savez(input_path, input_feature_with_mask)
             np.savez(output_path, output_feature_with_mask)
         #logger.info(f'Finished generating zooms for projection {projection_str}')
 
-    def _process_projection(self, feature_size, interlopers_id: np.ndarray, biny_i, projection: str,
-                            cosmos_data: CosmosData, input_feature: FeatureProcessor, output_feature: FeatureProcessor):
+    def _process_projection(self, feature_size, interlopers_id: np.ndarray, biny_i, projection: str, rotation_axis: str,
+                            rotation_iteration: int,  cosmos_data: CosmosData, input_feature: FeatureProcessor,
+                            output_feature: FeatureProcessor):
         """
         Processes each projection (XY, YZ, XZ) for the given data, generating maps and saving zoomed-in versions.
 
@@ -291,10 +295,11 @@ class MapStep(PipelineStep):
             output_feature (FeatureProcessor): The processor for output features.
         """
         interlopers_mask = self._get_interlopers_mask(cosmos_data, feature_size, interlopers_id, biny_i)
-        self._create_n_zooms(projection, cosmos_data, input_feature, output_feature, interlopers_mask)
+        self._create_n_zooms(projection, rotation_axis, rotation_iteration, cosmos_data, input_feature, output_feature,
+                             interlopers_mask)
 
     def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
-                cosmos_data: CosmosData, g: Generator, next_step: Callable[[Generator], Generator]):
+                cosmos_data: CosmosData, g: Generator, next_step: Callable[[Generator], Generator], **kwargs):
         """
         Main method to process projections for the given cosmos data, generating maps and processing them.
 
@@ -325,6 +330,9 @@ class MapStep(PipelineStep):
         ------
         This method generates three different map projections, processes them, and updates the features and metadata accordingly.
         """
+        rotation_axis = kwargs['rotation_axis']
+        rotation_iteration = kwargs['rotation_iteration']
+        logger.debug(f'Rotation axis: {rotation_axis}, rotation_iteration: {rotation_iteration}')
         for halo, _ in g:
             try:
                 start_time = time.time()
@@ -336,8 +344,8 @@ class MapStep(PipelineStep):
                     projection_name = projections[j]
                     input_feature.map = map_f_i
                     output_feature.map = map_f_o
-                    self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, cosmos_data,
-                                             input_feature, output_feature)
+                    self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, rotation_axis,
+                                             rotation_iteration, cosmos_data, input_feature, output_feature)
                 elapsed_time = time.time() - start_time
                 logger.info(f"Map step time for halo {halo.halo_id} with time: {elapsed_time}")
                 if next_step is not None:

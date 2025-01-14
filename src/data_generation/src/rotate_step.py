@@ -95,7 +95,8 @@ class RotateStep(PipelineStep):
         return X_rot
 
     def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
-                cosmos_data: CosmosData, g: Generator, next_step: Callable[[Generator], Generator]):
+                cosmos_data: CosmosData, g: Generator, next_step: Callable[[Generator], Generator],
+                **kwargs):
         """
         Rotates the data in the cosmos dataset and updates the features accordingly.
 
@@ -132,9 +133,11 @@ class RotateStep(PipelineStep):
             try:
                 iterations = 360 // int(self.rotation_angle)
                 for rt_i, rotation_axis in enumerate(self.rotation_directions):
+                    kwargs['rotation_axis'] = rt_i
                     degree = 0
                     for i in range(iterations):
                         rotation_axis = np.array(rotation_axis)
+                        kwargs['rotation_iteration'] = i
 
                         # Update cosmos data, subhalos data and subhalo particle positions
                         spos = np.array(cosmos_data.subhalos['spos'].tolist())
@@ -150,7 +153,8 @@ class RotateStep(PipelineStep):
                         if next_step is not None:
                             logger.info(f"Generating maps for halo {halo.halo_id}, iteration={i}/{iterations-1},"
                                         f" rotation_axis={rt_i}/{len(self.rotation_directions)-1}")
-                            yield from next_step([(halo, subhalo_df)],)
+
+                            yield from next_step([(halo, subhalo_df)], **kwargs)
                         else:
                             yield input_feature, output_feature, cosmos_data
                         degree += self.rotation_angle

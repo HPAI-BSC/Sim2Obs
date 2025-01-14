@@ -26,7 +26,7 @@ class PipelineStep(ABC):
     """
     @abstractmethod
     def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor, cosmos_data: CosmosData,
-                g: Any, next_step: Callable[[Any], 'Any']):
+                g: Any, next_step: Callable[[Any], 'Any'], **kwargs):
         """
         Process the input and output features, along with cosmos data, and apply the next step in the pipeline.
 
