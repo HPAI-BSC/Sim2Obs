@@ -72,6 +72,21 @@ for id_halo in halo_context_filtered.halo_id:
     halo_subhalos_df = pd.concat([halo_subhalos_df, tmp])
 print(f'From filtered halos, we obtain {np.sum(halo_subhalos_df["subhalo_counts"])} util subhalos')
 
+# Analyze particle data
+subhalos_error = []
+for i, halo in halo_context_filtered.data.iterrows():
+    try:
+        subhalo_id = halo.fsub
+        halo_id = halo.halo_id
+        # Those idx comes directly from halo api
+        print(f'Fetching particles for: {halo_id}, {subhalo_id}')
+        subhalo_particles = fetcher_illustris.get_p_subhalo(subhalo_id=subhalo_id, group_number=halo_id)
+    except Exception as e:
+        print(e)
+        subhalos_error.append((halo_id, subhalo_id))
+        continue
+
+print(f'Subhalos with errors (and their halo parent): {subhalos_error}')
 # Confirm non-accepted halos
 non_accepted_halo_ids = total_halo_ids - filtered_halo_ids
 halo_context = fetcher_illustris.get_halos()

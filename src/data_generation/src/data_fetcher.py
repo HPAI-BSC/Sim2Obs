@@ -266,16 +266,20 @@ class Illustris300Fetcher(DataFetcher):
             logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
-        star_p = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, "star", fields=fields)
-        if len(star_p) > 0:
-            p = star_p["Coordinates"]
-            v = star_p["Velocities"] * np.sqrt(self.catalog.scalf) # 𝑘𝑚𝑎‾√/𝑠 -> kms-1
-            m = star_p["Masses"] * self.solar_mass_convention
-            logger.debug(f"Particle data fetched successfully, {len(p)} particles retrieved")
-        else:
-            logger.warning(f"No particle data found for subhalo {subhalo_id}.")
-            p = v = m = np.ndarray([])
-        return SubhaloParticles(m, p, v, self.catalog.scalf)
+        try:
+
+            star_p = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, "star", fields=fields)
+            if len(star_p) > 0:
+                p = star_p["Coordinates"]
+                v = star_p["Velocities"] * np.sqrt(self.catalog.scalf) # 𝑘𝑚𝑎‾√/𝑠 -> kms-1
+                m = star_p["Masses"] * self.solar_mass_convention
+                logger.debug(f"Particle data fetched successfully, {len(p)} particles retrieved")
+            else:
+                logger.warning(f"No particle data found for subhalo {subhalo_id}.")
+                p = v = m = np.ndarray([])
+            return SubhaloParticles(m, p, v, self.catalog.scalf)
+        except Exception as e:
+            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
 
 
 class EagleFetcher(DataFetcher):
