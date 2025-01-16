@@ -24,7 +24,7 @@ pipeline:
     G: 4.30091e-6              # Gravitational constant in units of kpc Msun^-1 (km/s)^2
     H: 0.6774
   - name: rotate_step
-    rotation_group: ${rotation_90}
+    rotation_group: ${rotation_120}
   - name: map_step
     n_zooms: 3
 
