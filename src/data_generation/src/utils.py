@@ -2,6 +2,7 @@ import hashlib
 import logging
 import os
 import re
+from pathlib import Path
 from typing import List
 import eagleSqlTools as sql
 import h5py
@@ -70,6 +71,7 @@ def get_connection():
 def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray:
     """
     Reads and processes data from HDF5 snapshot files for a specific particle type and attribute.
+    # https://arxiv.org/pdf/1706.09899
 
     Parameters:
     -----------
@@ -93,11 +95,6 @@ def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray
     and h-scale-exponent, which are retrieved from the HDF5 file metadata.
     """
     data = []
-    conversion_att = {
-        'Mass': {'aexp': 0, 'hexp': -1},
-        'Coordinates': {'aexp': 1, 'hexp': -1},
-        'Velocity': {'aexp': 1 / 2, 'hexp': 0}
-    }
 
     def find_folders_with_snapshot(parent_folder: str) -> str:
         """
@@ -121,12 +118,19 @@ def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray
     if not snapshot_folder:
         raise FileNotFoundError("Snapshot folder not found in the specified path.")
 
+    # Update nfiles
+    snapdir = os.path.join(path, snapshot_folder)
+    nfiles = sum(1 for entry in Path(snapdir).iterdir() if entry.is_file())
+
     for i in range(nfiles):
         file = os.path.join(path, snapshot_folder, f'{snapshot_folder.replace("snapshot", "snap")}.{i}.hdf5')
         with h5py.File(file, 'r') as f:
             tmp = f[f'PartType{itype}/{att}'][...]
             data.append(tmp)
             cgs = f[f'PartType{itype}/{att}'].attrs.get('CGSConversionFactor', 1)
+            aexp = f[f'PartType{itype}/{att}'].attrs.get('aexp-scale-exponent')
+            hexp = f[f'PartType{itype}/{att}'].attrs.get('h-scale-exponent')
+            print(f'   file: {i}, cfg={cgs}, aexp={aexp}, hpex={hexp}')
 
             a = f['Header'].attrs.get('Time')
             h = f['Header'].attrs.get('HubbleParam')
@@ -137,8 +141,6 @@ def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray
         data = np.concatenate(data)
 
     if data.dtype not in (np.int32, np.int64):
-        aexp = conversion_att.get(att, {}).get('aexp', 0)
-        hexp = conversion_att.get(att, {}).get('hexp', 0)
         data = np.multiply(data, cgs * a ** aexp * h ** hexp, dtype='f8')
     return data
 
