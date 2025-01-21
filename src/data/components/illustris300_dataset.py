@@ -1,59 +1,65 @@
+import os
+
+import numpy as np
+import torch
 from torch.utils.data import Dataset
 
+from src.data.components.galaxy_dataset import GalaxyDataset
 
-class Illustris300Dataset(Dataset):
-    def __init__(self, image_dir, labels_dir, transform=None, mask_interlopers=False):
-        self.image_dir = image_dir
-        self.labels_dir = labels_dir
-        self.transform = transform
-        self.images = sorted(os.listdir(image_dir))
-        self.labels = sorted(os.listdir(labels_dir))
-        self.mask_interlopers = mask_interlopers
 
-    def __len__(self):
-        return len(self.images)
+class Illustris300Dataset(GalaxyDataset):
+    name = 'illustris-300'
+
+    def __init__(self, image_dir, labels_dir, transform=None):
+        super().__init__(image_dir, labels_dir, transform)
 
     def __getitem__(self, index):
+        """
+        Get a single data point from the dataset.
+
+        Args:
+            index (int): Index of the data point.
+
+        Returns:
+            tuple: (image, label), both as tensors with shape (C, H, W).
+        """
         img_path = os.path.join(self.image_dir, self.images[index])
-        labels_path = os.path.join(self.labels_dir, self.labels[index])
-        images = np.load(img_path)
-        if self.mask_interlopers:
-            image = images[f'arr_0'][:, :, 0]
-            interlopers_vel_mask = images['arr_0'][:, :, 1]  # Shape: (128, 128), boolean mask
-            if np.any(interlopers_vel_mask != 0):
-                image = np.ma.masked_array(image, mask=interlopers_vel_mask).filled(fill_value=0)
-        else:
-            image = images[f'arr_0']
-        # resize image to 128x128
-        image = image[1:129, 1:129]
-        image = torch.tensor(image)
+        label_path = os.path.join(self.labels_dir, self.labels[index])
 
-        labels = np.load(labels_path)
-        if self.mask_interlopers:
-            label = labels[f'arr_0'][:, :, 0]
-            interlopers_label_mask = labels['arr_0'][:, :, 1]
-            label = np.ma.masked_array(label, mask=interlopers_label_mask).filled(fill_value=0)
-        else:
-            label = labels[f'arr_0']
+        # Process image and label
+        image = self._load_and_process_npy(img_path)
+        label = self._load_and_process_npy(label_path)
 
-        label = torch.tensor(label)
-        # resize image to 128x128
-        label = label[1:129, 1:129]
-
-        image = image.float().unsqueeze(0)
+        # Apply transformation if provided
         if self.transform:
             image = self.transform(image)
-        label = label.float().unsqueeze(0)
+
         return image, label
 
+    @staticmethod
+    def _load_and_process_npy(file_path):
+        """
+        Load and process a .npy file.
 
-class PredictDataset(Dataset):
-    def __init__(self, original_dataset):
-        self.original_dataset = original_dataset
+        Args:
+            file_path (str): Path to the .npy file.
 
-    def __len__(self):
-        return len(self.original_dataset)
+        Returns:
+            torch.Tensor: Processed tensor with shape (H, W, C).
+        """
+        try:
+            data = np.load(file_path)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File not found: {file_path}")
+        except Exception as e:
+            raise RuntimeError(f"Error loading file {file_path}: {e}")
 
-    def __getitem__(self, idx):
-        x, _ = self.original_dataset[idx]
-        return x
+        # Extract main channel and interlopers mask
+        main_channel = data['arr_0'][:, :, 0][1:129, 1:129][..., np.newaxis]
+        interlopers_mask = data['arr_0'][:, :, 1][1:129, 1:129][..., np.newaxis]
+
+        # Combine channels and convert to tensor
+        combined_data = np.concatenate((main_channel, interlopers_mask), axis=-1)
+        tensor_data = torch.from_numpy(combined_data).permute(0, 1, 2)  # H x W x C
+
+        return tensor_data

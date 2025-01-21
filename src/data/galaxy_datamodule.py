@@ -1,6 +1,6 @@
-from src.data.components.galaxy_dataset import GalaxyDataset, PredictDataset
+from src.data.components.galaxy_dataset import PredictDataset
+from src.data.components.galaxy_dataset_factory import GalaxyDatasetFactory
 import torch
-from torch.utils.data import Dataset
 from typing import Any, Dict, Optional, Tuple
 
 from lightning import LightningDataModule
@@ -47,8 +47,9 @@ class GalaxyDataModule(LightningDataModule):
 
     def __init__(
         self,
-        data_dir: str = "local/data/ilarias_dataset_v0/Velocity_Dispersion",
-        target_maskdir: str = "local/data/ilarias_dataset_v0/Labels",
+        data_dir: str,
+        target_maskdir: str,
+        dataset: str,
         batch_size: int = 16,
         train_val_test_split: Tuple[int, int, int] = (0.85, 0.05, 0.10),
         resize_shape: Tuple[int, int] = (128, 128),
@@ -56,7 +57,7 @@ class GalaxyDataModule(LightningDataModule):
         num_workers: int = 0,
         pin_memory: int = False
     ) -> None:
-        """Initialize a `MNISTDataModule`.
+        """Initialize a `GalaxyDataModule`.
 
         :param data_dir: The datasets directory. Defaults to `"data/"`.
         :param train_val_test_split: The train, validation and test split. Defaults to `(55_000, 5_000, 10_000)`.
@@ -99,11 +100,10 @@ class GalaxyDataModule(LightningDataModule):
             ]
         )
 
-        full_dataset = GalaxyDataset(
-            image_dir=data_dir,
-            labels_dir=target_maskdir,
-            transform=None,
-        )
+        full_dataset = GalaxyDatasetFactory.get_dataset(dataset,
+                                                        image_dir=data_dir,
+                                                        labels_dir=target_maskdir,
+                                                        transform=None)
 
         train_size = int(train_val_test_split[0] * len(full_dataset))
         val_size = int(train_val_test_split[1] * len(full_dataset))
@@ -117,7 +117,6 @@ class GalaxyDataModule(LightningDataModule):
         self.data_val: Optional[Dataset] = val_ds
         self.data_test: Optional[Dataset] = test_ds
         self.data_predict: Optional[Dataset] = predict_ds
-
 
     def prepare_data(self) -> None:
         """Download data if needed. Lightning ensures that `self.prepare_data()` is called only

@@ -12,7 +12,7 @@ class TestGenerateDataset(unittest.TestCase):
     def test_generate_dataset_illustris(self):
         with initialize(config_path="../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
-            self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
+            self.cfg_illustris.catalog = compose("catalog/illustris300_rotation120.yaml")['catalog']
         os.environ['PROJECT_ROOT'] = '..'
         result = main(self.cfg_illustris)
 
