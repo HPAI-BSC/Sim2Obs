@@ -1,5 +1,4 @@
 import os
-import illustris_python as il
 
 import numpy as np
 import pandas as pd
