@@ -52,9 +52,10 @@ class DataLoader(PipelineStep):
             halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'] * data_loader_dict['H'])] # M⊙ / h
             subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'])] # M⊙
         elif self.cfg.catalog.name == 'eagle':
-            # TODO fix this
-            halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'])]
-            subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'])]
+            # Convert halo_min_mass from M⊙/h to M⊙, so it is in the same units than M200
+            # TODO review this
+            halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'] / data_loader_dict['H'])] # M⊙
+            subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'])] # M⊙
         return halo_conditions, subhalo_conditions
 
     @classmethod
