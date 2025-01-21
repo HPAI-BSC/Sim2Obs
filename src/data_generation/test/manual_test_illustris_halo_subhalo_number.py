@@ -23,7 +23,7 @@ with initialize(config_path="../../../configs"):
     cfg_illustris = compose(config_name="data_generation.yaml")
     local_config = compose(config_name="paths/local.yaml")
     cfg_illustris.paths = local_config.paths
-    cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
+    cfg_illustris.catalog = compose("catalog/illustris300")['catalog']
 
 os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -43,7 +43,7 @@ total_halo_ids = set(halo_context.data['halo_id'])
 print(f'Illustris (raw) halos: {n_halos}')
 
 # Filter halos and subhalos by min mass conditions
-halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'])]
+halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'] * fetcher_illustris.H)]
 halo_context_filtered = fetcher_illustris.filter_halos(halo_context, halo_conditions)
 filtered_halo_ids = set(halo_context_filtered.data['halo_id'])
 print(f'Illustris filtered halos by mass: {halo_context_filtered.data["halo_id"].nunique()}')
@@ -55,7 +55,7 @@ total_subhalo_ids = set(subhalo_context.data['subhalo_id'])
 print(f'Illustris (raw) subhalos: {n_subhalos}')
 
 # Filter halos and subhalos by min mass conditions
-subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'] / fetcher_illustris.H)] # convert to solar masses
+subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'])]  # solar_masses
 subhalo_context_filtered = fetcher_illustris.filter_subhalos(subhalo_context, subhalo_conditions)
 filtered_subhalo_ids = set(subhalo_context_filtered.data['subhalo_id'])
 print(f'Illustris filtered subhalos by mass: {subhalo_context_filtered.data["subhalo_id"].nunique()}')
@@ -73,20 +73,16 @@ for id_halo in halo_context_filtered.halo_id:
 print(f'From filtered halos, we obtain {np.sum(halo_subhalos_df["subhalo_counts"])} util subhalos')
 
 # Analyze particle data
-subhalos_error = []
 for i, halo in halo_context_filtered.data.iterrows():
     try:
         subhalo_id = halo.fsub
         halo_id = halo.halo_id
         # Those idx comes directly from halo api
-        print(f'Fetching particles for: {halo_id}, {subhalo_id}')
         subhalo_particles = fetcher_illustris.get_p_subhalo(subhalo_id=subhalo_id, group_number=halo_id)
     except Exception as e:
         print(e)
-        subhalos_error.append((halo_id, subhalo_id))
         continue
 
-print(f'Subhalos with errors (and their halo parent): {subhalos_error}')
 # Confirm non-accepted halos
 non_accepted_halo_ids = total_halo_ids - filtered_halo_ids
 halo_context = fetcher_illustris.get_halos()
@@ -108,21 +104,3 @@ if len(tmp) > 0:
     raise Exception(f'There is something wrong')
 print(f'There are {len(non_accepted_subhalo_ids)} subhalos that do not fulfill minimum mass condition')
 
-# halos
-fields = ["Group_M_Crit200", "Group_R_Crit200", "GroupPos", "GroupFirstSub"]
-path = cfg_illustris.catalog.path + '/output'
-halos = il.groupcat.loadHalos(path, cfg_illustris.catalog.snapnum, fields=fields)
-if len(halos) > 0:
-    scalf = cfg_illustris.catalog.scalf
-    halos['GroupPos'] = [halos['GroupPos'][i] * scalf for i in range(halos['GroupPos'].shape[0])]
-    halos['Group_R_Crit200'] = halos['Group_R_Crit200'] * scalf
-    halos = pd.DataFrame.from_dict(halos)
-    halos['halo_id'] = np.arange(len(halos['Group_M_Crit200']))
-    halos['Group_M_Crit200'] = halos['Group_M_Crit200']
-
-halo_mass_min = 1e13  # M⊙ / h
-tmp = halos[halos['Group_M_Crit200'] * 1e10 > halo_mass_min]
-print(len(tmp))
-result = halo_context.data[halo_context.data['m200'] > halo_mass_min]
-print(len(result))
-assert len(tmp) == len(result)
