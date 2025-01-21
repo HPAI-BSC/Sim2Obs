@@ -21,7 +21,7 @@ class TestPipeline(unittest.TestCase):
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
             self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
-            self.cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
+            self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
 
         os.environ['PROJECT_ROOT'] = '../../..'
         self.remove_folder = True

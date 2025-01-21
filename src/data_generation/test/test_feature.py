@@ -35,7 +35,7 @@ class TestFeature(unittest.TestCase):
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
             self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
-            self.cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
+            self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -49,13 +49,15 @@ class TestFeature(unittest.TestCase):
         mock_halo.return_value = self.halo_illustris
         mock_subhalo_particles_instance = self.subhalo_particles_illustris
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
-        expected_mask = np.ones((100, ), dtype=int)  # ICL mask
+        length = mock_subhalo_particles_instance.v.shape[0]
+
+        expected_mask = np.ones((length, ), dtype=int)  # ICL mask
 
         result = self.icl_processor.process(halo=mock_halo_instance,
                                             particle_velocity=mock_subhalo_particles_instance.v,
                                             particle_position=mock_subhalo_particles_instance.p)
 
-        self.assertEqual(result.shape, (100, ))
+        self.assertEqual(result.shape, (length, ))
         self.assertTrue(np.all(np.isin(result, [0, 1])))  # Check if it's a binary mask
         assert_array_equal(result, expected_mask)
 
@@ -65,12 +67,14 @@ class TestFeature(unittest.TestCase):
         mock_halo.return_value = mock_halo_instance
         mock_subhalo_particles_instance = self.subhalo_particles_eagle
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
+        length = mock_subhalo_particles_instance.v.shape[0]
+        expected_mask = np.ones((length, ), dtype=int)  # ICL mask
 
         result = self.icl_processor.process(halo=mock_halo_instance,
                                             particle_velocity=mock_subhalo_particles_instance.v,
                                             particle_position=mock_subhalo_particles_instance.p)
 
-        self.assertEqual(result.shape, (100, ))
+        self.assertEqual(result.shape, (length, ))
         self.assertTrue(np.all(np.isin(result, [0, 1])))  # Check if it's a binary mask
         assert_array_equal(result, expected_mask)
 
@@ -84,7 +88,7 @@ class TestFeature(unittest.TestCase):
         bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius
         ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
 
-        self.icl_processor.value = np.ones((100, ), dtype=int)  # ICL mask
+        self.icl_processor.value = np.ones((mock_subhalo_particles_instance.p.shape[0], ), dtype=int)  # ICL mask
         # Axis x-y
         icl_map, _, biny = self.icl_processor.generate_map(particle_positions=mock_subhalo_particles_instance.p,
                                                            bins=bins, ranging=ranging, axis=(0, 1))
@@ -92,7 +96,7 @@ class TestFeature(unittest.TestCase):
 
         # Eagle
         self.icl_processor = ICLProcessor(self.cfg_eagle)
-        self.icl_processor.value = np.ones((100, ), dtype=int)  # ICL mask
+        self.icl_processor.value = np.ones((self.subhalo_particles_eagle.p.shape[0], ), dtype=int)  # ICL mask
         mock_subhalo_particles_instance = self.subhalo_particles_eagle
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
         icl_map, _, biny = self.icl_processor.generate_map(particle_positions=mock_subhalo_particles_instance.p,
@@ -106,19 +110,21 @@ class TestFeature(unittest.TestCase):
         # Illustris
         mock_subhalo_particles_instance = self.subhalo_particles_illustris
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
+        expected_shape = mock_subhalo_particles_instance.v.shape
 
         result = self.vel_disp_processor.process(particle_velocity=mock_subhalo_particles_instance.v)
 
-        self.assertEqual(result.shape, (100, 3))
+        self.assertEqual(result.shape, expected_shape)
         self.assertTrue(np.issubdtype(result.dtype, np.floating))
 
         # Eagle
         mock_subhalo_particles_instance = self.subhalo_particles_eagle
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
+        expected_shape = mock_subhalo_particles_instance.v.shape
 
         result = self.vel_disp_processor.process(particle_velocity=mock_subhalo_particles_instance.v)
 
-        self.assertEqual(result.shape, (100, 3))
+        self.assertEqual(result.shape, expected_shape)
         self.assertTrue(np.issubdtype(result.dtype, np.floating))
 
     def test_process_empty_velocity(self):

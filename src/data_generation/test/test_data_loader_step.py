@@ -26,7 +26,7 @@ class TestDataLoaderStep(unittest.TestCase):
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
 
         self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
-        self.cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
+        self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
 
     def test_load_halo_data_illustris(self):
         self.dataLoader = DataLoader(self.cfg_illustris)

@@ -63,16 +63,16 @@ class TestFetcher(unittest.TestCase):
     def test_filter_halos_illustris(self):
         halo_context_1 = self.fetcher_illustris.get_halos()
         print(len(halo_context_1.data))
-        conditions = [('m200', '>', self.fetcher_illustris.halo_min_mass)]
+        conditions = [('m200', '>', self.fetcher_illustris.halo_min_mass * self.fetcher_illustris.H)]
         halo_context_1 = self.fetcher_illustris.filter_halos(halo_context_1, conditions)
-        self.assertEqual(len(halo_context_1.data), 48)
+        self.assertEqual(len(halo_context_1.data), 83)
 
     def test_filter_subhalos_illustris(self):
         subhalo_context_1 = self.fetcher_illustris.get_subhalos()
         print(len(subhalo_context_1.data))
-        conditions = [('mstr', '>', self.fetcher_illustris.subhalo_min_mass / self.fetcher_illustris.H)]
+        conditions = [('mstr', '>', self.fetcher_illustris.subhalo_min_mass)]
         subhalo_context_1 = self.fetcher_illustris.filter_subhalos(subhalo_context_1, conditions)
-        self.assertEqual(len(subhalo_context_1.data), 1890)
+        self.assertEqual(len(subhalo_context_1.data), 2598)
 
     def test_check_halo_subhalo_info(self):
         subhalo_context_1 = self.fetcher_illustris.get_subhalos()
@@ -115,7 +115,7 @@ class TestFetcher(unittest.TestCase):
 
     def test_get_p_subhalo_eagle(self):
         self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
-        self.cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
+        self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
         subhalo_particles_2 = self.fetcher_eagle.get_p_subhalo(subhalo_id=0, group_number=2)
         self.assertIsInstance(subhalo_particles_2, SubhaloParticles)
 

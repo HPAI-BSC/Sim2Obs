@@ -8,7 +8,6 @@ from unittest.mock import patch, MagicMock
 import numpy as np
 import pandas as pd
 from numpy.testing import assert_array_equal
-from pandas._testing import assert_series_equal
 from scipy import stats
 
 from hydra import initialize, compose
@@ -55,7 +54,7 @@ class TestMapStep(unittest.TestCase):
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
             self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
-            self.cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
+            self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
 
         os.environ['PROJECT_ROOT'] = '../../..'
         self.remove_folder = True
@@ -75,9 +74,13 @@ class TestMapStep(unittest.TestCase):
                                         self.mock_output_feature.name)
                     shutil.rmtree(path)
 
-    def mock_generator(self) -> Generator:
+    def mock_generator_illustris(self) -> Generator:
         """Mock generator to simulate data_loader.process."""
-        yield self.mock_input_feature, self.mock_output_feature, self.mock_cosmos_data
+        yield self.halo_illustris, self.subhalo_illustris
+
+    def mock_generator_eagle(self) -> Generator:
+        """Mock generator to simulate data_loader.process."""
+        yield self.halo_eagle, self.subhalo_eagle
 
     @patch('src.data_generation.src.halo.Halo')
     @patch('src.data_generation.src.subhalo.SubhaloContext')
@@ -116,12 +119,13 @@ class TestMapStep(unittest.TestCase):
                                            mock_subhalo_particles.return_value)
         self.map_step = MapStep(self.cfg_illustris)
         self.map_step.map_configuration['root_path'] = '../test/data/illustris'
-
+        kwargs = {'rotation_axis': 0, 'rotation_iteration': 0}
         generator = self.map_step.process(
             input_feature=self.mock_input_feature,
             output_feature=self.mock_output_feature,
             cosmos_data=self.mock_cosmos_data,
-            g=self.mock_generator(),
+            g=self.mock_generator_illustris(),
+            **kwargs,
             next_step=None
         )
 
@@ -164,17 +168,19 @@ class TestMapStep(unittest.TestCase):
                                            mock_subhalo_particles.return_value)
         self.map_step = MapStep(self.cfg_illustris)
         self.map_step.map_configuration['root_path'] = '../test/data/eagle'
-
+        kwargs = {'rotation_axis': 0, 'rotation_iteration': 0}
         generator = self.map_step.process(
             input_feature=self.mock_input_feature,
             output_feature=self.mock_output_feature,
             cosmos_data=self.mock_cosmos_data,
-            g=self.mock_generator(),
+            g=self.mock_generator_eagle(),
+            **kwargs,
             next_step=None
         )
 
         _ = list(generator)
 
+    # TODO do the same for illustris
     @patch('src.data_generation.src.halo.Halo')
     @patch('src.data_generation.src.subhalo.SubhaloContext')
     @patch('src.data_generation.src.subhalo.SubhaloParticles')

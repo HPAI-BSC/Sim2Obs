@@ -48,7 +48,7 @@ class TestRotateStep(unittest.TestCase):
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
             self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
-            self.cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
+            self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -58,9 +58,13 @@ class TestRotateStep(unittest.TestCase):
         self.mock_output_feature = MagicMock()
         self.mock_output_feature.value = np.array([[0.0, 0.0, 0.0]])
 
-    def mock_generator(self) -> Generator:
+    def mock_generator_illustris(self) -> Generator:
         """Mock generator to simulate data_loader.process."""
-        yield self.mock_input_feature, self.mock_output_feature, self.mock_cosmos_data
+        yield self.halo_illustris, self.subhalo_illustris
+
+    def mock_generator_eagle(self) -> Generator:
+        """Mock generator to simulate data_loader.process."""
+        yield self.halo_eagle, self.subhalo_eagle
 
     @patch('src.data_generation.src.halo.Halo')
     @patch('src.data_generation.src.subhalo.SubhaloContext')
@@ -79,8 +83,9 @@ class TestRotateStep(unittest.TestCase):
             input_feature=self.mock_input_feature,
             output_feature=self.mock_output_feature,
             cosmos_data=self.mock_cosmos_data,
-            g=self.mock_generator(),
-            next_step=None
+            g=self.mock_generator_illustris(),
+            next_step=None,
+            kwargs={}
         )
 
         result = list(generator)
@@ -107,8 +112,9 @@ class TestRotateStep(unittest.TestCase):
             input_feature=self.mock_input_feature,
             output_feature=self.mock_output_feature,
             cosmos_data=self.mock_cosmos_data,
-            g=self.mock_generator(),
-            next_step=None
+            g=self.mock_generator_eagle(),
+            next_step=None,
+            kwargs={}
         )
 
         result = list(generator)

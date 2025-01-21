@@ -18,7 +18,7 @@ if __name__ == '__main__':
         cfg_eagle.paths = local_config.paths
         cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
         cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
-        cfg_eagle.catalog.path = '../../../local/data/eagle/RefL0050N0752'
+        cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
 
     os.environ['PROJECT_ROOT'] = '../../..'
     data_loader_dict = cfg_eagle.pipeline[0]
