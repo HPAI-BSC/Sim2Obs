@@ -15,26 +15,27 @@ if dotenv_path:
 else:
     print(".env file not found, skipping load.")
 
+os.environ['PROJECT_ROOT'] = '..'
+
 
 def get_pipeline_steps(cfg: DictConfig) -> List[PipelineStep]:
     if 'pipeline' not in cfg:
-        raise ValueError('')
-
-    pipeline_steps = {
-        'data_loader': DataLoader(cfg),
-        'rotate_step': RotateStep(cfg),
-        'map_step':  MapStep(cfg)
-        # Add more steps if required
-    }
+        raise ValueError('Error, pipeline variable must be specified in the configuration file.')
 
     pipeline = []
-
-    for stage in cfg['pipeline']:
-        name = stage['name']
-        if name not in pipeline_steps:
-            raise ValueError(f'Error, the step {name} does not exist, please add the step in the pipeline steps'
-                             f' dictionary.')
-        pipeline.append(pipeline_steps[name])
+    for item in cfg['pipeline']:
+        if isinstance(item, DictConfig):  # Ensure the item is a DictConfig
+            if "name" in item:
+                if item["name"] == "data_loader":
+                    pipeline.append(DataLoader(cfg))
+                elif item['name'] == 'rotate_step':
+                    pipeline.append(RotateStep(cfg))
+                elif item['name'] == 'map_step':
+                    pipeline.append(MapStep(cfg))
+                # Add more steps if required
+                else:
+                    raise ValueError(f'Error, name={item["name"]} does not belonging to any stage of the'
+                                     f' pipeline=[data_loader, rotate_step, map_step]')
     return pipeline
 
 

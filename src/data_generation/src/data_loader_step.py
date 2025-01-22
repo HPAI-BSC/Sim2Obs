@@ -96,12 +96,9 @@ class DataLoader(PipelineStep):
         Tuple
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
-        halo_subhalo_df = pd.DataFrame(data=[], columns=['halo_id', 'subhalos_num'])
         with tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar:
             for halo, subhalo_df in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_df)} subhalos.")
-                tmp = pd.DataFrame([[halo.halo_id, len(subhalo_df)]],  columns=['halo_id', 'subhalos_num'])
-                halo_subhalo_df = pd.concat([halo_subhalo_df, tmp])
                 start_time = time.time()
                 subhalo_id = halo.fsub
                 halo_id = halo.halo_id
@@ -123,6 +120,8 @@ class DataLoader(PipelineStep):
                     elapsed_time = time.time() - start_time
                     logger.info(f"Finished processing halo {halo_id} with time: {elapsed_time}")
                     continue
+
+                subhalo_particles.p = subhalo_particles.p - halo.gpos
 
                 i_value = input_feature.process(
                     halo=halo,
@@ -151,7 +150,6 @@ class DataLoader(PipelineStep):
                 elapsed_time = time.time() - start_time
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo_id} with time: {elapsed_time}")
-        halo_subhalo_df.to_csv(self.cfg.paths.datasets_dir + f'/halo_subhalo.csv')
 
     def load_halo_data(self, halo_conditions: List = [], subhalo_conditions: List = []) -> List[Tuple]:
         """
@@ -178,6 +176,8 @@ class DataLoader(PipelineStep):
         for id_halo in halo_context.halo_id:
             halo_df = halo_context.get_item(id_halo)
             subhalo_df = subhalo_context.get_items_by_halo(id_halo)
+            # Normalize subhalo positions respect to the center of its halo
+            subhalo_df.loc[:, 'spos'] = subhalo_df.apply(lambda row: row['spos'] - halo_df.gpos, axis=1)
             result.append((halo_df, subhalo_df))
         return result
 

@@ -167,23 +167,27 @@ class MapStep(PipelineStep):
             np.linspace(biny[0], biny[-1], rows)  # Y coordinates matching rows in maschera
         )
 
-        for i in interlopers_id:
-            # For each interloper get its center position (h, k) and its radius
-            subhalo = cosmos_data.subhalos.get_item(i)
-            h = subhalo.spos[i, 0]
-            k = subhalo.spos[i, 1]
-            rradius = subhalo.shmr[i, 0]
-            for cc in range(rows):
-                for dd in range(cols):
-                    radius_circle = circle(X[cc, dd], Y[cc, dd], h, k, rradius)
-                    if radius_circle <= 1:
-                        interlopers_mask[cc, dd] = 1
+        try:
+            for i in interlopers_id:
+                # For each interloper get its center position (h, k) and its radius
+                subhalo = cosmos_data.subhalos[cosmos_data.subhalos['subhalo_id'] == i]
+                subhalo = subhalo.reset_index(drop=True)
+                h = subhalo.iloc[0]['spos'][0]
+                k = subhalo.iloc[0]['spos'][1]
+                rradius = subhalo.iloc[0]['shmr']
+                for cc in range(rows):
+                    for dd in range(cols):
+                        radius_circle = circle(X[cc, dd], Y[cc, dd], h, k, rradius)
+                        if radius_circle <= 1:
+                                interlopers_mask[cc, dd] = 1
 
-        # Check if the mask is just zero
-        if np.all(interlopers_mask == 0):
-            pass
-            #logger.warning('Mask is full of zeros.')
-        interlopers_mask = interlopers_mask.astype(bool)
+            # Check if the mask is just zero
+            if np.all(interlopers_mask == 0):
+                logger.warning(f'Mask is full of zeros for halo: {cosmos_data.halo.halo_id}')
+            interlopers_mask = interlopers_mask.astype(bool)
+        except Exception as e:
+            print(e)
+
         return interlopers_mask
 
     def _create_random_zoom(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
