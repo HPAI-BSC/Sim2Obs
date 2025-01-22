@@ -1,4 +1,3 @@
-import os
 from typing import Any, List
 import hydra
 from dotenv import load_dotenv, find_dotenv
@@ -15,8 +14,6 @@ if dotenv_path:
     load_dotenv(dotenv_path)
 else:
     print(".env file not found, skipping load.")
-
-os.environ['PROJECT_ROOT'] = '..'
 
 
 def get_pipeline_steps(cfg: DictConfig) -> List[PipelineStep]:
