@@ -14,7 +14,7 @@ import joblib                  # For loading the pre-trained model (pickle)
 # The variables with "S" in their names represent the units used in the simulations.
 
 # Load the best model identified by a GridSearch algorithm (likely a Random Forest model)
-final_model = joblib.load('../model/Best_Model-Random-3par.pkl')
+final_model = joblib.load('../../model/Best_Model-Random-3par.pkl')
 
 # Define simulation parameters
 sim = "TNG-300"                # Name of the simulation (TNG-300)
