@@ -6,5 +6,5 @@ batch_size: 8
 train_val_test_split: [.85, .05, .10]
 resize_shape: [128, 128]
 random_seed:  0
-num_workers: 4
+num_workers: 0
 pin_memory: True

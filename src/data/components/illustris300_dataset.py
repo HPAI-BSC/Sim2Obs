@@ -34,6 +34,9 @@ class Illustris300Dataset(GalaxyDataset):
         if self.transform:
             image = self.transform(image)
 
+        if image is None or label is None:
+            raise ValueError(f'Error, either the image or the label with index: {index} are None.')
+
         return image, label
 
     def _load_and_process_npy(self, file_path):
