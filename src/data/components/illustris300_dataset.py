@@ -26,6 +26,8 @@ class Illustris300Dataset(GalaxyDataset):
         img_path = os.path.join(self.image_dir, self.images[index])
         label_path = os.path.join(self.labels_dir, self.labels[index])
 
+        print(f"Image path: {img_path}, Label path: {label_path}")
+
         # Process image and label
         image = self._load_and_process_npy(img_path)
         label = self._load_and_process_npy(label_path)
@@ -51,6 +53,8 @@ class Illustris300Dataset(GalaxyDataset):
         """
         try:
             data = np.load(file_path)
+            print(f"Image data shape: {data.shape}, dtype: {data.dtype}")
+
         except FileNotFoundError:
             raise FileNotFoundError(f"File not found: {file_path}")
         except Exception as e:
@@ -59,6 +63,15 @@ class Illustris300Dataset(GalaxyDataset):
         if self.mask_interlopers:
             main_channel = data['arr_0'][:, :, 0][1:129, 1:129]
             interlopers_mask = data['arr_0'][:, :, 1][1:129, 1:129]
+
+            # Log the results of the loading process
+            print(f"Loaded image: {main_channel}, Loaded label: {interlopers_mask}")
+
+            if main_channel is None:
+                raise ValueError(f"Failed to load image from: {file_path}")
+            if interlopers_mask is None:
+                raise ValueError(f"Failed to load label from: {file_path}")
+
             if np.any(interlopers_mask != 0):
                 main_channel = np.ma.masked_array(main_channel, mask=interlopers_mask).filled(fill_value=0)
                 main_channel = torch.as_tensor(main_channel.astype('float'))
