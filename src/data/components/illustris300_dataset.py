@@ -58,7 +58,7 @@ class Illustris300Dataset(GalaxyDataset):
             interlopers_mask = data['arr_0'][:, :, 1][1:129, 1:129]
             if np.any(interlopers_mask != 0):
                 main_channel = np.ma.masked_array(main_channel, mask=interlopers_mask).filled(fill_value=0)
-                main_channel = torch.from_numpy(main_channel)
+                main_channel = torch.as_tensor(main_channel.astype('float'))
                 main_channel = main_channel.float().unsqueeze(0)
                 return main_channel
         else:
