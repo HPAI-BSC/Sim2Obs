@@ -53,7 +53,6 @@ class Illustris300Dataset(GalaxyDataset):
         """
         try:
             data = np.load(file_path)
-            print(f"Image data shape: {data.shape}, dtype: {data.dtype}")
 
         except FileNotFoundError:
             raise FileNotFoundError(f"File not found: {file_path}")
