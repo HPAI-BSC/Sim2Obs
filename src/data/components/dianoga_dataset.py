@@ -8,8 +8,8 @@ from src.data.components.galaxy_dataset import GalaxyDataset
 class DianogaDataset(GalaxyDataset):
     name = 'dianoga'
 
-    def __init__(self, image_dir, labels_dir, transform=None):
-        super().__init__(image_dir, labels_dir, transform)
+    def __init__(self, image_dir, labels_dir, transform=None, **kwargs):
+        super().__init__(image_dir, labels_dir, transform, **kwargs)
 
     def __getitem__(self, index):
         img_path = os.path.join(self.image_dir, self.images[index])

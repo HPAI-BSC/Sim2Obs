@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 
 
 class GalaxyDataset(Dataset, ABC):
-    def __init__(self, image_dir, labels_dir, transform=None):
+    def __init__(self, image_dir, labels_dir, transform=None, **kwargs):
         self.image_dir = image_dir
         self.labels_dir = labels_dir
         self.transform = transform

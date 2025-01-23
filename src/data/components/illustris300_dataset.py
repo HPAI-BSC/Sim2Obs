@@ -9,8 +9,9 @@ from src.data.components.galaxy_dataset import GalaxyDataset
 class Illustris300Dataset(GalaxyDataset):
     name = 'illustris-300'
 
-    def __init__(self, image_dir, labels_dir, transform=None):
-        super().__init__(image_dir, labels_dir, transform)
+    def __init__(self, image_dir, labels_dir, transform=None, mask_interlopers=True, **kwargs):
+        super().__init__(image_dir, labels_dir, transform, **kwargs)
+        self.mask_interlopers = mask_interlopers
 
     def __getitem__(self, index):
         """
@@ -35,8 +36,7 @@ class Illustris300Dataset(GalaxyDataset):
 
         return image, label
 
-    @staticmethod
-    def _load_and_process_npy(file_path):
+    def _load_and_process_npy(self, file_path):
         """
         Load and process a .npy file.
 
@@ -53,12 +53,19 @@ class Illustris300Dataset(GalaxyDataset):
         except Exception as e:
             raise RuntimeError(f"Error loading file {file_path}: {e}")
 
-        # Extract main channel and interlopers mask
-        main_channel = data['arr_0'][:, :, 0][1:129, 1:129][..., np.newaxis]
-        interlopers_mask = data['arr_0'][:, :, 1][1:129, 1:129][..., np.newaxis]
+        if self.mask_interlopers:
+            main_channel = data['arr_0'][:, :, 0][1:129, 1:129]
+            interlopers_mask = data['arr_0'][:, :, 1][1:129, 1:129]
+            if np.any(interlopers_mask != 0):
+                main_channel = np.ma.masked_array(main_channel, mask=interlopers_mask).filled(fill_value=0)
+                main_channel = torch.from_numpy(main_channel)
+                main_channel = main_channel.float().unsqueeze(0)
+                return main_channel
+        else:
+            main_channel = data['arr_0'][:, :, 0][1:129, 1:129][..., np.newaxis]
+            interlopers_mask = data['arr_0'][:, :, 1][1:129, 1:129][..., np.newaxis]
+            # Combine channels and convert to tensor
+            combined_data = np.concatenate((main_channel, interlopers_mask), axis=-1)
+            tensor_data = torch.from_numpy(combined_data).permute(2, 0, 1)  # C x H x W
 
-        # Combine channels and convert to tensor
-        combined_data = np.concatenate((main_channel, interlopers_mask), axis=-1)
-        tensor_data = torch.from_numpy(combined_data).permute(0, 1, 2)  # H x W x C
-
-        return tensor_data
+            return tensor_data

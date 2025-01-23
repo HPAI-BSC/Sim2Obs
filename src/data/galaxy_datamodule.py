@@ -55,7 +55,8 @@ class GalaxyDataModule(LightningDataModule):
         resize_shape: Tuple[int, int] = (128, 128),
         random_seed: int = 0,
         num_workers: int = 0,
-        pin_memory: int = False
+        pin_memory: int = False,
+        mask_interlopers: bool = True
     ) -> None:
         """Initialize a `GalaxyDataModule`.
 
@@ -103,7 +104,8 @@ class GalaxyDataModule(LightningDataModule):
         full_dataset = GalaxyDatasetFactory.get_dataset(dataset,
                                                         image_dir=data_dir,
                                                         labels_dir=target_maskdir,
-                                                        transform=None)
+                                                        transform=None,
+                                                        mask_interlopers=mask_interlopers)
 
         train_size = int(train_val_test_split[0] * len(full_dataset))
         val_size = int(train_val_test_split[1] * len(full_dataset))
