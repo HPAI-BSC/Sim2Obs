@@ -14,10 +14,11 @@ class TestDataset(unittest.TestCase):
     def test_illustris300dataset(self):
         with initialize(config_path="../configs"):
             cfg_train = compose(config_name="train.yaml")
-            cfg_train.data = compose(config_name="data/illustris300_rotation45.yaml").data
+            cfg_train.data = compose(config_name="data/galaxy_illustris300_rotation45.yaml").data
 
         kwargs = {'image_dir': cfg_train.data.data_dir,
-                   'labels_dir': cfg_train.data.target_maskdir}
+                  'labels_dir': cfg_train.data.target_maskdir,
+                  'mask_interlopers': False}
 
         full_dataset = GalaxyDatasetFactory.get_dataset(cfg_train.data.dataset, **kwargs)
         for i in range(1):
@@ -30,7 +31,7 @@ class TestDataset(unittest.TestCase):
     def test_illustris300dataset_mask_interlopers(self):
         with initialize(config_path="../configs"):
             cfg_train = compose(config_name="train.yaml")
-            cfg_train.data = compose(config_name="data/illustris300_rotation45.yaml").data
+            cfg_train.data = compose(config_name="data/galaxy_illustris300_rotation45.yaml").data
 
         kwargs = {'image_dir': cfg_train.data.data_dir, 'labels_dir': cfg_train.data.target_maskdir,
                   'mask_interlopers': True}

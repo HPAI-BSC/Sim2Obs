@@ -66,6 +66,7 @@ class Illustris300Dataset(GalaxyDataset):
             interlopers_mask = data['arr_0'][:, :, 1][1:129, 1:129][..., np.newaxis]
             # Combine channels and convert to tensor
             combined_data = np.concatenate((main_channel, interlopers_mask), axis=-1)
-            tensor_data = torch.from_numpy(combined_data).permute(2, 0, 1)  # C x H x W
+            tensor_data = torch.as_tensor(combined_data.astype('float'))
+            tensor_data = tensor_data.permute(2, 0, 1)  # C x H x W
 
             return tensor_data
