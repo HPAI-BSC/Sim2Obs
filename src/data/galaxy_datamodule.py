@@ -100,8 +100,7 @@ class GalaxyDataModule(LightningDataModule):
                 transforms.Normalize((0.1307,), (0.3081,)),
             ]
         )
-        print(f'image_dir: {data_dir}')
-        print(f'labels_dir: {target_maskdir}')
+
         full_dataset = GalaxyDatasetFactory.get_dataset(dataset,
                                                         image_dir=data_dir,
                                                         labels_dir=target_maskdir,
@@ -196,6 +195,10 @@ class GalaxyDataModule(LightningDataModule):
 
         :return: The predict dataloader.
         """
+        dataset_length = len(self.data_predict)
+        # Print or use the length
+        print(f"The length of the predict dataset is: {dataset_length}")
+
         return DataLoader(
             dataset=self.data_predict,
             batch_size=self.hparams.batch_size,
