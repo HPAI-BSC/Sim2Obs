@@ -100,12 +100,30 @@ class GalaxyDataModule(LightningDataModule):
                 transforms.Normalize((0.1307,), (0.3081,)),
             ]
         )
-
+        print(f'image_dir: {data_dir}')
+        print(f'labels_dir: {target_maskdir}')
         full_dataset = GalaxyDatasetFactory.get_dataset(dataset,
                                                         image_dir=data_dir,
                                                         labels_dir=target_maskdir,
                                                         transform=None,
                                                         mask_interlopers=mask_interlopers)
+
+        # ---------------
+        image_error = []
+        for i in range(len(full_dataset)):
+            image, label = full_dataset.__getitem__(index=i)
+            if image is None or label is None:
+                image_error.append(i)
+                print(f'Error, either the image or the label with index: {i} are None.')
+                continue
+            assert isinstance(image, torch.Tensor)
+            assert isinstance(label, torch.Tensor)
+            assert image.shape == (1, 128, 128)
+            assert label.shape == (1, 128, 128)
+        print('--------------------')
+        print(image_error)
+        print('--------------------')
+        # ---------------
 
         train_size = int(train_val_test_split[0] * len(full_dataset))
         val_size = int(train_val_test_split[1] * len(full_dataset))

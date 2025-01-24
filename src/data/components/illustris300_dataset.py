@@ -26,7 +26,8 @@ class Illustris300Dataset(GalaxyDataset):
         img_path = os.path.join(self.image_dir, self.images[index])
         label_path = os.path.join(self.labels_dir, self.labels[index])
 
-        print(f"Image path: {img_path}, Label path: {label_path}")
+        if not os.path.exists(img_path) or not os.path.exists(label_path):
+            raise FileNotFoundError(f"Image or label file not found at index {index}")
 
         # Process image and label
         image = self._load_and_process_npy(img_path)
@@ -35,10 +36,6 @@ class Illustris300Dataset(GalaxyDataset):
         # Apply transformation if provided
         if self.transform:
             image = self.transform(image)
-
-        if image is None or label is None:
-            raise ValueError(f'Error, either the image or the label with index: {index} are None.')
-
         return image, label
 
     def _load_and_process_npy(self, file_path):
@@ -51,27 +48,21 @@ class Illustris300Dataset(GalaxyDataset):
         Returns:
             torch.Tensor: Processed tensor with shape (H, W, C).
         """
-        tensor_data = None
         try:
             data = np.load(file_path)
-
             if self.mask_interlopers:
                 main_channel = data['arr_0'][:, :, 0][1:129, 1:129]
                 interlopers_mask = data['arr_0'][:, :, 1][1:129, 1:129]
-
-                # Log the results of the loading process
-                print(f"Loaded image: {main_channel}, Loaded label: {interlopers_mask}")
 
                 if main_channel is None:
                     raise ValueError(f"Failed to load image from: {file_path}")
                 if interlopers_mask is None:
                     raise ValueError(f"Failed to load label from: {file_path}")
 
-                if np.any(interlopers_mask != 0):
-                    main_channel = np.ma.masked_array(main_channel, mask=interlopers_mask).filled(fill_value=0)
-                    main_channel = torch.as_tensor(main_channel.astype('float'))
-                    main_channel = main_channel.float().unsqueeze(0)
-                    return main_channel
+                main_channel = np.ma.masked_array(main_channel, mask=interlopers_mask).filled(fill_value=0)
+                main_channel = torch.as_tensor(main_channel.astype('float'))
+                main_channel = main_channel.float().unsqueeze(0)
+                return main_channel
             else:
                 main_channel = data['arr_0'][:, :, 0][1:129, 1:129][..., np.newaxis]
                 interlopers_mask = data['arr_0'][:, :, 1][1:129, 1:129][..., np.newaxis]
@@ -79,10 +70,8 @@ class Illustris300Dataset(GalaxyDataset):
                 combined_data = np.concatenate((main_channel, interlopers_mask), axis=-1)
                 tensor_data = torch.as_tensor(combined_data.astype('float'))
                 tensor_data = tensor_data.permute(2, 0, 1)  # C x H x W
-
+                return tensor_data
         except Exception as e:
-            print(e)
-            raise Exception('Something went wrong reading the data.')
+            raise Exception(f'Something went wrong reading the data: {e}')
         except FileNotFoundError:
             raise FileNotFoundError(f"File not found: {file_path}")
-        return tensor_data
