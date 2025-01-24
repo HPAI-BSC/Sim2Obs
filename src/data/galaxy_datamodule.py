@@ -51,7 +51,7 @@ class GalaxyDataModule(LightningDataModule):
         target_maskdir: str,
         dataset: str,
         batch_size: int = 16,
-        train_val_test_split: Tuple[int, int, int] = (0.85, 0.05, 0.10),
+        train_val_test_split: Tuple[int, int, int] = (None, None, None),
         resize_shape: Tuple[int, int] = (128, 128),
         random_seed: int = 0,
         num_workers: int = 0,
@@ -107,19 +107,25 @@ class GalaxyDataModule(LightningDataModule):
                                                         labels_dir=target_maskdir,
                                                         transform=None,
                                                         mask_interlopers=mask_interlopers)
-
-        train_size = int(train_val_test_split[0] * len(full_dataset))
-        val_size = int(train_val_test_split[1] * len(full_dataset))
-        test_size = len(full_dataset) - train_size - val_size
-        print(f'train/val/test sizes: {(train_size, val_size, test_size)}')
         torch.manual_seed(random_seed)
-        train_ds, val_ds, test_ds = torch.utils.data.random_split(full_dataset, [train_size, val_size, test_size])
-        predict_ds = PredictDataset(test_ds)
 
-        self.data_train: Optional[Dataset] = train_ds
-        self.data_val: Optional[Dataset] = val_ds
-        self.data_test: Optional[Dataset] = test_ds
-        self.data_predict: Optional[Dataset] = predict_ds
+        if train_val_test_split == (None, None, None):
+            self.data_train: Optional[Dataset] = None
+            self.data_val: Optional[Dataset] = None
+            self.data_test = full_dataset  # Use the whole dataset for testing/evaluation
+            self.data_predict = PredictDataset(full_dataset)  # Use the whole dataset for prediction
+        else:
+            train_size = int(train_val_test_split[0] * len(full_dataset))
+            val_size = int(train_val_test_split[1] * len(full_dataset))
+            test_size = len(full_dataset) - train_size - val_size
+            print(f'train/val/test sizes: {(train_size, val_size, test_size)}')
+            train_ds, val_ds, test_ds = torch.utils.data.random_split(full_dataset, [train_size, val_size, test_size])
+            predict_ds = PredictDataset(test_ds)
+
+            self.data_train: Optional[Dataset] = train_ds
+            self.data_val: Optional[Dataset] = val_ds
+            self.data_test: Optional[Dataset] = test_ds
+            self.data_predict: Optional[Dataset] = predict_ds
 
     def prepare_data(self) -> None:
         """Download data if needed. Lightning ensures that `self.prepare_data()` is called only
