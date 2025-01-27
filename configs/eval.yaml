@@ -3,7 +3,7 @@
 defaults:
   - _self_
   - data: galaxy_illustris300_rotation45.yaml
-  - model: attention_unet
+  - model: mamba_unet2
   - logger:
   - trainer: default
   - paths: gpfs
@@ -18,8 +18,9 @@ commit_tag: "commit_hash"
 
 # passing checkpoint path is necessary for evaluation # last.skpt
 # -AttentionUNet
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt -> Mamba
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
+# -Mamba (UNet2)
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
 
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt #Unet
 #ckpt_path: ${oc.env:PROJECT_ROOT}/local/ckpt/19b3ea5f/last.ckpt #Unet local
