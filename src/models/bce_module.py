@@ -69,12 +69,12 @@ class BCELitModule(LightningModule):
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
         # and Root Mean Squared Error Using Sliding Window
-        #self.train_RASE = RelativeAverageSpectralError(window_size=8)
+        self.train_RASE = RelativeAverageSpectralError(window_size=8)
         self.val_RASE = RelativeAverageSpectralError(window_size=8)
         self.test_RASE = RelativeAverageSpectralError(window_size=8)
 
         
-        #self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
+        self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
 
@@ -140,11 +140,11 @@ class BCELitModule(LightningModule):
 
         # update and log metrics
         self.train_loss(loss)
-        #self.train_RASE(preds.to(torch.float32), targets.to(torch.float32))
-        #self.train_rmse(preds.to(torch.float32), targets.to(torch.float32))
+        self.train_RASE(preds.to(torch.float32), targets.to(torch.float32))
+        self.train_rmse(preds.to(torch.float32), targets.to(torch.float32))
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
-        #self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
-        #self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
 
         # return loss or backpropagation will fail
         return loss
