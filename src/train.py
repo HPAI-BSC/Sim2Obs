@@ -75,7 +75,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     # Disable checkpoints temporary to test the profiler
     profiler = PyTorchProfiler(dirpath=None)
-    cfg.Trainer.enable_checkpointing = False
+    cfg.trainer.enable_checkpointing = False
     trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler=profiler)
 
     object_dict = {
