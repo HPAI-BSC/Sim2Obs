@@ -33,6 +33,14 @@ from src import utils
 
 log = utils.get_pylogger(__name__)
 
+import torch
+
+# Ensure CUDA is available
+if torch.cuda.is_available():
+    print(torch.cuda.memory_summary(device=0, abbreviated=False))
+else:
+    print("CUDA is not available!")
+
 
 @utils.task_wrapper
 def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
