@@ -37,6 +37,7 @@ import torch
 
 # Ensure CUDA is available
 if torch.cuda.is_available():
+    torch.tensor([1.0], device="cuda")
     print(torch.cuda.memory_summary(device=0, abbreviated=False))
 else:
     print("CUDA is not available!")
@@ -70,7 +71,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler="pytorch")
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler="simple")
 
     object_dict = {
         "cfg": cfg,
