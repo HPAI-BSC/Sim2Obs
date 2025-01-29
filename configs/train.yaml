@@ -5,7 +5,7 @@
 defaults:
   - _self_
   - data: galaxy_illustris300_rotation45
-  - model: mamba_unet2
+  - model: unet
   - callbacks: default
   - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default

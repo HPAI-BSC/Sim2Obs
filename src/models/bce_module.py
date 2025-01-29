@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, Tuple
 
 import torch
@@ -8,6 +9,7 @@ import torch.nn as nn
 
 
 torch.set_float32_matmul_precision('medium')
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 
 
 class BCELitModule(LightningModule):
