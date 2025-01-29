@@ -37,6 +37,23 @@ class TestDataLoaderStep(unittest.TestCase):
             self.assertIsInstance(halo_df, Halo)
             self.assertIsInstance(subhalo_df, pd.DataFrame)
 
+    def test_load_halo_data_illustris_mass_interval(self):
+        with initialize(config_path="../../../configs"):
+            cfg_illustris = compose(config_name="data_generation.yaml")
+            local_config = compose(config_name="paths/local.yaml")
+            cfg_illustris.paths = local_config.paths
+            cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
+
+        self.dataLoader = DataLoader(cfg_illustris)
+        cfg_illustris.pipeline[0].halo_min_mass = [1e12, 1e13]
+        cfg_illustris.pipeline[0].subhalo_min_mass = [1e9, 1e10]
+        result = list(self.dataLoader.load_halo_data())
+        self.assertEqual(len(result), 840)
+
+        for halo_df, subhalo_df in result:
+            self.assertIsInstance(halo_df, Halo)
+            self.assertIsInstance(subhalo_df, pd.DataFrame)
+
     def test_load_halo_data_eagle(self):
         self.dataLoader = DataLoader(self.cfg_eagle)
         result = list(self.dataLoader.load_halo_data())

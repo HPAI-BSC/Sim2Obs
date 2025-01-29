@@ -103,3 +103,70 @@ if len(tmp) > 0:
     raise Exception(f'There is something wrong')
 print(f'There are {len(non_accepted_subhalo_ids)} subhalos that do not fulfill minimum mass condition')
 
+print('-----------------------')
+# Filter halos and subhalos by range of min mass
+halo_min_mass = [1e12, 1e13]
+halo_context = fetcher_illustris.get_halos()
+halo_conditions = [('m200', '>', halo_min_mass[0] * fetcher_illustris.H),
+                   ('m200', '<', halo_min_mass[1] * fetcher_illustris.H)]
+halo_context_filtered_2 = fetcher_illustris.filter_halos(halo_context, halo_conditions)
+filtered_halo_ids_2 = set(halo_context_filtered_2.data['halo_id'])
+print(f'Illustris filtered halos by mass (1e12, 1e13): {halo_context_filtered_2.data["halo_id"].nunique()}')
+
+subhalo_min_mass = [1e7, 1e10]
+subhalo_context = fetcher_illustris.get_subhalos()
+subhalo_conditions = [('mstr', '>', subhalo_min_mass[0]),
+                      ('mstr', '<', subhalo_min_mass[1])]  # solar_masses
+subhalo_context_filtered_2 = fetcher_illustris.filter_subhalos(subhalo_context, subhalo_conditions)
+filtered_subhalo_ids_2 = set(subhalo_context_filtered_2.data['subhalo_id'])
+print(f'Illustris filtered subhalos by mass (1e7, 19e10): {subhalo_context_filtered_2.data["subhalo_id"].nunique()}')
+
+# Apply both conditions of mass
+halo_subhalos_df_2 = pd.DataFrame(data=[], columns=['halo_id', 'subhalo_counts'])
+util_subhalo_ids_2 = []
+halo_errors = []
+for id_halo in halo_context_filtered_2.halo_id:
+    # logger.debug(f"Loading data for halo_id: {id_halo}")
+    try:
+        halo_df = halo_context_filtered_2.get_item(id_halo)
+        subhalo_df = subhalo_context_filtered_2.get_items_by_halo(id_halo)
+        util_subhalo_ids_2.extend(subhalo_df['subhalo_id'])
+        tmp = pd.DataFrame(data=[[id_halo, len(subhalo_df)]], columns=['halo_id', 'subhalo_counts'])
+        halo_subhalos_df_2 = pd.concat([halo_subhalos_df_2, tmp])
+    except Exception as e:
+        halo_errors.append(id_halo)
+        continue
+print(f'Halos ids with no subhalos: {len(halo_errors)}')
+print(f'From filtered halos, we obtain {np.sum(halo_subhalos_df_2["subhalo_counts"])} util subhalos')
+print('-----------------------')
+
+# Filter halos and subhalos by the low threshold
+halo_context = fetcher_illustris.get_halos()
+halo_conditions = [('m200', '>', halo_min_mass[0] * fetcher_illustris.H)]
+halo_context_filtered_3 = fetcher_illustris.filter_halos(halo_context, halo_conditions)
+filtered_halo_ids_3 = set(halo_context_filtered_3.data['halo_id'])
+print(f'Illustris filtered halos by mass > 1e12: {halo_context_filtered_3.data["halo_id"].nunique()}')
+
+subhalo_conditions = [('mstr', '>', subhalo_min_mass[0])]  # solar_masses
+subhalo_context = fetcher_illustris.get_subhalos()
+subhalo_context_filtered_3 = fetcher_illustris.filter_subhalos(subhalo_context, subhalo_conditions)
+filtered_subhalo_ids = set(subhalo_context_filtered_3.data['subhalo_id'])
+print(f'Illustris filtered subhalos by mass > 1e9: {subhalo_context_filtered_3.data["subhalo_id"].nunique()}')
+
+# Apply both conditions of mass
+halo_subhalos_df_3 = pd.DataFrame(data=[], columns=['halo_id', 'subhalo_counts'])
+util_subhalo_ids_3 = []
+halo_errors = []
+for id_halo in halo_context_filtered_3.halo_id:
+    # logger.debug(f"Loading data for halo_id: {id_halo}")
+    try:
+        halo_df = halo_context_filtered_3.get_item(id_halo)
+        subhalo_df = subhalo_context_filtered_3.get_items_by_halo(id_halo)
+        util_subhalo_ids_3.extend(subhalo_df['subhalo_id'])
+        tmp = pd.DataFrame(data=[[id_halo, len(subhalo_df)]], columns=['halo_id', 'subhalo_counts'])
+        halo_subhalos_df_3 = pd.concat([halo_subhalos_df_3, tmp])
+    except Exception as e:
+        halo_errors.append(id_halo)
+        continue
+print(f'Halos ids with no subhalos: {len(halo_errors)}')
+print(f'From filtered halos, we obtain {np.sum(halo_subhalos_df_3["subhalo_counts"])} util subhalos')

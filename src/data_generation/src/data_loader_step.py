@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_fetcher import DataFetcherFactory
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig
 
 from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.pipeline_step import PipelineStep
@@ -47,15 +47,40 @@ class DataLoader(PipelineStep):
         self.cfg = cfg
 
     def _get_default_conditions(self):
+        def parse_conditions(min_mass, factor=1.0, key='m200'):
+            """
+            Helper function to parse mass conditions.
+            - min_mass: Mass range (tuple or scalar).
+            - factor: Conversion factor for mass.
+            - key: Property name (e.g., 'm200', 'mstr').
+            """
+            if isinstance(min_mass, ListConfig):
+                return [(key, '>', min_mass[0] * factor), (key, '<', min_mass[1] * factor)]
+            elif isinstance(min_mass, (int, float)):
+                return [(key, '>', min_mass * factor)]
+            return []
+
+        # Fetch data_loader step from the pipeline
         data_loader_dict = next((step for step in self.cfg.pipeline if step.name == 'data_loader'), None)
-        if self.cfg.catalog.name == 'illustris-300':
-            halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'] * data_loader_dict['H'])] # M⊙ / h
-            subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'])] # M⊙
-        elif self.cfg.catalog.name == 'eagle':
-            # Convert halo_min_mass from M⊙/h to M⊙, so it is in the same units than M200
-            # TODO review this
-            halo_conditions = [('m200', '>', data_loader_dict['halo_min_mass'] / data_loader_dict['H'])] # M⊙
-            subhalo_conditions = [('mstr', '>', data_loader_dict['subhalo_min_mass'])] # M⊙
+        if not data_loader_dict:
+            raise ValueError("Data loader configuration not found in the pipeline.")
+
+        # Check catalog name and generate conditions
+        catalog_name = self.cfg.catalog.name.lower()
+        if catalog_name == 'illustris-300':
+            # M⊙ / h
+            halo_conditions = parse_conditions(data_loader_dict.get('halo_min_mass'), factor=data_loader_dict['H'],
+                                               key='m200')
+            # M⊙
+            subhalo_conditions = parse_conditions(data_loader_dict.get('subhalo_min_mass'), key='mstr')
+        elif catalog_name == 'eagle':
+            # Convert from M⊙/h to M⊙ for 'eagle'
+            halo_conditions = parse_conditions(data_loader_dict.get('halo_min_mass'), factor=1 / data_loader_dict['H'],
+                                               key='m200')
+            subhalo_conditions = parse_conditions(data_loader_dict.get('subhalo_min_mass'), key='mstr')
+        else:
+            raise ValueError(f"Unsupported catalog name: {self.cfg.catalog.name}")
+
         return halo_conditions, subhalo_conditions
 
     @classmethod
@@ -174,10 +199,14 @@ class DataLoader(PipelineStep):
 
         result = []
         for id_halo in halo_context.halo_id:
-            halo_df = halo_context.get_item(id_halo)
-            subhalo_df = subhalo_context.get_items_by_halo(id_halo)
-            # Normalize subhalo positions respect to the center of its halo
-            subhalo_df.loc[:, 'spos'] = subhalo_df.apply(lambda row: row['spos'] - halo_df.gpos, axis=1)
+            try:
+                halo_df = halo_context.get_item(id_halo)
+                subhalo_df = subhalo_context.get_items_by_halo(id_halo)
+                # Normalize subhalo positions respect to the center of its halo
+                subhalo_df.loc[:, 'spos'] = subhalo_df.apply(lambda row: row['spos'] - halo_df.gpos, axis=1)
+            except Exception as e:
+                logger.error(e)
+                continue
             result.append((halo_df, subhalo_df))
         return result
 
