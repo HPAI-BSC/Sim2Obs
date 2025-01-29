@@ -4,6 +4,7 @@ import hydra
 import lightning as L
 import rootutils
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
+from lightning.pytorch.profilers import PyTorchProfiler
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 import mlflow
@@ -71,7 +72,11 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler="simple")
+
+    # Disable checkpoints temporary to test the profiler
+    profiler = PyTorchProfiler(dirpath=None)
+    cfg.Trainer.enable_checkpointing = False
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler=profiler)
 
     object_dict = {
         "cfg": cfg,
