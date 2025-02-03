@@ -1,4 +1,5 @@
 import os
+import re
 
 import numpy as np
 import torch
@@ -75,3 +76,46 @@ class Illustris300Dataset(GalaxyDataset):
             raise Exception(f'Something went wrong reading the data: {e}')
         except FileNotFoundError:
             raise FileNotFoundError(f"File not found: {file_path}")
+
+    def get_halo_ids(self):
+        halo_ids = set()
+        for file in self.images:
+            match = re.match(r'halo_(\d+)', file)
+            if match:
+                halo_id = int(match.group(1))
+                halo_ids.add(halo_id)
+        return list(halo_ids)
+
+    @staticmethod
+    def _filter_image_files_by_halos(image_files, halo_ids_to_include):
+        filtered_files = []
+
+        for file in image_files:
+            # Extract the halo ID from the filename using regex (assuming it's in the form 'halo_X')
+            match = re.match(r'halo_(\d+)', file)
+            if match:
+                halo_id = int(match.group(1))
+                if halo_id in halo_ids_to_include:
+                    filtered_files.append(file)
+        return filtered_files
+
+    def filter_by_halos(self, halos):
+        """
+        Filters the dataset by the list of halo IDs.
+
+        :param halos: List of halo IDs to include in the dataset.
+        :return: A new `Illustris300Dataset` instance with only the filtered halos.
+        """
+        filtered_images = self._filter_image_files_by_halos(self.images, halos)
+        filtered_labels = self._filter_image_files_by_halos(self.labels, halos)
+
+        # Create a new dataset instance with the filtered data
+        filtered_dataset = Illustris300Dataset(
+            image_dir=self.image_dir,
+            labels_dir=self.labels_dir,
+            transform=self.transform,
+            mask_interlopers=self.mask_interlopers
+        )
+        filtered_dataset.images = filtered_images
+        filtered_dataset.labels = filtered_labels
+        return filtered_dataset

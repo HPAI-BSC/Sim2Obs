@@ -22,6 +22,14 @@ class GalaxyDataset(Dataset, ABC):
     def __getitem__(self, index):
         pass
 
+    @abstractmethod
+    def get_halo_ids(self):
+        pass
+
+    @abstractmethod
+    def filter_by_halos(self, halos):
+        pass
+
 
 class PredictDataset(Dataset):
     def __init__(self, original_dataset):
