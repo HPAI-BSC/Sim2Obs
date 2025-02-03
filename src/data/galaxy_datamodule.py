@@ -1,3 +1,5 @@
+import numpy as np
+
 from src.data.components.galaxy_dataset import PredictDataset
 from src.data.components.galaxy_dataset_factory import GalaxyDatasetFactory
 import torch
@@ -114,11 +116,22 @@ class GalaxyDataModule(LightningDataModule):
             self.data_test = full_dataset  # Use the whole dataset for testing/evaluation
             self.data_predict = PredictDataset(full_dataset)  # Use the whole dataset for prediction
         else:
-            train_size = int(train_val_test_split[0] * len(full_dataset))
-            val_size = int(train_val_test_split[1] * len(full_dataset))
-            test_size = len(full_dataset) - train_size - val_size
+            halo_ids = full_dataset.get_halo_ids()
+            num_halos = len(halo_ids)
+            train_size = int(train_val_test_split[0] * num_halos)
+            val_size = int(train_val_test_split[1] * num_halos)
+            test_size = num_halos - train_size - val_size
+
+            train_halos = set(halo_ids[:train_size])
+            val_halos = set(halo_ids[train_size:train_size + val_size])
+            test_halos = set(halo_ids[train_size + val_size:])
+
+            # Apply filtering
+            train_ds = full_dataset.filter_by_halos(list(train_halos))
+            val_ds = full_dataset.filter_by_halos(list(val_halos))
+            test_ds = full_dataset.filter_by_halos(list(test_halos))
+
             print(f'train/val/test sizes: {(train_size, val_size, test_size)}')
-            train_ds, val_ds, test_ds = torch.utils.data.random_split(full_dataset, [train_size, val_size, test_size])
             predict_ds = PredictDataset(test_ds)
 
             self.data_train: Optional[Dataset] = train_ds
