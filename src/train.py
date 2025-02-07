@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import hydra
@@ -41,6 +42,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 if device.type == 'cuda':
     torch.tensor([1.0], device="cuda")
     print(torch.cuda.memory_summary(device=0, abbreviated=False))
+    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:32'
 
 
 @utils.task_wrapper
