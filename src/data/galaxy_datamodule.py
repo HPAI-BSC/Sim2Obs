@@ -122,6 +122,16 @@ class GalaxyDataModule(LightningDataModule):
             val_size = int(train_val_test_split[1] * num_halos)
             test_size = num_halos - train_size - val_size
 
+            # Ensure validation set is not empty
+            if val_size == 0 and train_size > 1:
+                val_size = max(1, int(0.05 * num_halos))  # Take at least 5% or 1 sample from training
+                train_size -= val_size
+
+            # Ensure at least one training sample
+            if train_size == 0 and val_size > 1:
+                train_size = 1
+                val_size -= 1
+
             train_halos = set(halo_ids[:train_size])
             val_halos = set(halo_ids[train_size:train_size + val_size])
             test_halos = set(halo_ids[train_size + val_size:])
@@ -209,8 +219,6 @@ class GalaxyDataModule(LightningDataModule):
         :return: The predict dataloader.
         """
         dataset_length = len(self.data_predict)
-        # Print or use the length
-        print(f"The length of the predict dataset is: {dataset_length}")
 
         return DataLoader(
             dataset=self.data_predict,

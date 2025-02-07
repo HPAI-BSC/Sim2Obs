@@ -6,7 +6,7 @@ import rootutils
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.profilers import PyTorchProfiler
 from lightning.pytorch.loggers import Logger
-from omegaconf import DictConfig
+from omegaconf import DictConfig, open_dict
 import mlflow
 from lightning.pytorch.loggers import MLFlowLogger
 
@@ -37,11 +37,10 @@ log = utils.get_pylogger(__name__)
 import torch
 
 # Ensure CUDA is available
-if torch.cuda.is_available():
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if device.type == 'cuda':
     torch.tensor([1.0], device="cuda")
     print(torch.cuda.memory_summary(device=0, abbreviated=False))
-else:
-    print("CUDA is not available!")
 
 
 @utils.task_wrapper
@@ -74,9 +73,11 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
 
     # Disable checkpoints temporary to test the profiler
-    # profiler = PyTorchProfiler(dirpath=None)
-    # cfg.trainer.enable_checkpointing = False
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler='simple')
+    profiler = PyTorchProfiler(dirpath=None)
+    with open_dict(cfg):
+        cfg.trainer.enable_checkpointing = False
+        callbacks.pop(0)
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler=profiler)
 
     object_dict = {
         "cfg": cfg,
