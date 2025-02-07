@@ -3,7 +3,7 @@ data_dir: ${paths.datasets_dir}/illustris300/rotation_120/VelocityDispersion
 target_maskdir: ${paths.datasets_dir}/illustris300/rotation_120/IntraClusterLight
 dataset: illustris-300
 batch_size: 8
-#train_val_test_split: [.85, .05, .10]
+train_val_test_split: [.85, .05, .10]
 resize_shape: [128, 128]
 random_seed:  0
 num_workers: 4
