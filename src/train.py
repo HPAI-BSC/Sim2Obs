@@ -42,7 +42,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 if device.type == 'cuda':
     torch.tensor([1.0], device="cuda")
     print(torch.cuda.memory_summary(device=0, abbreviated=False))
-    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:32'
+    #os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:32'
 
 
 @utils.task_wrapper
@@ -79,7 +79,19 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cfg.trainer.enable_checkpointing = False
         callbacks.pop(0)
 
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler='pytorch')
+    profiler = PyTorchProfiler(
+        dirpath='/gpfs/scratch/bsc70/hpai/storage/projects/space/',  # Directory to save logs
+        filename="memory_profile",  # Name of the file to save results
+        sort_by_key="self_cpu_memory_usage",  # Sort by CPU memory usage
+        export_to_chrome=True,  # Export as JSON for Chrome
+        row_limit=16,
+        activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+        profile_memory=True,  # Record CPU memory usage
+        with_stack=True,
+        record_shapes=True,
+    )
+
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler=profiler)
 
     object_dict = {
         "cfg": cfg,
