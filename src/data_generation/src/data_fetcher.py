@@ -99,6 +99,8 @@ class DataFetcherFactory:
         logger.debug(f"Fetching data fetcher for catalog: {catalog.name}")
         if catalog.name == "illustris-300":
             return Illustris300Fetcher(catalog, **kwargs)
+        elif catalog.name == "big-illustris-300":
+            return BigIllustris300Fetcher(catalog, **kwargs)
         elif catalog.name == "eagle":
             return EagleFetcher(catalog, **kwargs)
         else:
@@ -202,6 +204,185 @@ class Illustris300Fetcher(DataFetcher):
             halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * self.solar_mass_convention # 𝑀⊙/ℎ
             column_map = {'halo_id': 'halo_id', 'r200': 'Group_R_Crit200', 'm200': 'Group_M_Crit200',
                           'gpos': 'GroupPos', 'fsub': 'GroupFirstSub'}
+            logger.debug("Halo data fetched successfully.")
+            return HaloContext(halos, column_map)
+        else:
+            logger.warning("No halos found.")
+            return HaloContext(pd.DataFrame(data=[]), {})
+
+    def _get_subhalos(self) -> SubhaloContext:
+        """
+        Fetches subhalo data from the Illustris-300 simulation.
+
+        Returns:
+        --------
+        SubhaloContext
+            A context object containing subhalo data.
+        """
+        logger.debug("Fetching subhalos from Illustris-300...")
+
+        # Units of measure -> [𝑐𝑘𝑝𝑐/ℎ, int, 𝑐𝑘𝑝𝑐/ℎ, 10^10𝑀⊙/ℎ]
+        fields = ["SubhaloPos", "SubhaloGrNr", "SubhaloHalfmassRadType", "SubhaloMassType"]
+        path = self.catalog.path + '/output'
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        subhalos = il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=fields)
+        if len(subhalos) > 0:
+            subhalos['spos'] = subhalos['SubhaloPos']
+            subhalos['SubhaloHalfmassRadType'] = subhalos["SubhaloHalfmassRadType"][:, 4]  # stars
+            subhalos['SubhaloMassType'] = subhalos["SubhaloMassType"][:, 4] * self.solar_mass_convention / self.H # 𝑀⊙
+            subhalos['subhalo_id'] = np.arange(len(subhalos['spos']))
+            column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "SubhaloGrNr",
+                          "shmr": "SubhaloHalfmassRadType", "mstr": "SubhaloMassType"}
+            logger.debug("Subhalo data fetched successfully.")
+            subhalo_context = SubhaloContext(subhalos, self.catalog.scalf, column_map)
+            return subhalo_context
+        else:
+            logger.warning("No subhalos found.")
+            return SubhaloContext(pd.DataFrame(data=[]), self.catalog.scalf, {})
+
+    def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
+        """
+        Fetches particle data for a specific subhalo.
+
+        Parameters:
+        -----------
+        isubhalo : int
+            The index of the subhalo from which to retrieve particle data.
+
+        Returns:
+        --------
+        SubhaloParticles
+            A context object containing particle data such as mass, coordinates, and velocities.
+        """
+        logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
+
+        # Units of measure [𝑐𝑘𝑝𝑐/ℎ, 𝑘𝑚𝑎‾√/𝑠, 10^10𝑀⊙/ℎ]
+        fields = ["Coordinates", "Velocities", "Masses"]
+        path = self.catalog.path + '/output'
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        try:
+
+            star_p = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, "star", fields=fields)
+            if len(star_p) > 0:
+                p = star_p["Coordinates"]
+                v = star_p["Velocities"] * np.sqrt(self.catalog.scalf) # 𝑘𝑚𝑎‾√/𝑠 -> kms-1
+                m = star_p["Masses"] * self.solar_mass_convention
+                logger.debug(f"Particle data fetched successfully, {len(p)} particles retrieved")
+            else:
+                logger.warning(f"No particle data found for subhalo {subhalo_id}.")
+                p = v = m = np.ndarray([])
+            return SubhaloParticles(m, p, v, self.catalog.scalf)
+        except Exception as e:
+            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
+
+
+class BigIllustris300Fetcher(DataFetcher):
+    """
+    Data fetcher for the Big-Illustris-300 catalog.
+    """
+    def __init__(self, catalog: DictConfig, **kwargs):
+        """
+        Initializes the fetcher with the given configuration.
+
+        Parameters:
+        -----------
+        cfg : DictConfig
+            Configuration object containing catalog settings.
+        """
+        self.catalog = catalog
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+        logger.info(f"BigIllustris300Fetcher initialized with config: {catalog}")
+
+    def get_halos(self, *args, **kwargs) -> HaloContext:
+        """
+        Fetches the halo data.
+
+        Returns:
+        --------
+        HaloContext
+            A context object containing halo data.
+        """
+        logger.info("Fetching halo data...")
+        halo_context = self._get_halos()
+        return halo_context
+
+    def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
+        """
+        Fetches the subhalo data.
+
+        Returns:
+        --------
+        SubhaloContext
+            A context object containing subhalo data.
+        """
+        logger.info("Fetching subhalo data...")
+        subhalo_context = self._get_subhalos()
+        return subhalo_context
+
+    def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
+        """
+        Fetches particle data for a given subhalo.
+
+        Parameters:
+        -----------
+        subhalo_id : int
+            ID of the subhalo for which particle data is needed.
+
+        Returns:
+        --------
+        SubhaloParticles
+            A context object containing particle data.
+        """
+        subhalo_id = kwargs.get('subhalo_id', None)
+
+        if subhalo_id is None:
+            logger.error("subhalo_id must be provided in kwargs")
+            raise ValueError("subhalo_id must be provided in kwargs")
+
+        logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
+        return self._get_p_subhalo(subhalo_id)
+
+    def _get_halos(self) -> HaloContext:
+        """
+        Fetches halo data from the Illustris-300 simulation.
+
+        Returns:
+        --------
+        HaloContext
+            A context object containing halo data such as mass, radius, position, and subhalo index.
+        """
+        logger.debug("Fetching halos from Big-Illustris-300...")
+
+        # Units of measure -> [10^10𝑀⊙/ℎ, 𝑐𝑘𝑝𝑐/ℎ, 𝑐𝑘𝑝𝑐/ℎ, int]
+        fields = ["Group_M_Crit200", "Group_R_Crit200", "GroupPos", "GroupFirstSub", "GroupLenType"]
+        path = self.catalog.path + '/output'
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        halos = il.groupcat.loadHalos(path, self.catalog.snapnum, fields=fields)
+        if len(halos) > 0:
+            scalf = self.catalog.scalf
+            halos['GroupPos'] = [halos['GroupPos'][i] * scalf for i in range(halos['GroupPos'].shape[0])]
+            halos['Group_R_Crit200'] = halos['Group_R_Crit200'] * scalf
+            halos['halo_num_particles'] = halos['GroupLenType'][:, 4] + halos['GroupLenType'][:, 0]
+            del halos['GroupLenType']
+            halos = pd.DataFrame.from_dict(halos)
+            halos['halo_id'] = np.arange(len(halos['Group_M_Crit200']))
+            halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * self.solar_mass_convention # 𝑀⊙/ℎ
+            column_map = {'halo_id': 'halo_id', 'r200': 'Group_R_Crit200', 'm200': 'Group_M_Crit200',
+                          'gpos': 'GroupPos', 'fsub': 'GroupFirstSub', 'halo_num_particles':'halo_num_particles'}
             logger.debug("Halo data fetched successfully.")
             return HaloContext(halos, column_map)
         else:
@@ -407,6 +588,7 @@ class EagleFetcher(DataFetcher):
             df['gpos'] = df.apply(lambda row: np.array([(row['pos_x'] * scalf) / self.H,
                                                         (row['pos_y'] * scalf) / self.H,
                                                         (row['pos_z'] * scalf) / self.H]), axis=1)
+            # TODO review these units
             df['r200'] = df['r200'].values / (self.H * self.catalog.scalf)    # pkps -> kps / h
             df['m200'] = df['m200'].values / self.H    # 𝑀⊙/ℎ
             df['halo_id'] = df['halo_id'].astype(int)

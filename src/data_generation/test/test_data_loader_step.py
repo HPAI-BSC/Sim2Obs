@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import numpy as np
 from hydra import initialize, compose
 import pandas as pd
+from omegaconf import OmegaConf
 
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_loader_step import DataLoader
@@ -19,10 +20,18 @@ class TestDataLoaderStep(unittest.TestCase):
         with initialize(config_path="../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
+            self.cfg_big_illustris = compose(config_name="data_generation.yaml")
+            OmegaConf.set_struct(self.cfg_big_illustris, False)
+            del self.cfg_big_illustris.pipeline[0]['halo_min_mass']
+            del self.cfg_big_illustris.pipeline[0]['subhalo_min_mass']
+            self.cfg_big_illustris.pipeline[0]['halo_num_particles'] = 1000
+            OmegaConf.set_struct(self.cfg_big_illustris, True)
+
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_eagle.paths = local_config.paths
             self.cfg_illustris.paths = local_config.paths
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
+            self.cfg_big_illustris.catalog = compose("catalog/bigillustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
 
         self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
@@ -49,6 +58,15 @@ class TestDataLoaderStep(unittest.TestCase):
         cfg_illustris.pipeline[0].subhalo_min_mass = [1e9, 1e10]
         result = list(self.dataLoader.load_halo_data())
         self.assertEqual(len(result), 840)
+
+        for halo_df, subhalo_df in result:
+            self.assertIsInstance(halo_df, Halo)
+            self.assertIsInstance(subhalo_df, pd.DataFrame)
+
+    def test_load_halo_data_big_illustris(self):
+        self.dataLoader = DataLoader(self.cfg_big_illustris)
+        result = list(self.dataLoader.load_halo_data())
+        self.assertEqual(len(result), 2890)
 
         for halo_df, subhalo_df in result:
             self.assertIsInstance(halo_df, Halo)

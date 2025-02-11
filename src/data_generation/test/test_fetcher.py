@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from hydra import initialize, compose
 import eagleSqlTools as sql
 
-from src.data_generation.src.data_fetcher import DataFetcherFactory
+from src.data_generation.src.data_fetcher import DataFetcherFactory, BigIllustris300Fetcher
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import get_connection
@@ -34,6 +34,7 @@ class TestFetcher(unittest.TestCase):
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
         self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
         self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
+        self.fetcher_big_illustris = BigIllustris300Fetcher(self.cfg_illustris.catalog, **attr_dict)
 
     def test_get_halos_illustris(self):
         halo_context_1 = self.fetcher_illustris.get_halos()
@@ -184,4 +185,9 @@ class TestFetcher(unittest.TestCase):
             array = sql.execute_query(conn, query)
             df = pd.DataFrame(array)
             print(len(df))
+
+    def test_get_halos_big_illustris(self):
+        halo_context_1 = self.fetcher_big_illustris.get_halos()
+        self.assertIsInstance(halo_context_1, HaloContext)
+
 

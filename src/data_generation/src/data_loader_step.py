@@ -67,12 +67,17 @@ class DataLoader(PipelineStep):
 
         # Check catalog name and generate conditions
         catalog_name = self.cfg.catalog.name.lower()
+        halo_conditions = []
+        subhalo_conditions = []
         if catalog_name == 'illustris-300':
             # M⊙ / h
             halo_conditions = parse_conditions(data_loader_dict.get('halo_min_mass'), factor=data_loader_dict['H'],
                                                key='m200')
             # M⊙
             subhalo_conditions = parse_conditions(data_loader_dict.get('subhalo_min_mass'), key='mstr')
+        elif catalog_name == 'big-illustris-300':
+            halo_conditions = parse_conditions(data_loader_dict.get('halo_num_particles'), factor=1,
+                                               key='halo_num_particles')
         elif catalog_name == 'eagle':
             # Convert from M⊙/h to M⊙ for 'eagle'
             halo_conditions = parse_conditions(data_loader_dict.get('halo_min_mass'), factor=1 / data_loader_dict['H'],
@@ -91,7 +96,7 @@ class DataLoader(PipelineStep):
 
         data_loader_dict = next((step for step in cfg.pipeline if step.name == cls.name), None)
 
-        required_keys = ['subhalo_min_mass', 'halo_min_mass', 'solar_mass_convention', 'G', 'H']
+        required_keys = ['solar_mass_convention', 'G', 'H']
         for key in required_keys:
             if key not in data_loader_dict:
                 raise ValueError(f"Error, missing required configuration key: {key}")
