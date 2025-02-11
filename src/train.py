@@ -79,6 +79,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cfg.trainer.enable_checkpointing = False
         callbacks.pop(0)
 
+    '''
     profiler = PyTorchProfiler(
         dirpath='/gpfs/scratch/bsc70/hpai/storage/projects/space/',  # Directory to save logs
         filename="memory_profile",  # Name of the file to save results
@@ -90,8 +91,8 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         with_stack=True,
         record_shapes=True,
     )
-
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler=profiler)
+    '''
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler='simple')
 
     object_dict = {
         "cfg": cfg,

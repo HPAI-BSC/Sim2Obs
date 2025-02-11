@@ -19,9 +19,8 @@ COMMIT_HASH=$(basename "$CURRENT_DIR")
 
 # Update the commit_tag in config.yaml using sed
 sed -i "s/^commit_tag: .*/commit_tag: \"$COMMIT_HASH\"/" configs/train.yaml
-export PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:128"
 
 module load singularity
 singularity exec -B /gpfs/scratch/bsc70/hpai/storage/projects \
                  --nv /gpfs/scratch/bsc70/hpai/storage/projects/space/singularity/space_v3.sif \
-   bash -c 'export PROJECT_ROOT='$CURRENT_DIR' && python src/train.py'
+   bash -c 'export PROJECT_ROOT='$CURRENT_DIR' && python -m torch.utils.bottleneck src/train.py'
