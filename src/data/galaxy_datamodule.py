@@ -90,7 +90,7 @@ class GalaxyDataModule(LightningDataModule):
                 # transforms.RandomRotation(degrees=90),
                 #transforms.RandomResizedCrop(size=resize_shape, scale=(0.9, 1.0)),
                 transforms.Resize(size=resize_shape),
-                transforms.Normalize((0.1307,), (0.3081,)),
+                #transforms.Normalize((0.1307,), (0.3081,)),
             ]
         )
 
@@ -99,7 +99,7 @@ class GalaxyDataModule(LightningDataModule):
             [
                 transforms.ToTensor(),
                 transforms.Resize(size=resize_shape),
-                transforms.Normalize((0.1307,), (0.3081,)),
+                #transforms.Normalize((0.1307,), (0.3081,)),
             ]
         )
 

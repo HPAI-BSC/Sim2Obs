@@ -89,6 +89,28 @@ class BCELitModule(LightningModule):
         self.val_rase_best = MaxMetric()
         self.val_rmse_best = MaxMetric()
 
+    def _print_cuda_memory(self):
+        if torch.cuda.is_available():
+            # Get current GPU device
+            device = torch.cuda.current_device()
+
+            # Get memory information in bytes
+            allocated = torch.cuda.memory_allocated(device)
+            reserved = torch.cuda.memory_reserved(device)
+            free = torch.cuda.get_device_properties(device).total_memory - allocated
+
+            # Convert to GB for readability
+            allocated_gb = allocated / 1024 ** 3
+            reserved_gb = reserved / 1024 ** 3
+            free_gb = free / 1024 ** 3
+
+            print(f"CUDA Memory Status on Device {device}:")
+            print(f"Allocated: {allocated_gb:.2f} GB")
+            print(f"Reserved:  {reserved_gb:.2f} GB")
+            print(f"Free:      {free_gb:.2f} GB")
+        else:
+            print("CUDA is not available")
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
 
@@ -106,6 +128,8 @@ class BCELitModule(LightningModule):
         self.val_rmse.reset()
         self.val_rase_best.reset()
         self.val_rmse_best.reset()
+        print(f"On train start")
+        self._print_cuda_memory()
 
     def model_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor]
@@ -119,6 +143,8 @@ class BCELitModule(LightningModule):
             - A tensor of predictions.
             - A tensor of target labels.
         """
+        print("Model step...")
+        self._print_cuda_memory()
         x, y = batch
         preds = self.forward(x)
         #loss = self.criterion(preds, y)
