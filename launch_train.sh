@@ -11,6 +11,7 @@
 #SBATCH -t 02:00:00         # Run time (hh:mm:ss) - 30 min
 #SBATCH --account bsc70
 #SBATCH --qos=acc_debug
+#SBATCH --exclusive
 
 CURRENT_DIR=$(pwd)
 echo "Current directory: '$CURRENT_DIR'"
