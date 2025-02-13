@@ -5,13 +5,13 @@ from abc import ABC, abstractmethod
 import eagleSqlTools as sql
 import numpy as np
 import pandas as pd
+import polars as pl
 import illustris_python as il
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
-from src.data_generation.src.utils import get_connection, read_dataset, setup_logger
-
+from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion
 
 logger = setup_logger("DataFetcher")
 
@@ -29,6 +29,10 @@ class DataFetcher(ABC):
     """
     Abstract base class for fetching data from various catalogs.
     """
+    def __init__(self, catalog: DictConfig, **kwargs):
+        self.catalog = catalog
+        self.__build_config(**kwargs)
+
     @abstractmethod
     def get_halos(self, *args, **kwargs):
         """
@@ -51,30 +55,48 @@ class DataFetcher(ABC):
         pass
 
     @staticmethod
-    def filter_halos(halo_context: HaloContext, conditions) -> HaloContext:
-        mask = pd.Series(True, index=halo_context.data.index)
-        for feature, symbol, value in conditions:
-            if feature not in halo_context.data:
-                raise Exception(f'Error, feature "{feature}" is not present in the halo dataframe with columns:'
-                                f' {halo_context.data.columns}')
-            mask &= operators[symbol](halo_context.data[feature], value)
+    def _filter(df: pd.DataFrame, conditions: dict) -> pd.DataFrame:
+        mask = pd.Series(True, index=df.index)
+        for key, condition in conditions.items():
+            if key not in df.columns:
+                raise Exception(f'Error, feature "{key}" is not present in the halo dataframe with columns:'
+                                f' {df.columns}')
+            if isinstance(condition.filter, ListConfig):
+                for expr in condition.filter:
+                    if isinstance(expr, str):
+                        symbol = expr.split(' ')[0]
+                        value = float(eval(expr.split(' ')[1]))
+                        mask &= operators[symbol](df[key], value)
+            else:
+                if isinstance(condition.filter, str):
+                    symbol = condition.filter.split(' ')[0]
+                    value = float(eval(condition.filter.split(' ')[1]))
+                    mask &= operators[symbol](df[key], value)
+        return df[mask]
 
-        halo_context.data = halo_context.data[mask]
-        return halo_context
-    @staticmethod
-    def filter_subhalos(subhalo_context: SubhaloContext, conditions) -> SubhaloContext:
-        """
-        Abstract method to filter subhalos by a set of conditions
-        """
-        mask = pd.Series(True, index=subhalo_context.data.index)
-        for feature, symbol, value in conditions:
-            if feature not in subhalo_context.data:
-                raise Exception(f'Error, feature "{feature}" is not present in the subhalo dataframe with columns:'
-                                f' {subhalo_context.data.columns}')
-            mask &= operators[symbol](subhalo_context.data[feature], value)
+    def _get_fields(self):
+        pass
 
-        subhalo_context.data = subhalo_context.data[mask]
-        return subhalo_context
+    def __build_config(self, **kwargs):
+        self.fields = self._get_fields()
+
+        fields = getattr(self.catalog, "fields", None)
+        if not fields:
+            raise ValueError("The catalog must contain a 'fields' attribute.")
+
+        self.halo_fields = list(self.catalog.fields.halo.keys())
+        self.subhalo_fields = list(self.catalog.fields.subhalo.keys())
+        self.particle_fields = list(self.catalog.fields.particles.keys())
+        self.halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
+        self.subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
+        self.column_map = {
+            column: data['name']
+            for group in [self.catalog.fields.halo, self.catalog.fields.subhalo]
+            for column, data in group.items()
+        }
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
 
 class DataFetcherFactory:
@@ -99,8 +121,6 @@ class DataFetcherFactory:
         logger.debug(f"Fetching data fetcher for catalog: {catalog.name}")
         if catalog.name == "illustris-300":
             return Illustris300Fetcher(catalog, **kwargs)
-        elif catalog.name == "big-illustris-300":
-            return BigIllustris300Fetcher(catalog, **kwargs)
         elif catalog.name == "eagle":
             return EagleFetcher(catalog, **kwargs)
         else:
@@ -120,11 +140,14 @@ class Illustris300Fetcher(DataFetcher):
         cfg : DictConfig
             Configuration object containing catalog settings.
         """
-        self.catalog = catalog
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
+        super().__init__(catalog, **kwargs)
         logger.info(f"Illustris300Fetcher initialized with config: {catalog}")
+
+    def _get_fields(self):
+        path = self.catalog.path + '/output'
+        halo_fields = list(il.groupcat.loadHalos(path, self.catalog.snapnum, fields=None).keys())
+        subhalo_fields = list(il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=None).keys())
+        return halo_fields + subhalo_fields
 
     def get_halos(self, *args, **kwargs) -> HaloContext:
         """
@@ -185,30 +208,61 @@ class Illustris300Fetcher(DataFetcher):
             A context object containing halo data such as mass, radius, position, and subhalo index.
         """
         logger.debug("Fetching halos from Illustris-300...")
-
-        # Units of measure -> [10^10𝑀⊙/ℎ, 𝑐𝑘𝑝𝑐/ℎ, 𝑐𝑘𝑝𝑐/ℎ, int]
-        fields = ["Group_M_Crit200", "Group_R_Crit200", "GroupPos", "GroupFirstSub"]
         path = self.catalog.path + '/output'
 
         if not os.path.exists(path):
             logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
-        halos = il.groupcat.loadHalos(path, self.catalog.snapnum, fields=fields)
+        if 'GroupFirstSub' not in self.halo_fields:
+            self.halo_fields.append('GroupFirstSub')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.halo["GroupFirstSub"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "fsub"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['GroupFirstSub'] = 'fsub'
+
+        halos = il.groupcat.loadHalos(path, self.catalog.snapnum, fields=self.halo_fields)
+
+        if isinstance(halos, np.ndarray):
+            tmp = halos
+            halos = {self.halo_fields[0]: tmp}
+            size = len(halos[self.halo_fields[0]])
+            halos['count'] = np.array(size)
+
         if len(halos) > 0:
-            scalf = self.catalog.scalf
-            halos['GroupPos'] = [halos['GroupPos'][i] * scalf for i in range(halos['GroupPos'].shape[0])]
-            halos['Group_R_Crit200'] = halos['Group_R_Crit200'] * scalf
+            halos['halo_id'] = np.arange(halos['count'])
+            for key in list(halos.keys()):
+                if key in self.halo_fields:
+                    # Ensure that every feature has a name
+                    if not getattr(self.catalog.fields.halo[key], 'name'):
+                        raise ValueError('Error, you must specify the name for each field.')
+
+                    # Unit conversion
+                    if self.catalog.fields.halo[key].scaling is not None:
+                        halos[key] = apply_conversion(self.catalog.fields.halo, key, halos[key], self.catalog.a,
+                                                      self.catalog.H)
+
+                    # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
+                    if halos[key].ndim > 1:
+                        converted = to_list(halos, key)
+                        del halos[key]
+                        halos[key] = converted
+                else:
+                    logger.warning(f'Column {key} not present in Illustris dataset')
+
             halos = pd.DataFrame.from_dict(halos)
-            halos['halo_id'] = np.arange(len(halos['Group_M_Crit200']))
-            halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * self.solar_mass_convention # 𝑀⊙/ℎ
-            column_map = {'halo_id': 'halo_id', 'r200': 'Group_R_Crit200', 'm200': 'Group_M_Crit200',
-                          'gpos': 'GroupPos', 'fsub': 'GroupFirstSub'}
+            halos = self._filter(halos, self.halo_conditions)
             logger.debug("Halo data fetched successfully.")
-            return HaloContext(halos, column_map)
+            halo_context = HaloContext(halos, self.column_map)
+            return halo_context
         else:
             logger.warning("No halos found.")
-            return HaloContext(pd.DataFrame(data=[]), {})
+            return HaloContext(pd.DataFrame(data=[]), self.column_map)
 
     def _get_subhalos(self) -> SubhaloContext:
         """
@@ -221,28 +275,59 @@ class Illustris300Fetcher(DataFetcher):
         """
         logger.debug("Fetching subhalos from Illustris-300...")
 
-        # Units of measure -> [𝑐𝑘𝑝𝑐/ℎ, int, 𝑐𝑘𝑝𝑐/ℎ, 10^10𝑀⊙/ℎ]
-        fields = ["SubhaloPos", "SubhaloGrNr", "SubhaloHalfmassRadType", "SubhaloMassType"]
+        fields = self.subhalo_fields
         path = self.catalog.path + '/output'
 
         if not os.path.exists(path):
             logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
+        if 'SubhaloGrNr' not in self.halo_fields:
+            self.subhalo_fields.append('SubhaloGrNr')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.subhalo["SubhaloGrNr"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "id_parents"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['SubhaloGrNr'] = 'id_parents'
+
         subhalos = il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=fields)
+
+        if isinstance(subhalos, np.ndarray):
+            tmp = subhalos
+            subhalos = {self.fields[0]: tmp}
+            size = len(subhalos[self.fields[0]])
+            subhalos['count'] = np.array(size)
+
         if len(subhalos) > 0:
-            subhalos['spos'] = subhalos['SubhaloPos']
-            subhalos['SubhaloHalfmassRadType'] = subhalos["SubhaloHalfmassRadType"][:, 4]  # stars
-            subhalos['SubhaloMassType'] = subhalos["SubhaloMassType"][:, 4] * self.solar_mass_convention / self.H # 𝑀⊙
-            subhalos['subhalo_id'] = np.arange(len(subhalos['spos']))
-            column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "SubhaloGrNr",
-                          "shmr": "SubhaloHalfmassRadType", "mstr": "SubhaloMassType"}
-            logger.debug("Subhalo data fetched successfully.")
-            subhalo_context = SubhaloContext(subhalos, self.catalog.scalf, column_map)
+            subhalos['subhalo_id'] = np.arange(subhalos['count'])
+            for key in list(subhalos.keys()):
+                if key in fields:
+                    # Ensure that every feature has a name
+                    if not getattr(self.catalog.fields.subhalo[key], 'name'):
+                        raise ValueError('Error, you must specify the name for each field.')
+
+                    # Unit conversion
+                    if self.catalog.fields.subhalo[key].scaling is not None:
+                        subhalos[key] = apply_conversion(self.catalog.fields.subhalo, key, subhalos[key],
+                                                         self.catalog.a, self.catalog.H)
+
+                    # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
+                    if subhalos[key].ndim > 1:
+                        converted = to_list(subhalos, key)
+                        del subhalos[key]
+                        subhalos[key] = converted
+
+            subhalos = pd.DataFrame.from_dict(subhalos)
+            subhalos = self._filter(subhalos, self.subhalo_conditions)
+            subhalo_context = SubhaloContext(subhalos, self.column_map)
             return subhalo_context
         else:
             logger.warning("No subhalos found.")
-            return SubhaloContext(pd.DataFrame(data=[]), self.catalog.scalf, {})
+            return SubhaloContext(pd.DataFrame(data=[]), self.column_map)
 
     def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
         """
@@ -259,9 +344,6 @@ class Illustris300Fetcher(DataFetcher):
             A context object containing particle data such as mass, coordinates, and velocities.
         """
         logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
-
-        # Units of measure [𝑐𝑘𝑝𝑐/ℎ, 𝑘𝑚𝑎‾√/𝑠, 10^10𝑀⊙/ℎ]
-        fields = ["Coordinates", "Velocities", "Masses"]
         path = self.catalog.path + '/output'
 
         if not os.path.exists(path):
@@ -269,196 +351,27 @@ class Illustris300Fetcher(DataFetcher):
             raise Exception(f'The path {path} does not exist.')
 
         try:
+            part_types = self.particle_fields
+            data = {}
+            for part_type in part_types:
+                fields = list(self.catalog.fields.particles[part_type].keys())
+                star_p = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, part_type, fields=fields)
 
-            star_p = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, "star", fields=fields)
-            if len(star_p) > 0:
-                p = star_p["Coordinates"]
-                v = star_p["Velocities"] * np.sqrt(self.catalog.scalf) # 𝑘𝑚𝑎‾√/𝑠 -> kms-1
-                m = star_p["Masses"] * self.solar_mass_convention
-                logger.debug(f"Particle data fetched successfully, {len(p)} particles retrieved")
-            else:
-                logger.warning(f"No particle data found for subhalo {subhalo_id}.")
-                p = v = m = np.ndarray([])
-            return SubhaloParticles(m, p, v, self.catalog.scalf)
-        except Exception as e:
-            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
+                if isinstance(star_p, np.ndarray):
+                    tmp = star_p
+                    star_p = {fields[0]: tmp}
 
-
-class BigIllustris300Fetcher(DataFetcher):
-    """
-    Data fetcher for the Big-Illustris-300 catalog.
-    """
-    def __init__(self, catalog: DictConfig, **kwargs):
-        """
-        Initializes the fetcher with the given configuration.
-
-        Parameters:
-        -----------
-        cfg : DictConfig
-            Configuration object containing catalog settings.
-        """
-        self.catalog = catalog
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
-        logger.info(f"BigIllustris300Fetcher initialized with config: {catalog}")
-
-    def get_halos(self, *args, **kwargs) -> HaloContext:
-        """
-        Fetches the halo data.
-
-        Returns:
-        --------
-        HaloContext
-            A context object containing halo data.
-        """
-        logger.info("Fetching halo data...")
-        halo_context = self._get_halos()
-        return halo_context
-
-    def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
-        """
-        Fetches the subhalo data.
-
-        Returns:
-        --------
-        SubhaloContext
-            A context object containing subhalo data.
-        """
-        logger.info("Fetching subhalo data...")
-        subhalo_context = self._get_subhalos()
-        return subhalo_context
-
-    def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
-        """
-        Fetches particle data for a given subhalo.
-
-        Parameters:
-        -----------
-        subhalo_id : int
-            ID of the subhalo for which particle data is needed.
-
-        Returns:
-        --------
-        SubhaloParticles
-            A context object containing particle data.
-        """
-        subhalo_id = kwargs.get('subhalo_id', None)
-
-        if subhalo_id is None:
-            logger.error("subhalo_id must be provided in kwargs")
-            raise ValueError("subhalo_id must be provided in kwargs")
-
-        logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
-        return self._get_p_subhalo(subhalo_id)
-
-    def _get_halos(self) -> HaloContext:
-        """
-        Fetches halo data from the Illustris-300 simulation.
-
-        Returns:
-        --------
-        HaloContext
-            A context object containing halo data such as mass, radius, position, and subhalo index.
-        """
-        logger.debug("Fetching halos from Big-Illustris-300...")
-
-        # Units of measure -> [10^10𝑀⊙/ℎ, 𝑐𝑘𝑝𝑐/ℎ, 𝑐𝑘𝑝𝑐/ℎ, int]
-        fields = ["Group_M_Crit200", "Group_R_Crit200", "GroupPos", "GroupFirstSub", "GroupLenType"]
-        path = self.catalog.path + '/output'
-
-        if not os.path.exists(path):
-            logger.error(f"The path {path} does not exist.")
-            raise Exception(f'The path {path} does not exist.')
-
-        halos = il.groupcat.loadHalos(path, self.catalog.snapnum, fields=fields)
-        if len(halos) > 0:
-            scalf = self.catalog.scalf
-            halos['GroupPos'] = [halos['GroupPos'][i] * scalf for i in range(halos['GroupPos'].shape[0])]
-            halos['Group_R_Crit200'] = halos['Group_R_Crit200'] * scalf
-            halos['halo_num_particles'] = halos['GroupLenType'][:, 4] + halos['GroupLenType'][:, 0]
-            del halos['GroupLenType']
-            halos = pd.DataFrame.from_dict(halos)
-            halos['halo_id'] = np.arange(len(halos['Group_M_Crit200']))
-            halos['Group_M_Crit200'] = halos['Group_M_Crit200'] * self.solar_mass_convention # 𝑀⊙/ℎ
-            column_map = {'halo_id': 'halo_id', 'r200': 'Group_R_Crit200', 'm200': 'Group_M_Crit200',
-                          'gpos': 'GroupPos', 'fsub': 'GroupFirstSub', 'halo_num_particles':'halo_num_particles'}
-            logger.debug("Halo data fetched successfully.")
-            return HaloContext(halos, column_map)
-        else:
-            logger.warning("No halos found.")
-            return HaloContext(pd.DataFrame(data=[]), {})
-
-    def _get_subhalos(self) -> SubhaloContext:
-        """
-        Fetches subhalo data from the Illustris-300 simulation.
-
-        Returns:
-        --------
-        SubhaloContext
-            A context object containing subhalo data.
-        """
-        logger.debug("Fetching subhalos from Illustris-300...")
-
-        # Units of measure -> [𝑐𝑘𝑝𝑐/ℎ, int, 𝑐𝑘𝑝𝑐/ℎ, 10^10𝑀⊙/ℎ]
-        fields = ["SubhaloPos", "SubhaloGrNr", "SubhaloHalfmassRadType", "SubhaloMassType"]
-        path = self.catalog.path + '/output'
-
-        if not os.path.exists(path):
-            logger.error(f"The path {path} does not exist.")
-            raise Exception(f'The path {path} does not exist.')
-
-        subhalos = il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=fields)
-        if len(subhalos) > 0:
-            subhalos['spos'] = subhalos['SubhaloPos']
-            subhalos['SubhaloHalfmassRadType'] = subhalos["SubhaloHalfmassRadType"][:, 4]  # stars
-            subhalos['SubhaloMassType'] = subhalos["SubhaloMassType"][:, 4] * self.solar_mass_convention / self.H # 𝑀⊙
-            subhalos['subhalo_id'] = np.arange(len(subhalos['spos']))
-            column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "SubhaloGrNr",
-                          "shmr": "SubhaloHalfmassRadType", "mstr": "SubhaloMassType"}
-            logger.debug("Subhalo data fetched successfully.")
-            subhalo_context = SubhaloContext(subhalos, self.catalog.scalf, column_map)
-            return subhalo_context
-        else:
-            logger.warning("No subhalos found.")
-            return SubhaloContext(pd.DataFrame(data=[]), self.catalog.scalf, {})
-
-    def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
-        """
-        Fetches particle data for a specific subhalo.
-
-        Parameters:
-        -----------
-        isubhalo : int
-            The index of the subhalo from which to retrieve particle data.
-
-        Returns:
-        --------
-        SubhaloParticles
-            A context object containing particle data such as mass, coordinates, and velocities.
-        """
-        logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
-
-        # Units of measure [𝑐𝑘𝑝𝑐/ℎ, 𝑘𝑚𝑎‾√/𝑠, 10^10𝑀⊙/ℎ]
-        fields = ["Coordinates", "Velocities", "Masses"]
-        path = self.catalog.path + '/output'
-
-        if not os.path.exists(path):
-            logger.error(f"The path {path} does not exist.")
-            raise Exception(f'The path {path} does not exist.')
-
-        try:
-
-            star_p = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, "star", fields=fields)
-            if len(star_p) > 0:
-                p = star_p["Coordinates"]
-                v = star_p["Velocities"] * np.sqrt(self.catalog.scalf) # 𝑘𝑚𝑎‾√/𝑠 -> kms-1
-                m = star_p["Masses"] * self.solar_mass_convention
-                logger.debug(f"Particle data fetched successfully, {len(p)} particles retrieved")
-            else:
-                logger.warning(f"No particle data found for subhalo {subhalo_id}.")
-                p = v = m = np.ndarray([])
-            return SubhaloParticles(m, p, v, self.catalog.scalf)
+                if len(star_p) > 0:
+                    for key in fields:
+                        if self.catalog.fields.particles[part_type][key].scaling is not None:
+                            star_p[key] = apply_conversion(self.catalog.fields.particles[part_type], key,
+                                                           star_p[key], self.catalog.a, self.catalog.H)
+                    data[part_type] = star_p
+                    logger.debug(f"Particle data fetched successfully, particles retrieved")
+                else:
+                    logger.warning(f"No particle data found for subhalo {subhalo_id}.")
+            particles = SubhaloParticles(data, self.catalog.fields.particles)
+            return particles
         except Exception as e:
             raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
 
@@ -476,9 +389,7 @@ class EagleFetcher(DataFetcher):
         cfg : DictConfig
             Configuration object containing catalog settings.
         """
-        self.catalog = catalog
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+        super().__init__(catalog, **kwargs)
         logger.info(f"EagleFetcher initialized with config: {catalog}")
 
     def get_halos(self, *args, **kwargs) -> HaloContext:
@@ -532,6 +443,98 @@ class EagleFetcher(DataFetcher):
         logger.info(f"Fetching particle data for subhalo: {subgroup_id}, Group_number: {group_number}")
         return self._get_p_subhalo(subgroup_id, group_number)
 
+    def _get_fields(self):
+        pass
+
+    def _build_query(self, table):
+        # TODO build the conditions with the proper unit measures
+        def _build_conditions(conditions, table) -> str:
+            expr = ''
+            for key, value in conditions.items():
+                if isinstance(value.filter, ListConfig):
+                    for elem in value.filter:
+                        symbol = elem.split(' ')[0]
+                        value = eval(elem.split(' ')[1])
+                        expr += f'{table}.{key} {symbol} {value} AND '
+                elif isinstance(value.filter, str):
+                    symbol = value.filter.split(' ')[0]
+                    value = eval(value.filter.split(' ')[1])
+                    expr += f'{table}.{key} {symbol} {value} AND '
+            return expr[:-4]
+
+        query = None
+
+        halo_conditions = _build_conditions(self.halo_conditions, table='FOF')
+        subhalo_conditions = _build_conditions(self.subhalo_conditions, table='SH')
+
+        if table == 'halo':
+            header = '''
+            SELECT 
+            FOF.GroupID AS halo_id,                          -- Unique identifier for each halo
+            '''
+            for column in self.halo_fields:
+                if column not in header:
+                    header += f'FOF.{column} AS {column},                     -- ... \n'
+
+            query = f"""
+                                SH.GroupNumber AS group_number,                 -- ID FoF, for linking particles
+                                SH.SubGroupNumber AS subhalo_id,                 -- ID of the subhalo
+                                SH.MassType_Star AS subhalo_mass                -- Mass of the subhalo
+                            FROM 
+                                {self.catalog.simulation_code}_FOF AS FOF -- Halo properties
+                            LEFT JOIN 
+                                (
+                                    SELECT 
+                                        SH.GroupID,
+                                        SH.SubGroupNumber,
+                                        SH.GroupNumber, 
+                                        SH.MassType_Star
+                                    FROM 
+                                        {self.catalog.simulation_code}_Subhalo AS SH
+                                    WHERE 
+                                        SH.MassType_Star = (
+                                            SELECT MAX(SH2.MassType_Star) -- Ensure it's the largest subhalo by mass
+                                            FROM {self.catalog.simulation_code}_Subhalo AS SH2
+                                            WHERE SH2.GroupID = SH.GroupID
+                                            AND SH.SnapNum = {self.catalog.snapnum} 
+                                            AND {subhalo_conditions}
+                                        )
+                                ) AS SH ON FOF.GroupID = SH.GroupID
+                            WHERE 
+                                FOF.SnapNum = {self.catalog.snapnum} -- Snapshot for redshift ~0.2
+                                AND {halo_conditions}
+                            """
+            query = header + query
+            return query
+        elif table == 'subhalo':
+            header = '''
+            SELECT
+            FOF.GroupID AS halo_id, -- Halo identifier
+            SH.SubGroupNumber AS subhalo_id, -- Subgroup
+            SH.GroupNumber AS GroupNumber, -- ID FoF, for linking particles
+            '''
+
+            for i, column in enumerate(self.subhalo_fields):
+                if column not in header:
+                    header += f'SH.{column} AS {column},                     -- ... \n'
+
+            query = f"""
+                        FOF.Group_M_Crit200 AS m200 -- Halo mass within R200
+                        FROM
+                            {self.catalog.simulation_code}_FOF AS FOF -- Halo properties
+                        JOIN
+                            {self.catalog.simulation_code}_Subhalo AS SH -- Subhalo properties
+                        ON 
+                            FOF.GroupID = SH.GroupID -- Match subhalos to their parent halos
+                        WHERE
+                            SH.SnapNum = {self.catalog.snapnum} -- Snapshot for redshift ~0.2
+                            AND {halo_conditions} AND {subhalo_conditions}
+                        ORDER BY
+                            SH.SubGroupNumber ASC -- Order results by subhalo id
+                        """
+            query = header + query
+        return query
+
     def _get_halos(self) -> HaloContext:
         """
         Fetches halo data from the Eagle simulation.
@@ -543,58 +546,23 @@ class EagleFetcher(DataFetcher):
         """
         logger.debug("Fetching halos from Eagle...")
         conn = get_connection()
-        query = f"""
-                SELECT 
-                    FOF.GroupID AS halo_id,                          -- Unique identifier for each halo
-                    FOF.Group_M_Crit200 AS m200,                     -- Mass within R200 (critical density)
-                    FOF.Group_R_Crit200 AS r200,                     -- Radius within which density is 200 times the critical density
-                    FOF.GroupCentreOfPotential_x AS pos_x,          -- X coordinate of halo's center
-                    FOF.GroupCentreOfPotential_y AS pos_y,          -- Y coordinate of halo's center
-                    FOF.GroupCentreOfPotential_z AS pos_z,          -- Z coordinate of halo's center
-                    SH.GroupNumber AS group_number,                 -- ID FoF, for linking particles
-                    SH.SubGroupNumber AS subhalo_id,                 -- ID of the subhalo
-                    SH.MassType_Star AS subhalo_mass                -- Mass of the subhalo
-                FROM 
-                    {self.catalog.simulation_code}_FOF AS FOF -- Halo properties
-                LEFT JOIN 
-                    (
-                        SELECT 
-                            SH.GroupID,
-                            SH.SubGroupNumber,
-                            SH.GroupNumber, 
-                            SH.MassType_Star
-                        FROM 
-                            {self.catalog.simulation_code}_Subhalo AS SH
-                        WHERE 
-                            SH.MassType_Star = (
-                                SELECT MAX(SH2.MassType_Star) -- Ensure it's the largest subhalo by mass
-                                FROM {self.catalog.simulation_code}_Subhalo AS SH2
-                                WHERE SH2.GroupID = SH.GroupID AND SH.MassType_Star > {self.subhalo_min_mass}
-                                AND SH.SnapNum = {self.catalog.snapnum} 
-                            )
-                    ) AS SH ON FOF.GroupID = SH.GroupID
-                WHERE 
-                    FOF.Group_M_Crit200 > {self.halo_min_mass}  -- Minimum halo mass threshold
-                    AND FOF.SnapNum = {self.catalog.snapnum} -- Snapshot for redshift ~0.2
-                """
+        query = self._build_query(table='halo')
+
         # Run the query
         array = sql.execute_query(conn, query)
-        # Units of measure [m200=M⊙, r200=kpc/h, gpos=cMpc]
         df = pd.DataFrame(array)
+
         if len(df) > 0:
             df = df.sort_values(by='halo_id')
-            # pkps -> ckps / h
-            scalf = self.catalog.scalf
-            df['gpos'] = df.apply(lambda row: np.array([(row['pos_x'] * scalf) / self.H,
-                                                        (row['pos_y'] * scalf) / self.H,
-                                                        (row['pos_z'] * scalf) / self.H]), axis=1)
-            # TODO review these units
-            df['r200'] = df['r200'].values / (self.H * self.catalog.scalf)    # pkps -> kps / h
-            df['m200'] = df['m200'].values / self.H    # 𝑀⊙/ℎ
             df['halo_id'] = df['halo_id'].astype(int)
-            column_map = {'halo_id': 'halo_id', 'r200': 'r200', 'm200': 'm200', 'gpos': 'gpos', 'fsub': 'subhalo_id',
-                          'group_number': 'group_number'}
-            halo_context = HaloContext(df, column_map=column_map)
+            for column in list(df.columns):
+                # Unit conversion
+                if column in self.halo_fields:
+                    if self.catalog.fields.halo[column].scaling is not None:
+                        df[column] = apply_conversion(self.catalog.fields.halo, column, df[column], self.catalog.a,
+                                                      self.catalog.H)
+
+            halo_context = HaloContext(df, column_map=self.column_map)
             logger.debug("Halo data fetched successfully.")
         else:
             logger.warning("No halo data found in Eagle database.")
@@ -612,50 +580,52 @@ class EagleFetcher(DataFetcher):
         """
         logger.debug("Fetching subhalos from Eagle...")
         conn = get_connection()
-        query = f"""
-            SELECT
-                FOF.GroupID AS halo_id, -- Halo identifier
-                FOF.Group_M_Crit200 AS m200, -- Halo mass within R200
-                SH.GroupNumber AS group_number, -- ID FoF, for linking particles
-                SH.SubGroupNumber AS subhalo_id, -- Subgroup
-                SH.MassType_Star AS total_stellar_mass, -- Total stellar mass in the subhalo
-                SH.HalfMassRad_Star AS stellar_half_mass_radius, --  stellar half-mass radius in the subhalo
-                SH.CentreOfPotential_x AS subhalo_pos_x, --  X coordinate of subhalo's center
-                SH.CentreOfPotential_y AS subhalo_pos_y, --  Y coordinate of subhalo's center
-                SH.CentreOfPotential_z AS subhalo_pos_z --  Z coordinate of subhalo's center
-            FROM
-                {self.catalog.simulation_code}_FOF AS FOF -- Halo properties
-            JOIN
-                {self.catalog.simulation_code}_Subhalo AS SH -- Subhalo properties
-            ON 
-                FOF.GroupID = SH.GroupID -- Match subhalos to their parent halos
-            WHERE
-                SH.MassType_Star > {self.subhalo_min_mass} -- Minimum subhalo stellar mass threshold
-                AND FOF.Group_M_Crit200 > {self.halo_min_mass} -- Minimum halo mass threshold
-                AND SH.SnapNum = {self.catalog.snapnum} -- Snapshot for redshift ~0.2
-            ORDER BY
-                SH.SubGroupNumber ASC -- Order results by subhalo id
-            """
-        # Executing the join is important so we ensure that we are selecting subhalos that are child of valid halos
+        query = self._build_query(table='subhalo')
+
+        # Run the query
         array = sql.execute_query(conn, query)
         df = pd.DataFrame(array)
-        # Units of measure [avg_stellar_half_mass_radius=pkpc, total_stellar_mass=M⊙, spos=cMpc]
+
+        # Remove useless columns
+        df = df.drop(columns=['m200'])
+        df = df.rename(columns={'halo_id': 'id_parents'})
+
         if len(df) > 0:
             df = df.sort_values(by='subhalo_id')
-            # pkps -> ckps / h
-            df['spos'] = df.apply(lambda row: np.array([row['subhalo_pos_x'] / self.H,
-                                                        row['subhalo_pos_y'] / self.H,
-                                                        row['subhalo_pos_z'] / self.H]), axis=1)
-            df['stellar_half_mass_radius'] = df['stellar_half_mass_radius'].values / self.H  # pkps -> ckps / h
-            column_map = {"subhalo_id": "subhalo_id", "spos": "spos", "id_parents": "halo_id",
-                          "shmr": "stellar_half_mass_radius", "mstr": "total_stellar_mass",
-                          "group_number": "group_number"}
-            subhalo_context = SubhaloContext(df, self.catalog.scalf, column_map)
+            for column in list(df.columns):
+                # Unit conversion
+                if column in self.subhalo_fields:
+                    if self.catalog.fields.subhalo[column].scaling is not None:
+                        df[column] = apply_conversion(self.catalog.fields.subhalo, column, df[column], self.catalog.a,
+                                                      self.catalog.H)
+            subhalo_context = SubhaloContext(df, self.column_map)
             logger.debug("Subhalo data fetched successfully.")
         else:
             logger.warning("No subhalo data found in Eagle database.")
-            subhalo_context = SubhaloContext(pd.DataFrame(data=[]), self.catalog.scalf, {})
+            subhalo_context = SubhaloContext(pd.DataFrame(data=[]), self.column_map)
         return subhalo_context
+
+    @staticmethod
+    def __partTypeNum(partType):
+        """ Mapping between common names and numeric particle types. """
+        if str(partType).isdigit():
+            return int(partType)
+
+        if str(partType).lower() in ['gas', 'cells']:
+            return 0
+        if str(partType).lower() in ['dm', 'darkmatter']:
+            return 1
+        if str(partType).lower() in ['dmlowres']:
+            return 2  # only zoom simulations, not present in full periodic boxes
+        if str(partType).lower() in ['tracer', 'tracers', 'tracermc', 'trmc']:
+            return 3
+        if str(partType).lower() in ['star', 'stars', 'stellar']:
+            return 4  # only those with GFM_StellarFormationTime>0
+        if str(partType).lower() in ['wind']:
+            return 4  # only those with GFM_StellarFormationTime<0
+        if str(partType).lower() in ['bh', 'bhs', 'blackhole', 'blackholes']:
+            return 5
+        raise Exception("Unknown particle type name.")
 
     def _get_p_subhalo(self, subgroup_id: int, group_number: int):
         """
@@ -673,35 +643,68 @@ class EagleFetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data such as mass, coordinates, and velocities.
         """
-        itype = 4  # PartType
-        path = self.catalog.path
-        if not os.path.exists(path):
-            logger.error(f"The path {path} does not exist.")
-            raise Exception(f'The path {path} does not exist.')
-        data = {
-            'mass': read_dataset(itype, 'Mass', path),
-            'coords': read_dataset(itype, 'Coordinates', path),
-            'velocity': read_dataset(itype, 'Velocity', path),
-            'GroupNumber': read_dataset(itype, 'GroupNumber', path),
-            'SubGroupNumber': read_dataset(itype, 'SubGroupNumber', path)
-        }
+        try:
+            path = self.catalog.path
+            part_types = self.particle_fields
+            data = {}
+            for part_type in part_types:
+                data_part_type = {}
+                itype = self.__partTypeNum(part_type)
+                OmegaConf.set_struct(self.catalog, False)
+                self.catalog.fields.particles[part_type]["GroupNumber"] = {
+                    "input": None,
+                    "output": None,
+                    "scaling": None,
+                    "name": "group_number"
+                }
+                self.catalog.fields.particles[part_type]["SubGroupNumber"] = {
+                    "input": None,
+                    "output": None,
+                    "scaling": None,
+                    "name": "subhalo_id"
+                }
+                OmegaConf.set_struct(self.catalog, True)
 
-        data['coords'] = [data['coords'][i] for i in range(data['coords'].shape[0])]
-        data['velocity'] = [data['velocity'][i] for i in range(data['velocity'].shape[0])]
+                fields = list(self.catalog.fields.particles[part_type].keys())
+                if not os.path.exists(path):
+                    logger.error(f"The path {path} does not exist.")
+                    raise Exception(f'The path {path} does not exist.')
 
-        tmp = pd.DataFrame(data)
-        data_filtered = tmp[(tmp['GroupNumber'] == group_number) & (tmp['SubGroupNumber'] == subgroup_id)]
+                for field in fields:
+                    # TODO deal with the conversion !!
+                    column = read_dataset(itype, field, path)
+                    if self.catalog.fields.particles[part_type][field].scaling is not None:
+                        column = apply_conversion(self.catalog.fields.particles[part_type], field,
+                                                  column, self.catalog.a, self.catalog.H)
+                    data_part_type[field] = column
 
-        if len(data_filtered) == 0:
-            logger.error(f'Error, there is not particle data for GroupNumber={group_number} and '
-                         f'SubGroupNumber={subgroup_id}')
-            raise ValueError(f'Error, there is not particle data for GroupNumber={group_number} and'
-                             f' SubGroupNumber={subgroup_id}')
-        else:
-            logger.debug(f"Particle data fetched successfully, {len(data_filtered)} particles retrieved.")
+                    # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
+                    if column.ndim > 1:
+                        converted = to_list(data_part_type, field)
+                        del data_part_type[field]
+                        data_part_type[field] = converted
 
-        velocity = np.vstack(data_filtered['velocity'].values)
-        positions = np.vstack(data_filtered['coords'].values)
-        subhalo_particles = SubhaloParticles(data_filtered['mass'].values, positions, velocity, self.catalog.scalf)
-        return subhalo_particles
+                tmp = pl.DataFrame(data_part_type)
+                # Create index with these two columns for speed
+                tmp.filter((pl.col('GroupNumber') == group_number) & (pl.col('SubGroupNumber') == subgroup_id))
+                if len(tmp) == 0:
+
+                    logger.error(f'Error, there is not particle data for GroupNumber={group_number} and '
+                                 f'SubGroupNumber={subgroup_id}')
+                    raise ValueError(f'Error, there is not particle data for GroupNumber={group_number} and'
+                                     f' SubGroupNumber={subgroup_id}')
+                data[part_type] = tmp.to_dict()
+            else:
+                logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
+
+            subhalo_particles = SubhaloParticles(data, self.catalog.fields.particles)
+            return subhalo_particles
+
+        except Exception as e:
+            raise Exception(f'Something went wrong: {e}')
+
+
+
+
+
 

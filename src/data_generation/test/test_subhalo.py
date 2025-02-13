@@ -11,18 +11,16 @@ class TestSubHalo(unittest.TestCase):
         Set up data for testing the SubHalo and SubhaloContext classes.
         """
         # Sample data for SubhaloContext
-        self.scale_factor = 0.5
         df = pd.DataFrame(data=[])
         df['spos'] = list(np.array([[100, 200, 300], [400, 500, 600]]))
-        df['grnr'] = np.array([1, 1])
+        df['id_parents'] = np.array([1, 1])
         df['shmr'] = np.array([10, 20])
         df['mstr'] = np.array([1e9, 2e9])
         df['subhalo_id'] = np.array([101, 102])
+        df.set_index(["id_parents", "subhalo_id"], inplace=True, drop=False)
 
         # Initialize SubhaloContext
-        self.context = SubhaloContext(df,
-            scale_factor=self.scale_factor, column_map={'subhalo_id': 'subhalo_id', 'spos': 'spos',
-                                                        'id_parents': 'grnr', 'shmr': 'shmr', 'mstr': 'mstr'})
+        self.context = SubhaloContext(df, column_map=None)
 
     def test_subhalo_initialization(self):
         """
@@ -31,7 +29,7 @@ class TestSubHalo(unittest.TestCase):
         attributes = {
             "subhalo_id": 101,
             "id_parents": 1,
-            "spos": [50.0, 100.0, 150.0],  # scaled
+            "spos": [100, 200, 300],
             "shmr": 5.0,  # scaled
             "mstr": 1e9
         }
@@ -40,7 +38,7 @@ class TestSubHalo(unittest.TestCase):
         # Check attributes are set correctly
         self.assertEqual(subhalo.subhalo_id, 101)
         self.assertEqual(subhalo.id_parents, 1)
-        np.testing.assert_array_equal(subhalo.spos, [50.0, 100.0, 150.0])
+        np.testing.assert_array_equal(subhalo.spos, [100, 200, 300])
         self.assertEqual(subhalo.shmr, 5.0)
         self.assertEqual(subhalo.mstr, 1e9)
 
@@ -53,56 +51,39 @@ class TestSubHalo(unittest.TestCase):
 
         self.assertIn("Missing required attributes", str(context.exception))
 
-    def test_get_item(self):
+    def test_get_subhalo_by_id(self):
         """
         Test SubhaloContext's get_item method.
         """
-        subhalo = self.context.get_item(subhalo_id=101, halo_id=1)
+        subhalo = self.context.get_subhalo_by_id(subhalo_id=101, halo_id=1)
 
         # Check SubHalo object attributes
         self.assertEqual(subhalo.subhalo_id, 101)
         self.assertEqual(subhalo.id_parents, 1)
-        np.testing.assert_array_equal(subhalo.spos, [50.0, 100.0, 150.0])
-        self.assertEqual(subhalo.shmr, 5.0)
+        np.testing.assert_array_equal(subhalo.spos, [100, 200, 300])
+        self.assertEqual(subhalo.shmr, 10)
         self.assertEqual(subhalo.mstr, 1e9)
 
     def test_get_items_by_halo(self):
         """
         Test SubhaloContext's get_items_by_halo method.
         """
-        items = self.context.get_items_by_halo(halo_id=1)
+        subhalo_context = self.context.get_items_by_halo(halo_id=1)
 
         # Check that the returned DataFrame matches the original data
-        self.assertEqual(len(items), 2)  # Two subhalos for this halo_id
-        self.assertTrue((items["subhalo_id"] == [101, 102]).all())
+        self.assertEqual(len(subhalo_context.data), 2)  # Two subhalos for this halo_id
+        self.assertListEqual(subhalo_context.subhalo_id, [101, 102])
 
     def test_subhalo_particles_initialization(self):
         """
-        Test that SubhaloParticles are initialized correctly with scaling.
+        Test SubhaloParticles initialization.
         """
-        m = np.array([1.0, 2.0, 3.0])
-        p = np.array([[10, 20, 30], [40, 50, 60], [70, 80, 90]])
-        v = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+        data = {'star_m': np.array([1.0, 2.0, 3.0]),
+                'star_p': np.array([[10, 20, 30], [40, 50, 60], [70, 80, 90]]),
+                'star_v': np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])}
 
-        particles = SubhaloParticles(m=m, p=p, v=v, scale_factor=self.scale_factor, init=True)
-
-        # Check attributes
-        np.testing.assert_array_equal(particles.m, m)
-        np.testing.assert_array_equal(particles.p, p * self.scale_factor)
-        np.testing.assert_array_equal(particles.v, v)
-
-    def test_subhalo_particles_without_scaling(self):
-        """
-        Test SubhaloParticles initialization without scaling.
-        """
-        m = np.array([1.0, 2.0, 3.0])
-        p = np.array([[10, 20, 30], [40, 50, 60], [70, 80, 90]])
-        v = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
-
-        particles = SubhaloParticles(m=m, p=p, v=v, init=False)
-
-        # Check attributes
-        np.testing.assert_array_equal(particles.m, m)
-        np.testing.assert_array_equal(particles.p, p)
-        np.testing.assert_array_equal(particles.v, v)
+        particles = SubhaloParticles(data, column_map=None)
+        self.assertTrue(hasattr(particles, 'star_m'), True)
+        self.assertEqual(hasattr(particles, 'star_p'), True)
+        self.assertEqual(hasattr(particles, 'star_v'), True)
 

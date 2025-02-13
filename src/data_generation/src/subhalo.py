@@ -1,5 +1,9 @@
+from collections import Counter
+
 import numpy as np
 import pandas as pd
+import polars as pl
+from omegaconf import DictConfig
 
 
 class SubHalo:
@@ -74,7 +78,7 @@ class SubhaloContext:
     subhalo_id:
         Property to retrieve the `subhalo_id` column from the stored DataFrame.
     """
-    def __init__(self, properties: pd.DataFrame, scale_factor: float, column_map) -> None:
+    def __init__(self, df: pd.DataFrame, column_map) -> None:
         """
         Initialize the SubhaloContext with properties of subhalos.
 
@@ -87,33 +91,47 @@ class SubhaloContext:
         column_map : dict
             Dictionary defining the mapping of expected fields to the keys/columns in `properties`.
         """
+        if column_map is None:
+            self.data = df
 
-        required_fields = ["subhalo_id", "spos", "id_parents", "shmr", "mstr"]
-        for field in required_fields:
-            if field not in column_map:
-                raise ValueError(f"Missing required field '{field}' in column_map.")
+        else:
+            # Create a DataFrame and set index
+            df = df.rename(columns=column_map)
 
-        properties[column_map["shmr"]] = properties[column_map["shmr"]] * scale_factor
-        properties[column_map["spos"]] = [spos_i * scale_factor for spos_i in properties[column_map["spos"]]]
+            # Count occurrences of each column
+            column_counts = Counter(df.columns)
+            duplicates = {col: count for col, count in column_counts.items() if count > 1}
 
-        # Create a DataFrame
-        self.data = pd.DataFrame({
-            "id_parents": properties[column_map["id_parents"]],  # Halo IDs
-            "subhalo_id": properties[column_map["subhalo_id"]],  # Subhalo IDs
-            "spos": properties[column_map["spos"]],  # Scaled positions
-            "shmr": list(properties[column_map["shmr"]]),  # Scaled half-mass radius
-            "mstr": list(properties[column_map["mstr"]])  # Stellar mass
-        })
+            # Join columns with the same name if any
+            for duplicated in duplicates:
+                tmp = df[duplicated].to_numpy()
+                df.drop(columns=[duplicated], inplace=True)
+                df[duplicated] = list(tmp)
 
-        # Add any additional fields dynamically
-        for key, col_name in column_map.items():
-            if key not in required_fields:
-                self.data[key] = properties[col_name]
+            self.data = df
 
-        # Set a multi-index for efficient querying
-        self.data.set_index(["id_parents", "subhalo_id"], inplace=True, drop=False)
+            for column in df.columns:
+                if column not in column_map.values():
+                    if column not in ['subhalo_id', 'id_parents']:
+                        self.data.drop(columns=[column], inplace=True)
 
-    def get_item(self, subhalo_id, halo_id=None) -> SubHalo:
+            # Set a multi-index for efficient querying
+            self.data.set_index(["id_parents", "subhalo_id"], inplace=True, drop=False)
+
+    def preprocess(self, halo_df: pd.DataFrame):
+        # Add missing columns
+        if 'spos' in self.data:
+            self.data.loc[:, 'spos'] = self.data.apply(lambda row: row['spos'] - halo_df.gpos, axis=1)
+        # ...
+
+    @classmethod
+    def from_dataframe(cls, df: pd.DataFrame):
+        return SubhaloContext(df, None)
+
+    def __getitem__(self, index):
+        return SubhaloContext.from_dataframe(self.data[index])  # Return a new instance with sliced data
+
+    def get_subhalo_by_id(self, subhalo_id, halo_id=None) -> SubHalo:
         """
         Retrieve a subhalo's properties given its subhalo ID and optional halo ID.
 
@@ -146,8 +164,7 @@ class SubhaloContext:
         except KeyError:
             raise Exception(f"Subhalo not found for halo_id={halo_id}, subhalo_id={subhalo_id}.")
 
-    # TODO modify this
-    def get_items_by_halo(self, halo_id) -> pd.DataFrame:
+    def get_items_by_halo(self, halo_id):
         """
         Retrieve all subhalos associated with a specific halo ID.
 
@@ -167,7 +184,8 @@ class SubhaloContext:
             If no subhalos are found for the given `halo_id`.
         """
         try:
-            return self.data.loc[halo_id]
+            df = self.data.loc[halo_id]
+            return SubhaloContext.from_dataframe(df)
         except KeyError:
             raise Exception(f"No subhalos found for halo_id={halo_id}.")
 
@@ -245,32 +263,55 @@ class SubhaloParticles:
     __init__(m, p, v, scale_factor=None, init=True):
         Initializes the SubhaloParticles object with particle mass, position, and velocity data.
     """
-    def __init__(self, m: np.ndarray, p: np.ndarray, v: np.ndarray,
-                 scale_factor: float = None, init: bool = True) -> None:
+    def __init__(self, data: dict, column_map: DictConfig) -> None:
         """
         Initialize the SubhaloParticles with mass, position, and velocity data.
 
         Parameters:
         -----------
-        m : np.ndarray
-            The mass of particles.
-        p : np.ndarray
-            The positions of particles. Should be of shape (N, 3) where N is the number of particles.
-        v : np.ndarray
-            The velocities of particles. Should also be of shape (N, 3).
-        scale_factor : float, optional
-            The scale factor to apply to positions and velocities. Defaults to None.
-        init : bool, optional
-            If True, initializes the attributes with conversion. Defaults to True.
+        ..
         """
-        if init:
-            self.m = m
-            self.p = p * scale_factor
-            self.v = v
+        # TODO decide if to keep subhalo id, group_number
+        # TODO make empty ?
+        def dict_depth(d, level=0):
+            if not isinstance(d, dict) or not d:
+                return level
+            return max(dict_depth(v, level + 1) for v in d.values())
+
+        if column_map is None:
+            if dict_depth(data) == 1:
+                for var in data:
+                    value = data[var]
+                    if isinstance(value, pl.Series):
+                        value = value.to_numpy()
+                    elif isinstance(value, list):
+                        value = np.array(value)
+                    setattr(self, var, value)
+
+            elif dict_depth(data) == 2:
+                for part_type in data:
+                    for var in data[part_type]:
+                        value = data[part_type][var]
+                        if isinstance(value, pl.Series):
+                            value = value.to_numpy()
+                        elif isinstance(value, list):
+                            value = np.array(value)
+                        setattr(self, f'{part_type}_{var}', value)
         else:
-            self.m = m
-            self.p = p
-            self.v = v
+            for part_type in data:
+                for var in data[part_type]:
+                    if var in column_map[part_type]:
+                        value = data[part_type][var]
+                        if isinstance(value, pl.Series):
+                            value = value.to_numpy()
+                        elif isinstance(value, list):
+                            value = np.array(value)
+                        name = column_map[part_type][var].name
+                        # Add attr with that provided name
+                        setattr(self, f'{part_type}_{name}', value)
+
+
+
 
 
 

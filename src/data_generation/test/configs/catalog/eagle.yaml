@@ -1,0 +1,113 @@
+name: eagle
+a: 0.846
+#a: 0.84551589459619
+H: 0.6774
+snapnum: 26          # redshift 0.18
+simulation_code: RefL0100N1504
+fov: 537.62   # 2 * 268.81 kpc
+spatial_resolution: 2.02 # kpc
+
+#   TODO SEE HOW TO AUMOTATE THIS, not working with interpolation
+path: ${paths.datasets_dir}/eagle/RefL0100N1504
+
+
+# Add per each feature its unit conversion + scalf, hubble (mandatory)
+# https://arxiv.org/pdf/1510.01320
+# TODO double check with Ilaria
+fields:
+  halo:
+    Group_M_Crit200:
+      input: "Msun"
+      output: "Msun/h"
+      scaling: "x * h"
+      name: 'm200'
+      filter: [ "> 6.77*1e12", "< 6.77*1e13" ]
+    Group_R_Crit200:
+      input: "pkpc"
+      output: "pkpc/h"
+      scaling: "x * h"
+      name: 'r200'
+    GroupCentreOfPotential_x:
+      input: "cMpc"
+      output: "pkpc/h"
+      scaling: "x * 1e3 * a * h"
+      name: 'gpos'
+    GroupCentreOfPotential_y:
+      input: "cMpc"
+      output: "pkpc/h"
+      scaling: "x * 1e3 * a * h"
+      name: 'gpos'
+    GroupCentreOfPotential_z:
+      input: "cMpc"
+      output: "pkpc/h"
+      scaling: "x * 1e3 * a * h"
+      name: 'gpos'
+    GroupID:
+      input: null
+      output: null
+      scaling: null
+      name: "halo_id"
+  subhalo:
+    CentreOfPotential_x:
+      input: "cMpc"
+      output: "pkpc/h"
+      scaling: "x * 1e3 * a * h"
+      name: "spos"
+    CentreOfPotential_y:
+      input: "cMpc"
+      output: "pkpc/h"
+      scaling: "x * 1e3 * a * h"
+      name: "spos"
+    CentreOfPotential_z:
+      input: "cMpc"
+      output: "pkpc/h"
+      scaling: "x * 1e3 * a * h"
+      name: "spos"
+    MassType_Star:
+      input: "Msun"
+      output: "Msun"
+      scaling: "x"
+      name: "mstr"
+      filter: "> 1e10"
+    HalfMassRad_Star:
+      input: "pkpc"
+      output: "pkpc/h"
+      scaling: "x * h"
+      name: 'shmr'
+    SubGroupNumber:
+      input: null
+      output: null
+      scaling: null
+      name: "subhalo_id"
+    GroupNumber:
+      input: null
+      output: null
+      scaling: null
+      name: "group_number"
+  # TODO clarify the units with Ilaria
+  # https://arxiv.org/pdf/1706.09899
+  particles:
+    star:
+      Coordinates:
+        input: "cMpc/h"
+        output: "pkpc/h"
+        scaling: "x * 1e3"
+        name: "p"
+      Velocity:
+        input: "kma/s^-1"
+        output: "km/s^-1"
+        scaling: "x * math.sqrt(a)"
+        name: "v"
+      Mass:
+        input: "Msuna/h"
+        output: "Msun/h"
+        scaling: "x / a"
+        name: "m"
+    gas:
+      Mass:
+        input: "10^10 Msun/h"
+        output: "Msun/h"
+        scaling: "x * 1e10"
+        name: "m"
+
+

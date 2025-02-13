@@ -1,3 +1,5 @@
+from collections import Counter
+
 import numpy as np
 import pandas as pd
 
@@ -69,7 +71,7 @@ class HaloContext:
     halo_id:
         Property to retrieve the halo_id column from the stored DataFrame.
     """
-    def __init__(self, properties: pd.DataFrame, column_map):
+    def __init__(self, df: pd.DataFrame, column_map):
         """
         Initialize a HaloContext object with scaled halo properties, stored in a Pandas DataFrame.
 
@@ -90,33 +92,44 @@ class HaloContext:
                     "fsub": "GroupFirstSub"
                 }
         """
-        if not isinstance(properties, pd.DataFrame):
-            raise Exception(f"Halo properties must be a pd.DataFrame instead of {type(properties)}")
+        if column_map is None:
+            self.data = df
 
-        required_fields = ["halo_id", "r200", "m200", "gpos", "fsub"]
-        for field in required_fields:
-            if field not in column_map:
-                raise ValueError(f"Missing required field '{field}' in column_map.")
+        else:
+            if not isinstance(df, pd.DataFrame):
+                raise Exception(f"Halo data must be a pd.DataFrame instead of {type(df)}")
 
-        # Map and process data
-        data = {
-            "halo_id": properties[column_map["halo_id"]],
-            "r200": properties[column_map["r200"]],
-            "m200": properties[column_map["m200"]],
-            "gpos": list(properties[column_map["gpos"]]),
-            "fsub": properties[column_map["fsub"]].astype(int)
-        }
+            # Create a DataFrame and set index
+            df = df.rename(columns=column_map)
+            df = df.rename(columns={'subhalo_id': 'fsub'})
 
-        # Add any additional fields dynamically
-        for key, col_name in column_map.items():
-            if key not in required_fields:
-                data[key] = properties[col_name]
+            # Count occurrences of each column
+            column_counts = Counter(df.columns)
+            duplicates = {col: count for col, count in column_counts.items() if count > 1}
 
-        # Create a DataFrame and set index
-        self.data = pd.DataFrame(data)
-        self.data.set_index("halo_id", inplace=True, drop=False)
+            # Join columns with the same name if any
+            for duplicated in duplicates:
+                tmp = df[duplicated].to_numpy()
+                df.drop(columns=[duplicated], inplace=True)
+                df[duplicated] = list(tmp)
 
-    def get_item(self, halo_id) -> Halo:
+            self.data = df
+
+            for column in df.columns:
+                if column not in column_map.values():
+                    if column not in ['halo_id', 'fsub']:
+                        self.data.drop(columns=[column], inplace=True)
+
+            self.data.set_index("halo_id", inplace=True, drop=False)
+
+    @classmethod
+    def from_dataframe(cls, df: pd.DataFrame):
+        return HaloContext(df, None)
+
+    def __getitem__(self, index):
+        return HaloContext.from_dataframe(self.data[index])  # Return a new instance with sliced data
+
+    def get_halo_by_id(self, halo_id) -> Halo:
         """
         Retrieve the properties for a specific halo ID and return a corresponding Halo object.
 
