@@ -74,11 +74,9 @@ class BCELitModule(LightningModule):
         self.val_RASE = RelativeAverageSpectralError(window_size=8)
         self.test_RASE = RelativeAverageSpectralError(window_size=8)
 
-        
         self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
-
 
         # for averaging loss across batches
         self.train_loss = MeanMetric()
@@ -163,6 +161,8 @@ class BCELitModule(LightningModule):
         :param batch_idx: The index of the current batch.
         :return: A tensor of losses between model predictions and targets.
         """
+        # We're having a memory leak, so better play safe
+        self.optimizer.zero_grad(set_to_none=True)
         loss, preds, targets = self.model_step(batch)
 
         # update and log metrics
