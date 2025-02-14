@@ -104,6 +104,9 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     # Fit as normal with new batch size
     trainer.fit(model)
+    batch_size = model.train_dataloader.batch_size  # If dataloader is an attribute
+
+    print(f"--> Optimal batch size: {batch_size}")
 
     object_dict = {
         "cfg": cfg,
