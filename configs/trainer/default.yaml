@@ -12,7 +12,6 @@ devices: 1
 
 accumulate_grad_batches: 4
 
-# Optional configuration for device monitoring
 callbacks:
   - _target_: lightning.pytorch.callbacks.DeviceStatsMonitor
     cpu_stats: True
@@ -20,7 +19,7 @@ callbacks:
   - _target_: lightning.pytorch.callbacks.StochasticWeightAveraging
     swa_lrs: 1e-2
 
-# mixed precision for extra speed-up
+# (optional) mixed precision for extra speed-up
 # precision: 16
 
 # perform a validation loop every N training epochs
