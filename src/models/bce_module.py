@@ -49,6 +49,7 @@ class BCELitModule(LightningModule):
         optimizer: torch.optim.Optimizer,
         scheduler: torch.optim.lr_scheduler,
         compile: bool,
+        batch_size: int = 8,
     ) -> None:
         """Initialize a `LitModule`.
 
