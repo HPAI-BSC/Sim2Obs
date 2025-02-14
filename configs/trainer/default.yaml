@@ -12,12 +12,12 @@ devices: 1
 
 accumulate_grad_batches: 4
 
-callbacks:
-  - _target_: lightning.pytorch.callbacks.DeviceStatsMonitor
-    cpu_stats: True
-    gpu_stats: True
-  - _target_: lightning.pytorch.callbacks.StochasticWeightAveraging
-    swa_lrs: 1e-2
+#callbacks:
+#  - _target_: lightning.pytorch.callbacks.DeviceStatsMonitor
+#    cpu_stats: True
+#    gpu_stats: True
+#  - _target_: lightning.pytorch.callbacks.StochasticWeightAveraging
+#    swa_lrs: 1e-2
 
 # (optional) mixed precision for extra speed-up
 # precision: 16
