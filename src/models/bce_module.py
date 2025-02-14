@@ -174,7 +174,6 @@ class BCELitModule(LightningModule):
             gradient_clip_algorithm="norm"
         )
 
-
         loss, preds, targets = self.model_step(batch)
 
         # update and log metrics
