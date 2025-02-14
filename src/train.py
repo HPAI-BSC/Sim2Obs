@@ -97,7 +97,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     tuner = Tuner(trainer)
 
     # Auto-scale batch size by growing it exponentially (default)
-    tuner.scale_batch_size(model, mode="power")
+    optimal_bs = tuner.scale_batch_size(model, mode="power")
 
     # Auto-scale batch size with binary search
     #tuner.scale_batch_size(model, mode="binsearch")
@@ -105,7 +105,8 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     # Fit as normal with new batch size
     trainer.fit(model)
 
-    print(f"--> Optimal batch size: {model.batch_size }")
+    print(f"--> Optimal batch size2: {optimal_bs}")
+    print(f"--> Optimal batch size: {model.hparams.batch_size }")
 
     object_dict = {
         "cfg": cfg,
