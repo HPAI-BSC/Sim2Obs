@@ -178,8 +178,8 @@ class BCELitModule(LightningModule):
 
         # update and log metrics
         self.train_loss(loss)
-        self.train_RASE(preds.to(torch.float32), targets.to(torch.float32))
-        self.train_rmse(preds.to(torch.float32), targets.to(torch.float32))
+        self.train_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.train_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
@@ -191,11 +191,11 @@ class BCELitModule(LightningModule):
         "Lightning hook that is called when a training epoch ends."
         # Better play safe to avoid memory leaks.
         torch.cuda.empty_cache()
-        self.train_loss.reset()
-        self.train_RASE.reset()
-        self.train_rmse.reset()
-        self.val_loss.reset()
-        self.val_RASE.reset()
+        #self.train_loss.reset()
+        #self.train_RASE.reset()
+        #self.train_rmse.reset()
+        #self.val_loss.reset()
+        #self.val_RASE.reset()
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single validation step on a batch of data from the validation set.
