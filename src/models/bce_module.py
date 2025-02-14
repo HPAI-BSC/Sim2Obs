@@ -162,7 +162,19 @@ class BCELitModule(LightningModule):
         :return: A tensor of losses between model predictions and targets.
         """
         # We're having a memory leak, so better play safe
-        self.optimizer.zero_grad(set_to_none=True)
+        #self.optimizer.zero_grad(set_to_none=True)
+        self.trainer.optimizers[0].zero_grad(set_to_none=True)
+        if batch_idx % 25 == 0:
+            torch.cuda.empty_cache()
+
+        # Use gradient clipping to prevent memory spikes
+        self.clip_gradients(
+            optimizer=self.trainer.optimizers[0],
+            gradient_clip_val=0.5,
+            gradient_clip_algorithm="norm"
+        )
+
+
         loss, preds, targets = self.model_step(batch)
 
         # update and log metrics

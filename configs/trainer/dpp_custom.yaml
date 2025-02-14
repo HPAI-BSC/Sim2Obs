@@ -1,0 +1,22 @@
+defaults:
+  - default
+
+strategy: ddp
+
+accelerator: gpu
+devices: 1
+num_nodes: 1
+sync_batchnorm: True
+
+# precision="16-mixed",
+accumulate_grad_batches: 4
+gradient_clip_val: 0.5
+
+# Optional configuration for device monitoring
+callbacks:
+  - _target_: lightning.pytorch.callbacks.DeviceStatsMonitor
+    cpu_stats: True
+    gpu_stats: True
+
+# Optional: enable auto batch size finding
+auto_scale_batch_size: "power"  # or "binsearch"
