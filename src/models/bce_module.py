@@ -191,11 +191,11 @@ class BCELitModule(LightningModule):
         "Lightning hook that is called when a training epoch ends."
         # Better play safe to avoid memory leaks.
         torch.cuda.empty_cache()
-        #self.train_loss.reset()
-        #self.train_RASE.reset()
-        #self.train_rmse.reset()
-        #self.val_loss.reset()
-        #self.val_RASE.reset()
+        self.train_loss.reset()
+        self.train_RASE.reset()
+        self.train_rmse.reset()
+        self.val_loss.reset()
+        self.val_RASE.reset()
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single validation step on a batch of data from the validation set.
