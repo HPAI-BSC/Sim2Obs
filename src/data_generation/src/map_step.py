@@ -67,7 +67,7 @@ class MapStep(PipelineStep):
         }
 
     def _create_maps(self, cosmos_data: CosmosData, input_feature: FeatureProcessor,
-                     output_feature: FeatureProcessor) -> List:
+                     output_feature: FeatureProcessor, dim: int) -> List:
         """
         Generates projection maps for both input and output features.
 
@@ -79,29 +79,33 @@ class MapStep(PipelineStep):
         Returns:
             List: A list of tuples containing the generated maps for each projection.
         """
-        ranging = ((-self.r, self.r), (-self.r, self.r))  # Defines the range for the 2D maps
+        if dim == 2:
+            ranging = ((-self.r, self.r), (-self.r, self.r))  # Defines the range for the 2D maps
 
-        # Create three different maps based on projections onto different coordinate planes (X-Y, Y-Z, X-Z).
-        # Break up the 2D spatial plane into small regions (bins), compute the mean of the squared velocities
-        # in each region, and return the resulting grid of values.
-        pos_rot = cosmos_data.subhalo_particle_positions
+            # Create three different maps based on projections onto different coordinate planes (X-Y, Y-Z, X-Z).
+            # Break up the 2D spatial plane into small regions (bins), compute the mean of the squared velocities
+            # in each region, and return the resulting grid of values.
 
-        # Map for the input feature
-        input_xy, _, biny_xy = input_feature.generate_map(pos_rot, self.bins, ranging, axis=(0, 1))
-        input_yz, _, biny_yz = input_feature.generate_map(pos_rot, self.bins, ranging, axis=(1, 2))
-        input_xz, _, biny_xz = input_feature.generate_map(pos_rot, self.bins, ranging, axis=(0, 2))
+            # Map for the input feature
+            subhalo_particles = cosmos_data.subhalo_particles
+            input_xy, _, biny_xy = input_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(0, 1))
+            input_yz, _, biny_yz = input_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(1, 2))
+            input_xz, _, biny_xz = input_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(0, 2))
 
-        # Map for the output feature
-        output_xy, _, _ = output_feature.generate_map(pos_rot, self.bins, ranging, axis=(0, 1))
-        output_yz, _, _ = output_feature.generate_map(pos_rot, self.bins, ranging, axis=(1, 2))
-        output_xz, _, _ = output_feature.generate_map(pos_rot, self.bins, ranging, axis=(0, 2))
+            # Map for the output feature
+            output_xy, _, _ = output_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(0, 1))
+            output_yz, _, _ = output_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(1, 2))
+            output_xz, _, _ = output_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(0, 2))
 
-        maps = [
-            (input_xy, output_xy, biny_xy),
-            (input_yz, output_yz, biny_yz),
-            (input_xz, output_xz, biny_xz)
-        ]
-        return maps
+            maps = [
+                (input_xy, output_xy, biny_xy),
+                (input_yz, output_yz, biny_yz),
+                (input_xz, output_xz, biny_xz)
+            ]
+            return maps
+        elif dim == 3:
+            # axis will be none
+            pass
 
     def _get_interlopers_id(self, cosmos_data: CosmosData) -> np.ndarray:
         """
@@ -172,6 +176,7 @@ class MapStep(PipelineStep):
                 # For each interloper get its center position (h, k) and its radius
                 subhalo = cosmos_data.subhalos[cosmos_data.subhalos['subhalo_id'] == i]
                 subhalo = subhalo.reset_index(drop=True)
+                # TODO check this columns exists other wise raise exception
                 h = subhalo.iloc[0]['spos'][0]
                 k = subhalo.iloc[0]['spos'][1]
                 rradius = subhalo.iloc[0]['shmr']
@@ -285,7 +290,6 @@ class MapStep(PipelineStep):
                                    projection_str, rotation_axis, rotation_iteration, i)
             np.savez(input_path, input_feature_with_mask)
             np.savez(output_path, output_feature_with_mask)
-        #logger.info(f'Finished generating zooms for projection {projection_str}')
 
     def _process_projection(self, feature_size, interlopers_id: np.ndarray, biny_i, projection: str, rotation_axis: str,
                             rotation_iteration: int,  cosmos_data: CosmosData, input_feature: FeatureProcessor,
@@ -334,24 +338,28 @@ class MapStep(PipelineStep):
         ------
         This method generates three different map projections, processes them, and updates the features and metadata accordingly.
         """
+        dim = kwargs['dim']
         rotation_axis = kwargs['rotation_axis']
         rotation_iteration = kwargs['rotation_iteration']
         logger.debug(f'Rotation axis: {rotation_axis}, rotation_iteration: {rotation_iteration}')
         for halo, _ in g:
             try:
-                start_time = time.time()
+                # TODO do we want to call this always ? use case Sebastian
                 interlopers_id = self._get_interlopers_id(cosmos_data)
-                io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
-                projections = ["xy", "yz", "xz"]
+                io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature, dim)
 
-                for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
-                    projection_name = projections[j]
-                    input_feature.map = map_f_i
-                    output_feature.map = map_f_o
-                    self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, rotation_axis,
-                                             rotation_iteration, cosmos_data, input_feature, output_feature)
-                elapsed_time = time.time() - start_time
-                logger.info(f"Map step time for halo {halo.halo_id} with time: {elapsed_time}")
+                if dim == 2:
+                    projections = ["xy", "yz", "xz"]
+                    for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
+                        projection_name = projections[j]
+                        input_feature.map = map_f_i
+                        output_feature.map = map_f_o
+                        self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, rotation_axis,
+                                                 rotation_iteration, cosmos_data, input_feature, output_feature)
+                elif dim == 3:
+                    pass
+
+                logger.info(f"Map step time for halo {halo.halo_id}")
                 if next_step is not None:
                     yield from next_step(g)
                 else:

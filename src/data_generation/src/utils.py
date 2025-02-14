@@ -6,11 +6,17 @@ from pathlib import Path
 from typing import List
 import eagleSqlTools as sql
 import h5py
+import numpy
 
 import numpy as np
 import pandas as pd
 from PIL import Image
+
+# do not delete
+import math
+
 from dotenv import load_dotenv, find_dotenv
+from omegaconf import DictConfig
 from scipy.spatial.distance import cosine
 
 
@@ -140,8 +146,10 @@ def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray
     else:
         data = np.concatenate(data)
 
+    '''
     if data.dtype not in (np.int32, np.int64):
         data = np.multiply(data, cgs * a ** aexp * h ** hexp, dtype='f8')
+    '''
     return data
 
 
@@ -383,3 +391,48 @@ def setup_output_directories(catalog_path: str, rotation_angle, input_feature_na
         if not os.path.exists(os.path.join(dataset_path, input_feature_name)):
             os.mkdir(os.path.join(dataset_path, input_feature_name))
 
+
+def to_list(d, column):
+    return [d[column][i] for i in range(d[column].shape[0])]
+
+
+def apply_conversion(cfg: DictConfig, column_name, values, scalefactor, h):
+    """Applies the correct unit transformation, including indexing if necessary."""
+    if column_name not in cfg:
+        print(f"No conversion rule found for {column_name}")
+        return values
+    # Extract scaling formula and index
+    scaling_formula = cfg[column_name]["scaling"]
+    index = cfg[column_name].get("index", None)
+
+    # Apply indexing if necessary
+    if index is not None:
+        values = values[:, index]
+
+    # Prepare a safe eval context
+    context = {"x": values, "a": scalefactor, "h": h, "np": np, "math": math}
+    return eval(scaling_formula, context)
+
+
+def rotate(z, axis, degree, X):
+    """
+    Helper function to rotate positions or velocities based on the provided axis and degree.
+
+    Parameters:
+    -----------
+    axis : np.ndarray
+        The axis around which the rotation is performed.
+    degree : float
+        The angle in degrees for the rotation.
+    X : np.ndarray
+        The array of positions or velocities to be rotated.
+
+    Returns:
+    --------
+    np.ndarray
+        The rotated array.
+    """
+    new_z = rotate_vector(v=z, axis=axis, angle_=degree)
+    Q = get_transform_matrix(new_z, z, normalized=False)
+    X_rot = np.float32(rotate_3dvec(Q, X))
+    return X_rot

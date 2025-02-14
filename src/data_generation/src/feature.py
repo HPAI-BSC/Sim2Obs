@@ -10,7 +10,8 @@ from scipy import stats
 from dotenv import load_dotenv, find_dotenv
 
 from src.data_generation.src.halo import Halo
-from src.data_generation.src.utils import setup_logger
+from src.data_generation.src.subhalo import SubhaloParticles
+from src.data_generation.src.utils import setup_logger, rotate
 
 logger = setup_logger("FeatureProcessor")
 
@@ -32,7 +33,7 @@ class FeatureProcessor(ABC):
     Subclasses must implement the `process` method.
     """
     @abstractmethod
-    def process(self, **kwargs) -> np.ndarray:
+    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
         """
         Process the feature data.
 
@@ -45,7 +46,12 @@ class FeatureProcessor(ABC):
         pass
 
     @abstractmethod
-    def generate_map(self, particle_positions: np.ndarray, bins: int, ranging: tuple, axis: tuple) -> tuple:
+    def rotate(self, z, rotation_axis, degree):
+        pass
+
+    # TODO update
+    @abstractmethod
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
         Generate a 2D map for the feature based on particle positions.
 
@@ -101,8 +107,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
         self.map = []
         self.value = []
 
-    # TODO review this computation
-    def process(self, **kwargs) -> np.ndarray:
+    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
         """
         Calculate the velocity dispersion of particles.
 
@@ -116,20 +121,24 @@ class VelocityDispersionProcessor(FeatureProcessor):
         Raises:
             ValueError: If the input particle_velocity is empty.
         """
-        if 'particle_velocity' not in kwargs:
-            logger.error('VelocityDispersion needs particle_velocity as input parameter.')
-            raise Exception('VelocityDispersion needs particle_velocity as input parameter.')
+        if not hasattr(subhalo_particles, 'star_v'):
+            logger.error('VelocityDispersion needs star_v as input parameter.')
+            raise Exception('VelocityDispersion needs star_v as input parameter.')
 
-        particle_velocity = kwargs['particle_velocity']
-
-        if particle_velocity.size == 0:
+        if subhalo_particles.star_v.size == 0:
             logger.error("SubhaloParticles cannot have 'v' (velocity) empty.")
             raise ValueError("SubhaloParticles cannot have 'v' (velocity) empty.")
 
-        logger.info(f'Computed velocity dispersion for {len(particle_velocity)} particles.')
-        return particle_velocity
+        logger.info(f'Computed velocity dispersion for {len(subhalo_particles.star_v)} particles.')
+        return subhalo_particles.star_v
 
-    def generate_map(self, particle_positions: np.ndarray, bins: int, ranging: tuple, axis: tuple) -> tuple:
+    def rotate(self, z, axis, degree):
+        if len(self.value) == 0:
+            logger.error('FeatureProcessor value is empty, call first process method.')
+            raise Exception('FeatureProcessor value is empty, call first process method.')
+        self.value = rotate(z, axis, degree, self.value)
+
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
         Generate a 2D map of processed particle features using binned statistics.
 
@@ -158,27 +167,31 @@ class VelocityDispersionProcessor(FeatureProcessor):
                 method needs to be called before generating the map.
         """
 
-        i, j = axis
-        if len(self.value) == 0:
-            logger.error('FeatureProcessor value is empty, call first process method.')
-            raise Exception('FeatureProcessor value is empty, call first process method.')
+        if axis is not None:
+            i, j = axis
+            if len(self.value) == 0:
+                logger.error('FeatureProcessor value is empty, call first process method.')
+                raise Exception('FeatureProcessor value is empty, call first process method.')
 
-        if isinstance(self.value, List):
-            self.value = np.array(self.value)
+            if isinstance(self.value, List):
+                self.value = np.array(self.value)
 
-        components = {0, 1, 2}
-        missing_component = components - set(axis)
-        k = next(iter(missing_component))
+            components = {0, 1, 2}
+            missing_component = components - set(axis)
+            k = next(iter(missing_component))
 
-        pos_rot = particle_positions
-        input_ij, binx, biny, _ = stats.binned_statistic_2d(
-            pos_rot[:, i], pos_rot[:, j],
-            (self.value[:, k]) ** 2,  # Access the relevant feature
-            statistic="mean", bins=bins, range=ranging
-        )
-        input_ij = np.sqrt(input_ij / 3)
-        input_ij[np.isnan(input_ij)] = 0
-        return input_ij, binx, biny
+            pos_rot = subhalo_particles.star_p
+            input_ij, binx, biny, _ = stats.binned_statistic_2d(
+                pos_rot[:, i], pos_rot[:, j],
+                (self.value[:, k]) ** 2,  # Access the relevant feature
+                statistic="mean", bins=bins, range=ranging
+            )
+            input_ij = np.sqrt(input_ij / 3)
+            input_ij[np.isnan(input_ij)] = 0
+            return input_ij, binx, biny
+        else:
+            # 3D
+            pass
 
     @classmethod
     def get_empty(cls) -> np.ndarray:
@@ -271,14 +284,12 @@ class ICLProcessor(FeatureProcessor):
         return final_predictions
 
     # Subhalo particles, halo
-    def process(self, **kwargs) -> np.ndarray:
+    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
         """
         Process the IntraCluster Light (ICL) for a given halo and its particles.
 
         Args:
             halo (Halo): The halo object containing halo parameters.
-            particle_velocity (np.ndarray): The velocity of each particle.
-            particle_position (np.ndarray): The position of each particle.
 
         Returns:
             np.ndarray: A mask (1 or 0) indicating whether each particle belongs to the ICL (1) or BCG (0).
@@ -286,13 +297,8 @@ class ICLProcessor(FeatureProcessor):
         Raises:
             ValueError: If the scaled particle data is empty.
         """
-        if not {'halo', 'particle_velocity', 'particle_position'}.issubset(kwargs):
-            logger.error("Missing required keys: 'halo', 'particle_velocity', or 'particle_position' in kwargs")
-            raise Exception("Missing required keys: 'halo', 'particle_velocity', or 'particle_position' in kwargs")
-
-        halo = kwargs['halo']
-        particle_velocity = kwargs['particle_velocity']
-        particle_position = kwargs['particle_position']
+        particle_velocity = subhalo_particles.star_v
+        particle_position = subhalo_particles.star_p
 
         logger.info(f'Processing ICL for Halo ID {halo.halo_id}.')
 
@@ -316,7 +322,7 @@ class ICLProcessor(FeatureProcessor):
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
         return icl_mask
 
-    def generate_map(self, particle_positions: np.ndarray, bins: int, ranging: tuple, axis: tuple) -> tuple:
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
         Generate a 2D map of particle feature data using binned statistics.
 
@@ -345,20 +351,23 @@ class ICLProcessor(FeatureProcessor):
             AssertionError: If the size of the input data along the specified axes and the length
                 of `self.value` do not match.
         """
-        i, j = axis
-        if len(self.value) == 0:
-            logger.error('FeatureProcessor value is empty, call first process method.')
-            raise Exception('FeatureProcessor value is empty, call first process method.')
-        pos_rot = particle_positions
+        if axis is not None:
+            i, j = axis
+            if len(self.value) == 0:
+                logger.error('FeatureProcessor value is empty, call first process method.')
+                raise Exception('FeatureProcessor value is empty, call first process method.')
+            pos_rot = subhalo_particles.star_p
 
-        assert pos_rot[:, i].size == pos_rot[:, j].size == len(self.value)
-        output_ij, binx, biny, _ = stats.binned_statistic_2d(
-            pos_rot[:, i], pos_rot[:, j],
-            self.value,  # Access the ICL feature data
-            statistic="mean", bins=bins, range=ranging
-        )
-        output_ij[np.isnan(output_ij)] = 0
-        return output_ij, binx, biny
+            assert pos_rot[:, i].size == pos_rot[:, j].size == len(self.value)
+            output_ij, binx, biny, _ = stats.binned_statistic_2d(
+                pos_rot[:, i], pos_rot[:, j],
+                self.value,  # Access the ICL feature data
+                statistic="mean", bins=bins, range=ranging
+            )
+            output_ij[np.isnan(output_ij)] = 0
+            return output_ij, binx, biny
+        else:
+            pass
 
     @classmethod
     def get_empty(cls) -> np.ndarray:

@@ -2,7 +2,6 @@ import time
 from typing import Tuple, List, Optional, Callable, Any
 import os
 
-import pandas as pd
 from tqdm import tqdm
 
 from src.data_generation.src.cosmos import CosmosData
@@ -10,8 +9,9 @@ from src.data_generation.src.data_fetcher import DataFetcherFactory
 from omegaconf import DictConfig, ListConfig
 
 from src.data_generation.src.feature import FeatureProcessor
+from src.data_generation.src.halo import Halo
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.subhalo import SubhaloParticles
+from src.data_generation.src.subhalo import SubhaloParticles, SubHalo
 from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("DataLoader")
@@ -46,48 +46,6 @@ class DataLoader(PipelineStep):
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
         self.cfg = cfg
 
-    def _get_default_conditions(self):
-        def parse_conditions(min_mass, factor=1.0, key='m200'):
-            """
-            Helper function to parse mass conditions.
-            - min_mass: Mass range (tuple or scalar).
-            - factor: Conversion factor for mass.
-            - key: Property name (e.g., 'm200', 'mstr').
-            """
-            if isinstance(min_mass, ListConfig):
-                return [(key, '>', min_mass[0] * factor), (key, '<', min_mass[1] * factor)]
-            elif isinstance(min_mass, (int, float)):
-                return [(key, '>', min_mass * factor)]
-            return []
-
-        # Fetch data_loader step from the pipeline
-        data_loader_dict = next((step for step in self.cfg.pipeline if step.name == 'data_loader'), None)
-        if not data_loader_dict:
-            raise ValueError("Data loader configuration not found in the pipeline.")
-
-        # Check catalog name and generate conditions
-        catalog_name = self.cfg.catalog.name.lower()
-        halo_conditions = []
-        subhalo_conditions = []
-        if catalog_name == 'illustris-300':
-            # M⊙ / h
-            halo_conditions = parse_conditions(data_loader_dict.get('halo_min_mass'), factor=data_loader_dict['H'],
-                                               key='m200')
-            # M⊙
-            subhalo_conditions = parse_conditions(data_loader_dict.get('subhalo_min_mass'), key='mstr')
-        elif catalog_name == 'big-illustris-300':
-            halo_conditions = parse_conditions(data_loader_dict.get('halo_num_particles'), factor=1,
-                                               key='halo_num_particles')
-        elif catalog_name == 'eagle':
-            # Convert from M⊙/h to M⊙ for 'eagle'
-            halo_conditions = parse_conditions(data_loader_dict.get('halo_min_mass'), factor=1 / data_loader_dict['H'],
-                                               key='m200')
-            subhalo_conditions = parse_conditions(data_loader_dict.get('subhalo_min_mass'), key='mstr')
-        else:
-            raise ValueError(f"Unsupported catalog name: {self.cfg.catalog.name}")
-
-        return halo_conditions, subhalo_conditions
-
     @classmethod
     def _build_data_loader_configuration(cls, cfg: DictConfig) -> dict:
         if cls.name not in [e['name'] for e in cfg.pipeline]:
@@ -96,7 +54,8 @@ class DataLoader(PipelineStep):
 
         data_loader_dict = next((step for step in cfg.pipeline if step.name == cls.name), None)
 
-        required_keys = ['solar_mass_convention', 'G', 'H']
+        # TODO
+        required_keys = ['G']
         for key in required_keys:
             if key not in data_loader_dict:
                 raise ValueError(f"Error, missing required configuration key: {key}")
@@ -127,61 +86,34 @@ class DataLoader(PipelineStep):
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
         with tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar:
-            for halo, subhalo_df in g:
-                logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_df)} subhalos.")
-                start_time = time.time()
-                subhalo_id = halo.fsub
-                halo_id = halo.halo_id
+            for halo, subhalo_ctx in g:
+                logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos.")
                 try:
-                    if hasattr(halo, 'group_number'):
-                        subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id,
-                                                                              halo_id=halo.group_number)
-                    else:
-                        subhalo_particles = self._load_subhalo_particles_data(subhalo_id=subhalo_id, halo_id=halo_id)
+                    subhalo_particles = self._load_subhalo_particles_data(halo)
 
-                    if subhalo_particles is None:
-                        raise ValueError(f"Invalid data for subhalo_id: {subhalo_id}, halo_id: {halo_id}")
-
-                    if any(x is None for x in [subhalo_particles.p, subhalo_particles.v, subhalo_particles.m]):
-                        raise ValueError("Missing particle data (positions, velocities, or masses).")
                 except Exception as e:
                     pbar.update(1)  # Ensure progress bar updates even for skipped halos
-                    logger.error(f"Failed to load particle data for halo {halo_id}: {e}")
-                    elapsed_time = time.time() - start_time
-                    logger.info(f"Finished processing halo {halo_id} with time: {elapsed_time}")
+                    logger.error(f"Failed to load particle data for halo {halo.halo_id}: {e}")
                     continue
 
-                subhalo_particles.p = subhalo_particles.p - halo.gpos
+                subhalo_particles.preprocess(halo)
 
-                i_value = input_feature.process(
-                    halo=halo,
-                    particle_velocity=subhalo_particles.v,
-                    particle_position=subhalo_particles.p)
-                input_feature.value = i_value
+                input_feature.value = input_feature.process(halo=halo, subhalo_particles=subhalo_particles)
+                output_feature.value = output_feature.process(halo=halo, subhalo_particles=subhalo_particles)
 
-                o_value = output_feature.process(
-                    halo=halo,
-                    particle_velocity=subhalo_particles.v,
-                    particle_position=subhalo_particles.p)
-                output_feature.value = o_value
-
-                tmp = CosmosData(halo, subhalo_df, subhalo_id, subhalo_particles.p)
-                cosmos_data.halo = tmp.halo
-                cosmos_data.subhalos = tmp.subhalos
-                cosmos_data.subhalo_id = tmp.subhalo_id
-                cosmos_data.subhalo_particle_positions = tmp.subhalo_particle_positions
-                cosmos_data.metadata = tmp.metadata
+                tmp = CosmosData(halo, subhalo_ctx, halo.fsub, subhalo_particles)
+                # Keep cosmos_data instance
+                vars(cosmos_data).update(vars(tmp))
 
                 if next_step is not None:
-                    yield from next_step([(halo, subhalo_df)])
+                    yield from next_step([(halo, subhalo_ctx)], **kwargs)
                 else:
                     yield input_feature, output_feature, cosmos_data
 
-                elapsed_time = time.time() - start_time
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
-                logger.info(f"Finished processing halo {halo_id} with time: {elapsed_time}")
+                logger.info(f"Finished processing halo {halo.halo_id}")
 
-    def load_halo_data(self, halo_conditions: List = [], subhalo_conditions: List = []) -> List[Tuple]:
+    def load_halo_subhalo_data(self) -> List[Tuple]:
         """
         Loads halo data and yields each halo's ID along with its associated data.
 
@@ -193,29 +125,20 @@ class DataLoader(PipelineStep):
         halo_context = self.fetcher.get_halos()
         subhalo_context = self.fetcher.get_subhalos()
 
-        if len(halo_conditions) == 0:
-            halo_conditions, _ = self._get_default_conditions()
-        if len(subhalo_conditions) == 0:
-            _, subhalo_conditions = self._get_default_conditions()
-
-        # Apply min mass conditions
-        halo_context = self.fetcher.filter_halos(halo_context, halo_conditions)
-        subhalo_context = self.fetcher.filter_subhalos(subhalo_context, subhalo_conditions)
-
+        subhalo_context.preprocess(halo_context)
         result = []
+
         for id_halo in halo_context.halo_id:
             try:
-                halo_df = halo_context.get_item(id_halo)
-                subhalo_df = subhalo_context.get_items_by_halo(id_halo)
-                # Normalize subhalo positions respect to the center of its halo
-                subhalo_df.loc[:, 'spos'] = subhalo_df.apply(lambda row: row['spos'] - halo_df.gpos, axis=1)
+                halo = halo_context.get_halo_by_id(id_halo)
+                subhalo_ctx = subhalo_context.get_items_by_halo(id_halo)
             except Exception as e:
                 logger.error(e)
                 continue
-            result.append((halo_df, subhalo_df))
+            result.append((halo, subhalo_ctx))
         return result
 
-    def _load_subhalo_particles_data(self, subhalo_id: int, halo_id: int=None) -> SubhaloParticles:
+    def _load_subhalo_particles_data(self, halo: Halo) -> SubhaloParticles:
         """
         Loads subhalo particle data for a given subhalo ID and applies rotations.
 
@@ -230,8 +153,13 @@ class DataLoader(PipelineStep):
             The particle data for the specified subhalo ID.
         """
         try:
-            subhalo_particles = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, group_number=halo_id)
+            subhalo_id = halo.fsub
+            halo_id = halo.halo_id
+            if hasattr(halo, 'group_number'):
+                subhalo_particles = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, group_number=halo.group_number)
+            else:
+                subhalo_particles = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, halo_id=halo_id)
             return subhalo_particles
         except Exception as e:
             logger.warning(f"Error fetching subhalo data for id {subhalo_id}: {e}")
-            return None
+            raise ValueError(f"Invalid data for subhalo_id: {subhalo_id}, halo_id: {halo_id}")

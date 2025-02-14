@@ -6,19 +6,19 @@ import pandas as pd
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 from src.data_generation.src.utils import read_dataset
 
-load_dotenv('../.env')
+load_dotenv('../../.env')
 
 
 if __name__ == '__main__':
     cfg_eagle = None
 
-    with initialize(config_path="../../../configs"):
+    with initialize(config_path="../../../../configs"):
         cfg_eagle = compose(config_name="data_generation.yaml")
         local_config = compose(config_name="paths/local.yaml")
         cfg_eagle.paths = local_config.paths
         cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
         cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
-        cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
+        cfg_eagle.catalog.path = '../../../../local/data/datasets/eagle/RefL0050N0752'
 
     os.environ['PROJECT_ROOT'] = '../../..'
 

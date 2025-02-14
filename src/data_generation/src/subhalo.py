@@ -5,6 +5,9 @@ import pandas as pd
 import polars as pl
 from omegaconf import DictConfig
 
+from src.data_generation.src.halo import HaloContext, Halo
+from src.data_generation.src.utils import rotate
+
 
 class SubHalo:
     """
@@ -118,11 +121,23 @@ class SubhaloContext:
             # Set a multi-index for efficient querying
             self.data.set_index(["id_parents", "subhalo_id"], inplace=True, drop=False)
 
-    def preprocess(self, halo_df: pd.DataFrame):
+    def preprocess(self, halo_context: HaloContext):
         # Add missing columns
-        if 'spos' in self.data:
-            self.data.loc[:, 'spos'] = self.data.apply(lambda row: row['spos'] - halo_df.gpos, axis=1)
-        # ...
+        for id_halo in halo_context.halo_id:
+            halo = halo_context.get_halo_by_id(id_halo)
+            indexing = self.data['id_parents'] == id_halo
+            if hasattr(halo, 'group_number'):
+                indexing &= self.data['group_number'] == halo.group_number
+            if 'spos' in self.data:
+                # Normalize subhalo positions respect to the center of its halo
+                self.data.loc[indexing, 'spos'] = self.data.loc[indexing, 'spos'].apply(lambda row: row - halo.gpos)
+            # ...
+
+    def rotate(self, z, axis, degree):
+        if 'spos' in self.data.columns:
+            spos = np.array(self.data['spos'].tolist())
+            subhalos_spos = rotate(z, axis, degree, spos)
+            self.data['spos'] = list([subhalos_spos[i] for i in range(subhalos_spos.shape[0])])
 
     @classmethod
     def from_dataframe(cls, df: pd.DataFrame):
@@ -214,36 +229,6 @@ class SubhaloContext:
         """
         return self.data["subhalo_id"].tolist()
 
-    @classmethod
-    def empty_instance(cls):
-        """
-        Returns an empty instance of the SubhaloContext object with default empty values.
-        """
-        # Provide empty or default values for the required fields
-        # For instance, we create an empty DataFrame and set scale_factor to 1.0
-        empty_properties = {
-            "subhalo_id": [],
-            "spos": [],
-            "id_parents": [],
-            "shmr": [],
-            "mstr": []
-        }
-
-        # Assuming the column map is the same as the one required in __init__
-        empty_column_map = {
-            "subhalo_id": "subhalo_id",
-            "spos": "spos",
-            "id_parents": "id_parents",
-            "shmr": "shmr",
-            "mstr": "mstr"
-        }
-
-        # Creating an empty DataFrame
-        empty_df = pd.DataFrame(empty_properties)
-
-        # Call the constructor with empty or default values
-        return cls(properties=empty_df, scale_factor=1.0, column_map=empty_column_map)
-
 
 class SubhaloParticles:
     """
@@ -271,8 +256,6 @@ class SubhaloParticles:
         -----------
         ..
         """
-        # TODO decide if to keep subhalo id, group_number
-        # TODO make empty ?
         def dict_depth(d, level=0):
             if not isinstance(d, dict) or not d:
                 return level
@@ -310,7 +293,15 @@ class SubhaloParticles:
                         # Add attr with that provided name
                         setattr(self, f'{part_type}_{name}', value)
 
+    def preprocess(self, halo: Halo):
+        # Normalize positions respect to the center of its halo
+        if hasattr(self, 'star_p'):
+            self.star_p = self.star_p - halo.gpos
+        # ...
 
+    def rotate(self, z, axis, degree):
+        if hasattr(self, 'star_p'):
+            self.star_p = rotate(z, axis, degree, self.star_p)
 
 
 

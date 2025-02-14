@@ -62,6 +62,11 @@ halo_data_2 = halo_context_2.get_halo_by_id(halo_id=halo_context_2.halo_id[0])
 save_to_pickle('data/eagle/halo_0.pkl', halo_data_2)
 
 subhalo_context_2 = fetcher_eagle.get_subhalos()
+if 'id_parents' in subhalo_context_2.data.index.names:
+    subhalo_context_2.data = subhalo_context_2.data.reset_index(drop=True)
+subhalo_context_2.data = subhalo_context_2.data.sort_values(by=["id_parents"])
+subhalo_context_2.data.set_index(["id_parents", "subhalo_id"], inplace=True, drop=False)
+
 subhalo_context_2 = subhalo_context_2[:5]
 save_to_pickle('data/eagle/subhalo_context_0.pkl', subhalo_context_2)
 subhalo_data_2 = subhalo_context_2.get_subhalo_by_id(subhalo_id=subhalo_context_2.subhalo_id[0])

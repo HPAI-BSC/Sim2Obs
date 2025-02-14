@@ -210,6 +210,47 @@ class TestMapStep(unittest.TestCase):
         self.map_step = MapStep(self.cfg_eagle)
         self.map_step.map_configuration['root_path'] = '../test/data/eagle'
         interlopers_id = self.map_step._get_interlopers_id(cosmos_data=self.mock_cosmos_data)
-        assert_array_equal(interlopers_id, np.array([202]))  # Passes if they are equal
+        assert_array_equal(interlopers_id, np.array([201, 202]))  # Passes if they are equal
+
+    @patch('src.data_generation.src.halo.Halo')
+    @patch('src.data_generation.src.subhalo.SubhaloContext')
+    @patch('src.data_generation.src.subhalo.SubhaloParticles')
+    def test_get_interlopers_mask(self, mock_halo, mock_subhalo_context, mock_subhalo_particles):
+        mock_halo.return_value = self.halo_eagle
+        mock_subhalo_particles.return_value = self.subhalo_particles_eagle.p
+
+        # Create test data for subhalos
+        self.subhalo_data = {
+            "id_parents": [1, 1, 1, 2, 2],
+            "subhalo_id": [101, 102, 103, 201, 202],
+            "spos": [
+                [200, 200, 1000],  # Interloper (within x, y, z limits)
+                [300, 200, 1000],  # Not an interloper (x exceeds limit)
+                [200, 300, 1000],  # Not an interloper (y exceeds limit)
+                [200, 200, 1100],  # Not an interloper (z exceeds limit)
+                [200, 200, 1000],  # Interloper (within x, y, z limits)
+            ],
+            "shmr": [[0.1], [0.2], [0.3], [0.4], [0.5]],
+            "mstr": [[1e10], [2e10], [3e10], [4e10], [5e10]],
+        }
+        mock_subhalo_context.return_value = pd.DataFrame(self.subhalo_data)
+        self.mock_cosmos_data = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
+                                           self.subhalo_eagle.subhalo_id,
+                                           mock_subhalo_particles.return_value)
+        processor_vel = VelocityDispersionProcessor()
+        processor_vel.value = processor_vel.process(halo=mock_halo.return_value,
+                                            particle_velocity=self.subhalo_particles_eagle.v,
+                                            particle_position=self.subhalo_particles_eagle.p)
+        icl_processor = ICLProcessor(self.cfg_eagle)
+        icl_processor.value = np.ones((self.subhalo_particles_eagle.p.shape[0],), dtype=int)  # ICL mask
+        self.map_step = MapStep(self.cfg_eagle)
+        self.map_step.map_configuration['root_path'] = '../test/data/eagle'
+        interlopers_id = np.array([202])  # Passes if they are equal
+
+        io_biny_projections = self.map_step._create_maps(self.mock_cosmos_data, processor_vel, icl_processor)
+        map_f_i, map_f_o, biny_i = io_biny_projections[0]
+        interlopers_mask = self.map_step._get_interlopers_mask(self.mock_cosmos_data, map_f_o.shape,
+                                                               interlopers_id, biny_i)
+
 
 

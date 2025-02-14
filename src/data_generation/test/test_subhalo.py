@@ -1,3 +1,4 @@
+import pickle
 import unittest
 import numpy as np
 import pandas as pd
@@ -86,4 +87,22 @@ class TestSubHalo(unittest.TestCase):
         self.assertTrue(hasattr(particles, 'star_m'), True)
         self.assertEqual(hasattr(particles, 'star_p'), True)
         self.assertEqual(hasattr(particles, 'star_v'), True)
+
+    def test_preprocess(self):
+        # Illustris objs
+        with open("data/illustris/subhalo_context_0.pkl", "rb") as file:
+            self.subhalo_context_illustris = pickle.load(file)
+
+        with open("data/illustris/halo_context_0.pkl", "rb") as file:
+            self.halo_context_illustris = pickle.load(file)
+
+        with open("data/eagle/subhalo_context_0.pkl", "rb") as file:
+            self.subhalo_context_eagle = pickle.load(file)
+
+        with open("data/eagle/halo_context_0.pkl", "rb") as file:
+            self.halo_context_eagle = pickle.load(file)
+
+        self.subhalo_context_illustris.preprocess(self.halo_context_illustris)
+        self.subhalo_context_eagle.preprocess(self.halo_context_eagle)
+
 

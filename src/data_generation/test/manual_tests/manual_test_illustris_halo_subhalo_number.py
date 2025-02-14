@@ -8,7 +8,7 @@ from hydra import initialize, compose
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 
 
-load_dotenv('../.env')
+load_dotenv('../../.env')
 
 
 def count_subhalos(group):
@@ -18,7 +18,7 @@ def count_subhalos(group):
 
 
 # Read config
-with initialize(config_path="../../../configs"):
+with initialize(config_path="../../../../configs"):
     cfg_illustris = compose(config_name="data_generation.yaml")
     local_config = compose(config_name="paths/local.yaml")
     cfg_illustris.paths = local_config.paths

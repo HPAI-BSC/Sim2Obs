@@ -252,8 +252,6 @@ class Illustris300Fetcher(DataFetcher):
                         converted = to_list(halos, key)
                         del halos[key]
                         halos[key] = converted
-                else:
-                    logger.warning(f'Column {key} not present in Illustris dataset')
 
             halos = pd.DataFrame.from_dict(halos)
             halos = self._filter(halos, self.halo_conditions)

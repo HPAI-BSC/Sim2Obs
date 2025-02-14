@@ -57,7 +57,6 @@ fields:
       output: null
       scaling: null
       name: "id_parents"
-  # TODO
   particles:
     star:
       # <part_type>_<name>
@@ -69,7 +68,7 @@ fields:
       Velocities:
         input: "kma/s^-1"
         output: "km/s^-1"
-        scaling: "x * math.sqrt(a)" # TODO check if this works
+        scaling: "x * math.sqrt(a)"
         name: "v"
       Masses:
         input: "10^10 Msun/h"

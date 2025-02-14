@@ -1,4 +1,3 @@
-import time
 from typing import Generator, Callable, Tuple
 from omegaconf import DictConfig
 
@@ -7,7 +6,7 @@ import numpy as np
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.utils import rotate_vector, get_transform_matrix, rotate_3dvec, setup_logger
+from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("RotateStep")
 
@@ -44,8 +43,6 @@ class RotateStep(PipelineStep):
             A set of rotation axes for the objects.
         """
         self.rotation_angle, self.z, self.rotation_directions = self._build_configuration(cfg)
-        self.path = cfg.paths.datasets_dir + f'/../logs/rotate_step.txt'
-
 
     @classmethod
     def _build_configuration(cls, cfg: DictConfig) -> Tuple:
@@ -70,29 +67,6 @@ class RotateStep(PipelineStep):
                              'in the pipeline of the configuration file.')
 
         return rotate_step_dict.rotation_group
-
-    def _rotate(self, axis, degree, X):
-        """
-        Helper function to rotate positions or velocities based on the provided axis and degree.
-
-        Parameters:
-        -----------
-        axis : np.ndarray
-            The axis around which the rotation is performed.
-        degree : float
-            The angle in degrees for the rotation.
-        X : np.ndarray
-            The array of positions or velocities to be rotated.
-
-        Returns:
-        --------
-        np.ndarray
-            The rotated array.
-        """
-        new_z = rotate_vector(v=self.z, axis=axis, angle_=degree)
-        Q = get_transform_matrix(new_z, self.z, normalized=False)
-        X_rot = np.float32(rotate_3dvec(Q, X))
-        return X_rot
 
     def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
                 cosmos_data: CosmosData, g: Generator, next_step: Callable[[Generator], Generator],
@@ -127,9 +101,8 @@ class RotateStep(PipelineStep):
         The method applies a series of rotations in specified directions and angles, updating the positions and velocities
         in the cosmos data, as well as updating the rotation-related metadata.
         """
-        for halo, subhalo_df in g:
+        for halo, subhalo_ctx in g:
             logger.info(f"Processing rotations for halo {halo.halo_id} ...")
-            start_time = time.time()
             try:
                 iterations = 360 // int(self.rotation_angle)
                 for rt_i, rotation_axis in enumerate(self.rotation_directions):
@@ -139,22 +112,17 @@ class RotateStep(PipelineStep):
                         rotation_axis = np.array(rotation_axis)
                         kwargs['rotation_iteration'] = i
 
-                        # Update cosmos data, subhalos data and subhalo particle positions
-                        spos = np.array(cosmos_data.subhalos['spos'].tolist())
-                        subhalos_spos = self._rotate(rotation_axis, degree, spos)
-                        cosmos_data.subhalos['spos'] = list([subhalos_spos[i] for i in range(subhalos_spos.shape[0])])
-
-                        cosmos_data.subhalo_particle_positions = (
-                            self._rotate(rotation_axis, degree, cosmos_data.subhalo_particle_positions))
-
-                        input_feature.value = self._rotate(rotation_axis, degree, input_feature.value)
+                        # Rotate the appropiate data in subhalos context, subhalo particles and input feature
+                        cosmos_data.subhalos.rotate(self.z, rotation_axis, degree)
+                        cosmos_data.subhalo_particles.rotate(self.z, rotation_axis, degree)
+                        input_feature.rotate(self.z, rotation_axis, degree)
                         cosmos_data.metadata['rotation'] = {'has_rotated': 1, 'angle': degree}
 
                         if next_step is not None:
                             logger.info(f"Generating maps for halo {halo.halo_id}, iteration={i}/{iterations-1},"
                                         f" rotation_axis={rt_i}/{len(self.rotation_directions)-1}")
 
-                            yield from next_step([(halo, subhalo_df)], **kwargs)
+                            yield from next_step([(halo, subhalo_ctx)], **kwargs)
                         else:
                             yield input_feature, output_feature, cosmos_data
                         degree += self.rotation_angle
@@ -162,7 +130,5 @@ class RotateStep(PipelineStep):
                 logger.error(f"Failed to execute rotations for halo {cosmos_data.halo.halo_id}: {e}")
                 continue
 
-            elapsed_time = time.time() - start_time
-            logger.info(f"Rotate step time for halo {halo.halo_id} with time: {elapsed_time}")
 
 
