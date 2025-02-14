@@ -7,7 +7,7 @@ defaults:
   - model: unet
   - callbacks: default
   - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
-  - trainer: dpp_custom
+  - trainer: default
   - paths: gpfs
   - extras: default
   - hydra: default
