@@ -8,8 +8,7 @@ from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.profilers import PyTorchProfiler
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig, open_dict
-import mlflow
-from lightning.pytorch.loggers import MLFlowLogger
+from lightning.pytorch.tuner import Tuner
 
 
 #rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -93,6 +92,18 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     )
     '''
     trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler='simple')
+
+    # Find optimal batch size
+    tuner = Tuner(trainer)
+
+    # Auto-scale batch size by growing it exponentially (default)
+    tuner.scale_batch_size(model, mode="power")
+
+    # Auto-scale batch size with binary search
+    #tuner.scale_batch_size(model, mode="binsearch")
+
+    # Fit as normal with new batch size
+    trainer.fit(model)
 
     object_dict = {
         "cfg": cfg,

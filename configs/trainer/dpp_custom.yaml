@@ -17,7 +17,3 @@ callbacks:
   - _target_: lightning.pytorch.callbacks.DeviceStatsMonitor
     cpu_stats: True
     gpu_stats: True
-
-# Optional: enable auto batch size finding
-tuner:
-  auto_scale_batch_size: "power"  # or "binsearch"
