@@ -19,4 +19,5 @@ callbacks:
     gpu_stats: True
 
 # Optional: enable auto batch size finding
-auto_scale_batch_size: "power"  # or "binsearch"
+tuner:
+  auto_scale_batch_size: "power"  # or "binsearch"
