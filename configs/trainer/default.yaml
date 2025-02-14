@@ -5,7 +5,7 @@ default_root_dir: ${paths.output_dir}
 min_epochs: 1 # prevents early stopping
 max_epochs: 50
 
-gradient_clip_val: 2.0
+gradient_clip_val: 0.5
 
 accelerator: gpu
 devices: 1
@@ -17,6 +17,8 @@ callbacks:
   - _target_: lightning.pytorch.callbacks.DeviceStatsMonitor
     cpu_stats: True
     gpu_stats: True
+  - _target_: lightning.pytorch.callbacks.StochasticWeightAveraging
+    swa_lrs: 1e-2
 
 # mixed precision for extra speed-up
 # precision: 16

@@ -93,14 +93,11 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     '''
     trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler='simple')
 
-    """
     # Find optimal batch size
     tuner = Tuner(trainer)
 
-    # Auto-scale batch size by growing it exponentially (default)
-    optimal_bs = tuner.scale_batch_size(model, mode="power")
-
-    # Auto-scale batch size with binary search
+    # Auto-scale batch size by growing it exponentially (default) or binary search
+    optimal_bs = tuner.scale_batch_size(model, datamodule=datamodule, mode="power")
     #tuner.scale_batch_size(model, mode="binsearch")
 
     # Fit as normal with new batch size
@@ -108,7 +105,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     print(f"--> Optimal batch size2: {optimal_bs}")
     print(f"--> Optimal batch size: {model.hparams.batch_size }")
-    """
 
     object_dict = {
         "cfg": cfg,
