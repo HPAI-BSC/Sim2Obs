@@ -244,8 +244,11 @@ class DownscaleBlock(nn.Module):
             E = torch.from_numpy(np.array(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim))).to('cpu').to(torch.float32)
         except Exception as e:
             result = getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)
-            print(result)
             E = torch.tensor(result, dtype=torch.float32).to('cpu')
+
+        print(proj_patches.device)
+        print(E.device)
+        E = E.to('cuda:0')
 
         token_sequence = proj_patches + E
         x = self.vim_block(token_sequence)
