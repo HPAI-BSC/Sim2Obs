@@ -239,7 +239,14 @@ class DownscaleBlock(nn.Module):
         x = self.downscale(x)
         patches = patch_image(x, self.patch_size)
         proj_patches = self.patch_linear_proj(patches)
-        E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to('cpu').to(torch.float32)
+        try:
+            E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)).to('cpu').to(torch.float32)
+        except Exception as e:
+            print(f"Error in torch.from_numpy: {e}")
+            print(type(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)))
+            E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim))
+            print(E)
+
         token_sequence = proj_patches + E
         x = self.vim_block(token_sequence)
         return x
