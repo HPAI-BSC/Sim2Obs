@@ -239,16 +239,12 @@ class DownscaleBlock(nn.Module):
         x = self.downscale(x)
         patches = patch_image(x, self.patch_size)
         proj_patches = self.patch_linear_proj(patches)
+        # This throws a weird error - TypeError: expected np.ndarray (got numpy.ndarray)
         try:
-            # Without the np.array() this throws a weird error - TypeError: expected np.ndarray (got numpy.ndarray)
             E = torch.from_numpy(np.array(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim))).to('cpu').to(torch.float32)
         except Exception as e:
-            print(f"Error in torch.from_numpy: {e}")
-            print(np.__file__)
-
-            # Approach 2: Use torch.tensor directly
-            result = getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)
-            print(type(result))
+            result = getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim).to('cpu').to(torch.float32)
+            print(result)
             E = torch.tensor(result, dtype=torch.float32)
 
         token_sequence = proj_patches + E
