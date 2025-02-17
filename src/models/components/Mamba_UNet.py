@@ -345,7 +345,7 @@ class FinalPatchExpand_X4(nn.Module):
         self.compress = nn.Linear(16 * dim, dim, bias=False)
 
     def forward(self, x):
-        print(x.shape)
+        print(f"FinalPatchExpand X4: {x.shape}")
         x = self.expand(x)
         B, H, W, C = x.shape
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
@@ -869,6 +869,9 @@ class VSSM(nn.Module):
             self.up = FinalPatchExpand_X4(dim_scale=self.patch_size, dim=self.embed_dim)
             self.output = nn.Conv2d(in_channels=self.embed_dim, out_channels=self.num_classes, kernel_size=1,
                                     bias=False)
+        else:
+            print("No final upsample")
+            self.up = lambda x: x
 
         self.apply(self._init_weights)
 
@@ -1046,7 +1049,7 @@ class MambaUNet(nn.Module):
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             pretrained_dict = torch.load(pretrained_path, map_location=device)
             if "model"  not in pretrained_dict:
-                print("---start load pretrained modle by splitting---")
+                print("---start load pretrained model by splitting---")
                 pretrained_dict = {k[17:]:v for k,v in pretrained_dict.items()}
                 for k in list(pretrained_dict.keys()):
                     if "output" in k:
@@ -1072,7 +1075,7 @@ class MambaUNet(nn.Module):
                         del full_dict[k]
 
             msg = self.mamba_unet.load_state_dict(full_dict, strict=False)
-            print(msg)
+            print(f"msg: {msg}")
         else:
             print("none pretrain")
 
