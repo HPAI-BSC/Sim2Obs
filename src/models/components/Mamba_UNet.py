@@ -345,6 +345,7 @@ class FinalPatchExpand_X4(nn.Module):
         self.compress = nn.Linear(16 * dim, dim, bias=False)
 
     def forward(self, x):
+        print(x.shape)
         x = self.expand(x)
         B, H, W, C = x.shape
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
@@ -353,6 +354,7 @@ class FinalPatchExpand_X4(nn.Module):
             # In this case we need to compress, cause p1 and p2 == 1
             x = self.compress(x)
         print(x.shape)
+        print(self.output_dim)
         x = self.norm(x)
 
         return x
