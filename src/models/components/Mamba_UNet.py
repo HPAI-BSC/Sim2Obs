@@ -247,7 +247,7 @@ class DownscaleBlock(nn.Module):
             result = getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)
             E = torch.tensor(result, dtype=torch.float32)
 
-        token_sequence = proj_patches + E
+        token_sequence = proj_patches + E.to(proj_patches.device)
         x = self.vim_block(token_sequence)
         return x
 
