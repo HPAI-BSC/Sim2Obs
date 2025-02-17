@@ -2,7 +2,7 @@
 #------------------------------------------------------
 # Example SLURM job script with SBATCH requesting GPUs
 #------------------------------------------------------
-#SBATCH -J eval-mn5      # Job name
+#SBATCH -J space-eval     # Job name
 #SBATCH -o slurm_output/out.txt       # Name of stdout output file(%j expands to jobId)
 #SBATCH -e slurm_output/err.txt       # Name of stderr output file(%j expands to jobId)
 #SBATCH -n 1

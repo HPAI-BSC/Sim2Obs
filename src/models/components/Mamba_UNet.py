@@ -863,6 +863,7 @@ class VSSM(nn.Module):
         self.norm = norm_layer(self.num_features)
         self.norm_up = norm_layer(self.embed_dim)
 
+        print(f'--> {self.final_upsample}')
         if self.final_upsample == "expand_first":
             print("---final upsample expand_first---")
             self.up = FinalPatchExpand_X4(dim_scale=self.patch_size, dim=self.embed_dim)
