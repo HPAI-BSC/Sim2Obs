@@ -352,6 +352,7 @@ class FinalPatchExpand_X4(nn.Module):
         if self.dim_scale == 1:
             # In this case we need to compress, cause p1 and p2 == 1
             x = self.compress(x)
+        print(x.shape)
         x = self.norm(x)
 
         return x
