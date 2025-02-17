@@ -25,7 +25,7 @@ net:
     drop_path_rate: 0.1
     patch_norm: True
     use_checkpoint: False
-    final_upsample: None  # From ['expand_first']
+    final_upsample: expand_first  # From ['expand_first']
   num_classes: 1 # aka num out channels
   zero_head: False
   vis: False
