@@ -348,21 +348,12 @@ class FinalPatchExpand_X4(nn.Module):
         print(x.shape)
         x = self.expand(x)
         B, H, W, C = x.shape
-        """
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
                       c=C // (self.dim_scale ** 2))
-        """
-        print(self.dim_scale)
         if self.dim_scale == 1:
-            print('')
             # In this case we need to compress, cause p1 and p2 == 1
             x = self.compress(x)
-        print(x.shape)
-        print(self.output_dim)
         x = self.norm(x)
-        x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
-                      c=C // (self.dim_scale ** 2))
-        print(x.shape)
 
         return x
 
