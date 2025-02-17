@@ -244,9 +244,17 @@ class DownscaleBlock(nn.Module):
             E = torch.from_numpy(np.array(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim))).to('cpu').to(torch.float32)
         except Exception as e:
             print(f"Error in torch.from_numpy: {e}")
-            print(type(np.array(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim))))
-            E = torch.from_numpy(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim))
+            print(np.__file__)
+
+            result = np.asarray(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim))
+            print(type(result))
+            E = torch.from_numpy(result)
             print(E)
+
+            # Approach 2: Use torch.tensor directly
+            result = getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)
+            print(type(result))
+            E = torch.tensor(result, dtype=torch.float32)
 
         token_sequence = proj_patches + E
         x = self.vim_block(token_sequence)
