@@ -177,8 +177,8 @@ class MambaLitModule(LightningModule):
 
         # update and log metrics
         self.val_loss(loss)
-        self.val_RASE(preds.to(torch.float32), targets.to(torch.float32))
-        self.val_rmse(preds.to(torch.float32), targets.to(torch.float32))
+        self.val_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.val_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/RASE", self.val_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
@@ -206,8 +206,8 @@ class MambaLitModule(LightningModule):
 
         # update and log metrics
         self.test_loss(loss)
-        self.test_RASE(preds.to(torch.float32), targets.to(torch.float32))
-        self.test_rmse(preds.to(torch.float32), targets.to(torch.float32))
+        self.test_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.test_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/RASE", self.test_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/rmse", self.test_rmse, on_step=False, on_epoch=True, prog_bar=True)
