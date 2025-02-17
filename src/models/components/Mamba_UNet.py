@@ -353,6 +353,9 @@ class FinalPatchExpand_X4(nn.Module):
         if self.dim_scale == 1:
             # In this case we need to compress, cause p1 and p2 == 1
             x = self.compress(x)
+        else:
+            print(self.dim_scale)
+            x = self.compress(x)
         x = self.norm(x)
 
         return x
@@ -923,12 +926,9 @@ class VSSM(nn.Module):
 
         x_downsample = []
         for i,layer in enumerate(self.layers):
-            print(f"before layer {i}, x - {x.shape}")
             x_downsample.append(x)
             x = layer(x)
-            print(f"after layer {i}, x - {x.shape}")
         x = self.norm(x) # B H W C
-        print(f'after norm layer, x - {x.shape}')
         return x, x_downsample
 
     # def forward_backbone(self, x):
