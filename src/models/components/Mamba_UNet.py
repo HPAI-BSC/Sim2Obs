@@ -246,11 +246,6 @@ class DownscaleBlock(nn.Module):
             print(f"Error in torch.from_numpy: {e}")
             print(np.__file__)
 
-            result = np.asarray(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim))
-            print(type(result))
-            E = torch.from_numpy(result)
-            print(E)
-
             # Approach 2: Use torch.tensor directly
             result = getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)
             print(type(result))
