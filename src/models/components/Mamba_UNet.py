@@ -58,6 +58,7 @@ class SimpleSSM(nn.Module):
             A_u_bar = A[:, i, :]
             B_u_bar = B[:, i, :]
             C_u = C[:, i, :]
+            print(h.device, A_u_bar.device, B_u_bar.device, C_u.device)
             h = torch.einsum('bn,bn->bn', h, A_u_bar) + torch.einsum('bn,bn->bn', u, B_u_bar)
             # y = C h
             y = torch.einsum('bn,bn -> bn', h, C_u)
@@ -241,14 +242,10 @@ class DownscaleBlock(nn.Module):
         proj_patches = self.patch_linear_proj(patches)
         # This throws a weird error - TypeError: expected np.ndarray (got numpy.ndarray)
         try:
-            E = torch.from_numpy(np.array(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim))).to('cpu').to(torch.float32)
+            E = torch.from_numpy(np.array(getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim))).to(torch.float32) #.to('cpu')
         except Exception as e:
             result = getPositionEncoding(seq_len=proj_patches.size()[1], d=self.input_dim)
-            E = torch.tensor(result, dtype=torch.float32).to('cpu')
-
-        print(proj_patches.device)
-        print(E.device)
-        E = E.to('cuda:0')
+            E = torch.tensor(result, dtype=torch.float32)
 
         token_sequence = proj_patches + E
         x = self.vim_block(token_sequence)
