@@ -42,7 +42,7 @@ class SimpleSSM(nn.Module):
         x = x.transpose(1, 2)
 
         # initialize hidden state
-        h = torch.zeros(batch_size, self.n).to('cpu')
+        h = torch.zeros(batch_size, self.n).to(A.device) # .to('cpu')
 
         # h_prime = torch.einsum('bn,n->bn', h, A) + torch.einsum('bn,n->bn', u, B)
         # y = torch.einsum('bn,n -> bn', h, C)
