@@ -333,7 +333,7 @@ class PatchExpand(nn.Module):
 
         return x
 
-"""
+
 class FinalPatchExpand_X4(nn.Module):
     def __init__(self, dim, dim_scale=4, norm_layer=nn.LayerNorm):
         super().__init__()
@@ -356,7 +356,6 @@ class FinalPatchExpand_X4(nn.Module):
         x = self.norm(x)
 
         return x
-"""
 
 
 class SS2D(nn.Module):
@@ -1032,7 +1031,8 @@ class MambaUNet(nn.Module):
                                 drop_rate=config.drop_rate,
                                 drop_path_rate=config.drop_path_rate,
                                 patch_norm=config.patch_norm,
-                                use_checkpoint=config.use_checkpoint)
+                                use_checkpoint=config.use_checkpoint,
+                                final_upsample=config.final_upsample)
 
     def forward(self, x):
         """
