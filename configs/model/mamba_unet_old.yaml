@@ -1,0 +1,25 @@
+_target_: src.models.mamba_module.MambaLitModule
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.00001
+  weight_decay: 0.0
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 10
+
+net:
+  _target_: src.models.components.Mamba_UNet_old.MambaUNet
+  input_dim: 256
+  hidden_dim: 512
+  ssm_dim: 64
+  patch_size: 16
+  img_original_size: [1,128,128]
+
+# compile model for faster training with pytorch 2.0
+compile: false
