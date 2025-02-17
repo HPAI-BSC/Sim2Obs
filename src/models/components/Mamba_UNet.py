@@ -333,7 +333,7 @@ class PatchExpand(nn.Module):
 
         return x
 
-
+"""
 class FinalPatchExpand_X4(nn.Module):
     def __init__(self, dim, dim_scale=4, norm_layer=nn.LayerNorm):
         super().__init__()
@@ -356,6 +356,7 @@ class FinalPatchExpand_X4(nn.Module):
         x = self.norm(x)
 
         return x
+"""
 
 
 class SS2D(nn.Module):
