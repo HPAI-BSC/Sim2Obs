@@ -22,7 +22,7 @@ fields:
       scaling: "x * h"
       name: 'm200'
       # Final unit measures
-      filter: [ "> 6.77*1e12", "< 6.77*1e13" ]
+      filter: [ "> 1e13" ]
     Group_R_Crit200:
       input: "pkpc"
       output: "pkpc/h"

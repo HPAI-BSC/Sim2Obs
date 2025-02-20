@@ -6,7 +6,7 @@ import polars as pl
 from omegaconf import DictConfig
 
 from src.data_generation.src.halo import HaloContext, Halo
-from src.data_generation.src.utils import rotate
+from src.data_generation.src.utils import rotate, dict_depth
 
 
 class SubHalo:
@@ -256,11 +256,6 @@ class SubhaloParticles:
         -----------
         ..
         """
-        def dict_depth(d, level=0):
-            if not isinstance(d, dict) or not d:
-                return level
-            return max(dict_depth(v, level + 1) for v in d.values())
-
         if column_map is None:
             if dict_depth(data) == 1:
                 for var in data:
@@ -285,8 +280,8 @@ class SubhaloParticles:
                 for var in data[part_type]:
                     if var in column_map[part_type]:
                         value = data[part_type][var]
-                        if isinstance(value, pl.Series):
-                            value = value.to_numpy()
+                        if isinstance(value, (pl.Series, pd.Series)):
+                            value = np.stack(value.to_list())
                         elif isinstance(value, list):
                             value = np.array(value)
                         name = column_map[part_type][var].name

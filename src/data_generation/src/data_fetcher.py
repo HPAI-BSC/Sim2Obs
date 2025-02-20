@@ -1,6 +1,7 @@
 import operator
 import os.path
 from abc import ABC, abstractmethod
+from typing import Any
 
 import eagleSqlTools as sql
 import numpy as np
@@ -11,7 +12,8 @@ from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
-from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion
+from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion, \
+    dict_depth
 
 logger = setup_logger("DataFetcher")
 
@@ -23,6 +25,130 @@ operators = {
     '==': operator.eq,
     '!=': operator.ne
 }
+
+
+def pipeline_step(func):
+    """Decorator to apply a transformation in a pipeline sequence."""
+    def wrapper(data, *args, **kwargs):
+        if data is None:
+            return None  # Stop processing if data is None
+        return func(data, *args, **kwargs)
+    return wrapper
+
+
+@pipeline_step
+def assign_id(d: dict, id_column: str):
+    """Assign an ID to each subhalo/halo."""
+    if len(d) == 0:
+        return None
+    d[id_column] = np.arange(d['count'])
+    return d
+
+
+@pipeline_step
+def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConfig):
+    """Validates fields, applies indexing, and converts multi-dimensional arrays."""
+
+    for key in list(d.keys()):
+        if key in fields:
+            field_info = OmegaConf.select(cfg, f"fields.{table}.{key}")
+            # Halo / subhalos case
+            if dict_depth(field_info) == 1:
+                if not getattr(field_info, 'name', None):
+                    raise ValueError(f"Error: The field '{key}' must have a name.")
+                index = field_info.get("index", None)
+                if index is not None:
+                    d[key] = d[key][:, index]
+                if isinstance(d[key], np.ndarray) and d[key].ndim > 1:
+                    d[key] = to_list(d, key)
+
+            # Particle case
+            elif dict_depth(field_info) == 2:
+                for key_ii in OmegaConf.select(cfg, f"fields.{table}.{key}"):
+                    field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
+                    h = dict_depth(field_info_ii)
+                    if h == 1:
+                        if not getattr(field_info_ii, 'name', None):
+                            raise ValueError(f"Error: The field '{key}' must have a name.")
+                        index = field_info_ii.get("index", None)
+                        if index is not None:
+                            d[key][key_ii] = d[key][key_ii][:, index]
+                        if isinstance(d[key][key_ii], np.ndarray) and d[key][key_ii].ndim > 1:
+                            d[key][key_ii] = to_list(d[key], key_ii)
+    return d
+
+
+@pipeline_step
+def convert_to_dataframe(d: dict):
+    """Convert dictionary to Pandas DataFrame."""
+    if dict_depth(d) == 1:
+        return pd.DataFrame.from_dict(d)
+    elif dict_depth(d) == 2:
+        for key in d:
+            d[key] = pd.DataFrame.from_dict(d[key])
+        return d
+    else:
+        raise ValueError(f'The format of the data is not correct, {dict_depth(d)} levels of data detected.')
+
+
+def apply_filter_df(d, conditions):
+    if isinstance(d, pd.DataFrame):
+        mask = pd.Series(True, index=d.index)
+        for key, condition in conditions.items():
+            if key not in d.columns:
+                raise Exception(f'Error, feature "{key}" is not present in the halo dataframe with columns:'
+                                f' {d.columns}')
+            if isinstance(condition.filter, ListConfig):
+                for expr in condition.filter:
+                    if isinstance(expr, str):
+                        symbol = expr.split(' ')[0]
+                        right_expr = ' '.join(expr.split(' ')[1:])
+                        value = float(eval(right_expr))
+                        mask &= operators[symbol](d[key], value)
+            else:
+                if isinstance(condition.filter, str):
+                    symbol = condition.filter.split(' ')[0]
+                    right_expr = ' '.join(condition.filter.split(' ')[1:])
+                    value = float(eval(right_expr))
+                    mask &= operators[symbol](d[key], value)
+        return d[mask]
+
+
+@pipeline_step
+def apply_filters(d: Any, conditions: dict):
+    if isinstance(d, pd.DataFrame):
+        return apply_filter_df(d, conditions)
+    elif isinstance(d, dict):
+        for key in d:
+            d[key] = apply_filter_df(d[key], conditions.get(key, {}))
+        return d
+
+
+@pipeline_step
+def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig):
+    """Apply unit conversions based on the catalog scaling factors."""
+    for key in fields:
+        if key in df:
+            field_info = OmegaConf.select(cfg, f"fields.{table}.{key}")
+            height = dict_depth(field_info)
+            if height == 2:
+                for key_ii in field_info:
+                    field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
+                    if field_info_ii.scaling is not None:
+                        df[key][key_ii] = apply_conversion(df[key][key_ii], field_info_ii.scaling, cfg.a, cfg.H)
+            else:
+                if field_info.scaling is not None:
+                    df[key] = apply_conversion(df[key], field_info.scaling, cfg.a, cfg.H)
+    return df
+
+
+def run_pipeline(data, steps):
+    """Executes a list of transformation steps sequentially."""
+    for step in steps:
+        data = step(data)  # Each function modifies `data`
+        if data is None:
+            break  # Stop early if a step returns None
+    return data
 
 
 class DataFetcher(ABC):
@@ -54,26 +180,6 @@ class DataFetcher(ABC):
         """
         pass
 
-    @staticmethod
-    def _filter(df: pd.DataFrame, conditions: dict) -> pd.DataFrame:
-        mask = pd.Series(True, index=df.index)
-        for key, condition in conditions.items():
-            if key not in df.columns:
-                raise Exception(f'Error, feature "{key}" is not present in the halo dataframe with columns:'
-                                f' {df.columns}')
-            if isinstance(condition.filter, ListConfig):
-                for expr in condition.filter:
-                    if isinstance(expr, str):
-                        symbol = expr.split(' ')[0]
-                        value = float(eval(expr.split(' ')[1]))
-                        mask &= operators[symbol](df[key], value)
-            else:
-                if isinstance(condition.filter, str):
-                    symbol = condition.filter.split(' ')[0]
-                    value = float(eval(condition.filter.split(' ')[1]))
-                    mask &= operators[symbol](df[key], value)
-        return df[mask]
-
     def _get_fields(self):
         pass
 
@@ -87,8 +193,6 @@ class DataFetcher(ABC):
         self.halo_fields = list(self.catalog.fields.halo.keys())
         self.subhalo_fields = list(self.catalog.fields.subhalo.keys())
         self.particle_fields = list(self.catalog.fields.particles.keys())
-        self.halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
-        self.subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
         self.column_map = {
             column: data['name']
             for group in [self.catalog.fields.halo, self.catalog.fields.subhalo]
@@ -227,36 +331,20 @@ class Illustris300Fetcher(DataFetcher):
             self.column_map['GroupFirstSub'] = 'fsub'
 
         halos = il.groupcat.loadHalos(path, self.catalog.snapnum, fields=self.halo_fields)
-
-        if isinstance(halos, np.ndarray):
-            tmp = halos
-            halos = {self.halo_fields[0]: tmp}
-            size = len(halos[self.halo_fields[0]])
-            halos['count'] = np.array(size)
-
         if len(halos) > 0:
-            halos['halo_id'] = np.arange(halos['count'])
-            for key in list(halos.keys()):
-                if key in self.halo_fields:
-                    # Ensure that every feature has a name
-                    if not getattr(self.catalog.fields.halo[key], 'name'):
-                        raise ValueError('Error, you must specify the name for each field.')
+            table = 'halo'
+            halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
+            steps = [
+                lambda halos: assign_id(halos, 'halo_id'),
+                lambda halos: validate_and_process_fields(halos, self.halo_fields, table, self.catalog),
+                lambda halos: convert_to_dataframe(halos),
+                lambda halos: apply_filters(halos, halo_conditions),
+                lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog)
+            ]
 
-                    # Unit conversion
-                    if self.catalog.fields.halo[key].scaling is not None:
-                        halos[key] = apply_conversion(self.catalog.fields.halo, key, halos[key], self.catalog.a,
-                                                      self.catalog.H)
-
-                    # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
-                    if halos[key].ndim > 1:
-                        converted = to_list(halos, key)
-                        del halos[key]
-                        halos[key] = converted
-
-            halos = pd.DataFrame.from_dict(halos)
-            halos = self._filter(halos, self.halo_conditions)
+            processed_halos = run_pipeline(halos, steps)
             logger.debug("Halo data fetched successfully.")
-            halo_context = HaloContext(halos, self.column_map)
+            halo_context = HaloContext(processed_halos, self.column_map)
             return halo_context
         else:
             logger.warning("No halos found.")
@@ -301,27 +389,19 @@ class Illustris300Fetcher(DataFetcher):
             subhalos['count'] = np.array(size)
 
         if len(subhalos) > 0:
-            subhalos['subhalo_id'] = np.arange(subhalos['count'])
-            for key in list(subhalos.keys()):
-                if key in fields:
-                    # Ensure that every feature has a name
-                    if not getattr(self.catalog.fields.subhalo[key], 'name'):
-                        raise ValueError('Error, you must specify the name for each field.')
+            table = 'subhalo'
+            subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
+            steps = [
+                lambda subhalos: assign_id(subhalos, 'subhalo_id'),
+                lambda subhalos: validate_and_process_fields(subhalos, self.subhalo_fields, table, self.catalog),
+                lambda subhalos: convert_to_dataframe(subhalos),
+                lambda subhalos: apply_filters(subhalos, subhalo_conditions),
+                lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog)
+            ]
 
-                    # Unit conversion
-                    if self.catalog.fields.subhalo[key].scaling is not None:
-                        subhalos[key] = apply_conversion(self.catalog.fields.subhalo, key, subhalos[key],
-                                                         self.catalog.a, self.catalog.H)
-
-                    # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
-                    if subhalos[key].ndim > 1:
-                        converted = to_list(subhalos, key)
-                        del subhalos[key]
-                        subhalos[key] = converted
-
-            subhalos = pd.DataFrame.from_dict(subhalos)
-            subhalos = self._filter(subhalos, self.subhalo_conditions)
-            subhalo_context = SubhaloContext(subhalos, self.column_map)
+            processed_subhalos = run_pipeline(subhalos, steps)
+            logger.debug("Subhalo data fetched successfully.")
+            subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
             return subhalo_context
         else:
             logger.warning("No subhalos found.")
@@ -353,23 +433,40 @@ class Illustris300Fetcher(DataFetcher):
             data = {}
             for part_type in part_types:
                 fields = list(self.catalog.fields.particles[part_type].keys())
-                star_p = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, part_type, fields=fields)
+                particles = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, part_type, fields=fields)
 
-                if isinstance(star_p, np.ndarray):
-                    tmp = star_p
-                    star_p = {fields[0]: tmp}
+                # if numpy, convert it to a dict
+                if isinstance(particles, np.ndarray):
+                    tmp = particles
+                    particles = {fields[0]: tmp}
 
-                if len(star_p) > 0:
-                    for key in fields:
-                        if self.catalog.fields.particles[part_type][key].scaling is not None:
-                            star_p[key] = apply_conversion(self.catalog.fields.particles[part_type], key,
-                                                           star_p[key], self.catalog.a, self.catalog.H)
-                    data[part_type] = star_p
+                if len(particles) > 0:
+                    data[part_type] = particles
                     logger.debug(f"Particle data fetched successfully, particles retrieved")
                 else:
                     logger.warning(f"No particle data found for subhalo {subhalo_id}.")
-            particles = SubhaloParticles(data, self.catalog.fields.particles)
-            return particles
+
+            particle_conditions = {}
+            for col, type_config in self.catalog.fields.particles.items():
+                for t in type_config:
+                    if 'filter' in type_config[t]:
+                        if col not in particle_conditions:
+                            particle_conditions[col] = {}
+                        particle_conditions[col][t] = type_config[t]
+
+            table = 'particles'
+            steps = [
+                lambda particles: validate_and_process_fields(particles, self.particle_fields, table,
+                                                              self.catalog),
+                lambda particles: convert_to_dataframe(particles),
+                lambda particles: apply_filters(particles, particle_conditions),
+                lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog)
+            ]
+
+            processed_particles = run_pipeline(data, steps)
+            logger.debug("Halo data fetched successfully.")
+            particle_data = SubhaloParticles(processed_particles, self.catalog.fields.particles)
+            return particle_data
         except Exception as e:
             raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
 
@@ -445,7 +542,6 @@ class EagleFetcher(DataFetcher):
         pass
 
     def _build_query(self, table):
-        # TODO build the conditions with the proper unit measures
         def _build_conditions(conditions, table) -> str:
             expr = ''
             for key, value in conditions.items():
@@ -461,9 +557,11 @@ class EagleFetcher(DataFetcher):
             return expr[:-4]
 
         query = None
+        halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
+        halo_conditions = _build_conditions(halo_conditions, table='FOF')
 
-        halo_conditions = _build_conditions(self.halo_conditions, table='FOF')
-        subhalo_conditions = _build_conditions(self.subhalo_conditions, table='SH')
+        subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
+        subhalo_conditions = _build_conditions(subhalo_conditions, table='SH')
 
         if table == 'halo':
             header = '''

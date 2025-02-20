@@ -15,7 +15,7 @@ fields:
       output: "Msun/h"
       scaling: "x * 1e10"
       name: "m200"
-      # Mass > (1e13 * H) M⊙/h
+      # Mass > (1e13 * H) 10^10 M⊙/h
       filter: ["> 6.77*1e12"]
     Group_R_Crit200:
       input: "ckpc/h"

@@ -351,12 +351,12 @@ class ICLProcessor(FeatureProcessor):
             AssertionError: If the size of the input data along the specified axes and the length
                 of `self.value` do not match.
         """
+        pos_rot = subhalo_particles.star_p
         if axis is not None:
             i, j = axis
             if len(self.value) == 0:
                 logger.error('FeatureProcessor value is empty, call first process method.')
                 raise Exception('FeatureProcessor value is empty, call first process method.')
-            pos_rot = subhalo_particles.star_p
 
             assert pos_rot[:, i].size == pos_rot[:, j].size == len(self.value)
             output_ij, binx, biny, _ = stats.binned_statistic_2d(
@@ -367,7 +367,12 @@ class ICLProcessor(FeatureProcessor):
             output_ij[np.isnan(output_ij)] = 0
             return output_ij, binx, biny
         else:
-            pass
+            # TODO to review computation and output
+            assert pos_rot[:, 0].size == pos_rot[:, 1].size == pos_rot[:, 2].size == len(self.value)
+            statistic_ijk, bin_edges, bin_number = stats.binned_statistic_dd(pos_rot, self.value, statistic="mean",
+                                                                             bins=bins, range=ranging)
+            statistic_ijk[np.isnan(statistic_ijk)] = 0
+            return statistic_ijk, bin_edges, bin_number
 
     @classmethod
     def get_empty(cls) -> np.ndarray:

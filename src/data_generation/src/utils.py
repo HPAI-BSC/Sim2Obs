@@ -396,22 +396,17 @@ def to_list(d, column):
     return [d[column][i] for i in range(d[column].shape[0])]
 
 
-def apply_conversion(cfg: DictConfig, column_name, values, scalefactor, h):
+def apply_conversion(values, scaling_formula, scalefactor, h):
     """Applies the correct unit transformation, including indexing if necessary."""
-    if column_name not in cfg:
-        print(f"No conversion rule found for {column_name}")
-        return values
-    # Extract scaling formula and index
-    scaling_formula = cfg[column_name]["scaling"]
-    index = cfg[column_name].get("index", None)
-
-    # Apply indexing if necessary
-    if index is not None:
-        values = values[:, index]
-
     # Prepare a safe eval context
     context = {"x": values, "a": scalefactor, "h": h, "np": np, "math": math}
     return eval(scaling_formula, context)
+
+
+def dict_depth(d, level=0):
+    if (not isinstance(d, DictConfig) and not isinstance(d, dict)) or not d:  # Base case: not a dict or empty dict
+        return level
+    return max(dict_depth(v, level + 1) for v in d.values())
 
 
 def rotate(z, axis, degree, X):
