@@ -51,10 +51,10 @@ class TestDataLoaderStep(unittest.TestCase):
             self.assertIsInstance(halo, Halo)
             self.assertIsInstance(subhalo_ctx, SubhaloContext)
 
-    def no_test_load_halo_data_eagle(self):
+    def test_load_halo_data_eagle(self):
         self.dataLoader = DataLoader(self.cfg_eagle)
         result = list(self.dataLoader.load_halo_subhalo_data())
-        #self.assertEqual(len(result), 21)
+        self.assertEqual(len(result), 21)
 
         for halo_df, subhalo_df in result:
             self.assertIsInstance(halo_df, Halo)
@@ -66,7 +66,7 @@ class TestDataLoaderStep(unittest.TestCase):
         particles = self.dataLoader._load_subhalo_particles_data(halo)
         self.assertIsInstance(particles, SubhaloParticles)
 
-    def no_test_load_subhalo_particles_eagle(self):
+    def test_load_subhalo_particles_eagle(self):
         self.dataLoader = DataLoader(self.cfg_eagle)
         halo = self.halo_eagle
         particles = self.dataLoader._load_subhalo_particles_data(halo)
@@ -96,7 +96,7 @@ class TestDataLoaderStep(unittest.TestCase):
         self.assertIsInstance(results[0][2].subhalo_particles, SubhaloParticles)
         self.assertIsInstance(results[0][2].subhalos, SubhaloContext)
 
-    def no_test_process_eagle(self):
+    def test_process_eagle(self):
         data_loader = DataLoader(self.cfg_eagle)
         halo_subhalo_list = data_loader.load_halo_subhalo_data()[:5]
         input_feature = VelocityDispersionProcessor()

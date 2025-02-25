@@ -730,6 +730,7 @@ class EagleFetcher(DataFetcher):
                     if self.catalog.fields.subhalo[column].scaling is not None:
                         df[column] = apply_conversion(df[column], self.catalog.fields.subhalo[column].scaling,
                                                       self.catalog.a, self.catalog.H)
+            df = df.sort_values(by=['subhalo_id', 'GroupNumber'])
             subhalo_context = SubhaloContext(df, self.column_map)
             logger.debug("Subhalo data fetched successfully.")
         else:
@@ -818,11 +819,8 @@ class EagleFetcher(DataFetcher):
 
                 tmp = pl.DataFrame(data_part_type)
                 # Create index with these two columns for speed
-                tmp = tmp.filter(
-                    (tmp["GroupNumber"] == group_number) & (tmp["SubGroupNumber"] == subgroup_id)
-                )
+                tmp = tmp.filter((tmp["GroupNumber"] == group_number) & (tmp["SubGroupNumber"] == subgroup_id))
                 if len(tmp) == 0:
-
                     logger.error(f'Error, there is not particle data for GroupNumber={group_number} and '
                                  f'SubGroupNumber={subgroup_id}')
                     raise ValueError(f'Error, there is not particle data for GroupNumber={group_number} and'

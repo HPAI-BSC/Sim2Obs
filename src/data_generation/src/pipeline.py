@@ -1,6 +1,7 @@
 from typing import Any
 
 import numpy as np
+import pandas as pd
 from omegaconf import DictConfig
 
 from src.data_generation.src.cosmos import CosmosData
@@ -8,7 +9,7 @@ from src.data_generation.src.data_loader_step import DataLoader
 from src.data_generation.src.feature import FeatureProcessorFactory, FeatureProcessor
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.subhalo import SubhaloContext
+from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("Pipeline")
@@ -57,7 +58,7 @@ class Pipeline:
         input_feature = FeatureProcessorFactory.get_feature(feature_input, cfg=self.cfg)
         output_feature = FeatureProcessorFactory.get_feature(feature_output, cfg=self.cfg)
         data_loader = DataLoader(self.cfg)
-        halo_subhalo_list = data_loader.load_halo_data()
+        halo_subhalo_list = data_loader.load_halo_subhalo_data()
 
         if n is not None:
             halo_subhalo_list = halo_subhalo_list[:n]
@@ -65,11 +66,12 @@ class Pipeline:
         steps = self.steps
         if len(steps) != 0:
             halo = Halo.empty_instance()
-            subhalos = SubhaloContext.empty_instance()
+            subhalos = SubhaloContext(pd.DataFrame(), None)
+            subhalo_particles = SubhaloParticles({}, None)
             cosmos_data = CosmosData(halo=halo,
                                      subhalo_id=-1,
                                      subhalos=subhalos,
-                                     subhalo_particle_positions=np.array([]))
+                                     subhalo_particles=subhalo_particles)
             result = self.build_pipeline(steps, halo_subhalo_list, cosmos_data, input_feature, output_feature)
             output = list(result)
             return output

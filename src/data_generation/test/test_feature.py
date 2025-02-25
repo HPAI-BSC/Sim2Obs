@@ -88,7 +88,7 @@ class TestFeature(unittest.TestCase):
 
         self.icl_processor.value = np.ones((mock_subhalo_particles_instance.star_p.shape[0], ), dtype=int)  # ICL mask
         # Axis x-y
-        icl_map, _, biny = self.icl_processor.generate_map(particle_positions=mock_subhalo_particles_instance.star_p,
+        icl_map, _, biny = self.icl_processor.generate_map(subhalo_particles=mock_subhalo_particles_instance,
                                                            bins=bins, ranging=ranging, axis=(0, 1))
         assert (len(icl_map)) == bins
 
@@ -97,7 +97,7 @@ class TestFeature(unittest.TestCase):
         self.icl_processor.value = np.ones((self.subhalo_particles_eagle.star_p.shape[0], ), dtype=int)  # ICL mask
         mock_subhalo_particles_instance = self.subhalo_particles_eagle
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
-        icl_map, _, biny = self.icl_processor.generate_map(particle_positions=mock_subhalo_particles_instance.star_p,
+        icl_map, _, biny = self.icl_processor.generate_map(subhalo_particles=mock_subhalo_particles_instance,
                                                            bins=bins, ranging=ranging, axis=(0, 1))
         assert (len(icl_map)) == bins
 
@@ -151,7 +151,7 @@ class TestFeature(unittest.TestCase):
         bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius
         ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
         # axis x-y
-        vel_map, _, biny = self.vel_disp_processor.generate_map(mock_subhalo_particles_instance.star_p, bins,
+        vel_map, _, biny = self.vel_disp_processor.generate_map(mock_subhalo_particles_instance, bins,
                                                                 ranging, axis=(0, 1))
         assert (len(vel_map)) == bins
 
@@ -161,7 +161,7 @@ class TestFeature(unittest.TestCase):
 
         self.vel_disp_processor.value = self.vel_disp_processor.process(mock_halo.return_value,
                                                                         mock_subhalo_particles_instance)
-        vel_map, _, biny = self.vel_disp_processor.generate_map(mock_subhalo_particles_instance.star_p, bins,
+        vel_map, _, biny = self.vel_disp_processor.generate_map(mock_subhalo_particles_instance, bins,
                                                                 ranging, axis=(0, 1))
         assert (len(vel_map)) == bins
 

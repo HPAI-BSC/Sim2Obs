@@ -45,7 +45,6 @@ class FeatureProcessor(ABC):
         """
         pass
 
-    @abstractmethod
     def rotate(self, z, rotation_axis, degree):
         pass
 

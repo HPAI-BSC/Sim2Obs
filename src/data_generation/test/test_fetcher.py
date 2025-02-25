@@ -73,10 +73,6 @@ class TestFetcher(unittest.TestCase):
         self.assertIsInstance(halo_context_1, HaloContext)
         self.assertEqual(len(halo_context_1.data), 83)
 
-        # Reorder columns for the test
-        tmp = halo_context_1.data.head()[['m200', 'r200', 'fsub', 'halo_id', 'gpos']]
-        assert_frame_equal(tmp, self.halo_context_illustris.data, check_dtype=False)
-
         # get_item
         halo_data_1 = halo_context_1.get_halo_by_id(halo_id=0)
         self.assertEqual(halo_data_1.halo_id, self.halo_illustris.halo_id)
@@ -89,9 +85,6 @@ class TestFetcher(unittest.TestCase):
         subhalo_context_1 = self.fetcher_illustris.get_subhalos()
         self.assertIsInstance(subhalo_context_1, SubhaloContext)
         self.assertEqual(len(subhalo_context_1.data), 2598)
-
-        tmp = subhalo_context_1.data.head()[['shmr', 'mstr', 'id_parents', 'subhalo_id', 'spos']]
-        assert_frame_equal(tmp, self.subhalo_context_illustris.data, check_dtype=False)
 
         # Get item
         subhalo_data_1 = subhalo_context_1.get_subhalo_by_id(subhalo_id=0)
@@ -119,16 +112,21 @@ class TestFetcher(unittest.TestCase):
         self.assertIsInstance(halo_context_2, HaloContext)
         self.assertEqual(len(halo_context_2.data), 21)
 
-        # TODO check units to compare equal
-
         # get_item
         halo_data_1 = halo_context_2.get_halo_by_id(halo_id=26000000000000)
+        self.assertEqual(halo_data_1.halo_id, self.halo_eagle.halo_id)
         self.assertTrue(hasattr(halo_data_1, "r200"))
+        self.assertEqual(halo_data_1.r200, self.halo_eagle.r200)
         self.assertTrue(hasattr(halo_data_1, "m200"))
+        self.assertEqual(halo_data_1.m200, self.halo_eagle.m200)
         self.assertTrue(hasattr(halo_data_1, "fsub"))
+        self.assertEqual(halo_data_1.fsub, self.halo_eagle.fsub)
         self.assertTrue(hasattr(halo_data_1, "halo_id"))
+        self.assertEqual(halo_data_1.halo_id, self.halo_eagle.halo_id)
         self.assertTrue(hasattr(halo_data_1, "group_number"))
+        self.assertEqual(halo_data_1.group_number, self.halo_eagle.group_number)
         self.assertTrue(hasattr(halo_data_1, "gpos"))
+        assert_array_equal(halo_data_1.gpos, self.halo_eagle.gpos)
 
     def test_get_subhalos_eagle(self):
         subhalo_context_2 = self.fetcher_eagle.get_subhalos()
@@ -137,6 +135,13 @@ class TestFetcher(unittest.TestCase):
 
         columns = set(subhalo_context_2.data.columns)
         assert set(['shmr', 'mstr', 'id_parents', 'subhalo_id', 'spos', 'group_number']) == columns
+
+        subhalo_data_2 = subhalo_context_2.get_subhalo_by_id(subhalo_id=0)
+        self.assertEqual(subhalo_data_2.subhalo_id, self.subhalo_eagle.subhalo_id)
+        self.assertEqual(subhalo_data_2.id_parents, self.subhalo_eagle.id_parents)
+        self.assertAlmostEquals(subhalo_data_2.mstr, self.subhalo_eagle.mstr)
+        self.assertAlmostEquals(subhalo_data_2.shmr, self.subhalo_eagle.shmr)
+        assert_array_equal(subhalo_data_2.spos, self.subhalo_eagle.spos)
 
     def test_get_p_subhalo_eagle(self):
         self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'

@@ -8,6 +8,7 @@ from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.rotate_step import RotateStep
+from src.data_generation.src.subhalo import SubhaloContext
 from src.data_generation.src.utils import muse_bins_r, circle, setup_output_directories, setup_logger
 
 logger = setup_logger("MapStep")
@@ -117,10 +118,11 @@ class MapStep(PipelineStep):
         Returns:
             np.ndarray: Array of subhalo IDs identified as interlopers.
         """
+
         # Considering as interloper any subhalo contained in a box defined by [-r, r] in the x and y directions and
         # inside [-R_200, R_200] along the z axis
-
-        spos = np.array(cosmos_data.subhalos['spos'].tolist())
+        subhalos: SubhaloContext = cosmos_data.subhalos
+        spos = np.array(subhalos.data['spos'].tolist())
 
         mask = (
                 (spos[:, 0] < self.r) &  # x condition
@@ -128,7 +130,10 @@ class MapStep(PipelineStep):
                 (spos[:, 2] < cosmos_data.halo.r200)  # z condition
         )
 
-        interlopers_id = cosmos_data.subhalos['subhalo_id'][mask]
+        if 'group_number' in subhalos.data.columns:
+            interlopers_id = subhalos.data[['subhalo_id', 'group_number']][mask]
+        else:
+            interlopers_id = subhalos.data['subhalo_id'][mask]
 
         # removing first galaxy (central/BCG), since it's usually the central galaxy or BCG
         # TODO is it possible to have no interlopers ?
@@ -174,17 +179,23 @@ class MapStep(PipelineStep):
         try:
             for i in interlopers_id:
                 # For each interloper get its center position (h, k) and its radius
-                subhalo = cosmos_data.subhalos[cosmos_data.subhalos['subhalo_id'] == i]
-                subhalo = subhalo.reset_index(drop=True)
+                # TODO change this access by subhalo method
+                subhalo = None
+                if isinstance(i, np.ndarray):
+                    # [subhalo_id, halo_id]
+                    subhalo = cosmos_data.subhalos.get_subhalo_by_id(subhalo_id=i[0], halo_id=i[1])
+                elif isinstance(i, int):
+                    subhalo = cosmos_data.subhalos.get_subhalo_by_id(subhalo_id=i, halo_id=None)
+                assert subhalo is not None
                 # TODO check this columns exists other wise raise exception
-                h = subhalo.iloc[0]['spos'][0]
-                k = subhalo.iloc[0]['spos'][1]
-                rradius = subhalo.iloc[0]['shmr']
+                h = subhalo.spos[0]
+                k = subhalo.spos[1]
+                rradius = subhalo.shmr
                 for cc in range(rows):
                     for dd in range(cols):
                         radius_circle = circle(X[cc, dd], Y[cc, dd], h, k, rradius)
                         if radius_circle <= 1:
-                                interlopers_mask[cc, dd] = 1
+                            interlopers_mask[cc, dd] = 1
 
             # Check if the mask is just zero
             if np.all(interlopers_mask == 0):

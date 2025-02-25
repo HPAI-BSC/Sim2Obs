@@ -72,5 +72,5 @@ save_to_pickle('data/eagle/subhalo_context_0.pkl', subhalo_context_2)
 subhalo_data_2 = subhalo_context_2.get_subhalo_by_id(subhalo_id=subhalo_context_2.subhalo_id[0])
 save_to_pickle('data/eagle/subhalo_0.pkl', subhalo_data_2)
 
-subhalo_particles_2 = fetcher_eagle.get_p_subhalo(subhalo_id=subhalo_context_2.subhalo_id[0], group_number=2)
+subhalo_particles_2 = fetcher_eagle.get_p_subhalo(subhalo_id=0, group_number=1)
 save_to_pickle('data/eagle/subhalo_particles_0.pkl', subhalo_particles_2)

@@ -100,10 +100,10 @@ class TestRotateStep(unittest.TestCase):
     @patch('src.data_generation.src.halo.Halo')
     @patch('src.data_generation.src.subhalo.SubhaloContext')
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
-    def no_test_rotation_process_eagle(self, mock_halo, mock_subhalo_context, mock_subhalo_particles):
+    def test_rotation_process_eagle(self, mock_halo, mock_subhalo_context, mock_subhalo_particles):
         self.rotate_step = RotateStep(self.cfg_eagle)
         mock_halo.return_value = self.halo_eagle
-        mock_subhalo_particles.return_value = self.subhalo_particles_eagle.p
+        mock_subhalo_particles.return_value = self.subhalo_particles_eagle
         mock_subhalo_context.return_value = self.subhalo_context_eagle
         self.mock_cosmos_data = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
                                            self.subhalo_eagle.subhalo_id,
