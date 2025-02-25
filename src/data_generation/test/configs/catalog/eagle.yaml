@@ -13,7 +13,7 @@ path: ${paths.datasets_dir}/eagle/RefL0050N0752
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320
-# TODO double check with Ilaria
+# TODO double check units and sample size with Ilaria
 fields:
   halo:
     Group_M_Crit200:

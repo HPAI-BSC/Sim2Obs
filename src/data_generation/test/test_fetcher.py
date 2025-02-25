@@ -32,6 +32,18 @@ class TestFetcher(unittest.TestCase):
         with open("data/illustris/subhalo_context_0.pkl", "rb") as file:
             self.subhalo_context_illustris = pickle.load(file)
 
+        with open("data/eagle/halo_0.pkl", "rb") as file:
+            self.halo_eagle = pickle.load(file)
+
+        with open("data/eagle/subhalo_0.pkl", "rb") as file:
+            self.subhalo_eagle = pickle.load(file)
+
+        with open("data/eagle/halo_context_0.pkl", "rb") as file:
+            self.halo_context_eagle = pickle.load(file)
+
+        with open("data/eagle/subhalo_context_0.pkl", "rb") as file:
+            self.subhalo_context_eagle = pickle.load(file)
+
         # Initialize Hydra and load configuration
         with initialize(config_path="configs"):
             # Initialize the cfg_illustris and cfg_eagle
@@ -105,30 +117,43 @@ class TestFetcher(unittest.TestCase):
     def test_get_halos_eagle(self):
         halo_context_2 = self.fetcher_eagle.get_halos()
         self.assertIsInstance(halo_context_2, HaloContext)
-        # TODO
-        #self.assertEqual(len(halo_context_2.data), XX)
+        self.assertEqual(len(halo_context_2.data), 21)
+
+        # TODO check units to compare equal
+
         # get_item
-        halo_data_2 = halo_context_2.get_item(halo_id=halo_context_2.halo_id[0])
-        assert halo_data_2 is not None
+        halo_data_1 = halo_context_2.get_halo_by_id(halo_id=26000000000000)
+        self.assertTrue(hasattr(halo_data_1, "r200"))
+        self.assertTrue(hasattr(halo_data_1, "m200"))
+        self.assertTrue(hasattr(halo_data_1, "fsub"))
+        self.assertTrue(hasattr(halo_data_1, "halo_id"))
+        self.assertTrue(hasattr(halo_data_1, "group_number"))
+        self.assertTrue(hasattr(halo_data_1, "gpos"))
 
     def test_get_subhalos_eagle(self):
         subhalo_context_2 = self.fetcher_eagle.get_subhalos()
         self.assertIsInstance(subhalo_context_2, SubhaloContext)
+        self.assertEqual(len(subhalo_context_2.data), 125)
 
-        # Get item
-        subhalo_data_2 = subhalo_context_2.get_item(subhalo_id=subhalo_context_2.subhalo_id[0])
-        assert subhalo_data_2 is not None
-
+        columns = set(subhalo_context_2.data.columns)
+        assert set(['shmr', 'mstr', 'id_parents', 'subhalo_id', 'spos', 'group_number']) == columns
 
     def test_get_p_subhalo_eagle(self):
         self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
         self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
+
         subhalo_particles_2 = self.fetcher_eagle.get_p_subhalo(subhalo_id=0, group_number=2)
+        self.assertEqual(len(subhalo_particles_2.gas_m), 2479560)
+        self.assertEqual(len(subhalo_particles_2.star_m), 265076)
         self.assertIsInstance(subhalo_particles_2, SubhaloParticles)
         self.assertTrue(hasattr(subhalo_particles_2, "gas_m"))
+        self.assertIsInstance(subhalo_particles_2.gas_m, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_2, "star_m"))
+        self.assertIsInstance(subhalo_particles_2.star_m, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_2, "star_p"))
+        self.assertIsInstance(subhalo_particles_2.star_p, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_2, "star_v"))
+        self.assertIsInstance(subhalo_particles_2.star_v, np.ndarray)
 
     def test_eagle_simulation_codes(self):
         simulation_codes = ['RefL0025N0376',    # nok

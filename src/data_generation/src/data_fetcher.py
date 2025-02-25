@@ -648,6 +648,18 @@ class EagleFetcher(DataFetcher):
         array = sql.execute_query(conn, query)
         df = pd.DataFrame(array)
 
+        if 'GroupNumber' not in self.halo_fields:
+            self.subhalo_fields.append('GroupNumber')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.subhalo["GroupNumber"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "group_number"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['GroupNumber'] = 'group_number'
+
         if len(df) > 0:
             df = df.sort_values(by='halo_id')
             df['halo_id'] = df['halo_id'].astype(int)
@@ -655,8 +667,8 @@ class EagleFetcher(DataFetcher):
                 # Unit conversion
                 if column in self.halo_fields:
                     if self.catalog.fields.halo[column].scaling is not None:
-                        df[column] = apply_conversion(self.catalog.fields.halo, column, df[column], self.catalog.a,
-                                                      self.catalog.H)
+                        df[column] = apply_conversion(df[column], self.catalog.fields.halo[column].scaling,
+                                                      self.catalog.a, self.catalog.H)
 
             halo_context = HaloContext(df, column_map=self.column_map)
             logger.debug("Halo data fetched successfully.")
@@ -686,14 +698,38 @@ class EagleFetcher(DataFetcher):
         df = df.drop(columns=['m200'])
         df = df.rename(columns={'halo_id': 'id_parents'})
 
+        if 'GroupNumber' not in self.halo_fields:
+            self.subhalo_fields.append('GroupNumber')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.subhalo["GroupNumber"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "group_number"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['GroupNumber'] = 'group_number'
+
+        if 'SubGroupNumber' not in self.halo_fields:
+            self.subhalo_fields.append('SubGroupNumber')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.subhalo["SubGroupNumber"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "subhalo_id"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['SubGroupNumber'] = 'subhalo_id'
+
         if len(df) > 0:
             df = df.sort_values(by='subhalo_id')
             for column in list(df.columns):
                 # Unit conversion
                 if column in self.subhalo_fields:
                     if self.catalog.fields.subhalo[column].scaling is not None:
-                        df[column] = apply_conversion(self.catalog.fields.subhalo, column, df[column], self.catalog.a,
-                                                      self.catalog.H)
+                        df[column] = apply_conversion(df[column], self.catalog.fields.subhalo[column].scaling,
+                                                      self.catalog.a, self.catalog.H)
             subhalo_context = SubhaloContext(df, self.column_map)
             logger.debug("Subhalo data fetched successfully.")
         else:
@@ -770,8 +806,8 @@ class EagleFetcher(DataFetcher):
                     # TODO deal with the conversion !!
                     column = read_dataset(itype, field, path)
                     if self.catalog.fields.particles[part_type][field].scaling is not None:
-                        column = apply_conversion(self.catalog.fields.particles[part_type], field,
-                                                  column, self.catalog.a, self.catalog.H)
+                        scaling = self.catalog.fields.particles[part_type][field].scaling
+                        column = apply_conversion(column, scaling, self.catalog.a, self.catalog.H)
                     data_part_type[field] = column
 
                     # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
@@ -782,7 +818,9 @@ class EagleFetcher(DataFetcher):
 
                 tmp = pl.DataFrame(data_part_type)
                 # Create index with these two columns for speed
-                tmp.filter((pl.col('GroupNumber') == group_number) & (pl.col('SubGroupNumber') == subgroup_id))
+                tmp = tmp.filter(
+                    (tmp["GroupNumber"] == group_number) & (tmp["SubGroupNumber"] == subgroup_id)
+                )
                 if len(tmp) == 0:
 
                     logger.error(f'Error, there is not particle data for GroupNumber={group_number} and '
