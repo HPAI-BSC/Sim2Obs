@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from hydra import initialize, compose
 import eagleSqlTools as sql
 from numpy.testing import assert_array_equal
+from omegaconf import OmegaConf
 from pandas._testing import assert_frame_equal
 
 from src.data_generation.src.data_fetcher import DataFetcherFactory
@@ -171,8 +172,10 @@ class TestFetcher(unittest.TestCase):
         for sim in simulation_codes:
             try:
                 print(sim)
+                OmegaConf.set_struct(self.cfg_eagle, False)
                 self.cfg_eagle.catalog['simulation_code'] = sim
-                self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle)
+                OmegaConf.set_struct(self.cfg_eagle, True)
+                self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog)
                 halos = self.fetcher_eagle.get_halos()
                 print(f'-- Number of halos: {len(halos.data["m200"])}')
                 subhalos = self.fetcher_eagle.get_subhalos()
