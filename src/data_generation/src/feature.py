@@ -445,7 +445,7 @@ class StellarMassDensityProcessor(FeatureProcessor):
             Exception: If the `self.value` attribute is empty, indicating that the `process`
                 method needs to be called before generating the map.
         """
-        pos_rot = subhalo_particles.star_m
+        pos_rot = subhalo_particles.star_p
         if axis is not None:
             i, j = axis
             if len(self.value) == 0:
@@ -552,7 +552,7 @@ class DMMassDensityProcessor(FeatureProcessor):
             Exception: If the `self.value` attribute is empty, indicating that the `process`
                 method needs to be called before generating the map.
         """
-        pos_rot = subhalo_particles.dm_m
+        pos_rot = subhalo_particles.star_p
         if axis is not None:
             i, j = axis
             if len(self.value) == 0:
@@ -566,7 +566,6 @@ class DMMassDensityProcessor(FeatureProcessor):
             missing_component = components - set(axis)
             k = next(iter(missing_component))
 
-            pos_rot = subhalo_particles.dm_m
             input_ij, binx, biny, _ = stats.binned_statistic_2d(
                 pos_rot[:, i], pos_rot[:, j],
                 (self.value[:, k]) ** 2,  # Access the relevant feature
