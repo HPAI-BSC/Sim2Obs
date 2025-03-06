@@ -44,7 +44,6 @@ class FeatureProcessor(ABC):
             np.ndarray: A numpy array containing the processed feature data.
         """
         pass
-
     def rotate(self, z, axis, degree):
         if len(self.value) == 0:
             logger.error('FeatureProcessor value is empty, call first process method.')
@@ -446,7 +445,7 @@ class StellarMassDensityProcessor(FeatureProcessor):
             Exception: If the `self.value` attribute is empty, indicating that the `process`
                 method needs to be called before generating the map.
         """
-
+        pos_rot = subhalo_particles.star_m
         if axis is not None:
             i, j = axis
             if len(self.value) == 0:
@@ -460,7 +459,6 @@ class StellarMassDensityProcessor(FeatureProcessor):
             missing_component = components - set(axis)
             k = next(iter(missing_component))
 
-            pos_rot = subhalo_particles.star_m
             input_ij, binx, biny, _ = stats.binned_statistic_2d(
                 pos_rot[:, i], pos_rot[:, j],
                 (self.value[:, k]) ** 2,  # Access the relevant feature
@@ -470,8 +468,13 @@ class StellarMassDensityProcessor(FeatureProcessor):
             input_ij[np.isnan(input_ij)] = 0
             return input_ij, binx, biny
         else:
-            # 3D
-            pass
+            # TODO to review computation and output
+            assert pos_rot[:, 0].size == pos_rot[:, 1].size == pos_rot[:, 2].size == len(self.value)
+            statistic_ijk, bin_edges, bin_number = stats.binned_statistic_dd(pos_rot, self.value, statistic="sum",
+                                                                             bins=bins, range=ranging)
+            statistic_ijk[np.isnan(statistic_ijk)] = 0
+            return statistic_ijk, bin_edges, bin_number
+
 
     @classmethod
     def get_empty(cls) -> np.ndarray:
@@ -549,7 +552,7 @@ class DMMassDensityProcessor(FeatureProcessor):
             Exception: If the `self.value` attribute is empty, indicating that the `process`
                 method needs to be called before generating the map.
         """
-
+        pos_rot = subhalo_particles.dm_m
         if axis is not None:
             i, j = axis
             if len(self.value) == 0:
@@ -573,8 +576,12 @@ class DMMassDensityProcessor(FeatureProcessor):
             input_ij[np.isnan(input_ij)] = 0
             return input_ij, binx, biny
         else:
-            # 3D
-            pass
+            # TODO to review computation and output
+            assert pos_rot[:, 0].size == pos_rot[:, 1].size == pos_rot[:, 2].size == len(self.value)
+            statistic_ijk, bin_edges, bin_number = stats.binned_statistic_dd(pos_rot, self.value, statistic="sum",
+                                                                             bins=bins, range=ranging)
+            statistic_ijk[np.isnan(statistic_ijk)] = 0
+            return statistic_ijk, bin_edges, bin_number
 
     @classmethod
     def get_empty(cls) -> np.ndarray:
