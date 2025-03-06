@@ -45,8 +45,11 @@ class FeatureProcessor(ABC):
         """
         pass
 
-    def rotate(self, z, rotation_axis, degree):
-        pass
+    def rotate(self, z, axis, degree):
+        if len(self.value) == 0:
+            logger.error('FeatureProcessor value is empty, call first process method.')
+            raise Exception('FeatureProcessor value is empty, call first process method.')
+        self.value = rotate(z, axis, degree, self.value)
 
     # TODO update
     @abstractmethod
@@ -130,12 +133,6 @@ class VelocityDispersionProcessor(FeatureProcessor):
 
         logger.info(f'Computed velocity dispersion for {len(subhalo_particles.star_v)} particles.')
         return subhalo_particles.star_v
-
-    def rotate(self, z, axis, degree):
-        if len(self.value) == 0:
-            logger.error('FeatureProcessor value is empty, call first process method.')
-            raise Exception('FeatureProcessor value is empty, call first process method.')
-        self.value = rotate(z, axis, degree, self.value)
 
     def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
@@ -384,6 +381,212 @@ class ICLProcessor(FeatureProcessor):
         return np.array([])
 
 
+class StellarMassDensityProcessor(FeatureProcessor):
+    """
+    Class to process the ...
+    Attributes:
+        name (str): The name of the feature ('VelocityDispersion').
+        map ([]): Velocity Dispersion map.
+        value ([]): Placeholder for storing computed value.
+    """
+    def __init__(self):
+        self.name = 'StellarMassDensity'
+        self.map = []
+        self.value = []
+
+    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
+        """
+        Calculate the velocity dispersion of particles.
+
+        Args:
+            **kwargs: Keyword arguments, expected to include the necessary data for processing, in this case
+            the velocities of the particles.
+
+        Returns:
+            np.ndarray: The velocity for each particle.
+
+        Raises:
+            ValueError: If the input particle_velocity is empty.
+        """
+        if not hasattr(subhalo_particles, 'star_m'):
+            logger.error('StellarMassDensity needs star_m as input parameter.')
+            raise Exception('StellarMassDensity needs star_m as input parameter.')
+
+        if subhalo_particles.star_m.size == 0:
+            logger.error("SubhaloParticles cannot have 'm' (mass) empty.")
+            raise ValueError("SubhaloParticles cannot have 'm' (mass) empty.")
+
+        return subhalo_particles.star_m
+
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+        """
+        Generate a 2D map of processed particle features using binned statistics.
+
+        This method calculates a 2D histogram-like map of a feature derived from particle data.
+        It uses the positions of particles and bins them into a grid, computing the mean of a
+        specific feature for each grid cell. The resulting feature values are processed further
+        to compute their normalized root mean square (RMS).
+
+        Args:
+            particle_positions (np.ndarray): A 2D array of shape (N, 3) representing the positions
+                of particles in 3D space, where N is the number of particles.
+            bins (int): The number of bins to use along each axis for the grid.
+            ranging (tuple): A tuple of two tuples defining the range for binning along each axis,
+                e.g., ((xmin, xmax), (ymin, ymax)).
+            axis (tuple): A tuple of two integers indicating which axes to use for the 2D grid
+                (e.g., (0, 1) for x and y).
+
+        Returns:
+            tuple: A tuple containing:
+                - input_ij (np.ndarray): A 2D array representing the grid of processed feature values.
+                - binx (np.ndarray): The bin edges along the first axis.
+                - biny (np.ndarray): The bin edges along the second axis.
+
+        Raises:
+            Exception: If the `self.value` attribute is empty, indicating that the `process`
+                method needs to be called before generating the map.
+        """
+
+        if axis is not None:
+            i, j = axis
+            if len(self.value) == 0:
+                logger.error('FeatureProcessor value is empty, call first process method.')
+                raise Exception('FeatureProcessor value is empty, call first process method.')
+
+            if isinstance(self.value, List):
+                self.value = np.array(self.value)
+
+            components = {0, 1, 2}
+            missing_component = components - set(axis)
+            k = next(iter(missing_component))
+
+            pos_rot = subhalo_particles.star_m
+            input_ij, binx, biny, _ = stats.binned_statistic_2d(
+                pos_rot[:, i], pos_rot[:, j],
+                (self.value[:, k]) ** 2,  # Access the relevant feature
+                statistic="sum", bins=bins, range=ranging
+            )
+            input_ij = np.sqrt(input_ij / 3)
+            input_ij[np.isnan(input_ij)] = 0
+            return input_ij, binx, biny
+        else:
+            # 3D
+            pass
+
+    @classmethod
+    def get_empty(cls) -> np.ndarray:
+        """
+        Return an empty value for velocity dispersion (an empty array).
+
+        Returns:
+            np.ndarray: Empty array for velocity dispersion.
+        """
+        return np.array([])
+
+
+class DMMassDensityProcessor(FeatureProcessor):
+    """
+    Class to process the ...
+    Attributes:
+        name (str): The name of the feature ('VelocityDispersion').
+        map ([]): Velocity Dispersion map.
+        value ([]): Placeholder for storing computed value.
+    """
+    def __init__(self):
+        self.name = 'DMMassDensity'
+        self.map = []
+        self.value = []
+
+    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
+        """
+        Calculate the velocity dispersion of particles.
+
+        Args:
+            **kwargs: Keyword arguments, expected to include the necessary data for processing, in this case
+            the velocities of the particles.
+
+        Returns:
+            np.ndarray: The velocity for each particle.
+
+        Raises:
+            ValueError: If the input particle_velocity is empty.
+        """
+        if not hasattr(subhalo_particles, 'dm_m'):
+            logger.error('StellarMassDensity needs dm_m as input parameter.')
+            raise Exception('StellarMassDensity needs dm_m as input parameter.')
+
+        if subhalo_particles.dm_m.size == 0:
+            logger.error("SubhaloParticles cannot have 'm' (mass) empty.")
+            raise ValueError("SubhaloParticles cannot have 'm' (mass) empty.")
+
+        return subhalo_particles.dm_m
+
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+        """
+        Generate a 2D map of processed particle features using binned statistics.
+
+        This method calculates a 2D histogram-like map of a feature derived from particle data.
+        It uses the positions of particles and bins them into a grid, computing the mean of a
+        specific feature for each grid cell. The resulting feature values are processed further
+        to compute their normalized root mean square (RMS).
+
+        Args:
+            particle_positions (np.ndarray): A 2D array of shape (N, 3) representing the positions
+                of particles in 3D space, where N is the number of particles.
+            bins (int): The number of bins to use along each axis for the grid.
+            ranging (tuple): A tuple of two tuples defining the range for binning along each axis,
+                e.g., ((xmin, xmax), (ymin, ymax)).
+            axis (tuple): A tuple of two integers indicating which axes to use for the 2D grid
+                (e.g., (0, 1) for x and y).
+
+        Returns:
+            tuple: A tuple containing:
+                - input_ij (np.ndarray): A 2D array representing the grid of processed feature values.
+                - binx (np.ndarray): The bin edges along the first axis.
+                - biny (np.ndarray): The bin edges along the second axis.
+
+        Raises:
+            Exception: If the `self.value` attribute is empty, indicating that the `process`
+                method needs to be called before generating the map.
+        """
+
+        if axis is not None:
+            i, j = axis
+            if len(self.value) == 0:
+                logger.error('FeatureProcessor value is empty, call first process method.')
+                raise Exception('FeatureProcessor value is empty, call first process method.')
+
+            if isinstance(self.value, List):
+                self.value = np.array(self.value)
+
+            components = {0, 1, 2}
+            missing_component = components - set(axis)
+            k = next(iter(missing_component))
+
+            pos_rot = subhalo_particles.dm_m
+            input_ij, binx, biny, _ = stats.binned_statistic_2d(
+                pos_rot[:, i], pos_rot[:, j],
+                (self.value[:, k]) ** 2,  # Access the relevant feature
+                statistic="sum", bins=bins, range=ranging
+            )
+            input_ij = np.sqrt(input_ij / 3)
+            input_ij[np.isnan(input_ij)] = 0
+            return input_ij, binx, biny
+        else:
+            # 3D
+            pass
+
+    @classmethod
+    def get_empty(cls) -> np.ndarray:
+        """
+        Return an empty value for velocity dispersion (an empty array).
+
+        Returns:
+            np.ndarray: Empty array for velocity dispersion.
+        """
+        return np.array([])
+
+
 class FeatureProcessorFactory:
     """
     Factory class to generate specific feature processors.
@@ -413,6 +616,8 @@ class FeatureProcessorFactory:
         feature_processors = {
             'velocity_dispersion': VelocityDispersionProcessor(),
             'icl': ICLProcessor(cfg=kwargs.get('cfg', None)),
+            'stellar_mass_density': StellarMassDensityProcessor(),
+            'dark_matter_mass_density': DMMassDensityProcessor()
             # Add more features if required
         }
 

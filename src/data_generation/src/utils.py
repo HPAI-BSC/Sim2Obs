@@ -431,3 +431,19 @@ def rotate(z, axis, degree, X):
     Q = get_transform_matrix(new_z, z, normalized=False)
     X_rot = np.float32(rotate_3dvec(Q, X))
     return X_rot
+
+
+def mass_conversion_nfw(M500, c500):
+    """Convert M500 to M200 using the NFW profile"""
+    c200 = 1.3 * c500  # Approximate relation from simulations
+    
+    def f(c):
+        return np.log(1 + c) - c / (1 + c)
+
+    M200 = M500 * (f(c200) / f(c500))
+    return M200, c200
+
+
+def r500_to_r200(R500):
+    """Convert R500 to R200 assuming an NFW profile"""
+    return R500 * (200 / 500) ** (1/3)
