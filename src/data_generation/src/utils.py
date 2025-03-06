@@ -433,17 +433,45 @@ def rotate(z, axis, degree, X):
     return X_rot
 
 
-def mass_conversion_nfw(M500, c500):
-    """Convert M500 to M200 using the NFW profile"""
-    c200 = 1.3 * c500  # Approximate relation from simulations
-    
-    def f(c):
-        return np.log(1 + c) - c / (1 + c)
-
-    M200 = M500 * (f(c200) / f(c500))
-    return M200, c200
+def r500_to_r200(r500):
+    """Convert R500c to R200c using scaling relation"""
+    return r500 / 0.65  # R200c ≈ R500c / 0.65
 
 
-def r500_to_r200(R500):
-    """Convert R500 to R200 assuming an NFW profile"""
-    return R500 * (200 / 500) ** (1/3)
+def m500_to_m200(m500):
+    """Convert M500c to M200c assuming NFW scaling"""
+    return m500 * (1.54) ** 3  # M200c ≈ M500c * (R200c / R500c)^3
+
+
+def mass_concentration_relation(M200, A=5.71, B=-0.084):
+    """Estimate c200 from M200 using Dutton & Macciò (2014) relation"""
+    return A * (M200 / 1e12) ** B
+
+
+def convert_c200_to_c500(c200):
+    """Convert c200 to c500 using empirical relations"""
+    return c200 * (500 / 200) ** (-0.3)  # Approximate scaling
+
+
+def compute_fov(stellar_positions, total_mass, percentage=90):
+    """
+    Compute the field of view (FOV) that includes a certain percentage of the total stellar mass.
+
+    :param stellar_positions: Array of stellar positions in kpc (N x 3 array).
+    :param total_mass: Array of stellar masses (N array).
+    :param percentage: Percentage of total mass to include in the FOV (default 90%).
+
+    :return: Radius of the FOV that captures the given percentage of total mass.
+    """
+    # Sort positions based on radial distance from the center
+    distances = np.linalg.norm(stellar_positions, axis=1)  # Distance from the center
+    sorted_indices = np.argsort(distances)
+    sorted_masses = total_mass[sorted_indices]
+
+    # Compute the cumulative mass distribution
+    cumulative_mass = np.cumsum(sorted_masses)
+    cumulative_mass /= np.sum(total_mass)  # Normalize to total mass
+
+    # Find the radius that includes the given percentage of mass
+    fov_radius = distances[sorted_indices[np.where(cumulative_mass >= percentage / 100)[0][0]]]
+    return fov_radius
