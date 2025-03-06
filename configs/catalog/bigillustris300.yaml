@@ -1,4 +1,4 @@
-name: big-illustris-300
+name: illustris-300
 subhalo_error_id: 4294967295
 snapnum: 84       # redshift 0.2
 a: 0.8333     # redshift 0.2
@@ -34,8 +34,10 @@ fields:
       input: null
       output: null
       scaling: null
-      index: 0, 4
+      index: [0, 4]
       name: "num_particles"
+      agg: "sum" #numpy function to aggregate the indx
+      filter: "> 1000"
   subhalo:
     SubhaloPos:
       input: "ckpc/h"
@@ -54,19 +56,19 @@ fields:
       scaling: "x * 1e10 / h"
       index: 4
       name: "mstr"
-      # Mass > 1e10 M⊙
-      filter: "> 1e10"
     SubhaloGrNr:
       input: null
       output: null
       scaling: null
       name: "id_parents"
-    GroupLenType:
+    SubhaloLenType:
       input: null
       output: null
       scaling: null
-      index: 0, 4
+      index: [0, 4]
       name: "sub_num_particles"
+      agg: "sum" #numpy function to aggregate the indx
+      filter: "> 1000"
   particles:
     star:
       # <part_type>_<name>
@@ -91,4 +93,3 @@ fields:
         output: "Msun/h"
         scaling: "x * 1e10"
         name: "m"
-
