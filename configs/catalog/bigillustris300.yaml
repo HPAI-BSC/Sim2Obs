@@ -1,15 +1,94 @@
 name: big-illustris-300
 subhalo_error_id: 4294967295
 snapnum: 84       # redshift 0.2
-scalf: 0.8333     # redshift 0.2
-fov: 526.68   # 2 * 263.34 kpc
-spatial_resolution: 2.02 # kpc
+a: 0.8333     # redshift 0.2
+H: 0.6774
+fov: 526.68   # TODO update
+spatial_resolution: 64**3  # kpc ? TODO verify with Sebastian
 path: ${paths.datasets_dir}/illustris300
 
-halo_data: ["GroupID", "Group_M_Crit200", "Group_R_Crit200", "GroupCentreOfPotential_x", "GroupCentreOfPotential_y" ,
-            "GroupCentreOfPotential_z", "GroupLenType"]
-subhalo_data: ["SubhaloPos", "SubhaloGrNr", "SubhaloHalfmassRadType", "SubhaloMassType"]
-conditions:
-  # TODO change format, use previous columns and logical symbols
-  # TODO integrate the attr in the query
-- halo_num_particles: 1000
+
+fields:
+  halo:
+    Group_M_Crit200:
+      input: "10^10 Msun/h"
+      output: "Msun/h"
+      scaling: "x * 1e10"
+      name: "m200"
+    Group_R_Crit200:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      name: "r200"
+    GroupPos:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      name: "gpos"
+    GroupFirstSub:
+      input: null
+      output: null
+      scaling: null
+      name: "fsub"
+    GroupLenType:
+      input: null
+      output: null
+      scaling: null
+      index: 0, 4
+      name: "num_particles"
+  subhalo:
+    SubhaloPos:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      name: "spos"
+    SubhaloHalfmassRadType:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      index: 4 # Select the 5th column (stars)
+      name: "shmr"
+    SubhaloMassType:
+      input: "10^10 Msun/h"
+      output: "Msun"
+      scaling: "x * 1e10 / h"
+      index: 4
+      name: "mstr"
+      # Mass > 1e10 M⊙
+      filter: "> 1e10"
+    SubhaloGrNr:
+      input: null
+      output: null
+      scaling: null
+      name: "id_parents"
+    GroupLenType:
+      input: null
+      output: null
+      scaling: null
+      index: 0, 4
+      name: "sub_num_particles"
+  particles:
+    star:
+      # <part_type>_<name>
+      Coordinates:
+        input: "ckpc/h"
+        output: "pkpc/h"
+        scaling: "x * a"
+        name: "p"
+      Velocities:
+        input: "kma/s^-1"
+        output: "km/s^-1"
+        scaling: "x * math.sqrt(a)"
+        name: "v"
+      Masses:
+        input: "10^10 Msun/h"
+        output: "Msun/h"
+        scaling: "x * 1e10"
+        name: "m"
+    gas:
+      Masses:
+        input: "10^10 Msun/h"
+        output: "Msun/h"
+        scaling: "x * 1e10"
+        name: "m"
+

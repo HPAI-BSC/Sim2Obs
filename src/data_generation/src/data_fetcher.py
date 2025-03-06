@@ -58,9 +58,16 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
                     raise ValueError(f"Error: The field '{key}' must have a name.")
                 index = field_info.get("index", None)
                 if index is not None:
-                    d[key] = d[key][:, index]
+                    if isinstance(index, (int, list, ListConfig)):
+                        d[key] = d[key][:, index]
+
                 if isinstance(d[key], np.ndarray) and d[key].ndim > 1:
-                    d[key] = to_list(d, key)
+                    agg_func = field_info.get("agg", None)
+                    if agg_func is None:
+                        d[key] = to_list(d, key)
+                    else:
+                        result = getattr(np, agg_func)(d[key], axis=1)
+                        d[key] = result
 
             # Particle case
             elif dict_depth(field_info) == 2:
@@ -74,7 +81,12 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
                         if index is not None:
                             d[key][key_ii] = d[key][key_ii][:, index]
                         if isinstance(d[key][key_ii], np.ndarray) and d[key][key_ii].ndim > 1:
-                            d[key][key_ii] = to_list(d[key], key_ii)
+                            agg_func = field_info.get("agg", None)
+                            if agg_func is None:
+                                d[key] = to_list(d, key)
+                            else:
+                                result = getattr(np, agg_func)(d[key], axis=1)
+                                d[key] = result
     return d
 
 

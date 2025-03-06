@@ -17,15 +17,18 @@ class TestDataLoaderStep(unittest.TestCase):
     def setUp(self):
         with initialize(config_path="configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
+            self.cfg_big_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
 
             # Load the local config for paths and assign them
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_illustris.paths = local_config.paths
+            self.cfg_big_illustris.paths = local_config.paths
             self.cfg_eagle.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
+            self.cfg_big_illustris.catalog = compose("catalog/bigillustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
 
             # Illustris objs
@@ -119,6 +122,12 @@ class TestDataLoaderStep(unittest.TestCase):
         self.assertNotEqual(len(results[0][1].value), 0)
         self.assertIsInstance(results[0][2].subhalo_particles, SubhaloParticles)
         self.assertIsInstance(results[0][2].subhalos, SubhaloContext)
+
+    def test_load_halo_subhalo_data_big_illustris(self):
+        self.dataLoader = DataLoader(self.cfg_big_illustris)
+        result = list(self.dataLoader.load_halo_subhalo_data())
+        self.assertEqual(len(result), 2149)
+
 
 
 

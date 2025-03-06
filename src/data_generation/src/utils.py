@@ -443,16 +443,6 @@ def m500_to_m200(m500):
     return m500 * (1.54) ** 3  # M200c ≈ M500c * (R200c / R500c)^3
 
 
-def mass_concentration_relation(M200, A=5.71, B=-0.084):
-    """Estimate c200 from M200 using Dutton & Macciò (2014) relation"""
-    return A * (M200 / 1e12) ** B
-
-
-def convert_c200_to_c500(c200):
-    """Convert c200 to c500 using empirical relations"""
-    return c200 * (500 / 200) ** (-0.3)  # Approximate scaling
-
-
 def compute_fov(stellar_positions, total_mass, percentage=90):
     """
     Compute the field of view (FOV) that includes a certain percentage of the total stellar mass.
