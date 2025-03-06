@@ -37,6 +37,7 @@ class Illustris300Dataset(GalaxyDataset):
         # Apply transformation if provided
         if self.transform:
             image = self.transform(image)
+            label = self.transform(label)
         return image, label
 
     def _load_and_process_npy(self, file_path):

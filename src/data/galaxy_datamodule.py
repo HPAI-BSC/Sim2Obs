@@ -85,10 +85,10 @@ class GalaxyDataModule(LightningDataModule):
         self.train_transforms = transforms.Compose(
             [
                 transforms.ToTensor(),
-                # transforms.RandomHorizontalFlip(p=0.5),
-                # transforms.RandomVerticalFlip(p=0.5),
-                # transforms.RandomRotation(degrees=90),
-                #transforms.RandomResizedCrop(size=resize_shape, scale=(0.9, 1.0)),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomVerticalFlip(p=0.5),
+                transforms.RandomRotation(degrees=45),
+                transforms.RandomResizedCrop(size=resize_shape, scale=(0.9, 1.0)),
                 transforms.Resize(size=resize_shape),
                 #transforms.Normalize((0.1307,), (0.3081,)),
             ]
