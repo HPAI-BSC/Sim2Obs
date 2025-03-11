@@ -80,6 +80,7 @@ class MapStep(PipelineStep):
         Returns:
             List: A list of tuples containing the generated maps for each projection.
         """
+        subhalo_particles = cosmos_data.subhalo_particles
         if dim == 2:
             ranging = ((-self.r, self.r), (-self.r, self.r))  # Defines the range for the 2D maps
 
@@ -88,7 +89,6 @@ class MapStep(PipelineStep):
             # in each region, and return the resulting grid of values.
 
             # Map for the input feature
-            subhalo_particles = cosmos_data.subhalo_particles
             input_xy, _, biny_xy = input_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(0, 1))
             input_yz, _, biny_yz = input_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(1, 2))
             input_xz, _, biny_xz = input_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(0, 2))
@@ -105,8 +105,13 @@ class MapStep(PipelineStep):
             ]
             return maps
         elif dim == 3:
-            # axis will be none
-            pass
+            # TODO REVIEW
+            ranging = ((-self.r, self.r), (-self.r, self.r), (-self.r, self.r))  # Defines the range for the 2D maps
+            input, i_bin_edges, i_bin_number = input_feature.generate_map(subhalo_particles,
+                                                                          self.bins, ranging, axis=None)
+            output, o_bin_edges, o_bin_number = output_feature.generate_map(subhalo_particles,
+                                                                            self.bins, ranging, axis=None)
+            return [(input, output, i_bin_number)]
 
     def _get_interlopers_id(self, cosmos_data: CosmosData) -> np.ndarray:
         """

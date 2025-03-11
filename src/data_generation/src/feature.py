@@ -475,7 +475,6 @@ class StellarMassDensityProcessor(FeatureProcessor):
             statistic_ijk[np.isnan(statistic_ijk)] = 0
             return statistic_ijk, bin_edges, bin_number
 
-
     @classmethod
     def get_empty(cls) -> np.ndarray:
         """

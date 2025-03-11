@@ -1,19 +1,19 @@
 name: eagle
-a: 0.846
-#a: 0.84551589459619
+#a: 0.846
+a: 0.84551589459619
 H: 0.6774
 snapnum: 26          # redshift 0.18
-simulation_code: RefL0100N1504
+simulation_code: RefL0050N0752
 fov: 537.62   # 2 * 268.81 kpc
 spatial_resolution: 2.02 # kpc
 
 #   TODO SEE HOW TO AUMOTATE THIS, not working with interpolation
-path: ${paths.datasets_dir}/eagle/RefL0100N1504
+path: ${paths.datasets_dir}/eagle/RefL0050N0752
 
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320
-# TODO double check with Ilaria
+# TODO double check units and sample size with Ilaria
 fields:
   halo:
     Group_M_Crit200:
@@ -21,7 +21,8 @@ fields:
       output: "Msun/h"
       scaling: "x * h"
       name: 'm200'
-      filter: [ "> 6.77*1e12", "< 6.77*1e13" ]
+      # Final unit measures
+      filter: [ "> 1e13" ]
     Group_R_Crit200:
       input: "pkpc"
       output: "pkpc/h"
@@ -91,23 +92,23 @@ fields:
       Coordinates:
         input: "cMpc/h"
         output: "pkpc/h"
-        scaling: "x * 1e3"
+        scaling: "x * a"
         name: "p"
       Velocity:
-        input: "kma/s^-1"
-        output: "km/s^-1"
+        input: "km*sqrt(a)/s"
+        output: "km/s"
         scaling: "x * math.sqrt(a)"
         name: "v"
       Mass:
-        input: "Msuna/h"
+        input: "Msun/h"
         output: "Msun/h"
-        scaling: "x / a"
+        scaling: "x"
         name: "m"
     gas:
       Mass:
-        input: "10^10 Msun/h"
+        input: "Msun/h"
         output: "Msun/h"
-        scaling: "x * 1e10"
+        scaling: "x"
         name: "m"
 
 

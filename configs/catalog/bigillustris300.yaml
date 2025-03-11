@@ -78,8 +78,8 @@ fields:
         scaling: "x * a"
         name: "p"
       Velocities:
-        input: "kma/s^-1"
-        output: "km/s^-1"
+        input: "kma/s"
+        output: "km/s"
         scaling: "x * math.sqrt(a)"
         name: "v"
       Masses:
