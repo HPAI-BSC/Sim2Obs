@@ -10,7 +10,7 @@ class GalaxyDatasetFactory:
         datasets = {
             'dianoga': DianogaDataset(**kwargs),
             'illustris-300': Illustris300Dataset(**kwargs),
-            'combined': CombinedDataset(**kwargs),
+            #'combined': CombinedDataset(**kwargs),
         }
 
         if dataset not in datasets:

@@ -1,10 +1,9 @@
-from dianoga_dataset import DianogaDataset
-from illustris300_dataset import Illustris300Dataset
+from src.data.components.dianoga_dataset import DianogaDataset
 from src.data.components.galaxy_dataset import GalaxyDataset
-import os
-import torch
 from torch.utils.data import ConcatDataset, Subset
 import numpy as np
+
+from src.data.components.illustris300_dataset import Illustris300Dataset
 
 
 class CombinedDataset(GalaxyDataset):
@@ -27,7 +26,7 @@ class CombinedDataset(GalaxyDataset):
         self.combined_dataset = Subset(combined_dataset, indices)
         super(CombinedDataset, self).__init__(combined_dataset)
 
-    def  __len__(self):
+    def __len__(self):
         return len(self.combined_dataset)
 
     def __getitem__(self, index):
