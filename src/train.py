@@ -59,6 +59,10 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if cfg.get("seed"):
         L.seed_everything(cfg.seed, workers=True)
 
+    # Set the number of epochs dynamically (for example, 50 epochs)
+    #with open_dict(cfg):
+    #    cfg.trainer.max_epochs = 1  # Modify this value based on your requirement
+
     log.info(f"Instantiating datamodule <{cfg.data._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(cfg.data)
 
@@ -72,11 +76,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-
-    # Disable checkpoints temporary to test the profiler
-    with open_dict(cfg):
-        cfg.trainer.enable_checkpointing = False
-        callbacks.pop(0)
 
     '''
     profiler = PyTorchProfiler(
