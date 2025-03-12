@@ -12,9 +12,14 @@ class CombinedDataset(GalaxyDataset):
     def __init__(self, image_dirs, label_dirs, transform=None):
         # image_dirs and label_dirs should be lists of the datasets that we are combining.
         self.datasets = []
+        print(image_dirs)
         for img_dir, label_dir in zip(image_dirs, label_dirs):
+            print(img_dir)
             if 'dianoga' in img_dir:
-                dataset = DianogaDataset(img_dir, label_dir, transform=transform)
+                try:
+                    dataset = DianogaDataset(img_dir, label_dir, transform=transform)
+                except Exception as e:
+                    print(f"Error in dianoga dataset: {e}")
             elif 'illustris' in img_dir:
                 dataset = Illustris300Dataset(img_dir, label_dir, transform=transform)
             else:
