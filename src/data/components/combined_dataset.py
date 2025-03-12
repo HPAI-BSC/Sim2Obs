@@ -24,7 +24,7 @@ class CombinedDataset(GalaxyDataset):
         print('_' * 8)
         for dataset in self.datasets:
             print(len(dataset))
-            print(dataset[0].shape)
+            print(dataset[0][0].shape, dataset[0][1].shape)
         print('_' * 8)
         combined_dataset = ConcatDataset(self.datasets)
         indices = list(range(len(combined_dataset)))
