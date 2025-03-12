@@ -10,7 +10,7 @@ class CombinedDataset(GalaxyDataset):
     name = 'combined'
 
     def __init__(self, image_dir, labels_dir, transform=None, **kwargs):
-        super(CombinedDataset, self).__init__(image_dir, labels_dir, transform, **kwargs)
+        super().__init__()
         # image_dirs and label_dirs should be lists of the datasets that we are combining.
         self.datasets = []
         for img_dir, label_dir in zip(image_dir, labels_dir):
