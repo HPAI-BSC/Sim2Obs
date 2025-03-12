@@ -13,6 +13,7 @@ class CombinedDataset(GalaxyDataset):
         # image_dirs and label_dirs should be lists of the datasets that we are combining.
         self.datasets = []
         for img_dir, label_dir in zip(image_dir, labels_dir):
+            print(img_dir)
             if 'dianoga' in img_dir:
                 dataset = DianogaDataset(img_dir, label_dir, transform=transform)
             elif 'illustris' in img_dir:
@@ -20,6 +21,7 @@ class CombinedDataset(GalaxyDataset):
             else:
                 dataset = None
             self.datasets.append(dataset)
+        self.datasets = [dataset for dataset in self.datasets if dataset is not None]
         print('_' * 8)
         for dataset in self.datasets:
             print(len(dataset))
