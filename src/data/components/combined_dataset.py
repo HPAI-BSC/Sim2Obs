@@ -12,19 +12,18 @@ class CombinedDataset(GalaxyDataset):
     def __init__(self, image_dir, labels_dir, transform=None, **kwargs):
         # image_dirs and label_dirs should be lists of the datasets that we are combining.
         self.datasets = []
-        print(image_dir)
         for img_dir, label_dir in zip(image_dir, labels_dir):
-            print(img_dir)
             if 'dianoga' in img_dir:
-                try:
-                    dataset = DianogaDataset(img_dir, label_dir, transform=transform)
-                except Exception as e:
-                    print(f"Error in dianoga dataset: {e}")
+                dataset = DianogaDataset(img_dir, label_dir, transform=transform)
             elif 'illustris' in img_dir:
                 dataset = Illustris300Dataset(img_dir, label_dir, transform=transform)
             else:
                 dataset = None
             self.datasets.append(dataset)
+        print('_' * 8)
+        for dataset in self.datasets:
+            print(len(dataset))
+        print('_' * 8)
         combined_dataset = ConcatDataset(self.datasets)
         indices = list(range(len(combined_dataset)))
         np.random.shuffle(indices)
