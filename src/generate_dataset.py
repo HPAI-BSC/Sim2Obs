@@ -2,12 +2,15 @@ from typing import Any, List
 import hydra
 from dotenv import load_dotenv, find_dotenv
 from omegaconf import DictConfig
+from rootutils import rootutils
 
 from data_generation.src.data_loader_step import DataLoader
 from data_generation.src.map_step import MapStep
 from data_generation.src.pipeline import Pipeline
 from data_generation.src.pipeline_step import PipelineStep
 from data_generation.src.rotate_step import RotateStep
+
+rootutils.setup_root(__file__, pythonpath=True)
 
 dotenv_path = find_dotenv('data_generation/.env')
 if dotenv_path:

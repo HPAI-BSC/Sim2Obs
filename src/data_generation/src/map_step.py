@@ -23,6 +23,7 @@ class MapStep(PipelineStep):
         # Compute bins and radius
         fov = self.map_configuration['fov']
         spatial_resolution = self.map_configuration['spatial_resolution']
+        self.dim = self.map_configuration['dim']
         self.bins, self.r = muse_bins_r(fov, spatial_resolution)
         self.path = cfg.paths.datasets_dir + f'/../logs/map_step.txt'
 
@@ -59,6 +60,7 @@ class MapStep(PipelineStep):
             rotation_angle, _, _ = rotate_step_dict.rotation_group
 
         return {
+            'dim': map_step_dict.get('dim', 2),
             'root_path': cfg.catalog.path,
             'number_zooms': map_step_dict.n_zooms,
             'catalog_name': cfg.catalog.name,
@@ -68,7 +70,7 @@ class MapStep(PipelineStep):
         }
 
     def _create_maps(self, cosmos_data: CosmosData, input_feature: FeatureProcessor,
-                     output_feature: FeatureProcessor, dim: int) -> List:
+                     output_feature: FeatureProcessor) -> List:
         """
         Generates projection maps for both input and output features.
 
@@ -81,7 +83,7 @@ class MapStep(PipelineStep):
             List: A list of tuples containing the generated maps for each projection.
         """
         subhalo_particles = cosmos_data.subhalo_particles
-        if dim == 2:
+        if self.dim == 2:
             ranging = ((-self.r, self.r), (-self.r, self.r))  # Defines the range for the 2D maps
 
             # Create three different maps based on projections onto different coordinate planes (X-Y, Y-Z, X-Z).
@@ -104,8 +106,7 @@ class MapStep(PipelineStep):
                 (input_xz, output_xz, biny_xz)
             ]
             return maps
-        elif dim == 3:
-            # TODO REVIEW
+        elif self.dim == 3:
             ranging = ((-self.r, self.r), (-self.r, self.r), (-self.r, self.r))  # Defines the range for the 2D maps
             input, i_bin_edges, i_bin_number = input_feature.generate_map(subhalo_particles,
                                                                           self.bins, ranging, axis=None)
@@ -275,6 +276,7 @@ class MapStep(PipelineStep):
                                     f'it_{rotation_iteration_}_{projection_}_zoom_{i_}')
             else:
                 path = os.path.join(self.map_configuration['root_path'],
+                                    'no_rotation',
                                     feature_name,
                                     f'halo_{halo_id_}_subhalo_{subhalo_id_}_{projection_}_zoom_{i_}')
             return path
@@ -354,17 +356,16 @@ class MapStep(PipelineStep):
         ------
         This method generates three different map projections, processes them, and updates the features and metadata accordingly.
         """
-        dim = kwargs['dim']
-        rotation_axis = kwargs['rotation_axis']
-        rotation_iteration = kwargs['rotation_iteration']
+        rotation_axis = kwargs.get('rotation_axis', None)
+        rotation_iteration = kwargs.get('rotation_iteration', None)
         logger.debug(f'Rotation axis: {rotation_axis}, rotation_iteration: {rotation_iteration}')
         for halo, _ in g:
             try:
                 # TODO do we want to call this always ? use case Sebastian
                 interlopers_id = self._get_interlopers_id(cosmos_data)
-                io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature, dim)
+                io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
 
-                if dim == 2:
+                if self.dim == 2:
                     projections = ["xy", "yz", "xz"]
                     for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
                         projection_name = projections[j]
@@ -372,7 +373,7 @@ class MapStep(PipelineStep):
                         output_feature.map = map_f_o
                         self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, rotation_axis,
                                                  rotation_iteration, cosmos_data, input_feature, output_feature)
-                elif dim == 3:
+                elif self.dim == 3:
                     pass
 
                 logger.info(f"Map step time for halo {halo.halo_id}")

@@ -15,8 +15,8 @@ fields:
       output: "Msun/h"
       scaling: "x * 1e10"
       name: "m200"
-      # Mass > (1e13 * H) 10^10 M⊙/h
-      filter: ["> 6.77*1e12"]
+      # Mass > (1e13 * H) M⊙/h
+      filter: ["> 1e13 * 0.6774 / 1e10"]
     Group_R_Crit200:
       input: "ckpc/h"
       output: "pkpc/h"
@@ -51,13 +51,12 @@ fields:
       index: 4
       name: "mstr"
       # Mass > 1e10 M⊙
-      filter: "> 1e10"
+      filter: "> (1e10 /1e10) * 0.6774"
     SubhaloGrNr:
       input: null
       output: null
       scaling: null
       name: "id_parents"
-  # TODO
   particles:
     star:
       # <part_type>_<name>
@@ -67,8 +66,8 @@ fields:
         scaling: "x * a"
         name: "p"
       Velocities:
-        input: "kma/s"
-        output: "km/s"
+        input: "kma/s^-1"
+        output: "km/s^-1"
         scaling: "x * math.sqrt(a)"
         name: "v"
       Masses:
@@ -82,4 +81,3 @@ fields:
         output: "Msun/h"
         scaling: "x * 1e10"
         name: "m"
-

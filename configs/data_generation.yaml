@@ -19,10 +19,6 @@ rotation_120: [ 120, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]
 pipeline:
   - name: data_loader
     G: 4.30091e-6              # Gravitational constant in units of kpc Msun^-1 (km/s)^2
-    subhalo_min_mass: 1e10
-    halo_min_mass: 1e13
-  - name: rotate_step
-    rotation_group: ${rotation_90}
   - name: map_step
     dim: 2 # new
     n_zooms: 3

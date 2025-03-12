@@ -83,10 +83,10 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
                         if isinstance(d[key][key_ii], np.ndarray) and d[key][key_ii].ndim > 1:
                             agg_func = field_info.get("agg", None)
                             if agg_func is None:
-                                d[key] = to_list(d, key)
+                                d[key][key_ii] = to_list(d[key], key_ii)
                             else:
                                 result = getattr(np, agg_func)(d[key], axis=1)
-                                d[key] = result
+                                d[key][key_ii] = result
     return d
 
 

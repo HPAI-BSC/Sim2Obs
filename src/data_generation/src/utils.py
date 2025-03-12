@@ -382,10 +382,11 @@ def setup_output_directories(catalog_path: str, rotation_angle, input_feature_na
         if rotation_angle is not None:
             dataset_path = os.path.join(catalog_path, f'rotation_{rotation_angle}')
             if not os.path.exists(dataset_path):
-                # TODO can we executed this inside mn5 ?
                 os.mkdir(dataset_path)
         else:
-            dataset_path = catalog_path
+            dataset_path = os.path.join(catalog_path, f'no_rotation')
+            if not os.path.exists(dataset_path):
+                os.mkdir(dataset_path)
         if not os.path.exists(os.path.join(dataset_path, output_feature_name)):
             os.mkdir(os.path.join(dataset_path, output_feature_name))
         if not os.path.exists(os.path.join(dataset_path, input_feature_name)):
