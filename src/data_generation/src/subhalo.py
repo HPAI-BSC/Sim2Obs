@@ -2,7 +2,6 @@ from collections import Counter
 
 import numpy as np
 import pandas as pd
-import polars as pl
 from omegaconf import DictConfig
 
 from src.data_generation.src.halo import HaloContext, Halo
@@ -260,7 +259,7 @@ class SubhaloParticles:
             if dict_depth(data) == 1:
                 for var in data:
                     value = data[var]
-                    if isinstance(value, pl.Series):
+                    if isinstance(value, pd.Series):
                         value = value.to_numpy()
                     elif isinstance(value, list):
                         value = np.array(value)
@@ -270,7 +269,7 @@ class SubhaloParticles:
                 for part_type in data:
                     for var in data[part_type]:
                         value = data[part_type][var]
-                        if isinstance(value, pl.Series):
+                        if isinstance(value, pd.Series):
                             value = value.to_numpy()
                         elif isinstance(value, list):
                             value = np.array(value)
@@ -280,7 +279,7 @@ class SubhaloParticles:
                 for var in data[part_type]:
                     if var in column_map[part_type]:
                         value = data[part_type][var]
-                        if isinstance(value, (pl.Series, pd.Series)):
+                        if isinstance(value, (pd.Series, pd.Series)):
                             value = np.stack(value.to_list())
                         elif isinstance(value, list):
                             value = np.array(value)

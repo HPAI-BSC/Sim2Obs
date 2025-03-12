@@ -6,7 +6,6 @@ from typing import Any
 import eagleSqlTools as sql
 import numpy as np
 import pandas as pd
-import polars as pl
 import illustris_python as il
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
@@ -829,9 +828,9 @@ class EagleFetcher(DataFetcher):
                         del data_part_type[field]
                         data_part_type[field] = converted
 
-                tmp = pl.DataFrame(data_part_type)
+                tmp = pd.DataFrame(data_part_type)
                 # Create index with these two columns for speed
-                tmp = tmp.filter((tmp["GroupNumber"] == group_number) & (tmp["SubGroupNumber"] == subgroup_id))
+                tmp = tmp[(tmp["GroupNumber"] == group_number) & (tmp["SubGroupNumber"] == subgroup_id)]
                 if len(tmp) == 0:
                     logger.error(f'Error, there is not particle data for GroupNumber={group_number} and '
                                  f'SubGroupNumber={subgroup_id}')
