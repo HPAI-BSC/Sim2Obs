@@ -7,7 +7,7 @@ target_maskdir:
   - ${paths.datasets_dir}/illustris300/rotation_120/IntraClusterLight
 dataset: combined
 mask_interlopers: True
-batch_size: 32
+batch_size: 64
 train_val_test_split: [.85, .05, .10]
 resize_shape: [128, 128]
 random_seed:  0
