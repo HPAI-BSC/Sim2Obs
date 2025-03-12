@@ -8,9 +8,9 @@ class GalaxyDatasetFactory:
     @staticmethod
     def get_dataset(dataset: str, **kwargs) -> GalaxyDataset:
         datasets = {
-            'dianoga': DianogaDataset(**kwargs),
-            'illustris-300': Illustris300Dataset(**kwargs),
-            #'combined': CombinedDataset(**kwargs),
+            #'dianoga': DianogaDataset(**kwargs),
+            #'illustris-300': Illustris300Dataset(**kwargs),
+            'combined': CombinedDataset(**kwargs),
         }
 
         if dataset not in datasets:
