@@ -9,11 +9,11 @@ from src.data.components.illustris300_dataset import Illustris300Dataset
 class CombinedDataset(GalaxyDataset):
     name = 'combined'
 
-    def __init__(self, image_dirs, label_dirs, transform=None):
+    def __init__(self, image_dir, labels_dir, transform=None):
         # image_dirs and label_dirs should be lists of the datasets that we are combining.
         self.datasets = []
-        print(image_dirs)
-        for img_dir, label_dir in zip(image_dirs, label_dirs):
+        print(image_dir)
+        for img_dir, label_dir in zip(image_dir, labels_dir):
             print(img_dir)
             if 'dianoga' in img_dir:
                 try:
