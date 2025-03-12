@@ -110,5 +110,3 @@ fields:
         output: "Msun/h"
         scaling: "x"
         name: "m"
-
-
