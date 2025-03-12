@@ -8,8 +8,8 @@ class GalaxyDatasetFactory:
     @staticmethod
     def get_dataset(dataset: str, **kwargs) -> GalaxyDataset:
         datasets = {
-            'dianoga': DianogaDataset(**kwargs),
-            'illustris-300': Illustris300Dataset(**kwargs),
+            #'dianoga': DianogaDataset(**kwargs),
+            #'illustris-300': Illustris300Dataset(**kwargs),
             'combined': CombinedDataset(**kwargs),
         }
 
