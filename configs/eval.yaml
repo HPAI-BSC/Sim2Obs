@@ -2,8 +2,8 @@
 
 defaults:
   - _self_
-  - data: galaxy_illustris300_rotation120.yaml
-  - model: mamba_unet2
+  - data: galaxy_dianoga
+  - model: transunet
   - logger:
   - trainer: default
   - paths: gpfs
@@ -20,7 +20,10 @@ commit_tag: "commit_hash"
 # -AttentionUNet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
 # -Mamba (UNet2)
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
+# ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
+
+# transunet
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/75a9662a/output/checkpoints/75a9662a/last.ckpt
 
 # - Unet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
