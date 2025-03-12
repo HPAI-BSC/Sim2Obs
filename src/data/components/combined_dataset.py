@@ -10,11 +10,11 @@ class CombinedDataset(GalaxyDataset):
     name = 'combined'
 
     def __init__(self, image_dir, labels_dir, transform=None, **kwargs):
+        super(CombinedDataset, self).__init__()
         # image_dirs and label_dirs should be lists of the datasets that we are combining.
         self.datasets = []
         for img_dir, label_dir in zip(image_dir, labels_dir):
-            print(img_dir)
-            if 'dianoga' in img_dir:
+            if 'dianoga' in img_dir or 'ilarias' in img_dir:
                 dataset = DianogaDataset(img_dir, label_dir, transform=transform)
             elif 'illustris' in img_dir:
                 dataset = Illustris300Dataset(img_dir, label_dir, transform=transform)
@@ -30,7 +30,6 @@ class CombinedDataset(GalaxyDataset):
         indices = list(range(len(combined_dataset)))
         np.random.shuffle(indices)
         self.combined_dataset = Subset(combined_dataset, indices)
-        super().__init__(image_dir, labels_dir, transform, **kwargs)
 
     def __len__(self):
         return len(self.combined_dataset)
