@@ -652,12 +652,23 @@ class EagleFetcher(DataFetcher):
             A context object containing halo data.
         """
         logger.debug("Fetching halos from Eagle...")
-        conn = get_connection()
-        query = self._build_query(table='halo')
 
-        # Run the query
-        array = sql.execute_query(conn, query)
-        df = pd.DataFrame(array)
+        path = os.path.join(self.catalog.path, 'output')
+
+        if not os.path.exists(path):
+            logger.info(f"Output folder does not exist, retrieving data from db ...")
+            conn = get_connection()
+            query = self._build_query(table='halo')
+
+            # Run the query
+            array = sql.execute_query(conn, query)
+            df = pd.DataFrame(array)
+
+            os.mkdir(path)
+            df.to_csv(os.path.join(path, 'fof.csv'), index=False)
+        else:
+            logger.info(f"Reading from files ...")
+            df = pd.read_csv(os.path.join(path, 'fof.csv'))
 
         if 'GroupNumber' not in self.halo_fields:
             self.subhalo_fields.append('GroupNumber')
@@ -698,12 +709,22 @@ class EagleFetcher(DataFetcher):
             A context object containing subhalo data.
         """
         logger.debug("Fetching subhalos from Eagle...")
-        conn = get_connection()
-        query = self._build_query(table='subhalo')
 
-        # Run the query
-        array = sql.execute_query(conn, query)
-        df = pd.DataFrame(array)
+        path = os.path.join(self.catalog.path, 'output')
+        if not os.path.exists(path):
+            logger.info(f"Output folder does not exist, retrieving data from db ...")
+            conn = get_connection()
+            query = self._build_query(table='subhalo')
+
+            # Run the query
+            array = sql.execute_query(conn, query)
+            df = pd.DataFrame(array)
+
+            os.mkdir(path)
+            df.to_csv(os.path.join(path, 'subhalo.csv'), index=False)
+        else:
+            logger.info(f"Reading from files ...")
+            df = pd.read_csv(os.path.join(path, 'subhalo.csv'))
 
         # Remove useless columns
         df = df.drop(columns=['m200'])
