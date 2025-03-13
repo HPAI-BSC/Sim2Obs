@@ -136,6 +136,7 @@ def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray
             cgs = f[f'PartType{itype}/{att}'].attrs.get('CGSConversionFactor', 1)
             aexp = f[f'PartType{itype}/{att}'].attrs.get('aexp-scale-exponent')
             hexp = f[f'PartType{itype}/{att}'].attrs.get('h-scale-exponent')
+            var = f[f'PartType{itype}/{att}'].attrs.get('VarDescription')
             # print(f'   file: {i}, cfg={cgs}, aexp={aexp}, hpex={hexp}')
 
             a = f['Header'].attrs.get('Time')
@@ -397,10 +398,12 @@ def to_list(d, column):
     return [d[column][i] for i in range(d[column].shape[0])]
 
 
-def apply_conversion(values, scaling_formula, scalefactor, h):
+def apply_conversion(values, scaling_formula, scalefactor, h, **kwargs):
     """Applies the correct unit transformation, including indexing if necessary."""
     # Prepare a safe eval context
     context = {"x": values, "a": scalefactor, "h": h, "np": np, "math": math}
+    context.update(kwargs)
+
     return eval(scaling_formula, context)
 
 

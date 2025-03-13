@@ -169,7 +169,9 @@ class SubhaloContext:
         try:
             # Query using the multi-index
             if halo_id is not None:
-                result = self.data.loc[(halo_id, subhalo_id)].to_dict()
+                # halo id here is the group number - Eagle case
+                result = self.data.loc[(self.data['group_number'] == halo_id) &
+                                       (self.data['subhalo_id'] == subhalo_id)].to_dict()
                 return SubHalo(**result)
             else:
                 # For Illustris-like single-index lookup, query all matching rows

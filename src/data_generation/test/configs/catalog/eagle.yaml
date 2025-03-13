@@ -1,11 +1,14 @@
 name: eagle
-#a: 0.846
+
 a: 0.84551589459619
 H: 0.6774
+g: 1.989e43
+g_2_solar: 1.989e33
+
 snapnum: 26          # redshift 0.18
 simulation_code: RefL0050N0752
 fov: 537.62   # 2 * 268.81 kpc
-spatial_resolution: 2.02 # kpc
+spatial_resolution: 3.1460082737656747 # kpc # TODO see if this changes for our interest sim
 
 #   TODO SEE HOW TO AUMOTATE THIS, not working with interpolation
 path: ${paths.datasets_dir}/eagle/RefL0050N0752
@@ -91,8 +94,8 @@ fields:
     star:
       Coordinates:
         input: "cMpc/h"
-        output: "pkpc/h"
-        scaling: "x * a"
+        output: "pKpc/h"
+        scaling: "x * a * 1000"   # convert to cm (* 3.085678e+24) back to km (/ 3.085678e+21)
         name: "p"
       Velocity:
         input: "km*sqrt(a)/s"
@@ -102,13 +105,11 @@ fields:
       Mass:
         input: "Msun/h"
         output: "Msun/h"
-        scaling: "x"
+        scaling: "(x * g) / g_2_solar"
         name: "m"
     gas:
       Mass:
         input: "Msun/h"
         output: "Msun/h"
-        scaling: "x"
+        scaling: "(x * g) / g_2_solar"
         name: "m"
-
-

@@ -815,12 +815,13 @@ class EagleFetcher(DataFetcher):
                     raise Exception(f'The path {path} does not exist.')
 
                 for field in fields:
-                    # TODO deal with the conversion !!
                     column = read_dataset(itype, field, path)
                     if self.catalog.fields.particles[part_type][field].scaling is not None:
                         scaling = self.catalog.fields.particles[part_type][field].scaling
-                        column = apply_conversion(column, scaling, self.catalog.a, self.catalog.H)
+                        column = apply_conversion(column, scaling, self.catalog.a, self.catalog.H,
+                                                  g=self.catalog.g, g_2_solar=self.catalog.g_2_solar)
                     data_part_type[field] = column
+                    # TODO apply filters
 
                     # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
                     if column.ndim > 1:
@@ -836,7 +837,7 @@ class EagleFetcher(DataFetcher):
                                  f'SubGroupNumber={subgroup_id}')
                     raise ValueError(f'Error, there is not particle data for GroupNumber={group_number} and'
                                      f' SubGroupNumber={subgroup_id}')
-                data[part_type] = tmp.to_dict()
+                data[part_type] = tmp.to_dict(orient='list')
             else:
                 logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
 

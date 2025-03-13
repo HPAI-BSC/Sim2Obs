@@ -55,3 +55,17 @@ class TestUtils(unittest.TestCase):
         halo_mass = halo_context.data['m200'].to_numpy()
         fov_radius = compute_fov(positions, halo_mass, percentage=90)
         print(fov_radius)
+
+    def test_find_values(self):
+        comoving_resolution = 2.66 # for Ref-L0050N0752
+        scale_factor = 0.84551589459619
+        spatial_resolution = comoving_resolution /  scale_factor # Convert to physical kpc
+        print(spatial_resolution)
+
+        # bin calculation
+        fov = 537.62
+        r = fov / 2  # Radius of the field of view
+
+        bins = fov / spatial_resolution
+        print(f'spatial resolution: {spatial_resolution}, fov: {fov}, r: {r}, bins: {bins}')
+
