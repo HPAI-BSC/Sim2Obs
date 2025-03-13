@@ -1,5 +1,4 @@
 import os
-import time
 from typing import List, Generator, Callable
 
 import numpy as np
@@ -376,7 +375,6 @@ class MapStep(PipelineStep):
                 elif self.dim == 3:
                     pass
 
-                logger.info(f"Map step time for halo {halo.halo_id}")
                 if next_step is not None:
                     yield from next_step(g)
                 else:
