@@ -6,12 +6,12 @@ g: 1.989e43
 g_2_solar: 1.989e33
 
 snapnum: 26          # redshift 0.18
-simulation_code: RefL0050N0752
+simulation_code: AGNdT9L0050N0752
 fov: 537.62   # 2 * 268.81 kpc
 spatial_resolution: 3.1460082737656747 # kpc # TODO see if this changes for our interest sim
 
 #   TODO SEE HOW TO AUMOTATE THIS, not working with interpolation
-path: ${paths.datasets_dir}/eagle/RefL0050N0752
+path: ${paths.datasets_dir}/eagle/AGNdT9L0050N0752
 
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
