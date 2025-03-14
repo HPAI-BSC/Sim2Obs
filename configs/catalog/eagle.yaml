@@ -14,8 +14,9 @@ path: ${paths.datasets_dir}/eagle/RefL0050N0752
 #path: ${paths.datasets_dir}/eagle/AGNdT9L0050N0752
 
 
-fov: 471.90   # enforce 150 bins
+fov: 526.68
 spatial_resolution: 3.1460082737656747 # kpc from the documentation "comoving" spatial resolution
+bin_spatial_resolution_scale: 1.8      # bin_size = spatial_resolution * 1.8
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320

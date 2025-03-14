@@ -83,7 +83,7 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
         # Defined by Ilaria
-        bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius
+        bins, r = muse_bins_r(2 * 263.34, 2.02, 1)  # Computes bins and radius
         ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
 
         self.icl_processor.value = np.ones((mock_subhalo_particles_instance.star_p.shape[0], ), dtype=int)  # ICL mask
@@ -148,7 +148,7 @@ class TestFeature(unittest.TestCase):
                                                                         mock_subhalo_particles_instance)
 
         # Defined by Ilaria
-        bins, r = muse_bins_r(2 * 263.34, 2.02)  # Computes bins and radius
+        bins, r = muse_bins_r(2 * 263.34, 2.02, 1)  # Computes bins and radius
         ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
         # axis x-y
         vel_map, _, biny = self.vel_disp_processor.generate_map(mock_subhalo_particles_instance, bins,

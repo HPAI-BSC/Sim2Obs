@@ -22,8 +22,9 @@ class MapStep(PipelineStep):
         # Compute bins and radius
         fov = self.map_configuration['fov']
         spatial_resolution = self.map_configuration['spatial_resolution']
+        bin_spatial_resolution_scale = self.map_configuration['bin_spatial_resolution_scale']
         self.dim = self.map_configuration['dim']
-        self.bins, self.r = muse_bins_r(fov, spatial_resolution)
+        self.bins, self.r = muse_bins_r(fov, spatial_resolution, bin_spatial_resolution_scale)
         self.path = cfg.paths.datasets_dir + f'/../logs/map_step.txt'
 
     @classmethod
@@ -65,7 +66,8 @@ class MapStep(PipelineStep):
             'catalog_name': cfg.catalog.name,
             'rotation_angle': rotation_angle,
             'fov': cfg.catalog.fov,
-            'spatial_resolution': cfg.catalog.spatial_resolution
+            'spatial_resolution': cfg.catalog.spatial_resolution,
+            'bin_spatial_resolution_scale': cfg.catalog.bin_spatial_resolution_scale
         }
 
     def _create_maps(self, cosmos_data: CosmosData, input_feature: FeatureProcessor,

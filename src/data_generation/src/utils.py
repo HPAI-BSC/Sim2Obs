@@ -326,7 +326,7 @@ def circle(x: float, y: float, h: float, k: float, r: float) -> float:
     return ((x - h) ** 2 + (y - k) ** 2) / r ** 2
 
 
-def muse_bins_r(fov: float, spatial_resolution: float) -> tuple[int, float]:
+def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_scale: float) -> tuple[int, float]:
     """
     Calculate the number of bins and the radius for MUSE observations.
 
@@ -352,7 +352,8 @@ def muse_bins_r(fov: float, spatial_resolution: float) -> tuple[int, float]:
     The function assumes that both `fov` and `spatial_resolution` are positive
     values and that the spatial resolution is less than or equal to the field of view.
     """
-    bins = int(fov / spatial_resolution)  # Number of bins along one axis
+    bin_size = spatial_resolution * bin_spatial_resolution_scale
+    bins = int(fov / bin_size) # Number of bins along one axis
     r = fov / 2  # Radius of the field of view
     return bins, r
 
