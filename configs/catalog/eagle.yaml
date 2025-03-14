@@ -13,6 +13,8 @@ path: ${paths.datasets_dir}/eagle/RefL0050N0752
 #simulation_code: AGNdT9L0050N0752
 #path: ${paths.datasets_dir}/eagle/AGNdT9L0050N0752
 
+#simulation_code: RefL0100N1504
+#path: ${paths.datasets_dir}/eagle/RefL0100N1504
 
 fov: 526.68
 spatial_resolution: 3.1460082737656747 # kpc from the documentation "comoving" spatial resolution
