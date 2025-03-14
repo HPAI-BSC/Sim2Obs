@@ -15,7 +15,7 @@ scheduler:
 
 net:
   _target_: src.models.components.TransUNet.TransUNet
-  n_channels: 1
+  n_channels: 3
   n_classes: 1
 
 # compile model for faster training with pytorch 2.0
