@@ -578,7 +578,7 @@ class TransUNet(nn.Module):
         n_classes (int, optional): Number of output classes for segmentation. Defaults to 2.
 
     """
-    def __init__(self, img_size=224, in_channels=3, hidden_dim=512, n_layers=2, n_heads=8, mlp_dim=3072,
+    def __init__(self, img_size=224, n_channels=3, hidden_dim=512, n_layers=2, n_heads=8, mlp_dim=3072,
                  zero_head=False, vis=False, dropout_rate=0.1, attention_dropout_rate=0.1,
                  resnet_n_layers=None, resnet_width_factor=None, patch_grid=None, patch_size=16, classifier=None,
                  head_channels=512, decoder_channels=(256, 128, 64, 16), skip_channels=(256, 128, 64, 16), n_skip=0,
@@ -592,7 +592,7 @@ class TransUNet(nn.Module):
         # Not sure about this
         self.classifier = classifier
         self.transformer = Transformer(img_size, hidden_dim, n_layers, n_heads, mlp_dim, dropout_rate,
-                                       attention_dropout_rate, vis, in_channels, patch_size, patch_grid,
+                                       attention_dropout_rate, vis, n_channels, patch_size, patch_grid,
                                        resnet_n_layers, resnet_width_factor)
         self.decoder = DecoderCup(hidden_dim, head_channels, decoder_channels, skip_channels, n_skip)
         self.segmentation_head = SegmentationHead(
