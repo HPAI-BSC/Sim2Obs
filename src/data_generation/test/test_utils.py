@@ -70,3 +70,14 @@ class TestUtils(unittest.TestCase):
         bins = int(fov / bin_size)
         print(f'spatial resolution: {spatial_resolution}, fov: {fov}, r: {r}, bins: {bins}, bin size: {bin_size}')
 
+        # Illustris
+        spatial_resolution = 2.02
+
+        # bin calculation
+        fov = 526.68  # 526.68 (should we use the same fov ? than illustris )
+        r = fov / 2  # Radius of the field of view
+
+        bin_size = spatial_resolution * 1.8
+        bins = int(fov / bin_size)
+        print(f'spatial resolution: {spatial_resolution}, fov: {fov}, r: {r}, bins: {bins}, bin size: {bin_size}')
+
