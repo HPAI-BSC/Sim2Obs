@@ -6,12 +6,16 @@ g: 1.989e43
 g_2_solar: 1.989e33
 
 snapnum: 26          # redshift 0.18
-simulation_code: RefL0050N0752
+
+#simulation_code: RefL0050N0752
+#path: ${paths.datasets_dir}/eagle/RefL0050N0752
+
+simulation_code: AGNdT9L0050N0752
+path: ${paths.datasets_dir}/eagle/AGNdT9L0050N0752
+
+
 fov: 471.90   # enforce 150 bins
 spatial_resolution: 3.1460082737656747 # kpc from the documentation "comoving" spatial resolution
-
-path: ${paths.datasets_dir}/eagle/RefL0050N0752
-
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320
@@ -86,7 +90,6 @@ fields:
       output: null
       scaling: null
       name: "group_number"
-  # TODO clarify the units with Ilaria
   # https://arxiv.org/pdf/1706.09899
   particles:
     star:
