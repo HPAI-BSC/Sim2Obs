@@ -270,13 +270,13 @@ class MapStep(PipelineStep):
         def get_path(feature_name, halo_id_, subhalo_id_, projection_, rotation_axis_, rotation_iteration_, i_):
             if self.map_configuration['rotation_angle'] is not None:
                 path = os.path.join(self.map_configuration['root_path'],
-                                    f'rotation_{self.map_configuration["rotation_angle"]}',
+                                    f'rotation_{self.map_configuration["rotation_angle"]}_s{self.map_configuration["bin_spatial_resolution_scale"]}',
                                     feature_name,
                                     f'halo_{halo_id_}_subhalo_{subhalo_id_}_axis_{rotation_axis_}_'
                                     f'it_{rotation_iteration_}_{projection_}_zoom_{i_}')
             else:
                 path = os.path.join(self.map_configuration['root_path'],
-                                    'no_rotation',
+                                    f'no_rotation_s{self.map_configuration["bin_spatial_resolution_scale"]}',
                                     feature_name,
                                     f'halo_{halo_id_}_subhalo_{subhalo_id_}_{projection_}_zoom_{i_}')
             return path
