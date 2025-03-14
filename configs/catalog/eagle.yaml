@@ -7,16 +7,14 @@ g_2_solar: 1.989e33
 
 snapnum: 26          # redshift 0.18
 simulation_code: RefL0050N0752
-fov: 537.62   # 2 * 268.81 kpc
-spatial_resolution: 3.1460082737656747 # kpc # TODO see if this changes for our interest sim
+fov: 471.90   # enforce 150 bins
+spatial_resolution: 3.1460082737656747 # kpc from the documentation "comoving" spatial resolution
 
-#   TODO SEE HOW TO AUMOTATE THIS, not working with interpolation
 path: ${paths.datasets_dir}/eagle/RefL0050N0752
 
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320
-# TODO double check units and sample size with Ilaria
 fields:
   halo:
     Group_M_Crit200:

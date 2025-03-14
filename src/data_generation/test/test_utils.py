@@ -63,9 +63,10 @@ class TestUtils(unittest.TestCase):
         print(spatial_resolution)
 
         # bin calculation
-        fov = 537.62
+        fov = 471.90
         r = fov / 2  # Radius of the field of view
 
         bins = fov / spatial_resolution
-        print(f'spatial resolution: {spatial_resolution}, fov: {fov}, r: {r}, bins: {bins}')
+        bin_size = fov / bins
+        print(f'spatial resolution: {spatial_resolution}, fov: {fov}, r: {r}, bins: {bins}, bin size: {bin_size}')
 
