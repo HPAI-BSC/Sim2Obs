@@ -358,7 +358,8 @@ def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_sc
     return bins, r
 
 
-def setup_output_directories(catalog_path: str, rotation_angle, input_feature_name: str, output_feature_name: str):
+def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spatial_resolution_scale: float,
+                             input_feature_name: str, output_feature_name: str):
     """
     Creates necessary output directories for storing feature data, optionally organizing by rotation angle.
 
@@ -383,12 +384,15 @@ def setup_output_directories(catalog_path: str, rotation_angle, input_feature_na
     if os.path.exists(catalog_path):
         if rotation_angle is not None:
             dataset_path = os.path.join(catalog_path, f'rotation_{rotation_angle}')
+            dataset_path = f'{dataset_path}_s{bin_spatial_resolution_scale}'
             if not os.path.exists(dataset_path):
                 os.mkdir(dataset_path)
         else:
             dataset_path = os.path.join(catalog_path, f'no_rotation')
+            dataset_path = f'{dataset_path}_s{bin_spatial_resolution_scale}'
             if not os.path.exists(dataset_path):
                 os.mkdir(dataset_path)
+
         if not os.path.exists(os.path.join(dataset_path, output_feature_name)):
             os.mkdir(os.path.join(dataset_path, output_feature_name))
         if not os.path.exists(os.path.join(dataset_path, input_feature_name)):

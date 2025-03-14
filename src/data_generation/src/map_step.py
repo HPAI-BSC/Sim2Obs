@@ -25,7 +25,6 @@ class MapStep(PipelineStep):
         bin_spatial_resolution_scale = self.map_configuration['bin_spatial_resolution_scale']
         self.dim = self.map_configuration['dim']
         self.bins, self.r = muse_bins_r(fov, spatial_resolution, bin_spatial_resolution_scale)
-        self.path = cfg.paths.datasets_dir + f'/../logs/map_step.txt'
 
     @classmethod
     def _build_map_configuration(cls, cfg: DictConfig) -> dict:
@@ -284,6 +283,7 @@ class MapStep(PipelineStep):
 
         setup_output_directories(self.map_configuration['root_path'],
                                  self.map_configuration['rotation_angle'],
+                                 self.map_configuration['bin_spatial_resolution_scale'],
                                  input_feature.name,
                                  output_feature.name)
 
