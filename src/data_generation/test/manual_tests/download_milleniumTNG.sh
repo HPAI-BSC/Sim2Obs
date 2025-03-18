@@ -6,7 +6,7 @@
 export $(grep -v '^#' .env | xargs)
 
 # Ensure SSH credentials are set
-if [ -z "$SSH_USER" ] || [ -z "$SSH_PASSWORD" ] || [ -z "$SSH_HOST" ] || [ -z "$SSH_VIRGO" ]; then
+if [ -z "$SSH_USER" ] || [ -z "$SSH_PASSWORD" ] || [ -z "$SSH_HOST" ] || [ -z "$SSH_VIRGO" ] || [ -z "$SSH_KEY" ]; then
     echo "Error: SSH credentials are not set in .env"
     exit 1
 fi
@@ -54,32 +54,17 @@ for i in "${!FILES[@]}"; do
     REMOTE_FILE="${FILES[$i]}"
     LOCAL_DEST="${DESTINATIONS[$i]}"
 
+    LOG_FILE="$HOME/download_${i}.log"  # Log file for each file download
     echo "Downloading $REMOTE_FILE to $LOCAL_DEST..."
 
-    # Use sshpass to supply password, and allow manual input of 2FA code when prompted
-    ERROR_MESSAGE=$(sshpass -p "$SSH_PASSWORD" ssh -i "$SSH_KEY" "$SSH_USER@$SSH_HOST" "
+    # Run the SCP command with nohup, redirecting both stdout and stderr to the log file
+    nohup sshpass -p "$SSH_PASSWORD" ssh -i "$SSH_KEY" "$SSH_USER@$SSH_HOST" "
         ssh -i $SSH_KEY $SSH_USER@$SSH_VIRGO 'scp -r $REMOTE_FILE $LOCAL_DEST'
-    " 2>&1)
+    " > "$LOG_FILE" 2>&1 &  # Run the command in the background, log output to $LOG_FILE
 
-    # Handle 2FA manually by checking if the output contains a 2FA prompt
-    if [[ "$ERROR_MESSAGE" == *"Verification code"* ]]; then
-        echo "Please enter your 2FA code:"
-        read -p "2FA Code: " OTP_CODE
+    # Notify user that the download is running in the background
+    echo "Download is running in the background. Check $LOG_FILE for progress."
 
-        # Send the OTP code to the prompt
-        ERROR_MESSAGE=$(sshpass -p "$SSH_PASSWORD" ssh -i "$SSH_KEY" "$SSH_USER@$SSH_HOST" "
-            ssh -i $SSH_KEY $SSH_USER@$SSH_VIRGO 'scp -r $REMOTE_FILE $LOCAL_DEST'
-        " 2>&1)
-    fi
-
-    # Check if the download was successful
-    if [ $? -eq 0 ]; then
-        echo "✅ Successfully downloaded: $REMOTE_FILE -> $LOCAL_DEST"
-    else
-        # Capture and display the error message from the last command
-        echo "❌ Failed to download: $REMOTE_FILE"
-        echo "Error details: $?"  # This shows the exit code of the last command
-        echo "Full error output:"
-        echo "$ERROR_MESSAGE"
-    fi
+    # Optionally,  monitor the log or notify if there was a 2FA prompt
+    # However, handling manual 2FA input automatically with sshpass is not feasible
 done

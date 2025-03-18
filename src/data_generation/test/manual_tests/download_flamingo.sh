@@ -11,6 +11,9 @@ if [ -z "$SSH_USER" ] || [ -z "$SSH_PASSWORD" ] || [ -z "$SSH_KEY" ] || [ -z "$S
     exit 1
 fi
 
+# Define log file
+LOG_FILE="$HOME/download_log.txt"
+
 # List of files to copy
 FILES=(
     # L1000N1800
@@ -56,8 +59,14 @@ for i in "${!FILES[@]}"; do
 
     echo "Downloading $REMOTE_FILE to $LOCAL_DEST..."
 
-    # Capture the output of the scp command and any errors
-    ERROR_MESSAGE=$(sshpass -p "$SSH_PASSWORD" scp -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$REMOTE_FILE" "$LOCAL_DEST" 2>&1)
+    # Use nohup to run the scp command in the background and log output
+    nohup sshpass -p "$SSH_PASSWORD" scp -i "$SSH_KEY" "$SSH_USER@$SSH_HOST:$REMOTE_FILE" "$LOCAL_DEST" > "$LOG_FILE" 2>&1 &
+
+    # Capture the PID of the background task
+    SCP_PID=$!
+
+    # Wait for the scp process to finish and capture its exit status
+    wait $SCP_PID
 
     # Check if the download was successful
     if [ $? -eq 0 ]; then
@@ -67,6 +76,6 @@ for i in "${!FILES[@]}"; do
         echo "❌ Failed to download: $REMOTE_FILE"
         echo "Error details: $?"  # This shows the exit code of the last command
         echo "Full error output:"
-        echo "$ERROR_MESSAGE"
+        tail -n 20 "$LOG_FILE"  # Show last 20 lines of the log
     fi
 done
