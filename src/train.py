@@ -77,19 +77,6 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
 
-    '''
-    profiler = PyTorchProfiler(
-        dirpath='/gpfs/scratch/bsc70/hpai/storage/projects/space/',  # Directory to save logs
-        filename="memory_profile",  # Name of the file to save results
-        sort_by_key="self_cpu_memory_usage",  # Sort by CPU memory usage
-        export_to_chrome=True,  # Export as JSON for Chrome
-        row_limit=16,
-        activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
-        profile_memory=True,  # Record CPU memory usage
-        with_stack=True,
-        record_shapes=True,
-    )
-    '''
     trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler='simple')
 
     """
