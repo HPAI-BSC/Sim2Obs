@@ -2,7 +2,7 @@
 
 defaults:
   - _self_
-  - data: galaxy_dianoga
+  - data: galaxy_eagle
   - model: transunet
   - logger:
   - trainer: default
