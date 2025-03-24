@@ -19,14 +19,12 @@ class EagleDataset(GalaxyDataset):
         images = np.load(img_path)
         image = images[f'arr_0']
         # resize image to 128x128
-        image = image[1:129, 1:129]
         image = torch.tensor(image)
 
         labels = np.load(labels_path)
         label = labels[f'arr_0']
         label = torch.tensor(label)
         # resize image to 128x128
-        label = label[1:129, 1:129]
         image = image.float().unsqueeze(0)
         if self.transform:
             image = self.transform(image)
