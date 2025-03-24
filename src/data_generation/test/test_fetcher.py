@@ -50,15 +50,18 @@ class TestFetcher(unittest.TestCase):
             # Initialize the cfg_illustris and cfg_eagle
             self.cfg_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
+            self.cfg_flamingo = compose(config_name="data_generation.yaml")
 
             # Load the local config for paths and assign them
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_illustris.paths = local_config.paths
             self.cfg_eagle.paths = local_config.paths
+            self.cfg_flamingo.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
+            self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -68,6 +71,7 @@ class TestFetcher(unittest.TestCase):
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
         self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
         self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
+        self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
 
     def test_get_halos_illustris(self):
         halo_context_1 = self.fetcher_illustris.get_halos()
@@ -160,6 +164,34 @@ class TestFetcher(unittest.TestCase):
         self.assertIsInstance(subhalo_particles_2.star_p, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_2, "star_v"))
         self.assertIsInstance(subhalo_particles_2.star_v, np.ndarray)
+
+    def test_get_halos_flamingo(self):
+        halo_context_1 = self.fetcher_flamingo.get_halos()
+        self.assertIsInstance(halo_context_1, HaloContext)
+        # self.assertEqual(len(halo_context_1.data), 83)
+
+        # get_item
+        '''
+        halo_data_1 = halo_context_1.get_halo_by_id(halo_id=0)
+        self.assertEqual(halo_data_1.halo_id, self.halo_illustris.halo_id)
+        self.assertEqual(halo_data_1.fsub, self.halo_illustris.fsub)
+        self.assertAlmostEquals(halo_data_1.m200, self.halo_illustris.m200)
+        self.assertAlmostEquals(halo_data_1.r200, self.halo_illustris.r200)
+        assert_array_equal(halo_data_1.gpos, self.halo_illustris.gpos)
+        '''
+
+    def test_get_p_subhalo_flamingo(self):
+        subhalo_particles_1 = self.fetcher_flamingo.get_p_subhalo(subhalo_id=10)
+
+        self.assertIsInstance(subhalo_particles_1, SubhaloParticles)
+        self.assertTrue(hasattr(subhalo_particles_1, "gas_m"))
+        self.assertIsInstance(subhalo_particles_1.gas_m, np.ndarray)
+        self.assertTrue(hasattr(subhalo_particles_1, "star_m"))
+        self.assertIsInstance(subhalo_particles_1.star_m, np.ndarray)
+        self.assertTrue(hasattr(subhalo_particles_1, "star_p"))
+        self.assertIsInstance(subhalo_particles_1.star_p, np.ndarray)
+        self.assertTrue(hasattr(subhalo_particles_1, "star_v"))
+        self.assertIsInstance(subhalo_particles_1.star_v, np.ndarray)
 
     def test_eagle_simulation_codes(self):
         simulation_codes = ['RefL0025N0376',    # nok

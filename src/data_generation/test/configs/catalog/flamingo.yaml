@@ -1,0 +1,86 @@
+name: flamingo
+
+a: 0.8333333333333335
+H: 0.6774 # Different from theirs
+g: 1.989e43
+
+snapnum: 73          # redshift 0.2
+
+simulation_code: L1000N0900
+path: ${paths.datasets_dir}/flamingo/L1000N0900
+
+fov: 526.68
+# https://flamingo.strw.leidenuniv.nl/simulations.html
+# TODO double check
+spatial_resolution: 44.6  # kpc from the documentation "comoving" spatial resolution
+bin_spatial_resolution_scale: 2.5      # bin_size = spatial_resolution * 1.8
+
+# Add per each feature its unit conversion + scalf, hubble (mandatory)
+# https://arxiv.org/pdf/1510.01320
+fields:
+  halo:
+    spherical_overdensity_200_crit:
+      total_mass:
+        input: "Msun"
+        output: "Msun/h"
+        scaling: "x * h"
+        name: 'm200'
+        # Final unit measures
+        filter: [ "> 1e13" ]
+      soradius:
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * h"
+        name: 'r200'
+    input_halos:
+      halo_centre:
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * 1e3 * a * h"
+        name: 'gpos'
+      halo_catalogue_index:
+        input: null
+        output: null
+        scaling: null
+        name: "halo_id"
+  subhalo:
+    CentreOfPotential_x:
+      input: "cMpc"
+      output: "pkpc/h"
+      scaling: "x * 1e3 * a * h"
+      name: "spos"
+    stellar_mass:
+      input: "Msun"
+      output: "Msun"
+      scaling: "x"
+      name: "mstr"
+      filter: "> 1e10"
+    half_mass_radius_stars:
+      input: "pkpc"
+      output: "pkpc/h"
+      scaling: "x * h"
+      name: 'shmr'
+  # TODO review
+  particles:
+    stars:
+      coordinates:
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * a"   # convert to cm (* 3.085678e+24) back to km (/ 3.085678e+21)
+        name: "p"
+      # TODO
+      velocities:
+        input: "km/s"
+        output: "km/s"
+        scaling: "x"
+        name: "v"
+      masses:
+        input: "Msun"
+        output: "Msun/h"
+        scaling: "x * h"
+        name: "m"
+      group_nr_bound:
+        input: null
+        output: null
+        scaling: null
+        name: "subhalo_id"

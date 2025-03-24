@@ -1,13 +1,16 @@
+import copy
 import operator
 import os.path
 from abc import ABC, abstractmethod
 from typing import Any
+import swiftsimio as sw
 
 import eagleSqlTools as sql
 import numpy as np
 import pandas as pd
 import illustris_python as il
 from omegaconf import DictConfig, ListConfig, OmegaConf
+from swiftsimio import SWIFTDataset
 
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
@@ -194,6 +197,56 @@ class DataFetcher(ABC):
     def _get_fields(self):
         pass
 
+    def __get_name_recursive(self, config, parent_key=""):
+        """Recursively get all keys up to the first level of fields."""
+        keys = []
+        for key, value in config.items():
+            full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
+            if dict_depth(value) > 1:
+                keys.append(full_key)
+                self.__get_name(value, parent_key=f"{full_key}.")
+            else:
+                keys.append(value['name'])
+        return keys
+
+    def __get_name(self, config, parent_key=""):
+        """Recursively get all keys up to the first level of fields."""
+        keys_branchs = []
+        for key, value in config.items():
+            full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
+            if dict_depth(value) > 1:
+                keys = self.__get_name_recursive(value, parent_key=f"{full_key}.")
+                keys_branchs.extend(keys)
+            else:
+                # non-recursive case
+                keys_branchs.append(full_key)
+        return keys_branchs
+
+    def __explore_branch(self, config, parent_key=""):
+        """Recursively get all keys up to the first level of fields."""
+        keys = []
+        for key, value in config.items():
+            full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
+            if dict_depth(value) > 1:
+                keys.append(full_key)
+                self.__get_nested_keys(value, parent_key=f"{full_key}.")
+            else:
+                keys.append(full_key)
+        return keys
+
+    def __get_nested_keys(self, config, parent_key=""):
+        """Recursively get all keys up to the first level of fields."""
+        keys_branchs = []
+        for key, value in config.items():
+            full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
+            if dict_depth(value) > 1:
+                keys = self.__explore_branch(value, parent_key=f"{full_key}.")
+                keys_branchs.extend(keys)
+            else:
+                # Non recursive case
+                keys_branchs.append(full_key)
+        return keys_branchs
+
     def __build_config(self, **kwargs):
         self.fields = self._get_fields()
 
@@ -201,14 +254,12 @@ class DataFetcher(ABC):
         if not fields:
             raise ValueError("The catalog must contain a 'fields' attribute.")
 
-        self.halo_fields = list(self.catalog.fields.halo.keys())
-        self.subhalo_fields = list(self.catalog.fields.subhalo.keys())
-        self.particle_fields = list(self.catalog.fields.particles.keys())
-        self.column_map = {
-            column: data['name']
-            for group in [self.catalog.fields.halo, self.catalog.fields.subhalo]
-            for column, data in group.items()
-        }
+        self.halo_fields = self.__get_nested_keys(self.catalog.fields.halo)
+        self.subhalo_fields = self.__get_nested_keys(self.catalog.fields.subhalo)
+        self.particle_fields = self.__get_nested_keys(self.catalog.fields.particles)
+        names = (self.__get_name(self.catalog.fields.halo) + self.__get_name(self.catalog.fields.subhalo) +
+                self.__get_name(self.catalog.fields.particles))
+        self.column_map = dict(zip(self.halo_fields + self.subhalo_fields + self.particle_fields, names))
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -238,6 +289,8 @@ class DataFetcherFactory:
             return Illustris300Fetcher(catalog, **kwargs)
         elif catalog.name == "eagle":
             return EagleFetcher(catalog, **kwargs)
+        elif catalog.name == "flamingo":
+            return FlamingoFetcher(catalog, **kwargs)
         else:
             raise ValueError(f"Unsupported catalog={catalog.name} type")
 
@@ -869,6 +922,273 @@ class EagleFetcher(DataFetcher):
             raise Exception(f'Something went wrong: {e}')
 
 
+class FlamingoFetcher(DataFetcher):
+    def get_halos(self, *args, **kwargs) -> HaloContext:
+        """
+        Fetches the halo data.
+
+        Returns:
+        --------
+        HaloContext
+            A context object containing halo data.
+        """
+        logger.info("Fetching halo data...")
+        halo_context = self._get_halos()
+        return halo_context
+
+    def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
+        """
+        Fetches the subhalo data.
+
+        Returns:
+        --------
+        SubhaloContext
+            A context object containing subhalo data.
+        """
+        logger.info("Fetching subhalo data...")
+        subhalo_context = self._get_subhalos()
+        return subhalo_context
+
+    def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
+        """
+        Fetches particle data for a given subhalo.
+
+        Parameters:
+        -----------
+        subhalo_id : int
+            ID of the subhalo for which particle data is needed.
+
+        Returns:
+        --------
+        SubhaloParticles
+            A context object containing particle data.
+        """
+        subhalo_id = kwargs.get('subhalo_id', None)
+
+        if subhalo_id is None:
+            logger.error("subhalo_id must be provided in kwargs")
+            raise ValueError("subhalo_id must be provided in kwargs")
+
+        logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
+        return self._get_p_subhalo(subhalo_id)
+
+    def _get_halos(self) -> HaloContext:
+        """
+        Fetches halo data from the Flamingo simulation.
+
+        Returns:
+        --------
+        HaloContext
+            A context object containing halo data such as mass, radius, position, and subhalo index.
+        """
+        logger.debug("Fetching halos from Flamingo...")
+        path = self.catalog.path + '/output'
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        if 'input_halos.halo_centre' not in self.halo_fields:
+            self.halo_fields.append('input_halos.halo_centre')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.halo["input_halos.halo_centre"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "fsub"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['input_halos.halo_centre'] = 'fsub'
+
+        redshift = str(self.catalog.snapnum).zfill(4)
+        path = path + f'/halo_properties_{redshift}.hdf5'
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        h_properties = sw.load(path)
+
+        if isinstance(h_properties, SWIFTDataset):
+            halos = {}
+            for attr in self.halo_fields:
+                field_name = attr
+                try:
+                    obj = copy.copy(h_properties)
+                    cfg = None
+                    for part in attr.split('.'):
+                        if cfg is None:
+                            cfg = self.catalog.fields.halo[part]
+                        else:
+                            cfg = cfg[part]
+                        if hasattr(obj, part):
+                            attr = getattr(obj, part)
+                            obj = attr
+                    units = cfg.input
+                    halos[field_name] = obj
+                    halos[field_name].convert_to_units(units)
+                    # Specify physical/comoving
+                    halos[field_name].convert_to_physical()
+                    halos[field_name] = halos[field_name].value
+                    if isinstance(halos[field_name], np.ndarray) and halos[field_name].ndim > 1:
+                        halos[field_name] = to_list(halos, field_name)
+
+                except Exception as e:
+                    print()
+
+            table = 'halo'
+            # TODO filter
+            # halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
+            steps = [
+                # lambda halos: validate_and_process_fields(halos, self.halo_fields, table, self.catalog),
+                lambda halos: convert_to_dataframe(halos),
+                # lambda halos: apply_filters(halos, halo_conditions),
+                lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog)
+            ]
+
+            processed_halos = run_pipeline(halos, steps)
+            logger.debug("Halo data fetched successfully.")
+            halo_context = HaloContext(processed_halos, self.column_map)
+            return halo_context
+
+        else:
+            logger.warning("No halos found.")
+            return HaloContext(pd.DataFrame(data=[]), self.column_map)
+
+    def _get_subhalos(self) -> SubhaloContext:
+        """
+        Fetches subhalo data from the Illustris-300 simulation.
+
+        Returns:
+        --------
+        SubhaloContext
+            A context object containing subhalo data.
+        """
+        logger.debug("Fetching subhalos from Illustris-300...")
+
+        fields = self.subhalo_fields
+        path = self.catalog.path + '/output'
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        if 'SubhaloGrNr' not in self.halo_fields:
+            self.subhalo_fields.append('SubhaloGrNr')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.subhalo["SubhaloGrNr"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "id_parents"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['SubhaloGrNr'] = 'id_parents'
+
+        subhalos = il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=fields)
+
+        if isinstance(subhalos, np.ndarray):
+            tmp = subhalos
+            subhalos = {self.fields[0]: tmp}
+            size = len(subhalos[self.fields[0]])
+            subhalos['count'] = np.array(size)
+
+        if len(subhalos) > 0:
+            table = 'subhalo'
+            subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
+            steps = [
+                lambda subhalos: assign_id(subhalos, 'subhalo_id'),
+                lambda subhalos: validate_and_process_fields(subhalos, self.subhalo_fields, table, self.catalog),
+                lambda subhalos: convert_to_dataframe(subhalos),
+                lambda subhalos: apply_filters(subhalos, subhalo_conditions),
+                lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog)
+            ]
+
+            processed_subhalos = run_pipeline(subhalos, steps)
+            logger.debug("Subhalo data fetched successfully.")
+            subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
+            return subhalo_context
+        else:
+            logger.warning("No subhalos found.")
+            return SubhaloContext(pd.DataFrame(data=[]), self.column_map)
+
+    def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
+        """
+        Fetches particle data for a specific subhalo.
+
+        Parameters:
+        -----------
+        isubhalo : int
+            The index of the subhalo from which to retrieve particle data.
+
+        Returns:
+        --------
+        SubhaloParticles
+            A context object containing particle data such as mass, coordinates, and velocities.
+        """
+        logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
+        redshift = str(self.catalog.snapnum).zfill(4)
+        path = self.catalog.path + f'/output/flamingo_{redshift}.hdf5'
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        try:
+            part_types = set([p.split('.')[0] for p in self.particle_fields])
+            data = {}
+            particles = sw.load(path)
+            for part_type in part_types:
+                fields = list(self.catalog.fields.particles[part_type].keys())
+                if hasattr(particles, part_type):
+                    data[part_type] = {}
+                    particles_type = getattr(particles, part_type)
+                    for field in fields:
+                        if hasattr(particles_type, field):
+                            attr = getattr(particles_type, field)
+                            units = self.catalog.fields.particles[part_type][field]['input']
+                            if units is not None:
+                                attr.convert_to_units(units)
+                                attr.convert_to_physical()
+                            # if numpy, convert it to a dict
+                            data[part_type][field] = attr.value
+
+                            if data[part_type][field].ndim > 1:
+                                def to_list_efficient(d, column, chunk_size=1000000):
+                                    for start in range(0, d[column].shape[0], chunk_size):
+                                        end = min(start + chunk_size, d[column].shape[0])
+                                        yield d[column][start:end].tolist()
+
+                                data[part_type][field] = to_list_efficient(data[part_type], field)
+
+                        else:
+                            # TODO write exception or message of warning
+                            continue
+                else:
+                    raise Exception()
+
+                if len(data) > 0:
+                    data[part_type] = particles
+                    logger.debug(f"Particle data fetched successfully, particles retrieved")
+                else:
+                    logger.warning(f"No particle data found for subhalo {subhalo_id}.")
+
+            # TODO filter and then convert it into a df
+            table = 'particles'
+            steps = [
+                '''
+                lambda particles: validate_and_process_fields(particles, self.particle_fields, table, self.catalog),
+                lambda particles: convert_to_dataframe(particles),
+                lambda particles: apply_filters(particles, particle_conditions)
+                '''
+            ]
+
+            processed_particles = run_pipeline(data, steps)
+            logger.debug("Halo data fetched successfully.")
+            particle_data = SubhaloParticles(processed_particles, self.catalog.fields.particles)
+            return particle_data
+        except Exception as e:
+            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
 
 
 
