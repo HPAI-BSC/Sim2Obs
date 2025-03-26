@@ -7,7 +7,9 @@ H: 0.6774
 fov: 526.68   # 2 * 263.34 kpc
 spatial_resolution: 2.02 # kpc
 
-# bin_size = spatial_resolution * 1 -> ensure that bins use a proper resolution, bin_size > spatial resolution *1.5-2 times
+# bin_size = spatial_resolution * 1 ->
+# ensure that bins use a proper resolution,
+#bin_size > spatial resolution *1.5-2 times
 # bin_size = 3.6, sp resolution = 2.02
 bin_spatial_resolution_scale: 1
 

@@ -19,33 +19,36 @@ bin_spatial_resolution_scale: 2.5      # bin_size = spatial_resolution * 1.8
 # https://arxiv.org/pdf/1510.01320
 fields:
   halo:
-    spherical_overdensity_200_crit.total_mass:
-      input: "Msun"
-      output: "Msun/h"
-      scaling: "x * h"
-      name: 'm200'
-      # Final unit measures
-      filter: [ "> 1e13" ]
-    spherical_overdensity_200_crit.soradius:
-      input: "kpc"
-      output: "kpc/h"
-      scaling: "x * h"
-      name: 'r200'
-    input_halos.halo_centre:
-      input: "kpc"
-      output: "kpc/h"
-      scaling: "x * 1e3 * a * h"
-      name: 'gpos'
-    input_halos.halo_catalogue_index:
-      input: null
-      output: null
-      scaling: null
-      name: "halo_id"
-  # TODO review
+    # TODO review unit of measures
+    spherical_overdensity_200_crit:
+      total_mass:
+        input: "Msun"
+        output: "Msun/h"
+        scaling: "x * h"
+        name: 'm200'
+        # Final unit measures
+        filter: [ "> 1e13" ]
+      soradius:
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * h"
+        name: 'r200'
+    input_halos:
+      halo_centre:
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * h"
+        name: 'gpos'
+      # TODO add ids of the primary subhalo
+      halo_catalogue_index:
+        input: null
+        output: null
+        scaling: null
+        name: "halo_id"
   subhalo:
     CentreOfPotential_x:
-      input: "cMpc"
-      output: "pkpc/h"
+      input: "kpc"
+      output: "kpc/h"
       scaling: "x * 1e3 * a * h"
       name: "spos"
     stellar_mass:
@@ -55,26 +58,28 @@ fields:
       name: "mstr"
       filter: "> 1e10"
     half_mass_radius_stars:
-      input: "pkpc"
-      output: "pkpc/h"
+      input: "kpc"
+      output: "kpc/h"
       scaling: "x * h"
       name: 'shmr'
+  # TODO review
   particles:
     stars:
       coordinates:
-        input: "cMpc/h"
-        output: "pKpc/h"
-        scaling: "x * a * 1000"   # convert to cm (* 3.085678e+24) back to km (/ 3.085678e+21)
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * h"
         name: "p"
+      # TODO
       velocities:
-        input: "km*sqrt(a)/s"
+        input: "km/s"
         output: "km/s"
-        scaling: "x * math.sqrt(a)"
+        scaling: "x"
         name: "v"
       masses:
-        input: "Msun/h"
+        input: "Msun"
         output: "Msun/h"
-        scaling: "(x * g) / g_2_solar"
+        scaling: "x * h"
         name: "m"
       group_nr_bound:
         input: null

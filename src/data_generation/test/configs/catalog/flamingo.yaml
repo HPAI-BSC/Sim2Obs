@@ -19,6 +19,7 @@ bin_spatial_resolution_scale: 2.5      # bin_size = spatial_resolution * 1.8
 # https://arxiv.org/pdf/1510.01320
 fields:
   halo:
+    # TODO review unit of measures
     spherical_overdensity_200_crit:
       total_mass:
         input: "Msun"
@@ -36,8 +37,9 @@ fields:
       halo_centre:
         input: "kpc"
         output: "kpc/h"
-        scaling: "x * 1e3 * a * h"
+        scaling: "x * h"
         name: 'gpos'
+      # TODO add ids of the primary subhalo
       halo_catalogue_index:
         input: null
         output: null
@@ -45,8 +47,8 @@ fields:
         name: "halo_id"
   subhalo:
     CentreOfPotential_x:
-      input: "cMpc"
-      output: "pkpc/h"
+      input: "kpc"
+      output: "kpc/h"
       scaling: "x * 1e3 * a * h"
       name: "spos"
     stellar_mass:
@@ -56,8 +58,8 @@ fields:
       name: "mstr"
       filter: "> 1e10"
     half_mass_radius_stars:
-      input: "pkpc"
-      output: "pkpc/h"
+      input: "kpc"
+      output: "kpc/h"
       scaling: "x * h"
       name: 'shmr'
   # TODO review
@@ -66,7 +68,7 @@ fields:
       coordinates:
         input: "kpc"
         output: "kpc/h"
-        scaling: "x * a"   # convert to cm (* 3.085678e+24) back to km (/ 3.085678e+21)
+        scaling: "x * h"
         name: "p"
       # TODO
       velocities:

@@ -9,7 +9,6 @@ from hydra import initialize, compose
 import eagleSqlTools as sql
 from numpy.testing import assert_array_equal
 from omegaconf import OmegaConf
-from pandas._testing import assert_frame_equal
 
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 from src.data_generation.src.halo import HaloContext
@@ -69,9 +68,9 @@ class TestFetcher(unittest.TestCase):
         required_keys = ['G']
         data_loader_dict = next((step for step in self.cfg_illustris.pipeline if step.name == 'data_loader'), None)
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
+        self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
         self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
         self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
-        self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
 
     def test_get_halos_illustris(self):
         halo_context_1 = self.fetcher_illustris.get_halos()
@@ -168,9 +167,10 @@ class TestFetcher(unittest.TestCase):
     def test_get_halos_flamingo(self):
         halo_context_1 = self.fetcher_flamingo.get_halos()
         self.assertIsInstance(halo_context_1, HaloContext)
-        # self.assertEqual(len(halo_context_1.data), 83)
+        self.assertTrue(len(halo_context_1.data) > 0)
 
-        # get_item
+        # TODO
+        # self.assertEqual(len(halo_context_1.data), 83)
         '''
         halo_data_1 = halo_context_1.get_halo_by_id(halo_id=0)
         self.assertEqual(halo_data_1.halo_id, self.halo_illustris.halo_id)
@@ -264,5 +264,7 @@ class TestFetcher(unittest.TestCase):
     def test_eagle_build_query(self):
         query = self.fetcher_eagle._build_query(table='subhalo')
         self.assertNotEqual(query, None)
+
+
 
 

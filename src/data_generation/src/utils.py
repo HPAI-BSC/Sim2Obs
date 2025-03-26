@@ -400,7 +400,20 @@ def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spati
 
 
 def to_list(d, column):
-    return [d[column][i] for i in range(d[column].shape[0])]
+    if isinstance(d, dict):
+        return [d[column][i] for i in range(d[column].shape[0])]
+    elif isinstance(d, np.ndarray):
+        return [d[i] for i in range(d.shape[0])]
+
+
+def to_list_in_batches(d, column, batch_size=1000000):
+    result = []
+    # Loop over the data in batches
+    for start in range(0, d[column].shape[0], batch_size):
+        end = min(start + batch_size, d[column].shape[0])
+        batch = d[column][start:end]
+        result.extend(to_list(batch, column))  # Add batch to result list
+    return result
 
 
 def apply_conversion(values, scaling_formula, scalefactor, h, **kwargs):

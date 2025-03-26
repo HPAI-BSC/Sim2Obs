@@ -15,7 +15,7 @@ from swiftsimio import SWIFTDataset
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion, \
-    dict_depth
+    dict_depth, to_list_in_batches
 
 logger = setup_logger("DataFetcher")
 
@@ -105,13 +105,16 @@ def convert_to_dataframe(d: dict):
         raise ValueError(f'The format of the data is not correct, {dict_depth(d)} levels of data detected.')
 
 
-def apply_filter_df(d, conditions):
+def apply_filter_df(d, conditions, config):
     if isinstance(d, pd.DataFrame):
         mask = pd.Series(True, index=d.index)
         for key, condition in conditions.items():
             if key not in d.columns:
                 raise Exception(f'Error, feature "{key}" is not present in the halo dataframe with columns:'
                                 f' {d.columns}')
+
+            condition = OmegaConf.select(config, key)
+
             if isinstance(condition.filter, ListConfig):
                 for expr in condition.filter:
                     if isinstance(expr, str):
@@ -129,12 +132,12 @@ def apply_filter_df(d, conditions):
 
 
 @pipeline_step
-def apply_filters(d: Any, conditions: dict):
+def apply_filters(d: Any, conditions: dict, config: DictConfig):
     if isinstance(d, pd.DataFrame):
-        return apply_filter_df(d, conditions)
+        return apply_filter_df(d, conditions, config)
     elif isinstance(d, dict):
         for key in d:
-            d[key] = apply_filter_df(d[key], conditions.get(key, {}))
+            d[key] = apply_filter_df(d[key], conditions.get(key, {}), config)
         return d
 
 
@@ -197,30 +200,28 @@ class DataFetcher(ABC):
     def _get_fields(self):
         pass
 
-    def __get_name_recursive(self, config, parent_key=""):
-        """Recursively get all keys up to the first level of fields."""
-        keys = []
+    def __get_attr_recursive(self, config, attr_name, parent_key="", branch={}):
         for key, value in config.items():
             full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
             if dict_depth(value) > 1:
-                keys.append(full_key)
-                self.__get_name(value, parent_key=f"{full_key}.")
+                self.__get_attr_recursive(value, attr_name, parent_key=f"{full_key}.", branch=branch)
             else:
-                keys.append(value['name'])
-        return keys
+                branch[full_key] = value.get(attr_name)
+        return branch
 
-    def __get_name(self, config, parent_key=""):
-        """Recursively get all keys up to the first level of fields."""
-        keys_branchs = []
+    def _get_attr(self, config, attr_name, parent_key=""):
+        dict_branchs = {}
         for key, value in config.items():
             full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
             if dict_depth(value) > 1:
-                keys = self.__get_name_recursive(value, parent_key=f"{full_key}.")
-                keys_branchs.extend(keys)
+                branch = {}
+                self.__get_attr_recursive(value, parent_key=f"{full_key}.", attr_name=attr_name, branch=branch)
+                dict_branchs.update(branch)
             else:
                 # non-recursive case
-                keys_branchs.append(full_key)
-        return keys_branchs
+                attr_value = value.get(attr_name)
+                dict_branchs[full_key] = attr_value
+        return dict_branchs
 
     def __explore_branch(self, config, parent_key=""):
         """Recursively get all keys up to the first level of fields."""
@@ -229,12 +230,12 @@ class DataFetcher(ABC):
             full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
             if dict_depth(value) > 1:
                 keys.append(full_key)
-                self.__get_nested_keys(value, parent_key=f"{full_key}.")
+                self._get_nested_keys(value, parent_key=f"{full_key}.")
             else:
                 keys.append(full_key)
         return keys
 
-    def __get_nested_keys(self, config, parent_key=""):
+    def _get_nested_keys(self, config, parent_key=""):
         """Recursively get all keys up to the first level of fields."""
         keys_branchs = []
         for key, value in config.items():
@@ -254,12 +255,16 @@ class DataFetcher(ABC):
         if not fields:
             raise ValueError("The catalog must contain a 'fields' attribute.")
 
-        self.halo_fields = self.__get_nested_keys(self.catalog.fields.halo)
-        self.subhalo_fields = self.__get_nested_keys(self.catalog.fields.subhalo)
-        self.particle_fields = self.__get_nested_keys(self.catalog.fields.particles)
-        names = (self.__get_name(self.catalog.fields.halo) + self.__get_name(self.catalog.fields.subhalo) +
-                self.__get_name(self.catalog.fields.particles))
-        self.column_map = dict(zip(self.halo_fields + self.subhalo_fields + self.particle_fields, names))
+        self.halo_fields = self._get_nested_keys(self.catalog.fields.halo)
+        self.subhalo_fields = self._get_nested_keys(self.catalog.fields.subhalo)
+        particle_fields = self._get_nested_keys(self.catalog.fields.particles)
+        self.particle_fields = set([p.split('.')[0] for p in particle_fields])
+
+        kv_halo = self._get_attr(self.catalog.fields.halo, attr_name='name')
+        kv_subhalo = self._get_attr(self.catalog.fields.halo, attr_name='name')
+        kv_particles = self._get_attr(self.catalog.fields.particles, attr_name='name')
+
+        self.column_map = kv_halo | kv_subhalo | kv_particles
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -402,7 +407,7 @@ class Illustris300Fetcher(DataFetcher):
                 lambda halos: assign_id(halos, 'halo_id'),
                 lambda halos: validate_and_process_fields(halos, self.halo_fields, table, self.catalog),
                 lambda halos: convert_to_dataframe(halos),
-                lambda halos: apply_filters(halos, halo_conditions),
+                lambda halos: apply_filters(halos, halo_conditions, self.catalog.fields.halo),
                 lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog)
             ]
 
@@ -459,7 +464,7 @@ class Illustris300Fetcher(DataFetcher):
                 lambda subhalos: assign_id(subhalos, 'subhalo_id'),
                 lambda subhalos: validate_and_process_fields(subhalos, self.subhalo_fields, table, self.catalog),
                 lambda subhalos: convert_to_dataframe(subhalos),
-                lambda subhalos: apply_filters(subhalos, subhalo_conditions),
+                lambda subhalos: apply_filters(subhalos, subhalo_conditions, self.catalog.fields.subhalo),
                 lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog)
             ]
 
@@ -523,7 +528,7 @@ class Illustris300Fetcher(DataFetcher):
                 lambda particles: validate_and_process_fields(particles, self.particle_fields, table,
                                                               self.catalog),
                 lambda particles: convert_to_dataframe(particles),
-                lambda particles: apply_filters(particles, particle_conditions),
+                lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles),
                 lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog)
             ]
 
@@ -972,6 +977,58 @@ class FlamingoFetcher(DataFetcher):
         logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
         return self._get_p_subhalo(subhalo_id)
 
+    @staticmethod
+    def __convert_keys(d):
+        new_dict = {}
+
+        for key, value in d.items():
+            # Split the key by the '.' separator to get the parts
+            keys = key.split('.')
+
+            # Traverse and create nested dictionaries
+            temp = new_dict
+            for part in keys[:-1]:
+                temp = temp.setdefault(part, {})
+
+            # Assign the value to the final key
+            temp[keys[-1]] = value
+
+        return new_dict
+
+    def __validate_and_process_fields(self, soap: SWIFTDataset, fields, super_key):
+        data = {}
+        for attr in fields:
+            field_name = attr
+            try:
+                obj = copy.copy(soap)
+                cfg = None
+                for part in attr.split('.'):
+                    if cfg is None:
+                        key = f"{super_key}.{part}"
+                        cfg = OmegaConf.select(self.catalog.fields, key, default=None)
+                    else:
+                        cfg = cfg[part]
+                    if hasattr(obj, part):
+                        attr = getattr(obj, part)
+                        obj = attr
+                units = cfg.input
+                data[field_name] = obj
+
+                if units is not None:
+                    data[field_name].convert_to_units(units)
+                    # Specify physical/comoving
+                    data[field_name].convert_to_physical()
+
+                data[field_name] = data[field_name].value
+                # data[field_name] = data[field_name][:100]
+                if isinstance(data[field_name], np.ndarray) and data[field_name].ndim > 1:
+                    data[field_name] = to_list_in_batches(data, field_name)
+            # TODO
+            except Exception as e:
+                print()
+        data = self.__convert_keys(data)
+        return data
+
     def _get_halos(self) -> HaloContext:
         """
         Fetches halo data from the Flamingo simulation.
@@ -988,10 +1045,11 @@ class FlamingoFetcher(DataFetcher):
             logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
-        if 'input_halos.halo_centre' not in self.halo_fields:
-            self.halo_fields.append('input_halos.halo_centre')
+        # TODO change the attribute
+        if 'input_halos.halo_catalogue_index' not in self.halo_fields:
+            self.halo_fields.append('input_halos.halo_catalogue_index')
             OmegaConf.set_struct(self.catalog, False)
-            self.catalog.fields.halo["input_halos.halo_centre"] = {
+            self.catalog.fields.halo["input_halos.halo_catalogue_index"] = {
                 "input": None,
                 "output": None,
                 "scaling": None,
@@ -1008,41 +1066,15 @@ class FlamingoFetcher(DataFetcher):
             raise Exception(f'The path {path} does not exist.')
 
         h_properties = sw.load(path)
-
+        table = 'halo'
         if isinstance(h_properties, SWIFTDataset):
-            halos = {}
-            for attr in self.halo_fields:
-                field_name = attr
-                try:
-                    obj = copy.copy(h_properties)
-                    cfg = None
-                    for part in attr.split('.'):
-                        if cfg is None:
-                            cfg = self.catalog.fields.halo[part]
-                        else:
-                            cfg = cfg[part]
-                        if hasattr(obj, part):
-                            attr = getattr(obj, part)
-                            obj = attr
-                    units = cfg.input
-                    halos[field_name] = obj
-                    halos[field_name].convert_to_units(units)
-                    # Specify physical/comoving
-                    halos[field_name].convert_to_physical()
-                    halos[field_name] = halos[field_name].value
-                    if isinstance(halos[field_name], np.ndarray) and halos[field_name].ndim > 1:
-                        halos[field_name] = to_list(halos, field_name)
+            halos = self.__validate_and_process_fields(h_properties, self.halo_fields, super_key='halo')
 
-                except Exception as e:
-                    print()
-
-            table = 'halo'
-            # TODO filter
-            # halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
+            halo_conditions = self._get_attr(self.catalog.fields.halo, attr_name='filter', parent_key="")
+            filtered_conditions = {k: v for k, v in halo_conditions.items() if v is not None}
             steps = [
-                # lambda halos: validate_and_process_fields(halos, self.halo_fields, table, self.catalog),
                 lambda halos: convert_to_dataframe(halos),
-                # lambda halos: apply_filters(halos, halo_conditions),
+                lambda halos: apply_filters(halos, filtered_conditions, self.catalog.fields.halo),
                 lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog)
             ]
 
@@ -1100,7 +1132,7 @@ class FlamingoFetcher(DataFetcher):
                 lambda subhalos: assign_id(subhalos, 'subhalo_id'),
                 lambda subhalos: validate_and_process_fields(subhalos, self.subhalo_fields, table, self.catalog),
                 lambda subhalos: convert_to_dataframe(subhalos),
-                lambda subhalos: apply_filters(subhalos, subhalo_conditions),
+                lambda subhalos: apply_filters(subhalos, subhalo_conditions, self.catalog.fields.subhalo),
                 lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog)
             ]
 
@@ -1135,52 +1167,22 @@ class FlamingoFetcher(DataFetcher):
             raise Exception(f'The path {path} does not exist.')
 
         try:
-            part_types = set([p.split('.')[0] for p in self.particle_fields])
-            data = {}
             particles = sw.load(path)
-            for part_type in part_types:
-                fields = list(self.catalog.fields.particles[part_type].keys())
-                if hasattr(particles, part_type):
-                    data[part_type] = {}
-                    particles_type = getattr(particles, part_type)
-                    for field in fields:
-                        if hasattr(particles_type, field):
-                            attr = getattr(particles_type, field)
-                            units = self.catalog.fields.particles[part_type][field]['input']
-                            if units is not None:
-                                attr.convert_to_units(units)
-                                attr.convert_to_physical()
-                            # if numpy, convert it to a dict
-                            data[part_type][field] = attr.value
+            nested_particle_fields = self._get_nested_keys(self.catalog.fields.particles)
+            data = self.__validate_and_process_fields(particles, nested_particle_fields, super_key='particles')
 
-                            if data[part_type][field].ndim > 1:
-                                def to_list_efficient(d, column, chunk_size=1000000):
-                                    for start in range(0, d[column].shape[0], chunk_size):
-                                        end = min(start + chunk_size, d[column].shape[0])
-                                        yield d[column][start:end].tolist()
+            if len(data) > 0:
+                logger.debug(f"Particle data fetched successfully, particles retrieved")
+            else:
+                logger.warning(f"No particle data found for subhalo {subhalo_id}.")
 
-                                data[part_type][field] = to_list_efficient(data[part_type], field)
-
-                        else:
-                            # TODO write exception or message of warning
-                            continue
-                else:
-                    raise Exception()
-
-                if len(data) > 0:
-                    data[part_type] = particles
-                    logger.debug(f"Particle data fetched successfully, particles retrieved")
-                else:
-                    logger.warning(f"No particle data found for subhalo {subhalo_id}.")
-
-            # TODO filter and then convert it into a df
+            particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
+            filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
             table = 'particles'
             steps = [
-                '''
-                lambda particles: validate_and_process_fields(particles, self.particle_fields, table, self.catalog),
-                lambda particles: convert_to_dataframe(particles),
-                lambda particles: apply_filters(particles, particle_conditions)
-                '''
+                lambda particles: convert_to_dataframe(data),
+                lambda particles: apply_filters(particles, filtered_conditions, self.catalog.fields.particles),
+                lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog)
             ]
 
             processed_particles = run_pipeline(data, steps)
