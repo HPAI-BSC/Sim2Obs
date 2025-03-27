@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 
 class TestFlamingoData(unittest.TestCase):
     def setUp(self):
-        particles_file = '../data/flamingo/L1000N0900/SOAP-HBT/flamingo_0073.hdf5'
-        fof_subhalos_file = '../data/flamingo/L1000N0900/SOAP-HBT/halo_properties_0073.hdf5'
+        particles_file = '../../../../local/data/datasets/flamingo/L1000N0900/SOAP-HBT/flamingo_0073.hdf5'
+        fof_subhalos_file = '../../../../local/data/datasets/flamingo/L1000N0900/SOAP-HBT/halo_properties_0073.hdf5'
         self.h = 0.6774
 
         self.fof_subhalos = sw.load(fof_subhalos_file)
@@ -94,7 +94,7 @@ class TestFlamingoData(unittest.TestCase):
         shmr = shmr_array[fof_id]
         coordinates = coordinates_array[fof_id]
 
-        # TODO Retrieve data for the subhalo satellites, correct ?
+        # TODO Retrieve data for the subhalo satellites, correct
         satellites_mask = self.fof_subhalos.soap.host_halo_index == fof_id
         n_satellites = np.sum(satellites_mask)
 
