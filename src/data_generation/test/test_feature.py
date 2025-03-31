@@ -165,5 +165,14 @@ class TestFeature(unittest.TestCase):
                                                                 ranging, axis=(0, 1))
         assert (len(vel_map)) == bins
 
+    def test_transition_radius(self):
+        # Test case where transition happens
+        distance = np.array([2, 4, 3, 1, 5])
+        icl_mask = np.array([0, 1, 1, 0, 1])
+        r200 = 5.0
+
+        self.icl_processor = ICLProcessor(self.cfg_eagle)
+        transition_radius, _ = self.icl_processor._get_transition_radius(distance, icl_mask, r200)
+        self.assertEqual(transition_radius, 1.0)
 
 

@@ -279,10 +279,11 @@ class ICLProcessor(FeatureProcessor):
         return final_predictions
 
     @staticmethod
-    def _get_transition_radius(distance: np.ndarray, icl_mask: np.ndarray):
+    def _get_transition_radius(distance: np.ndarray, icl_mask: np.ndarray, r200: float):
+        normalized_distance = distance / r200
         # Compute cumulative mass profiles
-        sorted_indices = np.argsort(distance)
-        sorted_distances = distance[sorted_indices]
+        sorted_indices = np.argsort(normalized_distance)
+        sorted_distances = normalized_distance[sorted_indices]
         sorted_icl_mask = icl_mask[sorted_indices]
 
         # Compute cumulative counts for ICL and BCG
@@ -336,7 +337,7 @@ class ICLProcessor(FeatureProcessor):
 
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
 
-        transition_radius, _ = self._get_transition_radius(distance, icl_mask)
+        transition_radius, _ = self._get_transition_radius(distance, icl_mask, halo.r200)
         return icl_mask
 
     def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
