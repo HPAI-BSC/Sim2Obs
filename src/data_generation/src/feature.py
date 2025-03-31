@@ -278,6 +278,26 @@ class ICLProcessor(FeatureProcessor):
         final_predictions = self.model.predict(Data.to_numpy())
         return final_predictions
 
+    @staticmethod
+    def _get_transition_radius(distance: np.ndarray, icl_mask: np.ndarray):
+        # Compute cumulative mass profiles
+        sorted_indices = np.argsort(distance)
+        sorted_distances = distance[sorted_indices]
+        sorted_icl_mask = icl_mask[sorted_indices]
+
+        # Compute cumulative counts for ICL and BCG
+        icl_cumulative = np.cumsum(sorted_icl_mask)
+        bcg_cumulative = np.arange(1, len(sorted_distances) + 1) - icl_cumulative
+
+        # Step 7: Identify transition radius where ICL surpasses BCG
+        transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
+        if transition_index.size > 0:
+            transition_radius = sorted_distances[transition_index[0]]
+        else:
+            logger.warning("No transition radius found; ICL never dominates.")
+            transition_radius = None
+        return transition_radius, icl_mask
+
     # Subhalo particles, halo
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
         """
@@ -315,6 +335,8 @@ class ICLProcessor(FeatureProcessor):
             raise ValueError("icl_mask is empty; no masking applied.")
 
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
+
+        transition_radius, _ = self._get_transition_radius(distance, icl_mask)
         return icl_mask
 
     def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:

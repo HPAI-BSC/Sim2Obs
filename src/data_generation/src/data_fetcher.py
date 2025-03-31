@@ -43,7 +43,12 @@ def assign_id(d: dict, id_column: str):
     """Assign an ID to each subhalo/halo."""
     if len(d) == 0:
         return None
-    d[id_column] = np.arange(d['count'])
+
+    if 'count' in d:
+        d[id_column] = np.arange(d['count'])
+    else:
+        first_key = next(iter(d))
+        d[id_column] = np.arange(len(d[first_key]))
     return d
 
 
@@ -261,7 +266,7 @@ class DataFetcher(ABC):
         self.particle_fields = set([p.split('.')[0] for p in particle_fields])
 
         kv_halo = self._get_attr(self.catalog.fields.halo, attr_name='name')
-        kv_subhalo = self._get_attr(self.catalog.fields.halo, attr_name='name')
+        kv_subhalo = self._get_attr(self.catalog.fields.subhalo, attr_name='name')
         kv_particles = self._get_attr(self.catalog.fields.particles, attr_name='name')
 
         self.column_map = kv_halo | kv_subhalo | kv_particles
@@ -928,6 +933,7 @@ class EagleFetcher(DataFetcher):
 
 
 class FlamingoFetcher(DataFetcher):
+
     def get_halos(self, *args, **kwargs) -> HaloContext:
         """
         Fetches the halo data.
@@ -977,25 +983,7 @@ class FlamingoFetcher(DataFetcher):
         logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
         return self._get_p_subhalo(subhalo_id)
 
-    @staticmethod
-    def __convert_keys(d):
-        new_dict = {}
-
-        for key, value in d.items():
-            # Split the key by the '.' separator to get the parts
-            keys = key.split('.')
-
-            # Traverse and create nested dictionaries
-            temp = new_dict
-            for part in keys[:-1]:
-                temp = temp.setdefault(part, {})
-
-            # Assign the value to the final key
-            temp[keys[-1]] = value
-
-        return new_dict
-
-    def __validate_and_process_fields(self, soap: SWIFTDataset, fields, super_key):
+    def _validate_and_process_fields(self, soap: SWIFTDataset, fields, super_key, mask=None, n_rows=None):
         data = {}
         for attr in fields:
             field_name = attr
@@ -1020,16 +1008,51 @@ class FlamingoFetcher(DataFetcher):
                     data[field_name].convert_to_physical()
 
                 data[field_name] = data[field_name].value
-                # data[field_name] = data[field_name][:100]
+
+                if n_rows is not None:
+                    data[field_name] = data[field_name][:n_rows]
+
+                if mask is not None:
+                    if isinstance(mask, dict):
+                        mask_key = field_name.split('.')[0]
+                        is_full_false = np.sum(mask[mask_key])
+                        tmp = data[field_name][mask[mask_key]]
+                        data[field_name] = tmp
+                    else:
+                        data[field_name] = data[field_name][mask]
                 if isinstance(data[field_name], np.ndarray) and data[field_name].ndim > 1:
                     data[field_name] = to_list_in_batches(data, field_name)
-            # TODO
             except Exception as e:
-                print()
-        data = self.__convert_keys(data)
+                logger.error(e)
+                continue
         return data
 
+    def __add_primary_subhalo_id(self, halos):
+        # Check if it does has a primary subhalo linked, must have -1 as soap.host_halo_index
+        # TODO Ignore and remove them
+        halos.loc[halos['soap.host_halo_index'] != -1, 'fsub'] = None
+        return halos
+
+    # TODO call this method in dataloader, check if applicable for the rest of fetchers
+    def load_files(self):
+        redshift = str(self.catalog.snapnum).zfill(4)
+
+        path = self.catalog.path + f'/SOAP-HBT/flamingo_{redshift}.hdf5'
+        fof_path = self.catalog.path + f'/SOAP-HBT/halo_properties_{redshift}.hdf5'
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        if not os.path.exists(fof_path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        self.fof_subhalos = sw.load(fof_path)
+        self.particles = sw.load(path)
+
     def _get_halos(self) -> HaloContext:
+        # TODO UPDATE DOCSTRING
         """
         Fetches halo data from the Flamingo simulation.
 
@@ -1039,45 +1062,39 @@ class FlamingoFetcher(DataFetcher):
             A context object containing halo data such as mass, radius, position, and subhalo index.
         """
         logger.debug("Fetching halos from Flamingo...")
-        path = self.catalog.path + '/output'
 
-        if not os.path.exists(path):
-            logger.error(f"The path {path} does not exist.")
-            raise Exception(f'The path {path} does not exist.')
+        self.column_map['input_halos.halo_centre'] = 'gpos'
 
-        # TODO change the attribute
-        if 'input_halos.halo_catalogue_index' not in self.halo_fields:
-            self.halo_fields.append('input_halos.halo_catalogue_index')
+        table = 'halo'
+
+        # Filter primary subhalos
+        if 'soap.host_halo_index' not in self.halo_fields:
             OmegaConf.set_struct(self.catalog, False)
-            self.catalog.fields.halo["input_halos.halo_catalogue_index"] = {
+
+            if 'soap' not in self.catalog.fields.halo:
+                self.catalog.fields.halo["soap"] = {}
+
+            self.catalog.fields.halo["soap"]["host_halo_index"] = {
                 "input": None,
                 "output": None,
                 "scaling": None,
-                "name": "fsub"
+                "name": "parent_id_satellite"
             }
             OmegaConf.set_struct(self.catalog, True)
-            self.column_map['input_halos.halo_centre'] = 'fsub'
+            self.halo_fields.append('soap.host_halo_index')
 
-        redshift = str(self.catalog.snapnum).zfill(4)
-        path = path + f'/halo_properties_{redshift}.hdf5'
-
-        if not os.path.exists(path):
-            logger.error(f"The path {path} does not exist.")
-            raise Exception(f'The path {path} does not exist.')
-
-        h_properties = sw.load(path)
-        table = 'halo'
-        if isinstance(h_properties, SWIFTDataset):
-            halos = self.__validate_and_process_fields(h_properties, self.halo_fields, super_key='halo')
-
+        if isinstance(self.fof_subhalos, SWIFTDataset):
+            halos = self._validate_and_process_fields(self.fof_subhalos, self.halo_fields, super_key='halo')
             halo_conditions = self._get_attr(self.catalog.fields.halo, attr_name='filter', parent_key="")
             filtered_conditions = {k: v for k, v in halo_conditions.items() if v is not None}
             steps = [
+                lambda halos: assign_id(halos, 'halo_id'),
+                lambda halos: assign_id(halos, 'fsub'),
                 lambda halos: convert_to_dataframe(halos),
+                lambda halos: self.__add_primary_subhalo_id(halos),
+                lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog),
                 lambda halos: apply_filters(halos, filtered_conditions, self.catalog.fields.halo),
-                lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog)
             ]
-
             processed_halos = run_pipeline(halos, steps)
             logger.debug("Halo data fetched successfully.")
             halo_context = HaloContext(processed_halos, self.column_map)
@@ -1087,55 +1104,54 @@ class FlamingoFetcher(DataFetcher):
             logger.warning("No halos found.")
             return HaloContext(pd.DataFrame(data=[]), self.column_map)
 
+    @staticmethod
+    def __reindexing_satellites(df: pd.DataFrame):
+        # Update father of satellites
+        # satellites_mask = self.fof_subhalos.soap.host_halo_index == fof_id
+        df.loc[df['soap.host_halo_index'] != -1, 'id_parents'] = df.loc[df['soap.host_halo_index'] != -1, 'soap.host_halo_index']
+        df = df.drop(columns=['soap.host_halo_index'])
+        return df
+
     def _get_subhalos(self) -> SubhaloContext:
         """
-        Fetches subhalo data from the Illustris-300 simulation.
+        Fetches subhalo data from the Flamingo simulation.
 
         Returns:
         --------
         SubhaloContext
             A context object containing subhalo data.
         """
-        logger.debug("Fetching subhalos from Illustris-300...")
+        logger.debug("Fetching subhalos from Flamingo...")
 
-        fields = self.subhalo_fields
-        path = self.catalog.path + '/output'
-
-        if not os.path.exists(path):
-            logger.error(f"The path {path} does not exist.")
-            raise Exception(f'The path {path} does not exist.')
-
-        if 'SubhaloGrNr' not in self.halo_fields:
-            self.subhalo_fields.append('SubhaloGrNr')
+        if 'soap.host_halo_index' not in self.subhalo_fields:
             OmegaConf.set_struct(self.catalog, False)
-            self.catalog.fields.subhalo["SubhaloGrNr"] = {
+            if 'soap' not in self.catalog.fields.subhalo:
+                self.catalog.fields.subhalo["soap"] = {}
+
+            self.catalog.fields.subhalo["soap"]["host_halo_index"] = {
                 "input": None,
                 "output": None,
                 "scaling": None,
-                "name": "id_parents"
+                "name": "parent_id_satellite"
             }
+            self.subhalo_fields.append('soap.host_halo_index')  # to filter satellites
+            self.column_map['soap.host_halo_index'] = 'parent_id_satellite'
             OmegaConf.set_struct(self.catalog, True)
-            self.column_map['SubhaloGrNr'] = 'id_parents'
 
-        subhalos = il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=fields)
+        table = 'subhalo'
 
-        if isinstance(subhalos, np.ndarray):
-            tmp = subhalos
-            subhalos = {self.fields[0]: tmp}
-            size = len(subhalos[self.fields[0]])
-            subhalos['count'] = np.array(size)
-
-        if len(subhalos) > 0:
-            table = 'subhalo'
-            subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
+        if isinstance(self.fof_subhalos, SWIFTDataset):
+            subhalos = self._validate_and_process_fields(self.fof_subhalos, self.subhalo_fields, super_key='subhalo')
+            subhalo_conditions = self._get_attr(self.catalog.fields.subhalo, attr_name='filter', parent_key="")
+            filtered_conditions = {k: v for k, v in subhalo_conditions.items() if v is not None}
             steps = [
+                lambda subhalos: assign_id(subhalos, 'id_parents'),
                 lambda subhalos: assign_id(subhalos, 'subhalo_id'),
-                lambda subhalos: validate_and_process_fields(subhalos, self.subhalo_fields, table, self.catalog),
                 lambda subhalos: convert_to_dataframe(subhalos),
-                lambda subhalos: apply_filters(subhalos, subhalo_conditions, self.catalog.fields.subhalo),
-                lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog)
+                lambda subhalos: self.__reindexing_satellites(subhalos),
+                lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog),
+                lambda subhalos: apply_filters(subhalos, filtered_conditions, self.catalog.fields.subhalo),
             ]
-
             processed_subhalos = run_pipeline(subhalos, steps)
             logger.debug("Subhalo data fetched successfully.")
             subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
@@ -1159,25 +1175,42 @@ class FlamingoFetcher(DataFetcher):
             A context object containing particle data such as mass, coordinates, and velocities.
         """
         logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
-        redshift = str(self.catalog.snapnum).zfill(4)
-        path = self.catalog.path + f'/output/flamingo_{redshift}.hdf5'
+        host_halo_index = self.fof_subhalos.soap.host_halo_index[subhalo_id]
 
-        if not os.path.exists(path):
-            logger.error(f"The path {path} does not exist.")
-            raise Exception(f'The path {path} does not exist.')
+        if host_halo_index != -1:
+            # Not a primary index
+            raise ValueError(f'Subhalo: {subhalo_id} is not a primary subhalo')
+
+        # Add halo_catalogue_index for all the particle types
+        for part_type in self.particle_fields:
+            OmegaConf.set_struct(self.catalog, False)
+            field_info = OmegaConf.select(self.catalog.fields.particles, f"{part_type}")
+            if 'halo_catalogue_index' not in self.catalog.fields.particles[part_type]:
+                self.catalog.fields.particles[part_type]['halo_catalogue_index'] = {
+                    "input": None,
+                    "output": None,
+                    "scaling": None,
+                    "name": "parent_id"
+                }
+            OmegaConf.set_struct(self.catalog, True)
 
         try:
-            particles = sw.load(path)
-            nested_particle_fields = self._get_nested_keys(self.catalog.fields.particles)
-            data = self.__validate_and_process_fields(particles, nested_particle_fields, super_key='particles')
+            part_types = self.particle_fields
+            data = {}
 
-            if len(data) > 0:
-                logger.debug(f"Particle data fetched successfully, particles retrieved")
-            else:
-                logger.warning(f"No particle data found for subhalo {subhalo_id}.")
+            type_mask = {}
+            # Build particles mask
+            for part_type in part_types:
+                particles_of_type = getattr(self.particles, part_type)
+                # Mask to get particles belonging to the primary subhalo
+                particles_mask_primary = particles_of_type.halo_catalogue_index == subhalo_id
+                type_mask[part_type] = particles_mask_primary
 
             particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
             filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
+            particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
+            data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
+                                                     mask=type_mask)
             table = 'particles'
             steps = [
                 lambda particles: convert_to_dataframe(data),
@@ -1187,7 +1220,18 @@ class FlamingoFetcher(DataFetcher):
 
             processed_particles = run_pipeline(data, steps)
             logger.debug("Halo data fetched successfully.")
-            particle_data = SubhaloParticles(processed_particles, self.catalog.fields.particles)
+
+            # SubhaloParticles is expecting a dict with part_types - df
+            d = {}
+            columns = list(processed_particles.columns)
+            for part_type in part_types:
+                filtered_columns = [column for column in columns if part_type in column]
+                renamed_columns = [column.replace(f'{part_type}.', '') for column in filtered_columns]
+                rename_dict = dict(zip(filtered_columns, renamed_columns))
+                tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
+                d[part_type] = tmp
+
+            particle_data = SubhaloParticles(d, self.catalog.fields.particles)
             return particle_data
         except Exception as e:
             raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
