@@ -9,10 +9,9 @@ snapnum: 73          # redshift 0.2
 simulation_code: L1000N0900
 path: ${paths.datasets_dir}/flamingo/L1000N0900
 
-fov: 526.68
 # https://flamingo.strw.leidenuniv.nl/simulations.html
 spatial_resolution: 44.6  # kpc from the documentation "comoving" spatial resolution
-bin_spatial_resolution_scale: 2.5      # bin_size = spatial_resolution * 1.8
+bin_spatial_resolution_scale: 2      # bin_size = spatial_resolution * 1.8
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320

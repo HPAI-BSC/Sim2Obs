@@ -17,13 +17,12 @@ path: ${paths.datasets_dir}/eagle/RefL0050N0752
 #path: ${paths.datasets_dir}/eagle/RefL0100N1504
 
 
-fov: 537.62   # 2 * 268.81 kpc
-spatial_resolution: 3.1460082737656747 # kpc # TODO see if this changes for our interest sim
+spatial_resolution: 2.66  # kpc # TODO see if this changes for our interest sim
 # bin_size = spatial_resolution * 1 ->
 # ensure that bins use a proper resolution,
 #bin_size > spatial resolution *1.5-2 times
 # bin_size = 3.6, sp resolution = 2.02
-bin_spatial_resolution_scale: 1
+bin_spatial_resolution_scale: 2
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320

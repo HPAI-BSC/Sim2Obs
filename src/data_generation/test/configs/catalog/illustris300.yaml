@@ -3,8 +3,14 @@ subhalo_error_id: 4294967295
 snapnum: 84       # redshift 0.2
 a: 0.8333     # redshift 0.2
 H: 0.6774
-fov: 526.68   # 2 * 263.34 kpc
-spatial_resolution: 2.02 # kpc
+
+
+spatial_resolution: 1.480 # kpc
+# bin_size = spatial_resolution * 1 ->
+# ensure that bins use a proper resolution,
+#bin_size > spatial resolution *1.5-2 times
+# bin_size = 3.6, sp resolution = 2.02
+bin_spatial_resolution_scale: 2
 path: ${paths.datasets_dir}/illustris300
 
 
