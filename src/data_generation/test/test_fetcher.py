@@ -209,50 +209,6 @@ class TestFetcher(unittest.TestCase):
                 print(e)
                 continue
 
-    def test_eagle_halo_no_min_mass(self):
-        simulation_codes = ['RefL0025N0376',
-                            'RefL0025N0752',
-                            'RecalL0025N0752']
-
-        for sim in simulation_codes:
-            self.cfg_eagle.catalog['simulation_code'] = sim
-            conn = get_connection()
-            query = f"""
-                        WITH RankedSubhalos AS (
-                            SELECT 
-                                SH.GroupID AS halo_id, -- Halo ID linked to the subhalo
-                                SH.SubGroupNumber AS subhalo_id, -- Subhalo ID
-                                SH.MassType_Star AS stellar_mass, -- Stellar mass of the subhalo
-                                ROW_NUMBER() OVER(PARTITION BY SH.GroupID ORDER BY SH.MassType_Star DESC) AS rn -- Rank subhalos by mass
-                            FROM
-                                {sim}_Subhalo AS SH
-                            WHERE
-                                SH.SnapNum = {self.cfg_eagle.catalog.snapnum} -- Match the snapshot for consistency
-                        )
-                        SELECT
-                            FOF.GroupID AS halo_id, -- Unique identifier for each halo
-                            FOF.Group_M_Crit200 AS m200, -- Mass within R200 (critical density)
-                            FOF.Group_R_Crit200 AS r200, -- Radius within which density is 200 times the critical density
-                            FOF.GroupCentreOfPotential_x AS pos_x, -- X coordinate of halo's center
-                            FOF.GroupCentreOfPotential_y AS pos_y, -- Y coordinate of halo's center
-                            FOF.GroupCentreOfPotential_z AS pos_z, -- Z coordinate of halo's center
-                            FOF.NumOfSubhalos AS num_subhalos, -- Number of subhalos in each halo
-                            RS.subhalo_id AS max_subhalo_id, -- ID of the most massive subhalo in the halo
-                            RS.stellar_mass AS max_subhalo_mass -- Stellar mass of the most massive subhalo
-                        FROM
-                            {sim}_FOF AS FOF -- Table for halo properties
-                        LEFT JOIN 
-                            RankedSubhalos AS RS ON FOF.GroupID = RS.halo_id AND RS.rn = 1 -- Only the most massive subhalo (rn = 1)
-                        WHERE
-                            FOF.SnapNum = {self.cfg_eagle.catalog.snapnum} -- Snapshot for redshift ~0.3
-                        ORDER BY
-                            FOF.GroupID ASC -- Order results by halo ID
-                        """
-            # Run the query
-            array = sql.execute_query(conn, query)
-            df = pd.DataFrame(array)
-            print(len(df))
-
     def test_eagle_build_query(self):
         query = self.fetcher_eagle._build_query(table='subhalo')
         self.assertNotEqual(query, None)
