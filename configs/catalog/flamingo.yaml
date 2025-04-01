@@ -1,0 +1,75 @@
+name: flamingo
+
+a: 0.8333333333333335
+H: 0.6774 # Different from theirs
+g: 1.989e43
+
+snapnum: 73          # redshift 0.2
+
+simulation_code: L1000N0900
+path: ${paths.datasets_dir}/flamingo/L1000N0900
+
+fov: 526.68
+# https://flamingo.strw.leidenuniv.nl/simulations.html
+spatial_resolution: 44.6  # kpc from the documentation "comoving" spatial resolution
+bin_spatial_resolution_scale: 2.5      # bin_size = spatial_resolution * 1.8
+
+# Add per each feature its unit conversion + scalf, hubble (mandatory)
+# https://arxiv.org/pdf/1510.01320
+fields:
+  halo:
+    spherical_overdensity_200_crit:
+      total_mass:
+        input: "Msun"
+        output: "Msun/h"
+        scaling: "x * h"
+        name: 'm200'
+        # Final unit measures
+        filter: [ "> 1e13 * 0.6774" ]
+      soradius:
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * h"
+        name: 'r200'
+    input_halos:
+      halo_centre:
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * h"
+        name: 'gpos'
+  subhalo:
+    input_halos:
+      halo_centre:
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * 1e3 * a * h"
+        name: "spos"
+    bound_subhalo:
+      stellar_mass:
+        input: "Msun"
+        output: "Msun"
+        scaling: "x"
+        name: "mstr"
+        filter: "> 1e10"
+      half_mass_radius_stars:
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * h"
+        name: 'shmr'
+  particles:
+    stars:
+      coordinates:
+        input: "kpc"
+        output: "kpc/h"
+        scaling: "x * h"
+        name: "p"
+      velocities:
+        input: "km/s"
+        output: "km/s"
+        scaling: "x"
+        name: "v"
+      masses:
+        input: "Msun"
+        output: "Msun/h"
+        scaling: "x * h"
+        name: "m"

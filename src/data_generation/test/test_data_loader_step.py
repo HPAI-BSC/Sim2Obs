@@ -15,35 +15,38 @@ load_dotenv('../.env')
 
 class TestDataLoaderStep(unittest.TestCase):
     def setUp(self):
-        with initialize(config_path="configs"):
+        with initialize(config_path="'../../../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
             self.cfg_big_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
+            self.cfg_flamingo = compose(config_name="data_generation.yaml")
 
             # Load the local config for paths and assign them
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_illustris.paths = local_config.paths
             self.cfg_big_illustris.paths = local_config.paths
             self.cfg_eagle.paths = local_config.paths
+            self.cfg_flamingo.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_big_illustris.catalog = compose("catalog/bigillustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
+            self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
 
-            # Illustris objs
-            with open("data/illustris/subhalo_particles_0.pkl", "rb") as file:
-                self.subhalo_particles_illustris = pickle.load(file)
+        # Illustris objs
+        with open("data/illustris/subhalo_particles_0.pkl", "rb") as file:
+            self.subhalo_particles_illustris = pickle.load(file)
 
-            with open("data/illustris/halo_0.pkl", "rb") as file:
-                self.halo_illustris = pickle.load(file)
+        with open("data/illustris/halo_0.pkl", "rb") as file:
+            self.halo_illustris = pickle.load(file)
 
-            # Eagle objs
-            with open("data/eagle/subhalo_particles_0.pkl", "rb") as file:
-                self.subhalo_particles_eagle = pickle.load(file)
+        # Eagle objs
+        with open("data/eagle/subhalo_particles_0.pkl", "rb") as file:
+            self.subhalo_particles_eagle = pickle.load(file)
 
-            with open("data/eagle/halo_0.pkl", "rb") as file:
-                self.halo_eagle = pickle.load(file)
+        with open("data/eagle/halo_0.pkl", "rb") as file:
+            self.halo_eagle = pickle.load(file)
 
     def test_load_halo_subhalo_data_illustris(self):
         self.dataLoader = DataLoader(self.cfg_illustris)
@@ -58,6 +61,16 @@ class TestDataLoaderStep(unittest.TestCase):
         self.dataLoader = DataLoader(self.cfg_eagle)
         result = list(self.dataLoader.load_halo_subhalo_data())
         self.assertEqual(len(result), 21)
+
+        for halo_df, subhalo_df in result:
+            self.assertIsInstance(halo_df, Halo)
+            self.assertIsInstance(subhalo_df, SubhaloContext)
+
+    # Not checked (too big)
+    def test_load_halo_data_flamingo(self):
+        self.dataLoader = DataLoader(self.cfg_flamingo)
+        result = list(self.dataLoader.load_halo_subhalo_data())
+        self.assertEqual(len(result), 128967)
 
         for halo_df, subhalo_df in result:
             self.assertIsInstance(halo_df, Halo)

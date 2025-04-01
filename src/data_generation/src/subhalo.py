@@ -5,7 +5,7 @@ import pandas as pd
 from omegaconf import DictConfig
 
 from src.data_generation.src.halo import HaloContext, Halo
-from src.data_generation.src.utils import rotate, dict_depth
+from src.data_generation.src.utils import rotate, dict_depth, setup_logger
 
 
 class SubHalo:
@@ -80,6 +80,8 @@ class SubhaloContext:
     subhalo_id:
         Property to retrieve the `subhalo_id` column from the stored DataFrame.
     """
+    logger = setup_logger("SubhaloContext")
+
     def __init__(self, df: pd.DataFrame, column_map) -> None:
         """
         Initialize the SubhaloContext with properties of subhalos.
@@ -121,10 +123,21 @@ class SubhaloContext:
             self.data.set_index(["id_parents", "subhalo_id"], inplace=True, drop=False)
 
     def preprocess(self, halo_context: HaloContext):
-        # Add missing columns
+        """
+        Preprocesses the subhalo data based on the halo context, including normalizing positions.
+
+        Parameters:
+        -----------
+        halo_context : HaloContext
+            A HaloContext object providing necessary information for preprocessing.
+        """
+        # TODO Add missing columns
         for id_halo in halo_context.halo_id:
             halo = halo_context.get_halo_by_id(id_halo)
             indexing = self.data['id_parents'] == id_halo
+            is_full_false = np.sum(indexing)
+            if is_full_false == 0:
+                logger.warning(f'No subhalos found for: {id_halo}')
             if hasattr(halo, 'group_number'):
                 indexing &= self.data['group_number'] == halo.group_number
             if 'spos' in self.data:
@@ -133,6 +146,18 @@ class SubhaloContext:
             # ...
 
     def rotate(self, z, axis, degree):
+        """
+        Rotates the subhalo positions based on the provided parameters.
+
+        Parameters:
+        -----------
+        z : float
+            Z-axis parameter for rotation.
+        axis : np.ndarray
+            Axis of rotation.
+        degree : float
+            Angle of rotation in degrees.
+        """
         if 'spos' in self.data.columns:
             spos = np.array(self.data['spos'].tolist())
             subhalos_spos = rotate(z, axis, degree, spos)
@@ -140,9 +165,35 @@ class SubhaloContext:
 
     @classmethod
     def from_dataframe(cls, df: pd.DataFrame):
+        """
+        Creates an instance of SubhaloContext from a DataFrame.
+
+        Parameters:
+        -----------
+        df : pd.DataFrame
+            DataFrame containing the subhalo data.
+
+        Returns:
+        --------
+        SubhaloContext
+            A SubhaloContext object initialized from the provided DataFrame.
+        """
         return SubhaloContext(df, None)
 
     def __getitem__(self, index):
+        """
+        Retrieves a sliced portion of the data as a new SubhaloContext.
+
+        Parameters:
+        -----------
+        index : slice or list
+            Indexing parameters to slice the data.
+
+        Returns:
+        --------
+        SubhaloContext
+            A new SubhaloContext object containing the sliced data.
+        """
         return SubhaloContext.from_dataframe(self.data[index])  # Return a new instance with sliced data
 
     def get_subhalo_by_id(self, subhalo_id, halo_id=None) -> SubHalo:
@@ -251,12 +302,18 @@ class SubhaloParticles:
     """
     def __init__(self, data: dict, column_map: DictConfig) -> None:
         """
-        Initialize the SubhaloParticles with mass, position, and velocity data.
+        Initialize the SubhaloParticles object with particle mass, position, and velocity data.
 
         Parameters:
         -----------
-        ..
+        data : dict
+            Dictionary containing particle data for different particle types.
+        column_map : DictConfig
+            Mapping of column names for each particle type.
         """
+        # TODO complete
+        fix_names = {'stars': 'star', 'dark_matter': 'dm'}
+
         if column_map is None:
             if dict_depth(data) == 1:
                 for var in data:
@@ -275,7 +332,7 @@ class SubhaloParticles:
                             value = value.to_numpy()
                         elif isinstance(value, list):
                             value = np.array(value)
-                        setattr(self, f'{part_type}_{var}', value)
+                        setattr(self, f'{fix_names.get(part_type, part_type)}_{var}', value)
         else:
             for part_type in data:
                 for var in data[part_type]:
@@ -287,15 +344,35 @@ class SubhaloParticles:
                             value = np.array(value)
                         name = column_map[part_type][var].name
                         # Add attr with that provided name
-                        setattr(self, f'{part_type}_{name}', value)
+                        setattr(self, f'{fix_names.get(part_type, part_type)}_{name}', value)
 
     def preprocess(self, halo: Halo):
+        """
+        Preprocesses the particle data, such as normalizing positions.
+
+        Parameters:
+        -----------
+        halo : Halo
+            The Halo object that provides the necessary data for preprocessing.
+        """
         # Normalize positions respect to the center of its halo
         if hasattr(self, 'star_p'):
             self.star_p = self.star_p - halo.gpos
         # ...
 
     def rotate(self, z, axis, degree):
+        """
+        Rotates the particle positions based on the provided parameters.
+
+        Parameters:
+        -----------
+        z : float
+            Z-axis parameter for rotation.
+        axis : np.ndarray
+            Axis of rotation.
+        degree : float
+            Angle of rotation in degrees.
+        """
         if hasattr(self, 'star_p'):
             self.star_p = rotate(z, axis, degree, self.star_p)
 

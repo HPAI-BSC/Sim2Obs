@@ -1,18 +1,21 @@
+import copy
 import operator
 import os.path
 from abc import ABC, abstractmethod
 from typing import Any
+import swiftsimio as sw
 
 import eagleSqlTools as sql
 import numpy as np
 import pandas as pd
 import illustris_python as il
 from omegaconf import DictConfig, ListConfig, OmegaConf
+from swiftsimio import SWIFTDataset
 
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion, \
-    dict_depth
+    dict_depth, to_list_in_batches
 
 logger = setup_logger("DataFetcher")
 
@@ -27,7 +30,19 @@ operators = {
 
 
 def pipeline_step(func):
-    """Decorator to apply a transformation in a pipeline sequence."""
+    """
+    Decorator to apply a transformation in a pipeline sequence.
+
+    Parameters:
+    -----------
+    func : function
+        The function to be wrapped as a pipeline step.
+
+    Returns:
+    --------
+    function
+        A wrapper function that applies the transformation.
+    """
     def wrapper(data, *args, **kwargs):
         if data is None:
             return None  # Stop processing if data is None
@@ -37,17 +52,54 @@ def pipeline_step(func):
 
 @pipeline_step
 def assign_id(d: dict, id_column: str):
-    """Assign an ID to each subhalo/halo."""
+    """
+    Assign an ID to each subhalo/halo.
+
+    Parameters:
+    -----------
+    d : dict
+        Dictionary containing the dataset.
+    id_column : str
+        Column name where IDs will be assigned.
+
+    Returns:
+    --------
+    dict or None
+        Updated dictionary with assigned IDs, or None if the input is empty.
+    """
     if len(d) == 0:
         return None
-    d[id_column] = np.arange(d['count'])
+
+    if 'count' in d:
+        d[id_column] = np.arange(d['count'])
+    else:
+        first_key = next(iter(d))
+        num = len(d[first_key])
+        d[id_column] = np.arange(num)
     return d
 
 
 @pipeline_step
 def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConfig):
-    """Validates fields, applies indexing, and converts multi-dimensional arrays."""
+    """
+    Validates fields, applies indexing, and converts multi-dimensional arrays.
 
+    Parameters:
+    -----------
+    d : dict
+        Dictionary containing the dataset.
+    fields : list
+        List of fields to validate and process.
+    table : str
+        Name of the table being processed.
+    cfg : DictConfig
+        Configuration object defining field properties.
+
+    Returns:
+    --------
+    dict
+        Processed dataset with indexed and converted fields.
+    """
     for key in list(d.keys()):
         if key in fields:
             field_info = OmegaConf.select(cfg, f"fields.{table}.{key}")
@@ -91,7 +143,21 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
 
 @pipeline_step
 def convert_to_dataframe(d: dict):
-    """Convert dictionary to Pandas DataFrame."""
+    """
+    Convert dictionary to Pandas DataFrame.
+
+    Parameters:
+    -----------
+    d : dict
+        Dictionary containing the dataset.
+
+    Returns:
+    --------
+    pd.DataFrame or dict
+        Converted DataFrame if input is 1-level deep,
+        dictionary of DataFrames if 2 levels deep,
+        otherwise raises a ValueError.
+    """
     if dict_depth(d) == 1:
         return pd.DataFrame.from_dict(d)
     elif dict_depth(d) == 2:
@@ -102,13 +168,38 @@ def convert_to_dataframe(d: dict):
         raise ValueError(f'The format of the data is not correct, {dict_depth(d)} levels of data detected.')
 
 
-def apply_filter_df(d, conditions):
+def apply_filter_df(d, conditions, config):
+    """
+    Apply filtering conditions to a Pandas DataFrame.
+
+    Parameters:
+    -----------
+    d : pd.DataFrame
+        The DataFrame to be filtered.
+    conditions : dict
+        Dictionary specifying filtering conditions for each column.
+    config : DictConfig
+        Configuration object containing predefined filter expressions.
+
+    Returns:
+    --------
+    pd.DataFrame
+        Filtered DataFrame based on the specified conditions.
+
+    Raises:
+    -------
+    Exception
+        If a specified feature in `conditions` is not present in the DataFrame.
+    """
     if isinstance(d, pd.DataFrame):
         mask = pd.Series(True, index=d.index)
         for key, condition in conditions.items():
             if key not in d.columns:
                 raise Exception(f'Error, feature "{key}" is not present in the halo dataframe with columns:'
                                 f' {d.columns}')
+
+            condition = OmegaConf.select(config, key)
+
             if isinstance(condition.filter, ListConfig):
                 for expr in condition.filter:
                     if isinstance(expr, str):
@@ -126,18 +217,51 @@ def apply_filter_df(d, conditions):
 
 
 @pipeline_step
-def apply_filters(d: Any, conditions: dict):
+def apply_filters(d: Any, conditions: dict, config: DictConfig):
+    """
+    Apply filtering conditions to data.
+
+    Parameters:
+    -----------
+    d : Any
+        Data to be filtered (dictionary or DataFrame).
+    conditions : dict
+        Dictionary of filtering conditions.
+    config : DictConfig
+        Configuration object defining filter rules.
+
+    Returns:
+    --------
+    Any
+        Filtered data, either as a DataFrame or dictionary of DataFrames.
+    """
     if isinstance(d, pd.DataFrame):
-        return apply_filter_df(d, conditions)
+        return apply_filter_df(d, conditions, config)
     elif isinstance(d, dict):
         for key in d:
-            d[key] = apply_filter_df(d[key], conditions.get(key, {}))
+            d[key] = apply_filter_df(d[key], conditions.get(key, {}), config)
         return d
 
 
 @pipeline_step
-def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig):
-    """Apply unit conversions based on the catalog scaling factors."""
+def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig, **kwargs):
+    """
+    Apply filtering conditions to data.
+
+    Parameters:
+    -----------
+    d : Any
+        Data to be filtered (dictionary or DataFrame).
+    conditions : dict
+        Dictionary of filtering conditions.
+    config : DictConfig
+        Configuration object defining filter rules.
+
+    Returns:
+    --------
+    Any
+        Filtered data, either as a DataFrame or dictionary of DataFrames.
+    """
     for key in fields:
         if key in df:
             field_info = OmegaConf.select(cfg, f"fields.{table}.{key}")
@@ -146,7 +270,8 @@ def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig):
                 for key_ii in field_info:
                     field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
                     if field_info_ii.scaling is not None:
-                        df[key][key_ii] = apply_conversion(df[key][key_ii], field_info_ii.scaling, cfg.a, cfg.H)
+                        df[key][key_ii] = apply_conversion(df[key][key_ii], field_info_ii.scaling, cfg.a, cfg.H,
+                                                           **kwargs)
             else:
                 if field_info.scaling is not None:
                     df[key] = apply_conversion(df[key], field_info.scaling, cfg.a, cfg.H)
@@ -154,7 +279,21 @@ def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig):
 
 
 def run_pipeline(data, steps):
-    """Executes a list of transformation steps sequentially."""
+    """
+    Executes a list of transformation steps sequentially.
+
+    Parameters:
+    -----------
+    data : Any
+        The input data to be processed.
+    steps : list
+        List of functions representing the pipeline steps.
+
+    Returns:
+    --------
+    Any
+        Transformed data after applying the pipeline.
+    """
     for step in steps:
         data = step(data)  # Each function modifies `data`
         if data is None:
@@ -194,21 +333,151 @@ class DataFetcher(ABC):
     def _get_fields(self):
         pass
 
+    def __get_attr_recursive(self, config, attr_name, parent_key="", branch={}):
+        """
+        Recursively extract a specified attribute from a nested configuration dictionary.
+
+        Parameters:
+        -----------
+        config : dict
+            Dictionary containing the configuration structure.
+        attr_name : str
+            Attribute name to extract from the nested dictionary.
+        parent_key : str, optional
+            Prefix used to maintain full key paths (default: "").
+        branch : dict, optional
+            Dictionary to store extracted key-value pairs (default: {}).
+
+        Returns:
+        --------
+        dict
+            Dictionary mapping full key paths to their corresponding attribute values.
+        """
+        for key, value in config.items():
+            full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
+            if dict_depth(value) > 1:
+                self.__get_attr_recursive(value, attr_name, parent_key=f"{full_key}.", branch=branch)
+            else:
+                branch[full_key] = value.get(attr_name)
+        return branch
+
+    def _get_attr(self, config, attr_name, parent_key=""):
+        """
+        Extract a specified attribute from a nested dictionary.
+
+        Parameters:
+        -----------
+        config : dict
+            Dictionary containing the configuration structure.
+        attr_name : str
+            Attribute name to extract from the dictionary.
+        parent_key : str, optional
+            Prefix used to maintain full key paths (default: "").
+
+        Returns:
+        --------
+        dict
+            Dictionary mapping full key paths to their corresponding attribute values.
+        """
+        dict_branchs = {}
+        for key, value in config.items():
+            full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
+            if dict_depth(value) > 1:
+                branch = {}
+                self.__get_attr_recursive(value, parent_key=f"{full_key}.", attr_name=attr_name, branch=branch)
+                dict_branchs.update(branch)
+            else:
+                # non-recursive case
+                attr_value = value.get(attr_name)
+                dict_branchs[full_key] = attr_value
+        return dict_branchs
+
+    def __explore_branch(self, config, parent_key=""):
+        """
+        Recursively retrieve all keys up to the first level of fields in a nested dictionary.
+
+        Parameters:
+        -----------
+        config : dict
+            Dictionary containing the configuration structure.
+        parent_key : str, optional
+            Prefix used to maintain full key paths (default: "").
+
+        Returns:
+        --------
+        list
+            List of keys found in the configuration up to the first level.
+        """
+        keys = []
+        for key, value in config.items():
+            full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
+            if dict_depth(value) > 1:
+                keys.append(full_key)
+                self._get_nested_keys(value, parent_key=f"{full_key}.")
+            else:
+                keys.append(full_key)
+        return keys
+
+    def _get_nested_keys(self, config, parent_key=""):
+        """
+        Recursively retrieve all keys from a nested dictionary.
+
+        Parameters:
+        -----------
+        config : dict
+            Dictionary containing the configuration structure.
+        parent_key : str, optional
+            Prefix used to maintain full key paths (default: "").
+
+        Returns:
+        --------
+        list
+            List of all keys found in the nested configuration.
+        """
+        keys_branchs = []
+        for key, value in config.items():
+            full_key = f"{parent_key}{key}" if parent_key else key  # Construct the full key
+            if dict_depth(value) > 1:
+                keys = self.__explore_branch(value, parent_key=f"{full_key}.")
+                keys_branchs.extend(keys)
+            else:
+                # Non recursive case
+                keys_branchs.append(full_key)
+        return keys_branchs
+
     def __build_config(self, **kwargs):
+        """
+        Build and initialize the configuration for halo, subhalo, and particle fields.
+
+        This method extracts relevant field names, creates key-value mappings,
+        and sets instance attributes based on provided keyword arguments.
+
+        Parameters:
+        -----------
+        **kwargs : dict
+            Additional attributes to set dynamically on the instance.
+
+        Raises:
+        -------
+        ValueError
+            If the catalog does not contain a 'fields' attribute.
+        """
         self.fields = self._get_fields()
 
         fields = getattr(self.catalog, "fields", None)
         if not fields:
             raise ValueError("The catalog must contain a 'fields' attribute.")
 
-        self.halo_fields = list(self.catalog.fields.halo.keys())
-        self.subhalo_fields = list(self.catalog.fields.subhalo.keys())
-        self.particle_fields = list(self.catalog.fields.particles.keys())
-        self.column_map = {
-            column: data['name']
-            for group in [self.catalog.fields.halo, self.catalog.fields.subhalo]
-            for column, data in group.items()
-        }
+        self.halo_fields = self._get_nested_keys(self.catalog.fields.halo)
+        self.subhalo_fields = self._get_nested_keys(self.catalog.fields.subhalo)
+        particle_fields = self._get_nested_keys(self.catalog.fields.particles)
+        self.particle_fields = set([p.split('.')[0] for p in particle_fields])
+
+        kv_halo = self._get_attr(self.catalog.fields.halo, attr_name='name')
+        kv_subhalo = self._get_attr(self.catalog.fields.subhalo, attr_name='name')
+        kv_particles = self._get_attr(self.catalog.fields.particles, attr_name='name')
+
+        self.column_map = kv_halo | kv_subhalo | kv_particles
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -238,6 +507,8 @@ class DataFetcherFactory:
             return Illustris300Fetcher(catalog, **kwargs)
         elif catalog.name == "eagle":
             return EagleFetcher(catalog, **kwargs)
+        elif catalog.name == "flamingo":
+            return FlamingoFetcher(catalog, **kwargs)
         else:
             raise ValueError(f"Unsupported catalog={catalog.name} type")
 
@@ -259,6 +530,25 @@ class Illustris300Fetcher(DataFetcher):
         logger.info(f"Illustris300Fetcher initialized with config: {catalog}")
 
     def _get_fields(self):
+        """
+        Retrieve all available halo and subhalo fields from the simulation data.
+
+        This method loads the halo and subhalo field names from the Illustris group catalog
+        and returns a combined list of available fields.
+
+        Returns:
+        --------
+        list
+            A list containing all field names from the halo and subhalo datasets.
+
+        Notes:
+        ------
+        - The method retrieves data from the `output` directory of the catalog.
+        - Uses `il.groupcat.loadHalos` and `il.groupcat.loadSubhalos` to extract field names.
+        - Assumes that `self.catalog.path` points to the dataset's directory and that `self.catalog.snapnum`
+          specifies the snapshot number.
+
+        """
         path = self.catalog.path + '/output'
         halo_fields = list(il.groupcat.loadHalos(path, self.catalog.snapnum, fields=None).keys())
         subhalo_fields = list(il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=None).keys())
@@ -349,8 +639,8 @@ class Illustris300Fetcher(DataFetcher):
                 lambda halos: assign_id(halos, 'halo_id'),
                 lambda halos: validate_and_process_fields(halos, self.halo_fields, table, self.catalog),
                 lambda halos: convert_to_dataframe(halos),
-                lambda halos: apply_filters(halos, halo_conditions),
-                lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog)
+                lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog),
+                lambda halos: apply_filters(halos, halo_conditions, self.catalog.fields.halo)
             ]
 
             processed_halos = run_pipeline(halos, steps)
@@ -406,8 +696,8 @@ class Illustris300Fetcher(DataFetcher):
                 lambda subhalos: assign_id(subhalos, 'subhalo_id'),
                 lambda subhalos: validate_and_process_fields(subhalos, self.subhalo_fields, table, self.catalog),
                 lambda subhalos: convert_to_dataframe(subhalos),
-                lambda subhalos: apply_filters(subhalos, subhalo_conditions),
-                lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog)
+                lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog),
+                lambda subhalos: apply_filters(subhalos, subhalo_conditions, self.catalog.fields.subhalo)
             ]
 
             processed_subhalos = run_pipeline(subhalos, steps)
@@ -470,8 +760,8 @@ class Illustris300Fetcher(DataFetcher):
                 lambda particles: validate_and_process_fields(particles, self.particle_fields, table,
                                                               self.catalog),
                 lambda particles: convert_to_dataframe(particles),
-                lambda particles: apply_filters(particles, particle_conditions),
-                lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog)
+                lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+                lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles)
             ]
 
             processed_particles = run_pipeline(data, steps)
@@ -553,27 +843,47 @@ class EagleFetcher(DataFetcher):
         pass
 
     def _build_query(self, table):
-        def _build_conditions(conditions, table) -> str:
-            expr = ''
-            for key, value in conditions.items():
-                if isinstance(value.filter, ListConfig):
-                    for elem in value.filter:
-                        symbol = elem.split(' ')[0]
-                        value = eval(elem.split(' ')[1])
-                        expr += f'{table}.{key} {symbol} {value} AND '
-                elif isinstance(value.filter, str):
-                    symbol = value.filter.split(' ')[0]
-                    value = eval(value.filter.split(' ')[1])
-                    expr += f'{table}.{key} {symbol} {value} AND '
-            return expr[:-4]
+        """
+        Construct an SQL query to retrieve halo or subhalo properties from the simulation database.
 
-        query = None
-        halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
-        halo_conditions = _build_conditions(halo_conditions, table='FOF')
+        This method generates an SQL query based on the specified table type (`halo` or `subhalo`)
+        and incorporates fields defined in the object's configuration.
 
-        subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
-        subhalo_conditions = _build_conditions(subhalo_conditions, table='SH')
+        Parameters:
+        -----------
+        table : str
+            The name of the table to query, either `'halo'` or `'subhalo'`.
 
+        Returns:
+        --------
+        str
+            The complete SQL query string.
+
+        Raises:
+        -------
+        ValueError
+            If the provided `table` argument is not `'halo'` or `'subhalo'`.
+
+        Notes:
+        ------
+        - For `table='halo'`, the query retrieves:
+            - `halo_id`: Unique identifier for each halo (`FOF.GroupID`).
+            - Additional halo properties dynamically included from `self.halo_fields`.
+            - `group_number`: Links to the FoF group.
+            - `subhalo_id`: Identifier of the most massive subhalo.
+            - `subhalo_mass`: Mass of the most massive subhalo.
+
+        - For `table='subhalo'`, the query retrieves:
+            - `halo_id`: Identifier of the parent halo.
+            - `subhalo_id`: Identifier of the subhalo.
+            - `group_number`: Links to the FoF group.
+            - Additional subhalo properties dynamically included from `self.subhalo_fields`.
+            - `m200`: The mass within `R200` of the halo.
+
+        - Queries filter results based on the snapshot number (`SnapNum`) to ensure consistency
+          with a specific redshift.
+        - The results for subhalos are ordered by `SubGroupNumber` in ascending order.
+        """
         if table == 'halo':
             header = '''
             SELECT 
@@ -604,12 +914,10 @@ class EagleFetcher(DataFetcher):
                                             FROM {self.catalog.simulation_code}_Subhalo AS SH2
                                             WHERE SH2.GroupID = SH.GroupID
                                             AND SH.SnapNum = {self.catalog.snapnum} 
-                                            AND {subhalo_conditions}
                                         )
                                 ) AS SH ON FOF.GroupID = SH.GroupID
                             WHERE 
                                 FOF.SnapNum = {self.catalog.snapnum} -- Snapshot for redshift ~0.2
-                                AND {halo_conditions}
                             """
             query = header + query
             return query
@@ -626,21 +934,20 @@ class EagleFetcher(DataFetcher):
                     header += f'SH.{column} AS {column},                     -- ... \n'
 
             query = f"""
-                        FOF.Group_M_Crit200 AS m200 -- Halo mass within R200
-                        FROM
-                            {self.catalog.simulation_code}_FOF AS FOF -- Halo properties
-                        JOIN
-                            {self.catalog.simulation_code}_Subhalo AS SH -- Subhalo properties
-                        ON 
-                            FOF.GroupID = SH.GroupID -- Match subhalos to their parent halos
-                        WHERE
-                            SH.SnapNum = {self.catalog.snapnum} -- Snapshot for redshift ~0.2
-                            AND {halo_conditions} AND {subhalo_conditions}
-                        ORDER BY
-                            SH.SubGroupNumber ASC -- Order results by subhalo id
-                        """
+                    FOF.Group_M_Crit200 AS m200 -- Halo mass within R200
+                    FROM
+                        {self.catalog.simulation_code}_FOF AS FOF -- Halo properties
+                    JOIN
+                        {self.catalog.simulation_code}_Subhalo AS SH -- Subhalo properties
+                    ON 
+                        FOF.GroupID = SH.GroupID -- Match subhalos to their parent halos
+                    WHERE
+                        SH.SnapNum = {self.catalog.snapnum} -- Snapshot for redshift ~0.2
+                    ORDER BY
+                        SH.SubGroupNumber ASC -- Order results by subhalo id
+                    """
             query = header + query
-        return query
+            return query
 
     def _get_halos(self) -> HaloContext:
         """
@@ -662,13 +969,10 @@ class EagleFetcher(DataFetcher):
 
             # Run the query
             array = sql.execute_query(conn, query)
-            df = pd.DataFrame(array)
-
-            os.mkdir(path)
-            df.to_csv(os.path.join(path, 'fof.csv'), index=False)
+            halos = pd.DataFrame(array)
         else:
             logger.info(f"Reading from files ...")
-            df = pd.read_csv(os.path.join(path, 'fof.csv'))
+            halos = pd.read_csv(os.path.join(path, 'fof.csv'))
 
         if 'GroupNumber' not in self.halo_fields:
             self.subhalo_fields.append('GroupNumber')
@@ -682,17 +986,20 @@ class EagleFetcher(DataFetcher):
             OmegaConf.set_struct(self.catalog, True)
             self.column_map['GroupNumber'] = 'group_number'
 
-        if len(df) > 0:
-            df = df.sort_values(by='halo_id')
-            df['halo_id'] = df['halo_id'].astype(int)
-            for column in list(df.columns):
-                # Unit conversion
-                if column in self.halo_fields:
-                    if self.catalog.fields.halo[column].scaling is not None:
-                        df[column] = apply_conversion(df[column], self.catalog.fields.halo[column].scaling,
-                                                      self.catalog.a, self.catalog.H)
+        if len(halos) > 0:
+            # Use original names for later fitlering
+            halos = halos.sort_values(by='GroupID')
+            halos['GroupID'] = halos['GroupID'].astype(int)
 
-            halo_context = HaloContext(df, column_map=self.column_map)
+            table = 'halo'
+            halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
+
+            steps = [
+                lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog),
+                lambda halos: apply_filters(halos, halo_conditions, self.catalog.fields.halo)
+            ]
+            processed_halos = run_pipeline(halos, steps)
+            halo_context = HaloContext(processed_halos, column_map=self.column_map)
             logger.debug("Halo data fetched successfully.")
         else:
             logger.warning("No halo data found in Eagle database.")
@@ -718,17 +1025,14 @@ class EagleFetcher(DataFetcher):
 
             # Run the query
             array = sql.execute_query(conn, query)
-            df = pd.DataFrame(array)
-
-            os.mkdir(path)
-            df.to_csv(os.path.join(path, 'subhalo.csv'), index=False)
+            subhalos = pd.DataFrame(array)
         else:
             logger.info(f"Reading from files ...")
-            df = pd.read_csv(os.path.join(path, 'subhalo.csv'))
+            subhalos = pd.read_csv(os.path.join(path, 'subhalo.csv'))
 
         # Remove useless columns
-        df = df.drop(columns=['m200'])
-        df = df.rename(columns={'halo_id': 'id_parents'})
+        subhalos = subhalos.drop(columns=['Group_M_Crit200'])
+        subhalos = subhalos.rename(columns={'GroupID': 'id_parents'})
 
         if 'GroupNumber' not in self.halo_fields:
             self.subhalo_fields.append('GroupNumber')
@@ -754,16 +1058,18 @@ class EagleFetcher(DataFetcher):
             OmegaConf.set_struct(self.catalog, True)
             self.column_map['SubGroupNumber'] = 'subhalo_id'
 
-        if len(df) > 0:
-            df = df.sort_values(by='subhalo_id')
-            for column in list(df.columns):
-                # Unit conversion
-                if column in self.subhalo_fields:
-                    if self.catalog.fields.subhalo[column].scaling is not None:
-                        df[column] = apply_conversion(df[column], self.catalog.fields.subhalo[column].scaling,
-                                                      self.catalog.a, self.catalog.H)
-            df = df.sort_values(by=['subhalo_id', 'GroupNumber'])
-            subhalo_context = SubhaloContext(df, self.column_map)
+        if len(subhalos) > 0:
+            subhalos = subhalos.sort_values(by='SubGroupNumber')
+
+            table = 'subhalo'
+            subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
+            steps = [
+                lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog),
+                lambda subhalos: apply_filters(subhalos, subhalo_conditions, self.catalog.fields.subhalo)
+            ]
+            processed_subhalos = run_pipeline(subhalos, steps)
+            processed_subhalos = processed_subhalos.sort_values(by=['SubGroupNumber', 'GroupNumber'])
+            subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
             logger.debug("Subhalo data fetched successfully.")
         else:
             logger.warning("No subhalo data found in Eagle database.")
@@ -772,7 +1078,42 @@ class EagleFetcher(DataFetcher):
 
     @staticmethod
     def __partTypeNum(partType):
-        """ Mapping between common names and numeric particle types. """
+        """
+        Convert a particle type name into its corresponding numerical identifier.
+
+        This method maps common particle type names (such as 'gas', 'dm', 'stars', etc.)
+        to their respective numerical codes used in the simulation data.
+
+        Parameters:
+        -----------
+        partType : str or int
+            The particle type, either as a numeric identifier (0-5) or a string
+            representing the type (e.g., 'gas', 'stars', 'bh').
+
+        Returns:
+        --------
+        int
+            The numerical particle type corresponding to the given name.
+
+        Raises:
+        -------
+        Exception
+            If the provided particle type name is not recognized.
+
+        Notes:
+        ------
+        - The mapping is as follows:
+            - `0` : Gas (aliases: 'gas', 'cells')
+            - `1` : Dark Matter (aliases: 'dm', 'darkmatter')
+            - `2` : Low-resolution Dark Matter (alias: 'dmlowres', only in zoom simulations)
+            - `3` : Tracers (aliases: 'tracer', 'tracers', 'tracermc', 'trmc')
+            - `4` : Stars (aliases: 'star', 'stars', 'stellar') and Wind (alias: 'wind')
+            - `5` : Black Holes (aliases: 'bh', 'bhs', 'blackhole', 'blackholes')
+        - For stellar particles, those with `GFM_StellarFormationTime > 0` are considered stars,
+          while those with `GFM_StellarFormationTime < 0` are winds.
+        - If the input is already a digit, it is directly converted to an integer.
+
+        """
         if str(partType).isdigit():
             return int(partType)
 
@@ -800,7 +1141,7 @@ class EagleFetcher(DataFetcher):
         -----------
         subgroup_id : int
             The index of the subhalo from which to retrieve particle data.
-        halo_id: int
+        group_number: int
             The index of the halo where the subhalo belongs from
 
         Returns:
@@ -811,7 +1152,9 @@ class EagleFetcher(DataFetcher):
         try:
             path = self.catalog.path
             part_types = self.particle_fields
-            data = {}
+            particles = {}
+
+            # Read particles data and change format
             for part_type in part_types:
                 data_part_type = {}
                 itype = self.__partTypeNum(part_type)
@@ -837,19 +1180,14 @@ class EagleFetcher(DataFetcher):
 
                 for field in fields:
                     column = read_dataset(itype, field, path)
-                    if self.catalog.fields.particles[part_type][field].scaling is not None:
-                        scaling = self.catalog.fields.particles[part_type][field].scaling
-                        column = apply_conversion(column, scaling, self.catalog.a, self.catalog.H,
-                                                  g=self.catalog.g, g_2_solar=self.catalog.g_2_solar)
                     data_part_type[field] = column
-                    # TODO apply filters
-
                     # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
                     if column.ndim > 1:
                         converted = to_list(data_part_type, field)
                         del data_part_type[field]
                         data_part_type[field] = converted
 
+                # Filter by indexing
                 tmp = pd.DataFrame(data_part_type)
                 # Create index with these two columns for speed
                 tmp = tmp[(tmp["GroupNumber"] == group_number) & (tmp["SubGroupNumber"] == subgroup_id)]
@@ -858,17 +1196,443 @@ class EagleFetcher(DataFetcher):
                                  f'SubGroupNumber={subgroup_id}')
                     raise ValueError(f'Error, there is not particle data for GroupNumber={group_number} and'
                                      f' SubGroupNumber={subgroup_id}')
-                data[part_type] = tmp.to_dict(orient='list')
+                tmp = tmp.drop(columns=['GroupNumber', 'SubGroupNumber'])
+                particles[part_type] = tmp.to_dict(orient='list')
+
             else:
                 logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
 
-            subhalo_particles = SubhaloParticles(data, self.catalog.fields.particles)
+            table = 'particles'
+
+            particle_conditions = {}
+            for col, type_config in self.catalog.fields.particles.items():
+                for t in type_config:
+                    if 'filter' in type_config[t]:
+                        if col not in particle_conditions:
+                            particle_conditions[col] = {}
+                        particle_conditions[col][t] = type_config[t]
+
+            steps = [
+                lambda df: convert_to_dataframe(particles),
+                lambda df: apply_unit_conversion(df, self.particle_fields, table, self.catalog,
+                                                        g=self.catalog.g, g_2_solar=self.catalog.g_2_solar),
+                lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles)
+            ]
+            processed_particles = run_pipeline(particles, steps)
+            subhalo_particles = SubhaloParticles(processed_particles, self.catalog.fields.particles)
             return subhalo_particles
 
         except Exception as e:
             raise Exception(f'Something went wrong: {e}')
 
 
+class FlamingoFetcher(DataFetcher):
+    def __init__(self, catalog: DictConfig, **kwargs):
+        super().__init__(catalog, **kwargs)
+        self.fof_subhalos = None
+        self.particles = None
+        self.load_files()
+
+    def get_halos(self, *args, **kwargs) -> HaloContext:
+        """
+        Fetches the halo data.
+
+        Returns:
+        --------
+        HaloContext
+            A context object containing halo data.
+        """
+        logger.info("Fetching halo data...")
+        halo_context = self._get_halos()
+        return halo_context
+
+    def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
+        """
+        Fetches the subhalo data.
+
+        Returns:
+        --------
+        SubhaloContext
+            A context object containing subhalo data.
+        """
+        logger.info("Fetching subhalo data...")
+        subhalo_context = self._get_subhalos()
+        return subhalo_context
+
+    def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
+        """
+        Fetches particle data for a given subhalo.
+
+        Parameters:
+        -----------
+        subhalo_id : int
+            ID of the subhalo for which particle data is needed.
+
+        Returns:
+        --------
+        SubhaloParticles
+            A context object containing particle data.
+        """
+        subhalo_id = kwargs.get('subhalo_id', None)
+
+        if subhalo_id is None:
+            logger.error("subhalo_id must be provided in kwargs")
+            raise ValueError("subhalo_id must be provided in kwargs")
+
+        logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
+        return self._get_p_subhalo(subhalo_id)
+
+    def _validate_and_process_fields(self, soap: SWIFTDataset, fields, super_key, mask=None, n_rows=None):
+        """
+        Validate and extract field values from a SWIFT dataset, applying unit conversions and optional filtering.
+
+        This method iterates over the requested `fields`, extracts their values from the `soap` dataset,
+        applies unit conversions, and optionally filters the data based on `mask` or `n_rows` constraints.
+
+        Parameters:
+        -----------
+        soap : SWIFTDataset
+            The dataset containing simulation data.
+        fields : list of str
+            The list of field names to extract, following a hierarchical format (e.g., `"subhalo.mass"`).
+        super_key : str
+            The base key prefix used to locate field metadata in the catalog.
+        mask : dict or ndarray, optional
+            - If a dictionary, it applies a mask per field key.
+            - If an ndarray, it is applied directly as a boolean filter.
+        n_rows : int, optional
+            Limits the number of rows to extract from each field.
+
+        Returns:
+        --------
+        dict
+            A dictionary where keys are field names and values are extracted, filtered, and unit-converted arrays.
+
+        Notes:
+        ------
+        - Extracted values are converted to physical units when applicable.
+        - If a field is multi-dimensional, it is processed into batches.
+        - Errors during extraction/logging are caught, and missing fields are skipped.
+        """
+        data = {}
+        for attr in fields:
+            field_name = attr
+            try:
+                obj = copy.copy(soap)
+                cfg = None
+                for part in attr.split('.'):
+                    if cfg is None:
+                        key = f"{super_key}.{part}"
+                        cfg = OmegaConf.select(self.catalog.fields, key, default=None)
+                    else:
+                        cfg = cfg[part]
+                    if hasattr(obj, part):
+                        attr = getattr(obj, part)
+                        obj = attr
+                units = cfg.input
+                data[field_name] = obj
+
+                if units is not None:
+                    data[field_name].convert_to_units(units)
+                    # Specify physical/comoving
+                    data[field_name].convert_to_physical()
+
+                data[field_name] = data[field_name].value
+
+                if n_rows is not None:
+                    data[field_name] = data[field_name][:n_rows]
+
+                if mask is not None:
+                    if isinstance(mask, dict):
+                        mask_key = field_name.split('.')[0]
+                        is_full_false = np.sum(mask[mask_key])
+                        tmp = data[field_name][mask[mask_key]]
+                        data[field_name] = tmp
+                    else:
+                        data[field_name] = data[field_name][mask]
+                if isinstance(data[field_name], np.ndarray) and data[field_name].ndim > 1:
+                    data[field_name] = to_list_in_batches(data, field_name)
+            except Exception as e:
+                logger.error(e)
+                continue
+        return data
+
+    def __filter_non_primary(self, halos):
+        """
+        Filter halos to retain only those that are the primary FoF halos.
+
+        This function removes non-primary subhalos by checking the `soap.host_halo_index` field.
+
+        Parameters:
+        -----------
+        halos : pandas.DataFrame or similar structured array
+            The dataset containing halo properties.
+
+        Returns:
+        --------
+        pandas.DataFrame
+            A filtered version of the input `halos` where only primary halos (FoFs) are retained.
+
+        Notes:
+        ------
+        - This method removes subhalos by keeping only entries where `soap.host_halo_index == -1`.
+        """
+        # Check just positions allocating fofs and primary subhalos
+        halos = halos[halos['soap.host_halo_index'] == -1]
+        return halos
+
+    def load_files(self):
+        """
+        Load and validate the necessary dataset files for analysis.
+
+        This method loads two HDF5 files:
+        - `flamingo_<redshift>.hdf5`: Contains subhalo and particle data.
+        - `halo_properties_<redshift>.hdf5`: Contains halo-level properties.
+
+        If either file is missing, an error is logged, and an exception is raised.
+
+        Raises:
+        -------
+        Exception
+            If the required dataset files do not exist at the expected paths.
+
+        Notes:
+        ------
+        - The file paths are determined based on the snapshot number (`snapnum`).
+        - The loaded datasets are stored in `self.fof_subhalos` (halo properties) and `self.particles` (subhalos/particles).
+        """
+        redshift = str(self.catalog.snapnum).zfill(4)
+
+        path = self.catalog.path + f'/SOAP-HBT/flamingo_{redshift}.hdf5'
+        fof_path = self.catalog.path + f'/SOAP-HBT/halo_properties_{redshift}.hdf5'
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        if not os.path.exists(fof_path):
+            logger.error(f"The path {fof_path} does not exist.")
+            raise Exception(f'The path {fof_path} does not exist.')
+
+        self.fof_subhalos = sw.load(fof_path)
+        self.particles = sw.load(path)
+
+    def _get_halos(self) -> HaloContext:
+        """
+        Fetches halo data from the Flamingo simulation.
+
+        Returns:
+        --------
+        HaloContext
+            A context object containing halo data such as mass, radius, position, and subhalo index.
+        """
+        logger.debug("Fetching halos from Flamingo...")
+
+        self.column_map['input_halos.halo_centre'] = 'gpos'
+
+        table = 'halo'
+
+        # Filter primary subhalos
+        if 'soap.host_halo_index' not in self.halo_fields:
+            OmegaConf.set_struct(self.catalog, False)
+
+            if 'soap' not in self.catalog.fields.halo:
+                self.catalog.fields.halo["soap"] = {}
+
+            self.catalog.fields.halo["soap"]["host_halo_index"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "parent_id_satellite"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.halo_fields.append('soap.host_halo_index')
+
+        if isinstance(self.fof_subhalos, SWIFTDataset):
+            halos = self._validate_and_process_fields(self.fof_subhalos, self.halo_fields, super_key='halo')
+            halo_conditions = self._get_attr(self.catalog.fields.halo, attr_name='filter', parent_key="")
+            filtered_conditions = {k: v for k, v in halo_conditions.items() if v is not None}
+            steps = [
+                lambda halos: assign_id(halos, 'halo_id'),
+                lambda halos: assign_id(halos, 'fsub'),
+                lambda halos: convert_to_dataframe(halos),
+                lambda halos: self.__filter_non_primary(halos),
+                lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog),
+                lambda halos: apply_filters(halos, filtered_conditions, self.catalog.fields.halo),
+            ]
+            processed_halos = run_pipeline(halos, steps)
+            logger.debug("Halo data fetched successfully.")
+            halo_context = HaloContext(processed_halos, self.column_map)
+            return halo_context
+
+        else:
+            logger.warning("No halos found.")
+            return HaloContext(pd.DataFrame(data=[]), self.column_map)
+
+    @staticmethod
+    def __reindexing_satellites(df: pd.DataFrame):
+        """
+        Reindex satellite galaxies by updating their parent halo IDs.
+
+        This method modifies the `id_parents` column for satellite halos, ensuring they reference their
+        corresponding host halo. It then removes the `soap.host_halo_index` column.
+
+        Parameters:
+        -----------
+        df : pd.DataFrame
+            A DataFrame containing halo and satellite properties. It must include the `soap.host_halo_index` column.
+
+        Returns:
+        --------
+        pd.DataFrame
+            The modified DataFrame with:
+            - The `id_parents` column updated for satellites.
+            - The `soap.host_halo_index` column removed.
+
+        Notes:
+        ------
+        - A halo is identified as a satellite if its `soap.host_halo_index` is not `-1`.
+        - The `id_parents` column is assigned the `soap.host_halo_index` value for satellites.
+        """
+        # Update father of satellites
+        # satellites_mask = self.fof_subhalos.soap.host_halo_index == fof_id
+        df.loc[df['soap.host_halo_index'] != -1, 'id_parents'] = df.loc[df['soap.host_halo_index'] != -1, 'soap.host_halo_index']
+        df = df.drop(columns=['soap.host_halo_index'])
+        return df
+
+    def _get_subhalos(self) -> SubhaloContext:
+        """
+        Fetches subhalo data from the Flamingo simulation.
+
+        Returns:
+        --------
+        SubhaloContext
+            A context object containing subhalo data.
+        """
+        logger.debug("Fetching subhalos from Flamingo...")
+        self.column_map['input_halos.halo_centre'] = 'spos'
+
+        if 'soap.host_halo_index' not in self.subhalo_fields:
+            OmegaConf.set_struct(self.catalog, False)
+            if 'soap' not in self.catalog.fields.subhalo:
+                self.catalog.fields.subhalo["soap"] = {}
+
+            self.catalog.fields.subhalo["soap"]["host_halo_index"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "parent_id_satellite"
+            }
+            self.subhalo_fields.append('soap.host_halo_index')  # to filter satellites
+            self.column_map['soap.host_halo_index'] = 'parent_id_satellite'
+            OmegaConf.set_struct(self.catalog, True)
+
+        table = 'subhalo'
+
+        if isinstance(self.fof_subhalos, SWIFTDataset):
+            subhalos = self._validate_and_process_fields(self.fof_subhalos, self.subhalo_fields, super_key='subhalo')
+            subhalo_conditions = self._get_attr(self.catalog.fields.subhalo, attr_name='filter', parent_key="")
+            filtered_conditions = {k: v for k, v in subhalo_conditions.items() if v is not None}
+            steps = [
+                lambda subhalos: assign_id(subhalos, 'id_parents'),
+                lambda subhalos: assign_id(subhalos, 'subhalo_id'),
+                lambda subhalos: convert_to_dataframe(subhalos),
+                lambda subhalos: self.__reindexing_satellites(subhalos),
+                lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog),
+                lambda subhalos: apply_filters(subhalos, filtered_conditions, self.catalog.fields.subhalo),
+            ]
+            processed_subhalos = run_pipeline(subhalos, steps)
+            logger.debug("Subhalo data fetched successfully.")
+            subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
+            return subhalo_context
+        else:
+            logger.warning("No subhalos found.")
+            return SubhaloContext(pd.DataFrame(data=[]), self.column_map)
+
+    def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
+        """
+        Fetches particle data for a specific subhalo.
+
+        Parameters:
+        -----------
+        isubhalo : int
+            The index of the subhalo from which to retrieve particle data, corresponds to
+            fof_subhalos.input_halos.halo_catalogue_index.
+
+        Returns:
+        --------
+        SubhaloParticles
+            A context object containing particle data such as mass, coordinates, and velocities.
+        """
+        logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
+
+        # Get the position for the subhalo
+        subhalo_position = np.where(self.fof_subhalos.input_halos.halo_catalogue_index == subhalo_id)[0]
+
+        if len(subhalo_position) > 0:
+            host_halo_index = self.fof_subhalos.soap.host_halo_index[subhalo_position[0]]
+        else:
+            raise ValueError(f'Subhalo: {subhalo_id} is not a primary subhalo')
+
+        if host_halo_index != -1:
+            # Not a primary index
+            raise ValueError(f'Subhalo: {subhalo_id} is not a primary subhalo')
+
+        # Add halo_catalogue_index for all the particle types
+        for part_type in self.particle_fields:
+            OmegaConf.set_struct(self.catalog, False)
+            if 'halo_catalogue_index' not in self.catalog.fields.particles[part_type]:
+                self.catalog.fields.particles[part_type]['halo_catalogue_index'] = {
+                    "input": None,
+                    "output": None,
+                    "scaling": None,
+                    "name": "parent_id"
+                }
+            OmegaConf.set_struct(self.catalog, True)
+
+        try:
+            part_types = self.particle_fields
+            data = {}
+
+            type_mask = {}
+            # Build particles mask
+            for part_type in part_types:
+                particles_of_type = getattr(self.particles, part_type)
+                # Mask to get particles belonging to the primary subhalo
+                particles_mask_primary = particles_of_type.halo_catalogue_index == subhalo_id
+                is_full_false = np.sum(particles_mask_primary)
+                type_mask[part_type] = particles_mask_primary
+                # TODO add warning if mask is full of false
+
+            particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
+            filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
+            particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
+            data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
+                                                     mask=type_mask)
+            table = 'particles'
+            steps = [
+                lambda particles: convert_to_dataframe(data),
+                lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+                lambda particles: apply_filters(particles, filtered_conditions, self.catalog.fields.particles)
+            ]
+
+            processed_particles = run_pipeline(data, steps)
+            logger.debug("Halo data fetched successfully.")
+
+            # SubhaloParticles is expecting a dict with part_types - df
+            d = {}
+            columns = list(processed_particles.columns)
+            for part_type in part_types:
+                filtered_columns = [column for column in columns if part_type in column]
+                renamed_columns = [column.replace(f'{part_type}.', '') for column in filtered_columns]
+                rename_dict = dict(zip(filtered_columns, renamed_columns))
+                tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
+                d[part_type] = tmp
+
+            particle_data = SubhaloParticles(d, self.catalog.fields.particles)
+            return particle_data
+        except Exception as e:
+            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
 
 
 

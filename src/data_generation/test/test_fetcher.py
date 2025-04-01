@@ -9,7 +9,6 @@ from hydra import initialize, compose
 import eagleSqlTools as sql
 from numpy.testing import assert_array_equal
 from omegaconf import OmegaConf
-from pandas._testing import assert_frame_equal
 
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 from src.data_generation.src.halo import HaloContext
@@ -50,15 +49,18 @@ class TestFetcher(unittest.TestCase):
             # Initialize the cfg_illustris and cfg_eagle
             self.cfg_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
+            self.cfg_flamingo = compose(config_name="data_generation.yaml")
 
             # Load the local config for paths and assign them
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_illustris.paths = local_config.paths
             self.cfg_eagle.paths = local_config.paths
+            self.cfg_flamingo.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
+            self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -66,6 +68,7 @@ class TestFetcher(unittest.TestCase):
         required_keys = ['G']
         data_loader_dict = next((step for step in self.cfg_illustris.pipeline if step.name == 'data_loader'), None)
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
+        self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
         self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
         self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
 
@@ -132,7 +135,7 @@ class TestFetcher(unittest.TestCase):
     def test_get_subhalos_eagle(self):
         subhalo_context_2 = self.fetcher_eagle.get_subhalos()
         self.assertIsInstance(subhalo_context_2, SubhaloContext)
-        self.assertEqual(len(subhalo_context_2.data), 125)
+        self.assertEqual(len(subhalo_context_2.data), 494)
 
         columns = set(subhalo_context_2.data.columns)
         assert set(['shmr', 'mstr', 'id_parents', 'subhalo_id', 'spos', 'group_number']) == columns
@@ -160,6 +163,27 @@ class TestFetcher(unittest.TestCase):
         self.assertIsInstance(subhalo_particles_2.star_p, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_2, "star_v"))
         self.assertIsInstance(subhalo_particles_2.star_v, np.ndarray)
+
+    def test_get_halos_flamingo(self):
+        halo_context_1 = self.fetcher_flamingo.get_halos()
+        self.assertIsInstance(halo_context_1, HaloContext)
+        self.assertEqual(len(halo_context_1.data), 128967)
+
+    def test_get_subhalos_flamingo(self):
+        subhalo_context_1 = self.fetcher_flamingo.get_subhalos()
+        self.assertIsInstance(subhalo_context_1, SubhaloContext)
+        self.assertEqual(len(subhalo_context_1.data), 6514454)
+
+    def test_get_p_subhalo_flamingo(self):
+        subhalo_particles_1 = self.fetcher_flamingo.get_p_subhalo(subhalo_id=0)
+
+        self.assertIsInstance(subhalo_particles_1, SubhaloParticles)
+        self.assertTrue(hasattr(subhalo_particles_1, "star_m"))
+        self.assertIsInstance(subhalo_particles_1.star_m, np.ndarray)
+        self.assertTrue(hasattr(subhalo_particles_1, "star_p"))
+        self.assertIsInstance(subhalo_particles_1.star_p, np.ndarray)
+        self.assertTrue(hasattr(subhalo_particles_1, "star_v"))
+        self.assertIsInstance(subhalo_particles_1.star_v, np.ndarray)
 
     def test_eagle_simulation_codes(self):
         simulation_codes = ['RefL0025N0376',    # nok
@@ -232,5 +256,7 @@ class TestFetcher(unittest.TestCase):
     def test_eagle_build_query(self):
         query = self.fetcher_eagle._build_query(table='subhalo')
         self.assertNotEqual(query, None)
+
+
 
 
