@@ -23,8 +23,8 @@ fields:
       output: "Msun/h"
       scaling: "x * 1e10"
       name: "m200"
-      # Mass > (1e13 * H) M⊙/h
-      filter: ["> 1e13 * 0.6774 / 1e10"]
+      # Final units 1e13M⊙ to 6.77*1e12 M⊙/h
+      filter: ["> 1e13 * 0.6774"]
     Group_R_Crit200:
       input: "ckpc/h"
       output: "pkpc/h"
@@ -59,7 +59,7 @@ fields:
       index: 4
       name: "mstr"
       # Mass > 1e10 M⊙
-      filter: "> (1e10 /1e10) * 0.6774"
+      filter: "> 1e10 "
     SubhaloGrNr:
       input: null
       output: null

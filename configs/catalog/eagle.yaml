@@ -6,19 +6,13 @@ g: 1.989e43
 g_2_solar: 1.989e33
 
 snapnum: 26          # redshift 0.18
+simulation_code: RefL0050N0752
+fov: 537.62   # 2 * 268.81 kpc
+spatial_resolution: 3.1460082737656747 # kpc # TODO see if this changes for our interest sim
 
-#simulation_code: RefL0050N0752
-#path: ${paths.datasets_dir}/eagle/RefL0050N0752
+#   TODO SEE HOW TO AUMOTATE THIS, not working with interpolation
+path: ${paths.datasets_dir}/eagle/RefL0050N0752
 
-simulation_code: AGNdT9L0050N0752
-path: ${paths.datasets_dir}/eagle/AGNdT9L0050N0752
-
-#simulation_code: RefL0100N1504
-#path: ${paths.datasets_dir}/eagle/RefL0100N1504
-
-fov: 526.68
-spatial_resolution: 3.1460082737656747 # kpc from the documentation "comoving" spatial resolution
-bin_spatial_resolution_scale: 2.5      # bin_size = spatial_resolution * 1.8
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320
@@ -30,7 +24,7 @@ fields:
       scaling: "x * h"
       name: 'm200'
       # Final unit measures
-      filter: [ "> 1e13" ]
+      filter: [ "> 1e13 * 0.6774" ]
     Group_R_Crit200:
       input: "pkpc"
       output: "pkpc/h"
@@ -93,7 +87,6 @@ fields:
       output: null
       scaling: null
       name: "group_number"
-  # https://arxiv.org/pdf/1706.09899
   particles:
     star:
       Coordinates:
