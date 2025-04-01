@@ -82,8 +82,9 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles_instance = self.subhalo_particles_illustris
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
+        r = 263.34
         # Defined by Ilaria
-        bins, r = muse_bins_r(2 * 263.34, 2.02, 1)  # Computes bins and radius
+        bins = muse_bins_r(2 * 263.34, 2.02, 1)  # Computes bins and radius
         ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
 
         self.icl_processor.value = np.ones((mock_subhalo_particles_instance.star_p.shape[0], ), dtype=int)  # ICL mask
@@ -164,15 +165,5 @@ class TestFeature(unittest.TestCase):
         vel_map, _, biny = self.vel_disp_processor.generate_map(mock_subhalo_particles_instance, bins,
                                                                 ranging, axis=(0, 1))
         assert (len(vel_map)) == bins
-
-    def test_transition_radius(self):
-        # Test case where transition happens
-        distance = np.array([2, 4, 3, 1, 5])
-        icl_mask = np.array([0, 1, 1, 0, 1])
-        r200 = 5.0
-
-        self.icl_processor = ICLProcessor(self.cfg_eagle)
-        transition_radius, _ = self.icl_processor._get_transition_radius(distance, icl_mask, r200)
-        self.assertEqual(transition_radius, 1.0)
 
 

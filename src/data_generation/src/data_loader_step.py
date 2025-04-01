@@ -99,11 +99,25 @@ class DataLoader(PipelineStep):
                 subhalo_particles.preprocess(halo)
 
                 input_feature.value = input_feature.process(halo=halo, subhalo_particles=subhalo_particles)
-                output_feature.value = output_feature.process(halo=halo, subhalo_particles=subhalo_particles)
+                icl_mask = output_feature.process(halo=halo, subhalo_particles=subhalo_particles)
+                output_feature.value = icl_mask
+
+                # Compute the transition radius, r = FOV / 2
+                # TODO check units -> kpc
+                transition_radius = output_feature.get_transition_radius(halo, subhalo_particles, icl_mask)
+                if transition_radius in (0, None):
+                    # Ignoring current halo
+                    logger.warning(f'Ignoring halo: {halo.halo_id}')
+                    continue
 
                 tmp = CosmosData(halo, subhalo_ctx, halo.fsub, subhalo_particles)
                 # Keep cosmos_data instance
                 vars(cosmos_data).update(vars(tmp))
+
+                # Add new metadata for map generating
+                cosmos_data.metadata.update({"map": {"transition_radius": transition_radius,
+                                                     "fov": transition_radius * 2
+                                                     }})
 
                 if next_step is not None:
                     yield from next_step([(halo, subhalo_ctx)], **kwargs)

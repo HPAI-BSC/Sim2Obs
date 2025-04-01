@@ -279,31 +279,33 @@ class ICLProcessor(FeatureProcessor):
         return final_predictions
 
     @staticmethod
-    def _get_transition_radius(distance: np.ndarray, icl_mask: np.ndarray, r200: float):
+    def get_transition_radius(halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
         """
-        Computes the transition radius where the IntraCluster Light (ICL) surpasses the Brightest Cluster Galaxy (BCG)
-        based on the provided distance and ICL mask relative to the r200 radius.
+        Computes the transition radius where the intracluster light (ICL) dominates over the brightest cluster galaxy (BCG).
 
-        This function computes the cumulative mass profiles of ICL and BCG, and identifies the point at which the ICL
-        exceeds the BCG mass, indicating the transition radius.
+        The transition radius is defined as the point where the cumulative count of ICL particles surpasses
+        that of BCG particles. This method calculates the Euclidean distances of particles from the halo center,
+        normalizes them by the halo's R200 radius, and determines the transition point based on sorted
+        cumulative distributions of ICL and BCG particles.
 
         Parameters:
         -----------
-        distance : np.ndarray
-            Array of distances from the center of the cluster for each particle.
+        halo : Halo
+            The halo object containing global properties, including `r200` (the characteristic radius).
+        subhalo_particles : SubhaloParticles
+            Object containing star particle positions (`star_p`), which should be centered by subtracting `halo.gpos`.
         icl_mask : np.ndarray
-            Boolean mask indicating whether each particle is part of the IntraCluster Light (ICL).
-        r200 : float
-            The radius enclosing 200 times the critical density, used for normalizing the distance.
+            A boolean array indicating whether each star particle belongs to the ICL (1 for ICL, 0 for BCG).
 
         Returns:
         --------
-        transition_radius : float or None
-            The normalized distance where the ICL surpasses the BCG, or None if no such transition is found.
-        icl_mask : np.ndarray
-            The input ICL mask, potentially modified during the computation.
+        float or None
+            The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
-        normalized_distance = distance / r200
+        particle_position = subhalo_particles.star_p
+        # Computing the Euclidean distance from the new origin to each particle
+        distance = np.sqrt((particle_position ** 2).sum(axis=1))
+        normalized_distance = distance / halo.r200
         # Compute cumulative mass profiles
         sorted_indices = np.argsort(normalized_distance)
         sorted_distances = normalized_distance[sorted_indices]
@@ -313,14 +315,19 @@ class ICLProcessor(FeatureProcessor):
         icl_cumulative = np.cumsum(sorted_icl_mask)
         bcg_cumulative = np.arange(1, len(sorted_distances) + 1) - icl_cumulative
 
-        # Step 7: Identify transition radius where ICL surpasses BCG
+        # Identify transition radius where ICL surpasses BCG
         transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
         if transition_index.size > 0:
             transition_radius = sorted_distances[transition_index[0]]
         else:
             logger.warning("No transition radius found; ICL never dominates.")
             transition_radius = None
-        return transition_radius, icl_mask
+
+        if transition_radius == 0:
+            logger.warning("Transition radius is 0; ICL never dominates.")
+        else:
+            logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius}')
+        return transition_radius
 
     # Subhalo particles, halo
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
@@ -359,8 +366,6 @@ class ICLProcessor(FeatureProcessor):
             raise ValueError("icl_mask is empty; no masking applied.")
 
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
-
-        transition_radius, _ = self._get_transition_radius(distance, icl_mask, halo.r200)
         return icl_mask
 
     def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:

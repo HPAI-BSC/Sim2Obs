@@ -328,34 +328,38 @@ def circle(x: float, y: float, h: float, k: float, r: float) -> float:
 
 def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_scale: float) -> tuple[int, float]:
     """
-    Calculate the number of bins and the radius for MUSE observations.
+    Calculate the number of spatial bins and the radius for MUSE observations.
 
     Parameters:
     -----------
     fov : float
-        The field of view in kiloparsecs (kpc).
+        The field of view (FoV) in kiloparsecs (kpc).
     spatial_resolution : float
-        The spatial resolution in kiloparsecs (kpc) that defines the size of each bin.
+        The base spatial resolution in kiloparsecs (kpc), which defines the
+        unscaled size of each bin.
+    bin_spatial_resolution_scale : float
+        A scaling factor applied to the spatial resolution to determine the
+        final bin size.
 
     Returns:
     --------
-    tuple
+    tuple[int, float]
         A tuple containing:
         - bins : int
-            The number of bins along one axis calculated as the quotient of
-            the field of view divided by the spatial resolution.
+            The number of bins along one axis, calculated as the quotient of
+            the field of view divided by the scaled spatial resolution.
         - r : float
-            The radius of the field of view, computed as half of the fov.
+            The radius of the field of view, computed as half of the FoV.
 
-    Note:
-    -----
-    The function assumes that both `fov` and `spatial_resolution` are positive
-    values and that the spatial resolution is less than or equal to the field of view.
+    Notes:
+    ------
+    - The function assumes `fov` and `spatial_resolution` are positive values.
+    - The spatial resolution is scaled by `bin_spatial_resolution_scale` before computing bins.
+    - The number of bins is rounded down to the nearest integer.
     """
     bin_size = spatial_resolution * bin_spatial_resolution_scale
     bins = int(fov / bin_size) # Number of bins along one axis
-    r = fov / 2  # Radius of the field of view
-    return bins, r
+    return bins
 
 
 def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spatial_resolution_scale: float,

@@ -20,11 +20,9 @@ class MapStep(PipelineStep):
         self.map_configuration = self._build_map_configuration(cfg)
 
         # Compute bins and radius
-        fov = self.map_configuration['fov']
-        spatial_resolution = self.map_configuration['spatial_resolution']
-        bin_spatial_resolution_scale = self.map_configuration['bin_spatial_resolution_scale']
+        self.spatial_resolution = self.map_configuration['spatial_resolution']
+        self.bin_spatial_resolution_scale = self.map_configuration['bin_spatial_resolution_scale']
         self.dim = self.map_configuration['dim']
-        self.bins, self.r = muse_bins_r(fov, spatial_resolution, bin_spatial_resolution_scale)
 
     @classmethod
     def _build_map_configuration(cls, cfg: DictConfig) -> dict:
@@ -46,7 +44,7 @@ class MapStep(PipelineStep):
         if 'n_zooms' not in map_step_dict:
             raise ValueError('Error, n_zooms can not be found in the map step of the pipeline.')
 
-        required_keys = ['path', 'name', 'fov', 'spatial_resolution']
+        required_keys = ['path', 'name', 'spatial_resolution']
         for key in required_keys:
             if key not in cfg:
                 if key not in cfg.get('catalog', {}):
@@ -64,7 +62,6 @@ class MapStep(PipelineStep):
             'number_zooms': map_step_dict.n_zooms,
             'catalog_name': cfg.catalog.name,
             'rotation_angle': rotation_angle,
-            'fov': cfg.catalog.fov,
             'spatial_resolution': cfg.catalog.spatial_resolution,
             'bin_spatial_resolution_scale': cfg.catalog.bin_spatial_resolution_scale
         }
@@ -83,22 +80,24 @@ class MapStep(PipelineStep):
             List: A list of tuples containing the generated maps for each projection.
         """
         subhalo_particles = cosmos_data.subhalo_particles
+        r = cosmos_data.metadata['map']['transition_radius']
+        bins = cosmos_data.metadata['map']['bins']
         if self.dim == 2:
-            ranging = ((-self.r, self.r), (-self.r, self.r))  # Defines the range for the 2D maps
+            ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
 
             # Create three different maps based on projections onto different coordinate planes (X-Y, Y-Z, X-Z).
             # Break up the 2D spatial plane into small regions (bins), compute the mean of the squared velocities
             # in each region, and return the resulting grid of values.
 
             # Map for the input feature
-            input_xy, _, biny_xy = input_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(0, 1))
-            input_yz, _, biny_yz = input_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(1, 2))
-            input_xz, _, biny_xz = input_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(0, 2))
+            input_xy, _, biny_xy = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 1))
+            input_yz, _, biny_yz = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(1, 2))
+            input_xz, _, biny_xz = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 2))
 
             # Map for the output feature
-            output_xy, _, _ = output_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(0, 1))
-            output_yz, _, _ = output_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(1, 2))
-            output_xz, _, _ = output_feature.generate_map(subhalo_particles, self.bins, ranging, axis=(0, 2))
+            output_xy, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 1))
+            output_yz, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(1, 2))
+            output_xz, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 2))
 
             maps = [
                 (input_xy, output_xy, biny_xy),
@@ -107,11 +106,10 @@ class MapStep(PipelineStep):
             ]
             return maps
         elif self.dim == 3:
-            ranging = ((-self.r, self.r), (-self.r, self.r), (-self.r, self.r))  # Defines the range for the 2D maps
-            input, i_bin_edges, i_bin_number = input_feature.generate_map(subhalo_particles,
-                                                                          self.bins, ranging, axis=None)
-            output, o_bin_edges, o_bin_number = output_feature.generate_map(subhalo_particles,
-                                                                            self.bins, ranging, axis=None)
+            ranging = ((-r, r), (-r, r), (-r, r))  # Defines the range for the 2D maps
+            input, i_bin_edges, i_bin_number = input_feature.generate_map(subhalo_particles, bins, ranging, axis=None)
+            output, o_bin_edges, o_bin_number = output_feature.generate_map(subhalo_particles,  bins, ranging,
+                                                                            axis=None)
             return [(input, output, i_bin_number)]
 
     def _get_interlopers_id(self, cosmos_data: CosmosData) -> np.ndarray:
@@ -129,10 +127,10 @@ class MapStep(PipelineStep):
         # inside [-R_200, R_200] along the z axis
         subhalos: SubhaloContext = cosmos_data.subhalos
         spos = np.array(subhalos.data['spos'].tolist())
-
+        r = cosmos_data.metadata['map']['transition_radius']
         mask = (
-                (spos[:, 0] < self.r) &  # x condition
-                (spos[:, 1] < self.r) &  # y condition
+                (spos[:, 0] < r) &  # x condition
+                (spos[:, 1] < r) &  # y condition
                 (spos[:, 2] < cosmos_data.halo.r200)  # z condition
         )
 
@@ -174,18 +172,17 @@ class MapStep(PipelineStep):
             A boolean mask identifying interloper regions.
         """
         interlopers_mask = np.zeros(map_shape)
-
+        r = cosmos_data.metadata['map']['transition_radius']
         # Generate X and Y based on maschera's shape for consistency
         rows, cols = interlopers_mask.shape
         X, Y = np.meshgrid(
-            np.linspace(-self.r, self.r, cols),  # X coordinates matching columns in maschera
+            np.linspace(-r, r, cols),  # X coordinates matching columns in maschera
             np.linspace(biny[0], biny[-1], rows)  # Y coordinates matching rows in maschera
         )
 
         try:
             for i in interlopers_id:
                 # For each interloper get its center position (h, k) and its radius
-                # TODO change this access by subhalo method
                 subhalo = None
                 if isinstance(i, np.ndarray):
                     # [subhalo_id, halo_id]
@@ -193,7 +190,6 @@ class MapStep(PipelineStep):
                 elif isinstance(i, int):
                     subhalo = cosmos_data.subhalos.get_subhalo_by_id(subhalo_id=i, halo_id=None)
                 assert subhalo is not None
-                # TODO check this columns exists other wise raise exception
                 h = subhalo.spos[0]
                 k = subhalo.spos[1]
                 rradius = subhalo.shmr
@@ -213,7 +209,7 @@ class MapStep(PipelineStep):
         return interlopers_mask
 
     def _create_random_zoom(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
-                            interlopers_mask: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+                            interlopers_mask: np.ndarray, cosmos_data: CosmosData) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Creates a random zoom of the masked labels and velocity dispersion maps.
 
@@ -228,6 +224,9 @@ class MapStep(PipelineStep):
         interlopers_mask : np.ndarray
             The mask identifying interloper regions.
 
+        cosmos_data : CosmosData
+            The data containing subhalos and particle positions.
+
         Returns:
         -------
         tuple
@@ -239,17 +238,18 @@ class MapStep(PipelineStep):
             - mask_zoom : np.ndarray
                 The zoomed-in mask.
         """
-        xo, yo = (int(self.bins / 2), int(self.bins / 2))
+        bins = cosmos_data.metadata['map']['bins']
+        xo, yo = (int(bins / 2), int(bins / 2))
         xoprime, yoprime = xo + np.random.randint(-20, 21), yo + np.random.randint(-20, 21)
 
-        input_feature_zoom = input_feature.map[xoprime - int(self.bins / 4):xoprime + int(self.bins / 4),
-                     yoprime - int(self.bins / 4): yoprime + int(self.bins / 4)]
+        input_feature_zoom = input_feature.map[xoprime - int(bins / 4):xoprime + int(bins / 4),
+                     yoprime - int(bins / 4): yoprime + int(bins / 4)]
 
-        output_feature_zoom = output_feature.map[xoprime - int(self.bins / 4):xoprime + int(self.bins / 4),
-                  yoprime - int(self.bins / 4): yoprime + int(self.bins / 4)]
+        output_feature_zoom = output_feature.map[xoprime - int(bins / 4):xoprime + int(bins / 4),
+                  yoprime - int(bins / 4): yoprime + int(bins / 4)]
 
-        mask_zoom = interlopers_mask[xoprime - int(self.bins / 4):xoprime + int(self.bins / 4),
-                yoprime - int(self.bins / 4):yoprime + int(self.bins / 4)]
+        mask_zoom = interlopers_mask[xoprime - int(bins / 4):xoprime + int(bins / 4),
+                yoprime - int(bins / 4):yoprime + int(bins / 4)]
         return input_feature_zoom, output_feature_zoom, mask_zoom
 
     def _create_n_zooms(self, projection_str: str, rotation_axis: str, rotation_iteration: int, cosmos_data: CosmosData,
@@ -359,12 +359,18 @@ class MapStep(PipelineStep):
         """
         rotation_axis = kwargs.get('rotation_axis', None)
         rotation_iteration = kwargs.get('rotation_iteration', None)
-        logger.debug(f'Rotation axis: {rotation_axis}, rotation_iteration: {rotation_iteration}')
+        logger.debug(f'Rotation axis: {rotation_axis}, rotation_iteration: {rotation_iteration},'
+                     f' transition_radius: {cosmos_data.metadata["map"]["transition_radius"]}')
         for halo, _ in g:
             try:
-                # TODO do we want to call this always ? use case Sebastian
                 interlopers_id = self._get_interlopers_id(cosmos_data)
                 io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
+
+                # Compute number of bins and store it in the metadata
+                fov = cosmos_data.metadata['map']['fov']
+                bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
+                cosmos_data.metadata['map']['bins'] = bins
+                logger.debug(f'Number of bins: {bins}')
 
                 if self.dim == 2:
                     projections = ["xy", "yz", "xz"]
