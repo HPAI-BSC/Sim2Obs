@@ -363,14 +363,14 @@ class MapStep(PipelineStep):
                      f' transition_radius: {cosmos_data.metadata["map"]["transition_radius"]}')
         for halo, _ in g:
             try:
-                interlopers_id = self._get_interlopers_id(cosmos_data)
-                io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
-
                 # Compute number of bins and store it in the metadata
                 fov = cosmos_data.metadata['map']['fov']
                 bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
                 cosmos_data.metadata['map']['bins'] = bins
                 logger.debug(f'Number of bins: {bins}')
+
+                interlopers_id = self._get_interlopers_id(cosmos_data)
+                io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
 
                 if self.dim == 2:
                     projections = ["xy", "yz", "xz"]
