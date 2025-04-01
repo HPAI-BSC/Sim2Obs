@@ -280,6 +280,29 @@ class ICLProcessor(FeatureProcessor):
 
     @staticmethod
     def _get_transition_radius(distance: np.ndarray, icl_mask: np.ndarray, r200: float):
+        """
+        Computes the transition radius where the IntraCluster Light (ICL) surpasses the Brightest Cluster Galaxy (BCG)
+        based on the provided distance and ICL mask relative to the r200 radius.
+
+        This function computes the cumulative mass profiles of ICL and BCG, and identifies the point at which the ICL
+        exceeds the BCG mass, indicating the transition radius.
+
+        Parameters:
+        -----------
+        distance : np.ndarray
+            Array of distances from the center of the cluster for each particle.
+        icl_mask : np.ndarray
+            Boolean mask indicating whether each particle is part of the IntraCluster Light (ICL).
+        r200 : float
+            The radius enclosing 200 times the critical density, used for normalizing the distance.
+
+        Returns:
+        --------
+        transition_radius : float or None
+            The normalized distance where the ICL surpasses the BCG, or None if no such transition is found.
+        icl_mask : np.ndarray
+            The input ICL mask, potentially modified during the computation.
+        """
         normalized_distance = distance / r200
         # Compute cumulative mass profiles
         sorted_indices = np.argsort(normalized_distance)
@@ -385,7 +408,6 @@ class ICLProcessor(FeatureProcessor):
             output_ij[np.isnan(output_ij)] = 0
             return output_ij, binx, biny
         else:
-            # TODO to review computation and output
             assert pos_rot[:, 0].size == pos_rot[:, 1].size == pos_rot[:, 2].size == len(self.value)
             statistic_ijk, bin_edges, bin_number = stats.binned_statistic_dd(pos_rot, self.value, statistic="mean",
                                                                              bins=bins, range=ranging)

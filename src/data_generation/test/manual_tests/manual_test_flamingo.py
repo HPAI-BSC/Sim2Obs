@@ -120,7 +120,9 @@ class TestFlamingoData(unittest.TestCase):
         mass_array *= self.h
 
         # Star particles bound to the primary subhalo
-        subhalos_primary_idx = 4
+        subhalos_primary_idx = 10
+        fof_ids = sorted(list(set(self.fof_subhalos.input_halos.halo_catalogue_index.value)))
+        unique_ids = sorted(list(set(self.data.stars.halo_catalogue_index.value)))
         particles_mask_primary = self.data.stars.halo_catalogue_index == subhalos_primary_idx
 
         # Get satellite subhalos

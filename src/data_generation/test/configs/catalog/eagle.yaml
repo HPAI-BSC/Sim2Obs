@@ -16,7 +16,6 @@ path: ${paths.datasets_dir}/eagle/RefL0050N0752
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320
-# TODO double check units and sample size with Ilaria
 fields:
   halo:
     Group_M_Crit200:
@@ -25,7 +24,7 @@ fields:
       scaling: "x * h"
       name: 'm200'
       # Final unit measures
-      filter: [ "> 1e13" ]
+      filter: [ "> 1e13 * 0.6774" ]
     Group_R_Crit200:
       input: "pkpc"
       output: "pkpc/h"
@@ -88,7 +87,6 @@ fields:
       output: null
       scaling: null
       name: "group_number"
-  # TODO clarify the units with Ilaria
   # https://arxiv.org/pdf/1706.09899
   particles:
     star:

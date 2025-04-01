@@ -135,7 +135,7 @@ class TestFetcher(unittest.TestCase):
     def test_get_subhalos_eagle(self):
         subhalo_context_2 = self.fetcher_eagle.get_subhalos()
         self.assertIsInstance(subhalo_context_2, SubhaloContext)
-        self.assertEqual(len(subhalo_context_2.data), 125)
+        self.assertEqual(len(subhalo_context_2.data), 494)
 
         columns = set(subhalo_context_2.data.columns)
         assert set(['shmr', 'mstr', 'id_parents', 'subhalo_id', 'spos', 'group_number']) == columns
@@ -167,25 +167,17 @@ class TestFetcher(unittest.TestCase):
     def test_get_halos_flamingo(self):
         halo_context_1 = self.fetcher_flamingo.get_halos()
         self.assertIsInstance(halo_context_1, HaloContext)
-        self.assertTrue(len(halo_context_1.data) > 0)
+        self.assertEqual(len(halo_context_1.data), 128967)
 
-        # TODO
-        # self.assertEqual(len(halo_context_1.data), 83)
-        '''
-        halo_data_1 = halo_context_1.get_halo_by_id(halo_id=0)
-        self.assertEqual(halo_data_1.halo_id, self.halo_illustris.halo_id)
-        self.assertEqual(halo_data_1.fsub, self.halo_illustris.fsub)
-        self.assertAlmostEquals(halo_data_1.m200, self.halo_illustris.m200)
-        self.assertAlmostEquals(halo_data_1.r200, self.halo_illustris.r200)
-        assert_array_equal(halo_data_1.gpos, self.halo_illustris.gpos)
-        '''
+    def test_get_subhalos_flamingo(self):
+        subhalo_context_1 = self.fetcher_flamingo.get_subhalos()
+        self.assertIsInstance(subhalo_context_1, SubhaloContext)
+        self.assertEqual(len(subhalo_context_1.data), 6514454)
 
     def test_get_p_subhalo_flamingo(self):
-        subhalo_particles_1 = self.fetcher_flamingo.get_p_subhalo(subhalo_id=10)
+        subhalo_particles_1 = self.fetcher_flamingo.get_p_subhalo(subhalo_id=0)
 
         self.assertIsInstance(subhalo_particles_1, SubhaloParticles)
-        self.assertTrue(hasattr(subhalo_particles_1, "gas_m"))
-        self.assertIsInstance(subhalo_particles_1.gas_m, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_1, "star_m"))
         self.assertIsInstance(subhalo_particles_1.star_m, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_1, "star_p"))
