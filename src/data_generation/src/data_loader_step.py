@@ -103,7 +103,6 @@ class DataLoader(PipelineStep):
                 output_feature.value = icl_mask
 
                 # Compute the transition radius, r = FOV / 2
-                # TODO check units -> kpc
                 transition_radius = output_feature.get_transition_radius(halo, subhalo_particles, icl_mask)
                 if transition_radius in (0, None):
                     # Ignoring current halo

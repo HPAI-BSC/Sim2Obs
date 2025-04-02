@@ -305,28 +305,38 @@ class ICLProcessor(FeatureProcessor):
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
         distance = np.sqrt((particle_position ** 2).sum(axis=1))
-        normalized_distance = distance / halo.r200
+        normalized_distance = distance #/ halo.r200
+
         # Compute cumulative mass profiles
         sorted_indices = np.argsort(normalized_distance)
+        masses = subhalo_particles.star_m[sorted_indices]
         sorted_distances = normalized_distance[sorted_indices]
         sorted_icl_mask = icl_mask[sorted_indices]
+        inverse_icl_mask = 1 - sorted_icl_mask
 
         # Compute cumulative counts for ICL and BCG
-        icl_cumulative = np.cumsum(sorted_icl_mask)
-        bcg_cumulative = np.arange(1, len(sorted_distances) + 1) - icl_cumulative
+        icl_cumulative = np.cumsum(sorted_icl_mask * masses)
+        bcg_cumulative = np.cumsum(inverse_icl_mask * masses)
 
         # Identify transition radius where ICL surpasses BCG
         transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
-        if transition_index.size > 0:
-            transition_radius = sorted_distances[transition_index[0]]
+
+        if len(transition_index) > 0:
+            max_diff = -1
+            max_pos = -1
+            for i, index in enumerate(transition_index):
+                if i > 0:
+                    diff = transition_index[i] - transition_index[i - 1]
+                    if diff > max_diff:
+                        max_diff = diff
+                        max_pos = i
+            transition_radius = sorted_distances[transition_index[max_pos]]
+            normalized_transition_radius = transition_radius / halo.r200
+            logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
+                         f'({round(normalized_transition_radius, 2)} % r200)')
         else:
             logger.warning("No transition radius found; ICL never dominates.")
             transition_radius = None
-
-        if transition_radius == 0:
-            logger.warning("Transition radius is 0; ICL never dominates.")
-        else:
-            logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius}')
         return transition_radius
 
     # Subhalo particles, halo
@@ -349,7 +359,8 @@ class ICLProcessor(FeatureProcessor):
         logger.info(f'Processing ICL for Halo ID {halo.halo_id}.')
 
         v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
-        # Computing the Euclidean distance from the new origin to each particle
+        # Computing the Euclidean distance from the new origin to each particle,
+        # this value will be normalized inside predict method
         distance = np.sqrt((particle_position ** 2).sum(axis=1))
         # Computing the delta vel. from each particle in comparison to the mean-vel.
         v_delta = np.sqrt(((particle_velocity - v_cm) ** 2).sum(axis=1))

@@ -289,7 +289,7 @@ class MapStep(PipelineStep):
 
         for i in range(self.map_configuration['number_zooms']):
             input_feature_i, output_feature_i, mask_i = self._create_random_zoom(input_feature, output_feature,
-                                                                                 interlopers_mask)
+                                                                                 interlopers_mask, cosmos_data)
 
             # Expand the dimensions of the mask to match the shape of the other arrays
             mask_expanded = np.expand_dims(mask_i, axis=-1)  # Shape: (H, W, 1)
