@@ -242,14 +242,21 @@ class MapStep(PipelineStep):
         xo, yo = (int(bins / 2), int(bins / 2))
         xoprime, yoprime = xo + np.random.randint(-20, 21), yo + np.random.randint(-20, 21)
 
-        input_feature_zoom = input_feature.map[xoprime - int(bins / 4):xoprime + int(bins / 4),
-                     yoprime - int(bins / 4): yoprime + int(bins / 4)]
+        # Ensure indices stay within bounds
+        xoprime = np.clip(xoprime, int(bins / 4), input_feature.map.shape[0] - int(bins / 4))
+        yoprime = np.clip(yoprime, int(bins / 4), input_feature.map.shape[1] - int(bins / 4))
 
-        output_feature_zoom = output_feature.map[xoprime - int(bins / 4):xoprime + int(bins / 4),
-                  yoprime - int(bins / 4): yoprime + int(bins / 4)]
+        input_feature_zoom = input_feature.map[
+                             xoprime - int(bins / 4):xoprime + int(bins / 4),
+                             yoprime - int(bins / 4): yoprime + int(bins / 4)]
 
-        mask_zoom = interlopers_mask[xoprime - int(bins / 4):xoprime + int(bins / 4),
-                yoprime - int(bins / 4):yoprime + int(bins / 4)]
+        output_feature_zoom = output_feature.map[
+                              xoprime - int(bins / 4):xoprime + int(bins / 4),
+                              yoprime - int(bins / 4): yoprime + int(bins / 4)]
+
+        mask_zoom = interlopers_mask[
+                    xoprime - int(bins / 4):xoprime + int(bins / 4),
+                    yoprime - int(bins / 4):yoprime + int(bins / 4)]
         return input_feature_zoom, output_feature_zoom, mask_zoom
 
     def _create_n_zooms(self, projection_str: str, rotation_axis: str, rotation_iteration: int, cosmos_data: CosmosData,
@@ -290,7 +297,6 @@ class MapStep(PipelineStep):
         for i in range(self.map_configuration['number_zooms']):
             input_feature_i, output_feature_i, mask_i = self._create_random_zoom(input_feature, output_feature,
                                                                                  interlopers_mask, cosmos_data)
-
             # Expand the dimensions of the mask to match the shape of the other arrays
             mask_expanded = np.expand_dims(mask_i, axis=-1)  # Shape: (H, W, 1)
 

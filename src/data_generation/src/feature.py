@@ -330,13 +330,15 @@ class ICLProcessor(FeatureProcessor):
                     if diff > max_diff:
                         max_diff = diff
                         max_pos = i
+
             transition_radius = sorted_distances[transition_index[max_pos]]
             normalized_transition_radius = transition_radius / halo.r200
             logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
-                         f'({round(normalized_transition_radius, 2)} % r200)')
+                         f'({round(normalized_transition_radius, 2)} % r200), r200: {halo.r200}')
         else:
             logger.warning("No transition radius found; ICL never dominates.")
             transition_radius = None
+
         return transition_radius
 
     # Subhalo particles, halo
@@ -416,11 +418,19 @@ class ICLProcessor(FeatureProcessor):
                 raise Exception('FeatureProcessor value is empty, call first process method.')
 
             assert pos_rot[:, i].size == pos_rot[:, j].size == len(self.value)
+
+            # Check the range of your data and the bins
+            print("Range of pos_rot[:, i]:", np.min(pos_rot[:, i]), np.max(pos_rot[:, i]))
+            print("Range of pos_rot[:, j]:", np.min(pos_rot[:, j]), np.max(pos_rot[:, j]))
+
             output_ij, binx, biny, _ = stats.binned_statistic_2d(
                 pos_rot[:, i], pos_rot[:, j],
                 self.value,  # Access the ICL feature data
                 statistic="mean", bins=bins, range=ranging
             )
+            non_nan_bins = np.count_nonzero(~np.isnan(output_ij))
+            print(f"Number of bins with data: {non_nan_bins}")
+
             output_ij[np.isnan(output_ij)] = 0
             return output_ij, binx, biny
         else:
