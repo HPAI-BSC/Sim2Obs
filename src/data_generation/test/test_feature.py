@@ -166,4 +166,23 @@ class TestFeature(unittest.TestCase):
                                                                 ranging, axis=(0, 1))
         assert (len(vel_map)) == bins
 
+    @patch('src.data_generation.src.halo.Halo')
+    @patch('src.data_generation.src.subhalo.SubhaloParticles')
+    def test_ICLProcessor_get_transition_radius(self, mock_halo, mock_subhalo_particles):
+        self.icl_processor = ICLProcessor(self.cfg_illustris)
+
+        # Illustris
+        mock_halo_instance = self.halo_illustris
+        mock_halo.return_value = self.halo_illustris
+        mock_subhalo_particles_instance = self.subhalo_particles_illustris
+        mock_subhalo_particles.return_value = mock_subhalo_particles_instance
+        icl_mask = self.icl_processor.process(mock_halo_instance, mock_subhalo_particles_instance)
+
+        self.icl_processor.get_transition_radius(mock_halo.return_value,
+                                                 mock_subhalo_particles.return_value,
+                                                 icl_mask)
+        print(icl_mask)
+
+
+
 

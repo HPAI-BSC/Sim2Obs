@@ -5,6 +5,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 import joblib
+from matplotlib import pyplot as plt, ticker
 from omegaconf import DictConfig
 from scipy import stats
 from dotenv import load_dotenv, find_dotenv
@@ -330,6 +331,29 @@ class ICLProcessor(FeatureProcessor):
                     if diff > max_diff:
                         max_diff = diff
                         max_pos = i
+
+            scaled_transition_radius = sorted_distances / halo.r200
+
+            # Create the plot
+            plt.figure(figsize=(8, 5))
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.plot(scaled_transition_radius, icl_cumulative, label="cumsum icl", color="blue")
+            ax.plot(scaled_transition_radius, bcg_cumulative, label="cumsum bcg", color="orange")
+            ax.set_xlabel("r/R200")
+            ax.set_ylabel("cumsum")
+            ax.legend()
+
+            # Set scientific notation and scale Y-axis by 10^5
+            formatter = ticker.ScalarFormatter(useMathText=True)
+            formatter.set_scientific(True)
+            formatter.set_powerlimits((0, 0))  # Force scientific notation
+
+            ax.yaxis.set_major_formatter(formatter)  # Apply ScalarFormatter
+            ax.yaxis.get_offset_text().set_size(12)  # Adjust exponent text size
+
+            # Show the plot
+            plt.savefig(f"cumsum_transition_radius_{halo.halo_id}.png", dpi=300, bbox_inches="tight")
+            plt.show()
 
             transition_radius = sorted_distances[transition_index[max_pos]]
             normalized_transition_radius = transition_radius / halo.r200
