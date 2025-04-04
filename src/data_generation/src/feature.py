@@ -34,7 +34,9 @@ class FeatureProcessor(ABC):
     Subclasses must implement the `process` method.
     """
     @abstractmethod
-    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
+    def process(self, halo: Halo, subhalo_particles: SubhaloParticles,
+                overlapping_subhalo_particles: List[SubhaloParticles],
+                overlapping_halos: List[Halo]) -> np.ndarray:
         """
         Process the feature data.
 
@@ -45,6 +47,8 @@ class FeatureProcessor(ABC):
             np.ndarray: A numpy array containing the processed feature data.
         """
         pass
+
+    # TODO update
     def rotate(self, z, axis, degree):
         if len(self.value) == 0:
             logger.error('FeatureProcessor value is empty, call first process method.')
@@ -53,7 +57,8 @@ class FeatureProcessor(ABC):
 
     # TODO update
     @abstractmethod
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+    def generate_map(self, subhalo_particles: SubhaloParticles, overlapping_subhalo_particles: SubhaloParticles,
+                     bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
         Generate a 2D map for the feature based on particle positions.
 
@@ -108,8 +113,11 @@ class VelocityDispersionProcessor(FeatureProcessor):
         self.name = 'VelocityDispersion'
         self.map = []
         self.value = []
+        self.neighbour_values = []
 
-    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
+    def process(self, halo: Halo, subhalo_particles: SubhaloParticles,
+                overlapping_subhalo_particles: List[SubhaloParticles],
+                overlapping_halos: List[Halo]):
         """
         Calculate the velocity dispersion of particles.
 
@@ -132,9 +140,17 @@ class VelocityDispersionProcessor(FeatureProcessor):
             raise ValueError("SubhaloParticles cannot have 'v' (velocity) empty.")
 
         logger.info(f'Computed velocity dispersion for {len(subhalo_particles.star_v)} particles.')
-        return subhalo_particles.star_v
+        self.value = subhalo_particles.star_v
 
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+        for i, halo_neighbour in enumerate(overlapping_halos):
+            # Filter particles that falls within current halo
+            distance = np.linalg.norm(overlapping_subhalo_particles[i].star_p - halo.gpos)
+            mask = distance < halo.r200
+            velocity_disp_array = subhalo_particles.star_v[mask]
+            self.neighbour_values.extend(velocity_disp_array)
+
+    def generate_map(self, subhalo_particles: SubhaloParticles, overlapping_subhalo_particles: SubhaloParticles,
+                     bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
         Generate a 2D map of processed particle features using binned statistics.
 
@@ -162,6 +178,13 @@ class VelocityDispersionProcessor(FeatureProcessor):
             Exception: If the `self.value` attribute is empty, indicating that the `process`
                 method needs to be called before generating the map.
         """
+        pos_rot_main = subhalo_particles.star_p
+        pos_rot_overlap = overlapping_subhalo_particles.star_p
+        pos_rot = np.concatenate([pos_rot_main, pos_rot_overlap], axis=0)
+
+        feature_main = self.value
+        feature_overlap = np.array(self.neighbour_values)
+        feature_combined = np.concatenate([feature_main, feature_overlap], axis=0)
 
         if axis is not None:
             i, j = axis
@@ -176,10 +199,9 @@ class VelocityDispersionProcessor(FeatureProcessor):
             missing_component = components - set(axis)
             k = next(iter(missing_component))
 
-            pos_rot = subhalo_particles.star_p
             input_ij, binx, biny, _ = stats.binned_statistic_2d(
                 pos_rot[:, i], pos_rot[:, j],
-                (self.value[:, k]) ** 2,  # Access the relevant feature
+                (feature_combined[:, k]) ** 2,  # Access the relevant feature
                 statistic="mean", bins=bins, range=ranging
             )
             input_ij = np.sqrt(input_ij / 3)
@@ -223,6 +245,7 @@ class ICLProcessor(FeatureProcessor):
         self.cfg = cfg
         self.map = []
         self.value = []
+        self.neighbour_values = []
         self.model = joblib.load(os.path.join(project_root, 'src/data_generation/model/Best_Model-Random-3par.pkl'))
 
         attr_list = self._build_configuration(cfg, ['G'])
@@ -278,6 +301,33 @@ class ICLProcessor(FeatureProcessor):
         logger.info("Labeling particles ...")
         final_predictions = self.model.predict(Data.to_numpy())
         return final_predictions
+
+    def _compute_icl_mask(self, halo: Halo, subhalo_particles: SubhaloParticles):
+        particle_velocity = subhalo_particles.star_v
+        particle_position = subhalo_particles.star_p
+
+        logger.info(f'Processing ICL for Halo ID {halo.halo_id}.')
+
+        v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
+        # Computing the Euclidean distance from the new origin to each particle,
+        # this value will be normalized inside predict method
+        distance = np.sqrt((particle_position ** 2).sum(axis=1))
+        # Computing the delta vel. from each particle in comparison to the mean-vel.
+        v_delta = np.sqrt(((particle_velocity - v_cm) ** 2).sum(axis=1))
+        final_predictions = self._predict(v_delta, distance, halo)
+        # Extract indices of particles predicted to be part of the ICL
+        ids = np.where(final_predictions == 0)[0]
+        rows, _ = particle_velocity.shape
+        icl_mask = np.zeros((rows,))
+        if ids.size > 0:
+            # if particle belongs to ICL=1, otherwise BCG=0
+            icl_mask[ids] = 1
+        else:
+            logger.warning('No particles predicted as ICL.')
+            raise ValueError("icl_mask is empty; no masking applied.")
+
+        logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
+        return icl_mask
 
     @staticmethod
     def get_transition_radius(halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
@@ -365,8 +415,11 @@ class ICLProcessor(FeatureProcessor):
 
         return transition_radius
 
-    # Subhalo particles, halo
-    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
+    # TODO test this method do the same for velocity disp
+    def process(self, halo: Halo, subhalo_particles: SubhaloParticles,
+                overlapping_subhalo_particles: List[SubhaloParticles],
+                overlapping_halos: List[Halo]
+                ):
         """
         Process the IntraCluster Light (ICL) for a given halo and its particles.
 
@@ -379,33 +432,21 @@ class ICLProcessor(FeatureProcessor):
         Raises:
             ValueError: If the scaled particle data is empty.
         """
-        particle_velocity = subhalo_particles.star_v
-        particle_position = subhalo_particles.star_p
+        icl_mask = self._compute_icl_mask(halo, subhalo_particles)
+        self.value = icl_mask
 
-        logger.info(f'Processing ICL for Halo ID {halo.halo_id}.')
+        for i, halo_neighbour in enumerate(overlapping_halos):
+            overlapping_subhalo_particles[i].preprocess(halo_neighbour)
+            icl_neighbour_mask = self._compute_icl_mask(halo_neighbour, overlapping_subhalo_particles[i])
+            # Filter particles that falls within current halo
+            overlapping_subhalo_particles[i] = overlapping_subhalo_particles[i].star_p + halo_neighbour.gpos
+            distance = np.linalg.norm(overlapping_subhalo_particles[i] - halo.gpos)
+            mask = distance < halo.r200
+            icl_neighbour_filtered_mask = icl_neighbour_mask[mask]
+            self.neighbour_values.extend(icl_neighbour_filtered_mask)
 
-        v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
-        # Computing the Euclidean distance from the new origin to each particle,
-        # this value will be normalized inside predict method
-        distance = np.sqrt((particle_position ** 2).sum(axis=1))
-        # Computing the delta vel. from each particle in comparison to the mean-vel.
-        v_delta = np.sqrt(((particle_velocity - v_cm) ** 2).sum(axis=1))
-        final_predictions = self._predict(v_delta, distance, halo)
-        # Extract indices of particles predicted to be part of the ICL
-        ids = np.where(final_predictions == 0)[0]
-        rows, _ = particle_velocity.shape
-        icl_mask = np.zeros((rows, ))
-        if ids.size > 0:
-            # if particle belongs to ICL=1, otherwise BCG=0
-            icl_mask[ids] = 1
-        else:
-            logger.warning('No particles predicted as ICL.')
-            raise ValueError("icl_mask is empty; no masking applied.")
-
-        logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
-        return icl_mask
-
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+    def generate_map(self, subhalo_particles: SubhaloParticles, overlapping_subhalo_particles: SubhaloParticles,
+                     bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
         Generate a 2D map of particle feature data using binned statistics.
 
@@ -434,7 +475,14 @@ class ICLProcessor(FeatureProcessor):
             AssertionError: If the size of the input data along the specified axes and the length
                 of `self.value` do not match.
         """
-        pos_rot = subhalo_particles.star_p
+        pos_rot_main = subhalo_particles.star_p
+        pos_rot_overlap = overlapping_subhalo_particles.star_p
+        pos_rot = np.concatenate([pos_rot_main, pos_rot_overlap], axis=0)
+
+        feature_main = self.value
+        feature_overlap = np.array(self.neighbour_values)
+        feature_combined = np.concatenate([feature_main, feature_overlap])
+
         if axis is not None:
             i, j = axis
             if len(self.value) == 0:
@@ -449,7 +497,7 @@ class ICLProcessor(FeatureProcessor):
 
             output_ij, binx, biny, _ = stats.binned_statistic_2d(
                 pos_rot[:, i], pos_rot[:, j],
-                self.value,  # Access the ICL feature data
+                feature_combined,  # Access the ICL feature data
                 statistic="mean", bins=bins, range=ranging
             )
             non_nan_bins = np.count_nonzero(~np.isnan(output_ij))
@@ -458,6 +506,7 @@ class ICLProcessor(FeatureProcessor):
             output_ij[np.isnan(output_ij)] = 0
             return output_ij, binx, biny
         else:
+            # TODO
             assert pos_rot[:, 0].size == pos_rot[:, 1].size == pos_rot[:, 2].size == len(self.value)
             statistic_ijk, bin_edges, bin_number = stats.binned_statistic_dd(pos_rot, self.value, statistic="mean",
                                                                              bins=bins, range=ranging)

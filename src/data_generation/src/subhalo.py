@@ -346,6 +346,23 @@ class SubhaloParticles:
                         # Add attr with that provided name
                         setattr(self, f'{fix_names.get(part_type, part_type)}_{name}', value)
 
+    def __add__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
+        new_attrs = {}
+        for key in self.__dict__:
+            self_val = getattr(self, key)
+            other_val = getattr(other, key)
+
+            if isinstance(self_val, np.ndarray) and isinstance(other_val, np.ndarray):
+                new_attrs[key] = np.concatenate((self_val, other_val), axis=0)
+            else:
+                # Decide what to do with non-ndarray attributes here
+                raise TypeError(f"Cannot concatenate attribute '{key}' of type {type(self_val)}")
+
+        return self.__class__(**new_attrs)
+
     def preprocess(self, halo: Halo):
         """
         Preprocesses the particle data, such as normalizing positions.
