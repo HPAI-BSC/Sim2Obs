@@ -154,6 +154,30 @@ class HaloContext:
         except KeyError:
             raise Exception(f"Halo ID {halo_id} not found.")
 
+    def get_overlapping_halos(self, halo_id):
+        print(self.data.to_dict())
+
+        halo = self.get_halo_by_id(halo_id)
+        halo_r200 = halo.r200
+        halo_gpos = halo.gpos
+
+        # Compute distances to the other halos
+        # Using numpy for vectorized distance computation
+        positions = np.array(self.data['gpos'].tolist())  # Convert the positions of all halos into a numpy array
+        distances = np.linalg.norm(positions - halo_gpos, axis=1)  # Compute Euclidean distance between halo centers
+
+        # Compute the sum of the radii
+        radius_sum = self.data['r200'] + halo_r200
+
+        # Find halos whose distance is less than the sum of radii
+        overlapping_halo_ids = self.data[distances <= radius_sum]['halo_id'].to_list()
+        overlapping_halo_ids.remove(halo_id)
+
+        halos = []
+        for id in overlapping_halo_ids:
+            halos.append(self.get_halo_by_id(id))
+        return halos
+
     @property
     def halo_id(self):
         """

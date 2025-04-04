@@ -1,3 +1,4 @@
+import pickle
 import unittest
 
 import numpy as np
@@ -8,6 +9,16 @@ from src.data_generation.src.halo import Halo
 
 
 class TestHalo(unittest.TestCase):
+    def setUp(self):
+        with open("data/illustris/halo_0.pkl", "rb") as file:
+            self.halo_illustris = pickle.load(file)
+
+        with open("data/illustris/subhalo_0.pkl", "rb") as file:
+            self.subhalo_illustris = pickle.load(file)
+
+        with open("data/illustris/halo_context_0.pkl", "rb") as file:
+            self.halo_context_illustris = pickle.load(file)
+
     def test_missing_required_attributes(self):
         """Test that the Halo class raises an error if required attributes are missing."""
         with self.assertRaises(ValueError) as context:
@@ -56,15 +67,26 @@ class TestHalo(unittest.TestCase):
         required_keys = ['G']
         data_loader_dict = next((step for step in self.cfg_illustris.pipeline if step.name == 'data_loader'), None)
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
+        self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
 
-        fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
-        halo_context = fetcher_illustris.get_halos()
+        halo_context = self.fetcher_illustris.get_halos()
         halo = halo_context.get_halo_by_id(halo_id=114)
 
-        subhalo_context = fetcher_illustris.get_subhalos()
+        subhalo_context = self.fetcher_illustris.get_subhalos()
         subhalo_id = subhalo_context.get_subhalo_by_id(subhalo_id=4229)
 
         tmp = subhalo_context.get_items_by_halo(halo_id=114)
         print()
+
+    def test_get_overlapping_halos(self):
+        # Manually adjust the positions to introduce overlap between halos 0, 2, and 3
+        # The distance between their centers should be less than the sum of their radii.
+        self.halo_context_illustris.data['gpos'][0] = np.array([10000.0, 24000.0, 16000.0], dtype=np.float32)
+        self.halo_context_illustris.data['gpos'][2] = np.array([10000.0, 24500.0, 16000.0], dtype=np.float32)
+        self.halo_context_illustris.data['gpos'][3] = np.array([10000.0, 24700.0, 16000.0], dtype=np.float32)
+        overlapping_halos = self.halo_context_illustris.get_overlapping_halos(halo_id=0)
+        expected_ids = [2, 3]
+        for i, halo in enumerate(overlapping_halos):
+            self.assertEqual(halo.halo_id, expected_ids[i])
 
 
