@@ -12,7 +12,7 @@ import illustris_python as il
 from omegaconf import DictConfig, ListConfig, OmegaConf
 from swiftsimio import SWIFTDataset
 
-from src.data_generation.src.halo import HaloContext
+from src.data_generation.src.halo import HaloContext, Halo
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion, \
     dict_depth, to_list_in_batches
@@ -330,6 +330,12 @@ class DataFetcher(ABC):
         """
         pass
 
+    def get_p_halo(self, *args, **kwargs):
+        """
+        Abstract method to fetch particle data of all subhalos within a halo.
+        """
+        pass
+
     def _get_fields(self):
         pass
 
@@ -603,6 +609,20 @@ class Illustris300Fetcher(DataFetcher):
         logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
         return self._get_p_subhalo(subhalo_id)
 
+    def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
+        halo = kwargs.get('halo', None)
+        if halo is None:
+            logger.error("halo must be provided in kwargs")
+            raise ValueError("halo must be provided in kwargs")
+
+        subhalo_context = kwargs.get('subhalo_context', None)
+        if subhalo_context is None:
+            logger.error("subhalo_context must be provided in kwargs")
+            raise ValueError("subhalo_context must be provided in kwargs")
+
+        logger.info(f"Fetching particle data for halo: {halo.halo_id}")
+        return self._get_p_halo(halo, subhalo_context)
+
     def _get_halos(self) -> HaloContext:
         """
         Fetches halo data from the Illustris-300 simulation.
@@ -771,6 +791,28 @@ class Illustris300Fetcher(DataFetcher):
         except Exception as e:
             raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
 
+    #  TODO TEST
+    def _get_p_halo(self, halo: Halo, subhalo_context: SubhaloContext) -> SubhaloParticles:
+        logger.debug(f"Fetching particle data for halo: {halo.halo_id}")
+        path = self.catalog.path + '/output'
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        try:
+            subhalo_ids = subhalo_context.data['subhalo_id'].unique()
+            particles_halo = None
+            for subhalo_id in subhalo_ids:
+                particles = self._get_p_subhalo(subhalo_id)
+                if particles_halo is None:
+                    particles_halo = particles
+                else:
+                    particles_halo += particles
+            return particles_halo
+        except Exception as e:
+            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {halo.halo_id}\n {e}")
+
 
 class EagleFetcher(DataFetcher):
     """
@@ -827,7 +869,7 @@ class EagleFetcher(DataFetcher):
             A context object containing particle data.
         """
         subgroup_id = kwargs.get('subhalo_id', None)
-        group_number = kwargs.get('group_number')
+        group_number = kwargs.get('group_number', None)
 
         if subgroup_id is None:
             logger.error("subhalo_id must be provided in kwargs")
@@ -838,6 +880,29 @@ class EagleFetcher(DataFetcher):
 
         logger.info(f"Fetching particle data for subhalo: {subgroup_id}, Group_number: {group_number}")
         return self._get_p_subhalo(subgroup_id, group_number)
+
+    def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
+        """
+        Fetches particle data for a given subhalo in the Eagle catalog.
+
+        Parameters:
+        -----------
+        subhalo_id : int
+            ID of the subhalo for which particle data is needed.
+
+        Returns:
+        --------
+        SubhaloParticles
+            A context object containing particle data.
+        """
+        group_number = kwargs.get('group_number', None)
+
+        if group_number is None:
+            logger.error("halo_id must be provided in kwargs")
+            raise ValueError("group_number must be provided in kwargs")
+
+        logger.info(f"Fetching particle data for subhalo: Group_number: {group_number}")
+        return self._get_p_halo(group_number)
 
     def _get_fields(self):
         pass
@@ -1225,6 +1290,90 @@ class EagleFetcher(DataFetcher):
         except Exception as e:
             raise Exception(f'Something went wrong: {e}')
 
+    def _get_p_halo(self, group_number: int):
+        """
+        Fetches particle data for a specific subhalo from the Eagle simulation.
+
+        Parameters:
+        -----------
+        subgroup_id : int
+            The index of the subhalo from which to retrieve particle data.
+        group_number: int
+            The index of the halo where the subhalo belongs from
+
+        Returns:
+        --------
+        SubhaloParticles
+            A context object containing particle data such as mass, coordinates, and velocities.
+        """
+        try:
+            path = self.catalog.path
+            part_types = self.particle_fields
+            particles = {}
+
+            # Read particles data and change format
+            for part_type in part_types:
+                data_part_type = {}
+                itype = self.__partTypeNum(part_type)
+                OmegaConf.set_struct(self.catalog, False)
+                self.catalog.fields.particles[part_type]["GroupNumber"] = {
+                    "input": None,
+                    "output": None,
+                    "scaling": None,
+                    "name": "group_number"
+                }
+                OmegaConf.set_struct(self.catalog, True)
+
+                fields = list(self.catalog.fields.particles[part_type].keys())
+                if not os.path.exists(path):
+                    logger.error(f"The path {path} does not exist.")
+                    raise Exception(f'The path {path} does not exist.')
+
+                for field in fields:
+                    column = read_dataset(itype, field, path)
+                    data_part_type[field] = column
+                    # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
+                    if column.ndim > 1:
+                        converted = to_list(data_part_type, field)
+                        del data_part_type[field]
+                        data_part_type[field] = converted
+
+                # Filter by indexing
+                tmp = pd.DataFrame(data_part_type)
+                # Create index with these two columns for speed
+                tmp = tmp[(tmp["GroupNumber"] == group_number)]
+                if len(tmp) == 0:
+                    logger.error(f'Error, there is not particle data for GroupNumber={group_number}')
+                    raise ValueError(f'Error, there is not particle data for GroupNumber={group_number}')
+                tmp = tmp.drop(columns=['GroupNumber'])
+                particles[part_type] = tmp.to_dict(orient='list')
+
+            else:
+                logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
+
+            table = 'particles'
+
+            particle_conditions = {}
+            for col, type_config in self.catalog.fields.particles.items():
+                for t in type_config:
+                    if 'filter' in type_config[t]:
+                        if col not in particle_conditions:
+                            particle_conditions[col] = {}
+                        particle_conditions[col][t] = type_config[t]
+
+            steps = [
+                lambda df: convert_to_dataframe(particles),
+                lambda df: apply_unit_conversion(df, self.particle_fields, table, self.catalog,
+                                                        g=self.catalog.g, g_2_solar=self.catalog.g_2_solar),
+                lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles)
+            ]
+            processed_particles = run_pipeline(particles, steps)
+            halo_particles = SubhaloParticles(processed_particles, self.catalog.fields.particles)
+            return halo_particles
+
+        except Exception as e:
+            raise Exception(f'Something went wrong: {e}')
+
 
 class FlamingoFetcher(DataFetcher):
     def __init__(self, catalog: DictConfig, **kwargs):
@@ -1281,6 +1430,29 @@ class FlamingoFetcher(DataFetcher):
 
         logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
         return self._get_p_subhalo(subhalo_id)
+
+    def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
+        """
+        Fetches particle data for a given halo.
+
+        Parameters:
+        -----------
+        halo_id : int
+            ID of the halo for which particle data is needed.
+
+        Returns:
+        --------
+        SubhaloParticles
+            A context object containing particle data.
+        """
+        halo_id = kwargs.get('halo_id', None)
+
+        if halo_id is None:
+            logger.error("halo_id must be provided in kwargs")
+            raise ValueError("halo_id must be provided in kwargs")
+
+        logger.info(f"Fetching particle data for subhalo: {halo_id}")
+        return self._get_p_halo(halo_id)
 
     def _validate_and_process_fields(self, soap: SWIFTDataset, fields, super_key, mask=None, n_rows=None):
         """
@@ -1633,6 +1805,101 @@ class FlamingoFetcher(DataFetcher):
             return particle_data
         except Exception as e:
             raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
+
+    # TODO TEST
+    def _get_p_halo(self, halo_id: int) -> SubhaloParticles:
+        """
+        Fetches particle data for a specific halo.
+
+        Parameters:
+        -----------
+        isubhalo : int
+            The index of the subhalo from which to retrieve particle data, corresponds to
+            fof_subhalos.input_halos.halo_catalogue_index.
+
+        Returns:
+        --------
+        SubhaloParticles
+            A context object containing particle data such as mass, coordinates, and velocities.
+        """
+        logger.debug(f"Fetching particle data for halo: {halo_id}")
+
+        # Get the position for the subhalo
+        halo_position = np.where(self.fof_subhalos.input_halos.halo_catalogue_index == halo_id)[0]
+
+        if len(halo_position) > 0:
+            host_halo_index = self.fof_subhalos.soap.host_halo_index[halo_position[0]]
+        else:
+            raise ValueError(f'Subhalo: {halo_id} is not a primary subhalo')
+
+        if host_halo_index != -1:
+            # Not a primary index
+            raise ValueError(f'Subhalo: {halo_id} is not a primary subhalo')
+
+        # Add halo_catalogue_index for all the particle types
+        for part_type in self.particle_fields:
+            OmegaConf.set_struct(self.catalog, False)
+            if 'halo_catalogue_index' not in self.catalog.fields.particles[part_type]:
+                self.catalog.fields.particles[part_type]['halo_catalogue_index'] = {
+                    "input": None,
+                    "output": None,
+                    "scaling": None,
+                    "name": "parent_id"
+                }
+            OmegaConf.set_struct(self.catalog, True)
+
+        try:
+            part_types = self.particle_fields
+            data = {}
+
+            type_mask = {}
+            # Build particles mask
+            for part_type in part_types:
+                particles_of_type = getattr(self.particles, part_type)
+                # Mask to get particles belonging to the primary subhalo
+                particles_mask_primary = particles_of_type.halo_catalogue_index == halo_id
+                is_full_false = np.sum(particles_mask_primary)
+
+                # Get satellite subhalos
+                satellites_mask = self.fof_subhalos.soap.host_halo_index == halo_id
+
+                # Loop over the halo_catalogue_index of the satellites to get all bound particles
+                satellites_idx_array = self.fof_subhalos.input_halos.halo_catalogue_index[satellites_mask]
+                particles_mask_satellites = np.isin(particles_of_type.halo_catalogue_index, satellites_idx_array)
+                particles_mask = particles_mask_primary | particles_mask_satellites
+
+                type_mask[part_type] = particles_mask
+                # TODO add warning if mask is full of false
+
+            particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
+            filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
+            particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
+            data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
+                                                     mask=type_mask)
+            table = 'particles'
+            steps = [
+                lambda particles: convert_to_dataframe(data),
+                lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+                lambda particles: apply_filters(particles, filtered_conditions, self.catalog.fields.particles)
+            ]
+
+            processed_particles = run_pipeline(data, steps)
+            logger.debug("Halo data fetched successfully.")
+
+            # SubhaloParticles is expecting a dict with part_types - df
+            d = {}
+            columns = list(processed_particles.columns)
+            for part_type in part_types:
+                filtered_columns = [column for column in columns if part_type in column]
+                renamed_columns = [column.replace(f'{part_type}.', '') for column in filtered_columns]
+                rename_dict = dict(zip(filtered_columns, renamed_columns))
+                tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
+                d[part_type] = tmp
+
+            particle_data = SubhaloParticles(d, self.catalog.fields.particles)
+            return particle_data
+        except Exception as e:
+            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {halo_id}\n {e}")
 
 
 

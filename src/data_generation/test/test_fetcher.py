@@ -111,6 +111,18 @@ class TestFetcher(unittest.TestCase):
         self.assertTrue(hasattr(subhalo_particles_1, "star_v"))
         self.assertIsInstance(subhalo_particles_1.star_v, np.ndarray)
 
+    def test_get_p_halo_illustris(self):
+        halo_particles_1 = self.fetcher_illustris.get_p_halo(halo_id=0)
+        self.assertIsInstance(halo_particles_1, SubhaloParticles)
+        self.assertTrue(hasattr(halo_particles_1, "gas_m"))
+        self.assertIsInstance(halo_particles_1.gas_m, np.ndarray)
+        self.assertTrue(hasattr(halo_particles_1, "star_m"))
+        self.assertIsInstance(halo_particles_1.star_m, np.ndarray)
+        self.assertTrue(hasattr(halo_particles_1, "star_p"))
+        self.assertIsInstance(halo_particles_1.star_p, np.ndarray)
+        self.assertTrue(hasattr(halo_particles_1, "star_v"))
+        self.assertIsInstance(halo_particles_1.star_v, np.ndarray)
+
     def test_get_halos_eagle(self):
         halo_context_2 = self.fetcher_eagle.get_halos()
         self.assertIsInstance(halo_context_2, HaloContext)
@@ -164,6 +176,21 @@ class TestFetcher(unittest.TestCase):
         self.assertTrue(hasattr(subhalo_particles_2, "star_v"))
         self.assertIsInstance(subhalo_particles_2.star_v, np.ndarray)
 
+    def test_get_p_halo_eagle(self):
+        self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
+        self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
+
+        halo_particles_2 = self.fetcher_eagle.get_p_halo(group_number=2)
+        self.assertIsInstance(halo_particles_2, SubhaloParticles)
+        self.assertTrue(hasattr(halo_particles_2, "gas_m"))
+        self.assertIsInstance(halo_particles_2.gas_m, np.ndarray)
+        self.assertTrue(hasattr(halo_particles_2, "star_m"))
+        self.assertIsInstance(halo_particles_2.star_m, np.ndarray)
+        self.assertTrue(hasattr(halo_particles_2, "star_p"))
+        self.assertIsInstance(halo_particles_2.star_p, np.ndarray)
+        self.assertTrue(hasattr(halo_particles_2, "star_v"))
+        self.assertIsInstance(halo_particles_2.star_v, np.ndarray)
+
     def test_get_halos_flamingo(self):
         halo_context_1 = self.fetcher_flamingo.get_halos()
         self.assertIsInstance(halo_context_1, HaloContext)
@@ -184,6 +211,16 @@ class TestFetcher(unittest.TestCase):
         self.assertIsInstance(subhalo_particles_1.star_p, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_1, "star_v"))
         self.assertIsInstance(subhalo_particles_1.star_v, np.ndarray)
+
+    def test_get_p_halo_flamingo(self):
+        halo_particles_1 = self.fetcher_flamingo.get_p_halo(halo_id=0)
+        self.assertIsInstance(halo_particles_1, SubhaloParticles)
+        self.assertTrue(hasattr(halo_particles_1, "star_m"))
+        self.assertIsInstance(halo_particles_1.star_m, np.ndarray)
+        self.assertTrue(hasattr(halo_particles_1, "star_p"))
+        self.assertIsInstance(halo_particles_1.star_p, np.ndarray)
+        self.assertTrue(hasattr(halo_particles_1, "star_v"))
+        self.assertIsInstance(halo_particles_1.star_v, np.ndarray)
 
     def test_eagle_simulation_codes(self):
         simulation_codes = ['RefL0025N0376',    # nok

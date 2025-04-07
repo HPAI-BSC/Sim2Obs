@@ -130,7 +130,7 @@ class TestFlamingoData(unittest.TestCase):
 
         # Loop over the halo_catalogue_index of the satellites to get all bound particles
         satellites_idx_array = self.fof_subhalos.input_halos.halo_catalogue_index[satellites_mask]
-        particles_mask_satellites = self.data.stars.halo_catalogue_index == satellites_idx_array
+        particles_mask_satellites = np.isin(self.data.stars.halo_catalogue_index, satellites_idx_array)
 
         particles_mask = particles_mask_primary | particles_mask_satellites
 
@@ -171,7 +171,7 @@ class TestFlamingoData(unittest.TestCase):
 
                 # Loop over the halo_catalogue_index of the satellites to get all bound particles
                 satellites_idx_array = self.fof_subhalos.input_halos.halo_catalogue_index[satellites_mask]
-                particles_mask_satellites = self.data.stars.halo_catalogue_index == satellites_idx_array
+                particles_mask_satellites = np.isin(self.data.stars.halo_catalogue_index, satellites_idx_array)
 
                 particles_mask = particles_mask_primary | particles_mask_satellites
                 mass_particles_fof = mass_array[particles_mask]

@@ -171,7 +171,7 @@ class DataLoader(PipelineStep):
 
     def _load_subhalo_particles_data(self, halo: Halo) -> SubhaloParticles:
         """
-        Loads subhalo particle data for a given subhalo ID and applies rotations.
+        Loads subhalo particle data for a given subhalo ID.
 
         Parameters:
         -----------
