@@ -467,27 +467,3 @@ def r500_to_r200(r500):
 def m500_to_m200(m500):
     """Convert M500c to M200c assuming NFW scaling"""
     return m500 * (1.54) ** 3  # M200c ≈ M500c * (R200c / R500c)^3
-
-
-def compute_fov(stellar_positions, total_mass, percentage=90):
-    """
-    Compute the field of view (FOV) that includes a certain percentage of the total stellar mass.
-
-    :param stellar_positions: Array of stellar positions in kpc (N x 3 array).
-    :param total_mass: Array of stellar masses (N array).
-    :param percentage: Percentage of total mass to include in the FOV (default 90%).
-
-    :return: Radius of the FOV that captures the given percentage of total mass.
-    """
-    # Sort positions based on radial distance from the center
-    distances = np.linalg.norm(stellar_positions, axis=1)  # Distance from the center
-    sorted_indices = np.argsort(distances)
-    sorted_masses = total_mass[sorted_indices]
-
-    # Compute the cumulative mass distribution
-    cumulative_mass = np.cumsum(sorted_masses)
-    cumulative_mass /= np.sum(total_mass)  # Normalize to total mass
-
-    # Find the radius that includes the given percentage of mass
-    fov_radius = distances[sorted_indices[np.where(cumulative_mass >= percentage / 100)[0][0]]]
-    return fov_radius

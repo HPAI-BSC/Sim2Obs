@@ -1,7 +1,9 @@
+import os
 import pickle
 import unittest
 
 import numpy as np
+import requests
 from hydra import initialize, compose
 
 from src.data_generation.src.data_fetcher import DataFetcherFactory
@@ -18,6 +20,30 @@ class TestHalo(unittest.TestCase):
 
         with open("data/illustris/halo_context_0.pkl", "rb") as file:
             self.halo_context_illustris = pickle.load(file)
+
+        with open("data/illustris/subhalo_context_0.pkl", "rb") as file:
+            self.subhalo_context_illustris = pickle.load(file)
+
+        '''
+
+        with initialize(config_path="configs"):
+            # Initialize the cfg_illustris and cfg_eagle
+            self.cfg_illustris = compose(config_name="data_generation.yaml")
+
+            # Load the local config for paths and assign them
+            local_config = compose(config_name="paths/local.yaml")
+            self.cfg_illustris.paths = local_config.paths
+
+            # Dynamic catalog loading for both Illustris and Eagle
+            self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
+
+        os.environ['PROJECT_ROOT'] = '../../..'
+
+        required_keys = ['G']
+        data_loader_dict = next((step for step in self.cfg_illustris.pipeline if step.name == 'data_loader'), None)
+        attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
+        self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
+        '''
 
     def test_missing_required_attributes(self):
         """Test that the Halo class raises an error if required attributes are missing."""
@@ -51,24 +77,6 @@ class TestHalo(unittest.TestCase):
 
     def test_get_items_by_halo(self):
         # halo id 114, subhalo 4229
-
-        # Initialize Hydra and load configuration
-        with initialize(config_path="configs"):
-            # Initialize the cfg_illustris and cfg_eagle
-            self.cfg_illustris = compose(config_name="data_generation.yaml")
-
-            # Load the local config for paths and assign them
-            local_config = compose(config_name="paths/local.yaml")
-            self.cfg_illustris.paths = local_config.paths
-
-            # Dynamic catalog loading for both Illustris and Eagle
-            self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
-
-        required_keys = ['G']
-        data_loader_dict = next((step for step in self.cfg_illustris.pipeline if step.name == 'data_loader'), None)
-        attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
-        self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
-
         halo_context = self.fetcher_illustris.get_halos()
         halo = halo_context.get_halo_by_id(halo_id=114)
 
@@ -77,16 +85,5 @@ class TestHalo(unittest.TestCase):
 
         tmp = subhalo_context.get_items_by_halo(halo_id=114)
         print()
-
-    def test_get_overlapping_halos(self):
-        # Manually adjust the positions to introduce overlap between halos 0, 2, and 3
-        # The distance between their centers should be less than the sum of their radii.
-        self.halo_context_illustris.data['gpos'][0] = np.array([10000.0, 24000.0, 16000.0], dtype=np.float32)
-        self.halo_context_illustris.data['gpos'][2] = np.array([10000.0, 24500.0, 16000.0], dtype=np.float32)
-        self.halo_context_illustris.data['gpos'][3] = np.array([10000.0, 24700.0, 16000.0], dtype=np.float32)
-        overlapping_halos = self.halo_context_illustris.get_overlapping_halos(halo_id=0)
-        expected_ids = [2, 3]
-        for i, halo in enumerate(overlapping_halos):
-            self.assertEqual(halo.halo_id, expected_ids[i])
 
 

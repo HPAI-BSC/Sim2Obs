@@ -52,6 +52,16 @@ class Halo:
     def empty_instance(cls):
         return cls(halo_id=None, fsub=None)  # You can adjust these default values as needed
 
+    def add_children(self, subhalo_context):
+        if not hasattr(self, 'subhalos_ids'):
+            filtered_subhalo_context = subhalo_context.data[subhalo_context.data['id_parents'] == self.halo_id]
+            if 'group_number' in subhalo_context.data:
+                group_number = filtered_subhalo_context['group_number']
+                subhalo_id = filtered_subhalo_context['subhalo_id']
+                self.subhalo_ids = list(zip(group_number, subhalo_id))
+            else:
+                self.subhalo_ids = filtered_subhalo_context['subhalo_id'].tolist()
+
 
 class HaloContext:
     """
@@ -153,30 +163,6 @@ class HaloContext:
             return Halo(**halo_data)
         except KeyError:
             raise Exception(f"Halo ID {halo_id} not found.")
-
-    def get_overlapping_halos(self, halo_id):
-        print(self.data.to_dict())
-
-        halo = self.get_halo_by_id(halo_id)
-        halo_r200 = halo.r200
-        halo_gpos = halo.gpos
-
-        # Compute distances to the other halos
-        # Using numpy for vectorized distance computation
-        positions = np.array(self.data['gpos'].tolist())  # Convert the positions of all halos into a numpy array
-        distances = np.linalg.norm(positions - halo_gpos, axis=1)  # Compute Euclidean distance between halo centers
-
-        # Compute the sum of the radii
-        radius_sum = self.data['r200'] + halo_r200
-
-        # Find halos whose distance is less than the sum of radii
-        overlapping_halo_ids = self.data[distances <= radius_sum]['halo_id'].to_list()
-        overlapping_halo_ids.remove(halo_id)
-
-        halos = []
-        for id in overlapping_halo_ids:
-            halos.append(self.get_halo_by_id(id))
-        return halos
 
     @property
     def halo_id(self):

@@ -3,6 +3,7 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig
+from scipy.spatial import cKDTree
 
 from src.data_generation.src.halo import HaloContext, Halo
 from src.data_generation.src.utils import rotate, dict_depth, setup_logger
@@ -122,28 +123,25 @@ class SubhaloContext:
             # Set a multi-index for efficient querying
             self.data.set_index(["id_parents", "subhalo_id"], inplace=True, drop=False)
 
-    def preprocess(self, halo_context: HaloContext):
+    def preprocess(self, halo: Halo):
         """
-        Preprocesses the subhalo data based on the halo context, including normalizing positions.
-
+        ...
         Parameters:
         -----------
         halo_context : HaloContext
             A HaloContext object providing necessary information for preprocessing.
         """
         # TODO Add missing columns
-        for id_halo in halo_context.halo_id:
-            halo = halo_context.get_halo_by_id(id_halo)
-            indexing = self.data['id_parents'] == id_halo
-            is_full_false = np.sum(indexing)
-            if is_full_false == 0:
-                logger.warning(f'No subhalos found for: {id_halo}')
-            if hasattr(halo, 'group_number'):
-                indexing &= self.data['group_number'] == halo.group_number
-            if 'spos' in self.data:
-                # Normalize subhalo positions respect to the center of its halo
-                self.data.loc[indexing, 'spos'] = self.data.loc[indexing, 'spos'].apply(lambda row: row - halo.gpos)
-            # ...
+        indexing = self.data['id_parents'] == halo.halo_id
+        is_full_false = np.sum(indexing)
+        if is_full_false == 0:
+            logger.warning(f'No subhalos found for: {halo.halo_id}')
+        if hasattr(halo, 'group_number'):
+            indexing &= self.data['group_number'] == halo.group_number
+        if 'spos' in self.data:
+            # Normalize subhalo positions respect to the center of its halo
+            self.data.loc[indexing, 'spos'] = self.data.loc[indexing, 'spos'].apply(lambda row: row - halo.gpos)
+        # ...
 
     def rotate(self, z, axis, degree):
         """
@@ -218,12 +216,16 @@ class SubhaloContext:
             If the provided `subhalo_id` (and `halo_id` if given) is not found in the DataFrame.
         """
         try:
+            # TODO update ?
             # Query using the multi-index
             if halo_id is not None:
-                # halo id here is the group number - Eagle case
-                result = self.data.loc[(self.data['group_number'] == halo_id) &
-                                       (self.data['subhalo_id'] == subhalo_id)].to_dict()
-                return SubHalo(**result)
+                if 'group_number' in self.data:
+                    # halo id here is the group number - Eagle case
+                    result = self.data.loc[(self.data['group_number'] == halo_id) &
+                                           (self.data['subhalo_id'] == subhalo_id)].to_dict()
+                    return SubHalo(**result)
+                else:
+                    raise ValueError()
             else:
                 # For Illustris-like single-index lookup, query all matching rows
                 result = self.data.xs(subhalo_id, level="subhalo_id", drop_level=False).to_dict()
@@ -255,6 +257,42 @@ class SubhaloContext:
             return SubhaloContext.from_dataframe(df)
         except KeyError:
             raise Exception(f"No subhalos found for halo_id={halo_id}.")
+
+    # TODO REMOVE ?
+    def get_overlapping_subhalos(self, halo: Halo):
+        halo_r200 = halo.r200
+        halo_gpos = halo.gpos
+
+        # Distances are NOT PREPROCESSED
+
+        # Get subhalos of different halos, not current one
+        tmp = self.data[self.data['id_parents'] != halo.halo_id]
+
+        # Convert positions back to numpy 3D
+        positions = np.vstack(tmp['spos'])
+
+        # Compute Euclidean distance between halo center
+        distances = np.linalg.norm(positions - halo_gpos, axis=1)
+
+        # Find halos whose distance is less than the sum of radii * 2
+        overlapping_subhalo = tmp[distances <= (halo_r200*2)]
+        return overlapping_subhalo
+
+    def __add__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+
+        data = {}
+        for key in self.__dict__:
+            self_val = getattr(self, key)
+            other_val = getattr(other, key)
+
+            if isinstance(self_val, pd.DataFrame) and isinstance(other_val, pd.DataFrame):
+                data[key] = pd.concat([self_val, other_val], axis=0, ignore_index=True)
+            else:
+                raise TypeError(f"Cannot concatenate attribute '{key}' of type {type(self_val)}")
+
+        return self.__class__(df=data['data'], column_map=None)
 
     # Properties for direct access to columns
     @property
@@ -350,18 +388,24 @@ class SubhaloParticles:
         if not isinstance(other, self.__class__):
             return NotImplemented
 
-        new_attrs = {}
+        data = {}
         for key in self.__dict__:
-            self_val = getattr(self, key)
-            other_val = getattr(other, key)
+            try:
+                self_val = getattr(self, key)
+                if hasattr(other, key):
+                    other_val = getattr(other, key)
 
-            if isinstance(self_val, np.ndarray) and isinstance(other_val, np.ndarray):
-                new_attrs[key] = np.concatenate((self_val, other_val), axis=0)
-            else:
-                # Decide what to do with non-ndarray attributes here
-                raise TypeError(f"Cannot concatenate attribute '{key}' of type {type(self_val)}")
-
-        return self.__class__(**new_attrs)
+                    if isinstance(self_val, np.ndarray) and isinstance(other_val, np.ndarray):
+                        data[key] = np.concatenate((self_val, other_val), axis=0)
+                    else:
+                        # Decide what to do with non-ndarray attributes here
+                        raise TypeError(f"Cannot concatenate attribute '{key}' of type {type(self_val)}")
+                else:
+                    data[key] = self_val
+            except Exception as e:
+                print(e)
+                continue
+        return self.__class__(data=data, column_map=None)
 
     def preprocess(self, halo: Halo):
         """

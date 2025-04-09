@@ -1,13 +1,16 @@
 import pickle
 import unittest
+
+import pandas as pd
 from dotenv import load_dotenv
 
 from hydra import initialize, compose
 
 from src.data_generation.src.cosmos import CosmosData
+from src.data_generation.src.data_fetcher import DataFetcherFactory
 from src.data_generation.src.data_loader_step import DataLoader
 from src.data_generation.src.feature import VelocityDispersionProcessor, ICLProcessor, FeatureProcessor
-from src.data_generation.src.halo import Halo
+from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.subhalo import SubhaloParticles, SubhaloContext
 
 load_dotenv('../.env')
@@ -41,6 +44,12 @@ class TestDataLoaderStep(unittest.TestCase):
         with open("data/illustris/halo_0.pkl", "rb") as file:
             self.halo_illustris = pickle.load(file)
 
+        with open("data/illustris/halo_context_0.pkl", "rb") as file:
+            self.halo_context_illustris = pickle.load(file)
+
+        with open("data/illustris/subhalo_context_0.pkl", "rb") as file:
+            self.subhalo_context_illustris = pickle.load(file)
+
         # Eagle objs
         with open("data/eagle/subhalo_particles_0.pkl", "rb") as file:
             self.subhalo_particles_eagle = pickle.load(file)
@@ -48,9 +57,19 @@ class TestDataLoaderStep(unittest.TestCase):
         with open("data/eagle/halo_0.pkl", "rb") as file:
             self.halo_eagle = pickle.load(file)
 
+        required_keys = ['G']
+        data_loader_dict = next((step for step in self.cfg_eagle.pipeline if step.name == 'data_loader'), None)
+        attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
+        self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
+        self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
+        self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
+
     def test_load_halo_subhalo_data_illustris(self):
         self.dataLoader = DataLoader(self.cfg_illustris)
-        result = list(self.dataLoader.load_halo_subhalo_data())
+        halo_context = self.fetcher_illustris.get_halos()
+        subhalo_context = self.fetcher_illustris.get_subhalos()
+        overlapping_matrix = self.dataLoader._get_overlapping_halos(subhalo_context, halo_context)
+        result = self.dataLoader._load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         self.assertEqual(len(result), 83)
 
         for halo, subhalo_ctx in result:
@@ -59,38 +78,35 @@ class TestDataLoaderStep(unittest.TestCase):
 
     def test_load_halo_data_eagle(self):
         self.dataLoader = DataLoader(self.cfg_eagle)
-        result = list(self.dataLoader.load_halo_subhalo_data())
+        halo_context = self.fetcher_eagle.get_halos()
+        subhalo_context = self.fetcher_eagle.get_subhalos()
+        overlapping_matrix = self.dataLoader._get_overlapping_halos(subhalo_context, halo_context)
+        result = self.dataLoader._load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         self.assertEqual(len(result), 21)
 
         for halo_df, subhalo_df in result:
             self.assertIsInstance(halo_df, Halo)
             self.assertIsInstance(subhalo_df, SubhaloContext)
 
-    # Not checked (too big)
-    def test_load_halo_data_flamingo(self):
+    def no_test_load_halo_data_flamingo(self):
         self.dataLoader = DataLoader(self.cfg_flamingo)
-        result = list(self.dataLoader.load_halo_subhalo_data())
+        halo_context = self.fetcher_flamingo.get_halos()
+        subhalo_context = self.fetcher_flamingo.get_subhalos()
+        overlapping_matrix = self.dataLoader._get_overlapping_halos(subhalo_context, halo_context)
+        result = self.dataLoader._load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         self.assertEqual(len(result), 128967)
 
-        for halo_df, subhalo_df in result:
+        for halo_df, subhalo_df, overlapping_subhalos in result:
             self.assertIsInstance(halo_df, Halo)
             self.assertIsInstance(subhalo_df, SubhaloContext)
 
-    def test_load_subhalo_particles_illustris(self):
-        self.dataLoader = DataLoader(self.cfg_illustris)
-        halo = self.halo_illustris
-        particles = self.dataLoader._load_subhalo_particles_data(halo)
-        self.assertIsInstance(particles, SubhaloParticles)
-
-    def test_load_subhalo_particles_eagle(self):
-        self.dataLoader = DataLoader(self.cfg_eagle)
-        halo = self.halo_eagle
-        particles = self.dataLoader._load_subhalo_particles_data(halo)
-        self.assertIsInstance(particles, SubhaloParticles)
-
     def test_process_illustris(self):
         data_loader = DataLoader(self.cfg_illustris)
-        halo_subhalo_list = data_loader.load_halo_subhalo_data()[:5]
+        subhalo_context = self.fetcher_illustris.get_subhalos()
+        halo_context = self.fetcher_illustris.get_halos()
+        overlapping_matrix = data_loader._get_overlapping_halos(subhalo_context, halo_context)
+        halo_subhalo_list = data_loader._load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)[:5]
+
         input_feature = VelocityDispersionProcessor()
         output_feature = ICLProcessor(cfg=self.cfg_illustris)
         halo = Halo.empty_instance()
@@ -114,7 +130,11 @@ class TestDataLoaderStep(unittest.TestCase):
 
     def test_process_eagle(self):
         data_loader = DataLoader(self.cfg_eagle)
-        halo_subhalo_list = data_loader.load_halo_subhalo_data()[:5]
+        subhalo_context = self.fetcher_eagle.get_subhalos()
+        halo_context = self.fetcher_eagle.get_halos()
+        overlapping_matrix = data_loader._get_overlapping_halos(subhalo_context, halo_context)
+        halo_subhalo_list = data_loader._load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)[:5]
+
         input_feature = VelocityDispersionProcessor()
         output_feature = ICLProcessor(cfg=self.cfg_eagle)
         halo = Halo.empty_instance()
@@ -136,10 +156,35 @@ class TestDataLoaderStep(unittest.TestCase):
         self.assertIsInstance(results[0][2].subhalo_particles, SubhaloParticles)
         self.assertIsInstance(results[0][2].subhalos, SubhaloContext)
 
-    def test_load_halo_subhalo_data_big_illustris(self):
+    def test_get_overlapping_halos(self):
+        halo_df = pd.DataFrame({
+            'halo_id': [1, 2],
+            'gpos': [[0, 0, 0], [10, 0, 0]],
+            'r200': [3.0, 3.0]
+        })
+
+        subhalo_df = pd.DataFrame({
+            'subhalo_id': [101, 102, 103],
+            'spos': [[1, 0, 0], [10, 1, 0], [5, 5, 5]],  # one near halo 1, one near halo 2, one far
+            'id_parents': [2, 1, 2]  # parent halos are mixed intentionally
+        })
+
+        halo_ctx = HaloContext(halo_df, column_map=None)
+        subhalo_ctx = SubhaloContext(subhalo_df, column_map=None)
+
         self.dataLoader = DataLoader(self.cfg_big_illustris)
-        result = list(self.dataLoader.load_halo_subhalo_data())
-        self.assertEqual(len(result), 2149)
+        result = self.dataLoader._get_overlapping_halos(subhalo_ctx, halo_ctx)
+        # Validate overlaps
+        # Halo 1 overlaps with subhalo 101 (parent is 2)
+        self.assertIn((2, 101), result[1])
+        # Halo 2 overlaps with subhalo 102 (parent is 1)
+        self.assertIn((1, 102), result[2])
+        # Halo 1 should NOT overlap with subhalo 103 (too far)
+        self.assertNotIn((2, 103), result[1])
+
+        # Should only contain external subhalos
+        self.assertNotIn((1, 101), result[1])
+        self.assertNotIn((2, 102), result[2])
 
 
 

@@ -122,8 +122,11 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
 
             # Particle case
             elif dict_depth(field_info) == 2:
+                tmp = OmegaConf.select(cfg, f"fields.{table}.{key}")
                 for key_ii in OmegaConf.select(cfg, f"fields.{table}.{key}"):
                     field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
+                    if field_info_ii is None:
+                        print()
                     h = dict_depth(field_info_ii)
                     if h == 1:
                         if not getattr(field_info_ii, 'name', None):
@@ -615,13 +618,14 @@ class Illustris300Fetcher(DataFetcher):
             logger.error("halo must be provided in kwargs")
             raise ValueError("halo must be provided in kwargs")
 
-        subhalo_context = kwargs.get('subhalo_context', None)
-        if subhalo_context is None:
-            logger.error("subhalo_context must be provided in kwargs")
-            raise ValueError("subhalo_context must be provided in kwargs")
-
         logger.info(f"Fetching particle data for halo: {halo.halo_id}")
-        return self._get_p_halo(halo, subhalo_context)
+        return self._get_p_halo(halo)
+
+    def __get_children(self, halo_row, subhalo_df):
+        halo_id = halo_row['halo_id']
+        children = subhalo_df[subhalo_df['id_parents'] == halo_id]
+        children_ids = list(children['subhalo_id'])
+        return children_ids
 
     def _get_halos(self) -> HaloContext:
         """
@@ -652,6 +656,7 @@ class Illustris300Fetcher(DataFetcher):
             self.column_map['GroupFirstSub'] = 'fsub'
 
         halos = il.groupcat.loadHalos(path, self.catalog.snapnum, fields=self.halo_fields)
+
         if len(halos) > 0:
             table = 'halo'
             halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
@@ -662,9 +667,16 @@ class Illustris300Fetcher(DataFetcher):
                 lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog),
                 lambda halos: apply_filters(halos, halo_conditions, self.catalog.fields.halo)
             ]
+            # Get subhalos ids
+            subhalo_context = self._get_subhalos()
 
             processed_halos = run_pipeline(halos, steps)
+            processed_halos['subhalo_ids'] = processed_halos.apply(lambda halo: self.__get_children(halo,
+                                                                                                    subhalo_context.data),
+                                                                   axis=1)
+
             logger.debug("Halo data fetched successfully.")
+            self.column_map['subhalo_ids'] = 'subhalo_ids'
             halo_context = HaloContext(processed_halos, self.column_map)
             return halo_context
         else:
@@ -749,50 +761,50 @@ class Illustris300Fetcher(DataFetcher):
             logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
-        try:
-            part_types = self.particle_fields
-            data = {}
-            for part_type in part_types:
-                fields = list(self.catalog.fields.particles[part_type].keys())
-                particles = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, part_type, fields=fields)
+        part_types = self.particle_fields
+        data = {}
+        for part_type in part_types:
+            fields = list(self.catalog.fields.particles[part_type].keys())
+            particles = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, part_type, fields=fields)
 
-                # if numpy, convert it to a dict
-                if isinstance(particles, np.ndarray):
-                    tmp = particles
-                    particles = {fields[0]: tmp}
+            # if numpy, convert it to a dict
+            if isinstance(particles, np.ndarray):
+                tmp = particles
+                particles = {fields[0]: tmp}
 
-                if len(particles) > 0:
+            if len(particles) > 0:
+                count = particles.get('count', None)
+                if count is None or count > 0:
                     data[part_type] = particles
                     logger.debug(f"Particle data fetched successfully, particles retrieved")
                 else:
-                    logger.warning(f"No particle data found for subhalo {subhalo_id}.")
+                    logger.debug(f'Subhalo {subhalo_id} does not have {part_type} particles.')
+            else:
+                logger.warning(f"No particle data found for subhalo {subhalo_id}.")
 
-            particle_conditions = {}
-            for col, type_config in self.catalog.fields.particles.items():
-                for t in type_config:
-                    if 'filter' in type_config[t]:
-                        if col not in particle_conditions:
-                            particle_conditions[col] = {}
-                        particle_conditions[col][t] = type_config[t]
+        particle_conditions = {}
+        for col, type_config in self.catalog.fields.particles.items():
+            for t in type_config:
+                if 'filter' in type_config[t]:
+                    if col not in particle_conditions:
+                        particle_conditions[col] = {}
+                    particle_conditions[col][t] = type_config[t]
 
-            table = 'particles'
-            steps = [
-                lambda particles: validate_and_process_fields(particles, self.particle_fields, table,
-                                                              self.catalog),
-                lambda particles: convert_to_dataframe(particles),
-                lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
-                lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles)
-            ]
+        table = 'particles'
+        steps = [
+            lambda particles: validate_and_process_fields(particles, self.particle_fields, table,
+                                                          self.catalog),
+            lambda particles: convert_to_dataframe(particles),
+            lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+            lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles)
+        ]
 
-            processed_particles = run_pipeline(data, steps)
-            logger.debug("Halo data fetched successfully.")
-            particle_data = SubhaloParticles(processed_particles, self.catalog.fields.particles)
-            return particle_data
-        except Exception as e:
-            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
+        processed_particles = run_pipeline(data, steps)
+        logger.debug("Halo data fetched successfully.")
+        particle_data = SubhaloParticles(processed_particles, self.catalog.fields.particles)
+        return particle_data
 
-    #  TODO TEST
-    def _get_p_halo(self, halo: Halo, subhalo_context: SubhaloContext) -> SubhaloParticles:
+    def _get_p_halo(self, halo: Halo) -> SubhaloParticles:
         logger.debug(f"Fetching particle data for halo: {halo.halo_id}")
         path = self.catalog.path + '/output'
 
@@ -800,18 +812,15 @@ class Illustris300Fetcher(DataFetcher):
             logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
-        try:
-            subhalo_ids = subhalo_context.data['subhalo_id'].unique()
-            particles_halo = None
-            for subhalo_id in subhalo_ids:
-                particles = self._get_p_subhalo(subhalo_id)
-                if particles_halo is None:
-                    particles_halo = particles
-                else:
-                    particles_halo += particles
-            return particles_halo
-        except Exception as e:
-            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {halo.halo_id}\n {e}")
+        subhalo_ids = halo.subhalo_ids
+        particles_halo = None
+        for subhalo_id in subhalo_ids:
+            particles = self._get_p_subhalo(subhalo_id)
+            if particles_halo is None:
+                particles_halo = particles
+            else:
+                particles_halo += particles
+        return particles_halo
 
 
 class EagleFetcher(DataFetcher):
@@ -869,7 +878,7 @@ class EagleFetcher(DataFetcher):
             A context object containing particle data.
         """
         subgroup_id = kwargs.get('subhalo_id', None)
-        group_number = kwargs.get('group_number', None)
+        group_number = kwargs.get('halo_id', None)
 
         if subgroup_id is None:
             logger.error("subhalo_id must be provided in kwargs")
@@ -895,14 +904,13 @@ class EagleFetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data.
         """
-        group_number = kwargs.get('group_number', None)
+        halo = kwargs.get('halo', None)
+        if halo is None:
+            logger.error("halo must be provided in kwargs")
+            raise ValueError("halo must be provided in kwargs")
 
-        if group_number is None:
-            logger.error("halo_id must be provided in kwargs")
-            raise ValueError("group_number must be provided in kwargs")
-
-        logger.info(f"Fetching particle data for subhalo: Group_number: {group_number}")
-        return self._get_p_halo(group_number)
+        group_number_list, subhalo_id_list = zip(*halo.subhalo_ids)
+        return self._get_p_halo(group_number_list, subhalo_id_list)
 
     def _get_fields(self):
         pass
@@ -1063,6 +1071,8 @@ class EagleFetcher(DataFetcher):
                 lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog),
                 lambda halos: apply_filters(halos, halo_conditions, self.catalog.fields.halo)
             ]
+
+            # Get subhalos ids
             processed_halos = run_pipeline(halos, steps)
             halo_context = HaloContext(processed_halos, column_map=self.column_map)
             logger.debug("Halo data fetched successfully.")
@@ -1214,83 +1224,80 @@ class EagleFetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data such as mass, coordinates, and velocities.
         """
-        try:
-            path = self.catalog.path
-            part_types = self.particle_fields
-            particles = {}
+        path = self.catalog.path
+        part_types = self.particle_fields
+        particles = {}
 
-            # Read particles data and change format
-            for part_type in part_types:
-                data_part_type = {}
-                itype = self.__partTypeNum(part_type)
-                OmegaConf.set_struct(self.catalog, False)
-                self.catalog.fields.particles[part_type]["GroupNumber"] = {
-                    "input": None,
-                    "output": None,
-                    "scaling": None,
-                    "name": "group_number"
-                }
-                self.catalog.fields.particles[part_type]["SubGroupNumber"] = {
-                    "input": None,
-                    "output": None,
-                    "scaling": None,
-                    "name": "subhalo_id"
-                }
-                OmegaConf.set_struct(self.catalog, True)
+        # Read particles data and change format
+        for part_type in part_types:
+            data_part_type = {}
+            itype = self.__partTypeNum(part_type)
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.particles[part_type]["GroupNumber"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "group_number"
+            }
+            self.catalog.fields.particles[part_type]["SubGroupNumber"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "subhalo_id"
+            }
+            OmegaConf.set_struct(self.catalog, True)
 
-                fields = list(self.catalog.fields.particles[part_type].keys())
-                if not os.path.exists(path):
-                    logger.error(f"The path {path} does not exist.")
-                    raise Exception(f'The path {path} does not exist.')
+            fields = list(self.catalog.fields.particles[part_type].keys())
+            if not os.path.exists(path):
+                logger.error(f"The path {path} does not exist.")
+                raise Exception(f'The path {path} does not exist.')
 
-                for field in fields:
-                    column = read_dataset(itype, field, path)
-                    data_part_type[field] = column
-                    # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
-                    if column.ndim > 1:
-                        converted = to_list(data_part_type, field)
-                        del data_part_type[field]
-                        data_part_type[field] = converted
+            for field in fields:
+                column = read_dataset(itype, field, path)
+                data_part_type[field] = column
+                # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
+                if column.ndim > 1:
+                    converted = to_list(data_part_type, field)
+                    del data_part_type[field]
+                    data_part_type[field] = converted
 
-                # Filter by indexing
-                tmp = pd.DataFrame(data_part_type)
-                # Create index with these two columns for speed
-                tmp = tmp[(tmp["GroupNumber"] == group_number) & (tmp["SubGroupNumber"] == subgroup_id)]
-                if len(tmp) == 0:
-                    logger.error(f'Error, there is not particle data for GroupNumber={group_number} and '
-                                 f'SubGroupNumber={subgroup_id}')
-                    raise ValueError(f'Error, there is not particle data for GroupNumber={group_number} and'
-                                     f' SubGroupNumber={subgroup_id}')
-                tmp = tmp.drop(columns=['GroupNumber', 'SubGroupNumber'])
-                particles[part_type] = tmp.to_dict(orient='list')
+            # Filter by indexing
+            tmp = pd.DataFrame(data_part_type)
+            # Create index with these two columns for speed
+            tmp = tmp[(tmp["GroupNumber"] == group_number) & (tmp["SubGroupNumber"] == subgroup_id)]
+            if len(tmp) == 0:
+                logger.error(f'Error, there is not particle data for GroupNumber={group_number} and '
+                             f'SubGroupNumber={subgroup_id}')
+                raise ValueError(f'Error, there is not particle data for GroupNumber={group_number} and'
+                                 f' SubGroupNumber={subgroup_id}')
+            tmp = tmp.drop(columns=['GroupNumber', 'SubGroupNumber'])
+            particles[part_type] = tmp.to_dict(orient='list')
 
-            else:
-                logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
+        else:
+            logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
 
-            table = 'particles'
+        table = 'particles'
 
-            particle_conditions = {}
-            for col, type_config in self.catalog.fields.particles.items():
-                for t in type_config:
-                    if 'filter' in type_config[t]:
-                        if col not in particle_conditions:
-                            particle_conditions[col] = {}
-                        particle_conditions[col][t] = type_config[t]
+        particle_conditions = {}
+        for col, type_config in self.catalog.fields.particles.items():
+            for t in type_config:
+                if 'filter' in type_config[t]:
+                    if col not in particle_conditions:
+                        particle_conditions[col] = {}
+                    particle_conditions[col][t] = type_config[t]
 
-            steps = [
-                lambda df: convert_to_dataframe(particles),
-                lambda df: apply_unit_conversion(df, self.particle_fields, table, self.catalog,
-                                                        g=self.catalog.g, g_2_solar=self.catalog.g_2_solar),
-                lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles)
-            ]
-            processed_particles = run_pipeline(particles, steps)
-            subhalo_particles = SubhaloParticles(processed_particles, self.catalog.fields.particles)
-            return subhalo_particles
+        steps = [
+            lambda df: convert_to_dataframe(particles),
+            lambda df: apply_unit_conversion(df, self.particle_fields, table, self.catalog,
+                                                    g=self.catalog.g, g_2_solar=self.catalog.g_2_solar),
+            lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles)
+        ]
+        processed_particles = run_pipeline(particles, steps)
+        subhalo_particles = SubhaloParticles(processed_particles, self.catalog.fields.particles)
+        return subhalo_particles
 
-        except Exception as e:
-            raise Exception(f'Something went wrong: {e}')
-
-    def _get_p_halo(self, group_number: int):
+    # TODO need a list of subgroupids
+    def _get_p_halo(self, group_number_list: list, subhalo_id_list: list):
         """
         Fetches particle data for a specific subhalo from the Eagle simulation.
 
@@ -1306,73 +1313,72 @@ class EagleFetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data such as mass, coordinates, and velocities.
         """
-        try:
-            path = self.catalog.path
-            part_types = self.particle_fields
-            particles = {}
+        path = self.catalog.path
+        part_types = self.particle_fields
+        particles = {}
 
-            # Read particles data and change format
-            for part_type in part_types:
-                data_part_type = {}
-                itype = self.__partTypeNum(part_type)
-                OmegaConf.set_struct(self.catalog, False)
-                self.catalog.fields.particles[part_type]["GroupNumber"] = {
-                    "input": None,
-                    "output": None,
-                    "scaling": None,
-                    "name": "group_number"
-                }
-                OmegaConf.set_struct(self.catalog, True)
+        # Read particles data and change format
+        for part_type in part_types:
+            data_part_type = {}
+            itype = self.__partTypeNum(part_type)
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.particles[part_type]["GroupNumber"] = {
+                "input": None,
+                "output": None,
+                "scaling": None,
+                "name": "group_number"
+            }
+            OmegaConf.set_struct(self.catalog, True)
 
-                fields = list(self.catalog.fields.particles[part_type].keys())
-                if not os.path.exists(path):
-                    logger.error(f"The path {path} does not exist.")
-                    raise Exception(f'The path {path} does not exist.')
+            fields = list(self.catalog.fields.particles[part_type].keys())
+            fields.append('SubGroupNumber')
+            if not os.path.exists(path):
+                logger.error(f"The path {path} does not exist.")
+                raise Exception(f'The path {path} does not exist.')
 
-                for field in fields:
-                    column = read_dataset(itype, field, path)
-                    data_part_type[field] = column
-                    # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
-                    if column.ndim > 1:
-                        converted = to_list(data_part_type, field)
-                        del data_part_type[field]
-                        data_part_type[field] = converted
+            for field in fields:
+                column = read_dataset(itype, field, path)
+                data_part_type[field] = column
+                # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
+                if column.ndim > 1:
+                    converted = to_list(data_part_type, field)
+                    del data_part_type[field]
+                    data_part_type[field] = converted
 
-                # Filter by indexing
-                tmp = pd.DataFrame(data_part_type)
-                # Create index with these two columns for speed
-                tmp = tmp[(tmp["GroupNumber"] == group_number)]
-                if len(tmp) == 0:
-                    logger.error(f'Error, there is not particle data for GroupNumber={group_number}')
-                    raise ValueError(f'Error, there is not particle data for GroupNumber={group_number}')
-                tmp = tmp.drop(columns=['GroupNumber'])
-                particles[part_type] = tmp.to_dict(orient='list')
+            # Filter by indexing
+            tmp = pd.DataFrame(data_part_type)
+            # Create index with these two columns for speed
+            tmp = tmp[(tmp["GroupNumber"].isin(group_number_list)) & (tmp['SubGroupNumber'].isin(subhalo_id_list))]
+            if len(tmp) == 0:
+                logger.error(f'Error, there is not particle data for GroupNumber={group_number_list} '
+                             f'and subhalo ids={subhalo_id_list}')
+                raise ValueError(f'Error, there is not particle data for GroupNumber={group_number_list} '
+                                 f'and subhalo ids={subhalo_id_list}')
+            tmp = tmp.drop(columns=['GroupNumber', 'SubGroupNumber'])
+            particles[part_type] = tmp.to_dict(orient='list')
 
-            else:
-                logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
+        else:
+            logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
 
-            table = 'particles'
+        table = 'particles'
 
-            particle_conditions = {}
-            for col, type_config in self.catalog.fields.particles.items():
-                for t in type_config:
-                    if 'filter' in type_config[t]:
-                        if col not in particle_conditions:
-                            particle_conditions[col] = {}
-                        particle_conditions[col][t] = type_config[t]
+        particle_conditions = {}
+        for col, type_config in self.catalog.fields.particles.items():
+            for t in type_config:
+                if 'filter' in type_config[t]:
+                    if col not in particle_conditions:
+                        particle_conditions[col] = {}
+                    particle_conditions[col][t] = type_config[t]
 
-            steps = [
-                lambda df: convert_to_dataframe(particles),
-                lambda df: apply_unit_conversion(df, self.particle_fields, table, self.catalog,
-                                                        g=self.catalog.g, g_2_solar=self.catalog.g_2_solar),
-                lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles)
-            ]
-            processed_particles = run_pipeline(particles, steps)
-            halo_particles = SubhaloParticles(processed_particles, self.catalog.fields.particles)
-            return halo_particles
-
-        except Exception as e:
-            raise Exception(f'Something went wrong: {e}')
+        steps = [
+            lambda df: convert_to_dataframe(particles),
+            lambda df: apply_unit_conversion(df, self.particle_fields, table, self.catalog,
+                                                    g=self.catalog.g, g_2_solar=self.catalog.g_2_solar),
+            lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles)
+        ]
+        processed_particles = run_pipeline(particles, steps)
+        halo_particles = SubhaloParticles(processed_particles, self.catalog.fields.particles)
+        return halo_particles
 
 
 class FlamingoFetcher(DataFetcher):
@@ -1762,51 +1768,48 @@ class FlamingoFetcher(DataFetcher):
                 }
             OmegaConf.set_struct(self.catalog, True)
 
-        try:
-            part_types = self.particle_fields
-            data = {}
+        part_types = self.particle_fields
+        data = {}
 
-            type_mask = {}
-            # Build particles mask
-            for part_type in part_types:
-                particles_of_type = getattr(self.particles, part_type)
-                # Mask to get particles belonging to the primary subhalo
-                particles_mask_primary = particles_of_type.halo_catalogue_index == subhalo_id
-                is_full_false = np.sum(particles_mask_primary)
-                type_mask[part_type] = particles_mask_primary
-                # TODO add warning if mask is full of false
+        type_mask = {}
+        # Build particles mask
+        for part_type in part_types:
+            particles_of_type = getattr(self.particles, part_type)
+            # Mask to get particles belonging to the primary subhalo
+            particles_mask_primary = particles_of_type.halo_catalogue_index == subhalo_id
+            type_mask[part_type] = particles_mask_primary
 
-            particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
-            filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
-            particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
-            data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
-                                                     mask=type_mask)
-            table = 'particles'
-            steps = [
-                lambda particles: convert_to_dataframe(data),
-                lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
-                lambda particles: apply_filters(particles, filtered_conditions, self.catalog.fields.particles)
-            ]
+            if np.all(particles_mask_primary == False):
+                logger.warning(f'Subhalo {subhalo_id} has no particles associated.')
 
-            processed_particles = run_pipeline(data, steps)
-            logger.debug("Halo data fetched successfully.")
+        particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
+        filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
+        particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
+        data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
+                                                 mask=type_mask)
+        table = 'particles'
+        steps = [
+            lambda particles: convert_to_dataframe(data),
+            lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+            lambda particles: apply_filters(particles, filtered_conditions, self.catalog.fields.particles)
+        ]
 
-            # SubhaloParticles is expecting a dict with part_types - df
-            d = {}
-            columns = list(processed_particles.columns)
-            for part_type in part_types:
-                filtered_columns = [column for column in columns if part_type in column]
-                renamed_columns = [column.replace(f'{part_type}.', '') for column in filtered_columns]
-                rename_dict = dict(zip(filtered_columns, renamed_columns))
-                tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
-                d[part_type] = tmp
+        processed_particles = run_pipeline(data, steps)
+        logger.debug("Halo data fetched successfully.")
 
-            particle_data = SubhaloParticles(d, self.catalog.fields.particles)
-            return particle_data
-        except Exception as e:
-            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {subhalo_id}\n {e}")
+        # SubhaloParticles is expecting a dict with part_types - df
+        d = {}
+        columns = list(processed_particles.columns)
+        for part_type in part_types:
+            filtered_columns = [column for column in columns if part_type in column]
+            renamed_columns = [column.replace(f'{part_type}.', '') for column in filtered_columns]
+            rename_dict = dict(zip(filtered_columns, renamed_columns))
+            tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
+            d[part_type] = tmp
 
-    # TODO TEST
+        particle_data = SubhaloParticles(d, self.catalog.fields.particles)
+        return particle_data
+
     def _get_p_halo(self, halo_id: int) -> SubhaloParticles:
         """
         Fetches particle data for a specific halo.
@@ -1848,58 +1851,57 @@ class FlamingoFetcher(DataFetcher):
                 }
             OmegaConf.set_struct(self.catalog, True)
 
-        try:
-            part_types = self.particle_fields
-            data = {}
+        part_types = self.particle_fields
+        data = {}
 
-            type_mask = {}
-            # Build particles mask
-            for part_type in part_types:
-                particles_of_type = getattr(self.particles, part_type)
-                # Mask to get particles belonging to the primary subhalo
-                particles_mask_primary = particles_of_type.halo_catalogue_index == halo_id
-                is_full_false = np.sum(particles_mask_primary)
+        type_mask = {}
+        # Build particles mask
+        for part_type in part_types:
+            particles_of_type = getattr(self.particles, part_type)
+            # Mask to get particles belonging to the primary subhalo
+            particles_mask_primary = particles_of_type.halo_catalogue_index == halo_id
+            is_full_false = np.sum(particles_mask_primary)
 
-                # Get satellite subhalos
-                satellites_mask = self.fof_subhalos.soap.host_halo_index == halo_id
+            # Get satellite subhalos
+            satellites_mask = self.fof_subhalos.soap.host_halo_index == halo_id
 
-                # Loop over the halo_catalogue_index of the satellites to get all bound particles
-                satellites_idx_array = self.fof_subhalos.input_halos.halo_catalogue_index[satellites_mask]
-                particles_mask_satellites = np.isin(particles_of_type.halo_catalogue_index, satellites_idx_array)
-                particles_mask = particles_mask_primary | particles_mask_satellites
+            # Loop over the halo_catalogue_index of the satellites to get all bound particles
+            satellites_idx_array = self.fof_subhalos.input_halos.halo_catalogue_index[satellites_mask]
+            particles_mask_satellites = np.isin(particles_of_type.halo_catalogue_index, satellites_idx_array)
+            particles_mask = particles_mask_primary | particles_mask_satellites
 
-                type_mask[part_type] = particles_mask
-                # TODO add warning if mask is full of false
+            type_mask[part_type] = particles_mask
 
-            particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
-            filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
-            particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
-            data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
-                                                     mask=type_mask)
-            table = 'particles'
-            steps = [
-                lambda particles: convert_to_dataframe(data),
-                lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
-                lambda particles: apply_filters(particles, filtered_conditions, self.catalog.fields.particles)
-            ]
+            if np.all(particles_mask_satellites == False):
+                logger.warning(f'Halo {halo_id} has no satellites.')
 
-            processed_particles = run_pipeline(data, steps)
-            logger.debug("Halo data fetched successfully.")
+        particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
+        filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
+        particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
+        data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
+                                                 mask=type_mask)
+        table = 'particles'
+        steps = [
+            lambda particles: convert_to_dataframe(data),
+            lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+            lambda particles: apply_filters(particles, filtered_conditions, self.catalog.fields.particles)
+        ]
 
-            # SubhaloParticles is expecting a dict with part_types - df
-            d = {}
-            columns = list(processed_particles.columns)
-            for part_type in part_types:
-                filtered_columns = [column for column in columns if part_type in column]
-                renamed_columns = [column.replace(f'{part_type}.', '') for column in filtered_columns]
-                rename_dict = dict(zip(filtered_columns, renamed_columns))
-                tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
-                d[part_type] = tmp
+        processed_particles = run_pipeline(data, steps)
+        logger.debug("Halo data fetched successfully.")
 
-            particle_data = SubhaloParticles(d, self.catalog.fields.particles)
-            return particle_data
-        except Exception as e:
-            raise ValueError(f"Error, Particle data could not be retrieved for subhalo_id: {halo_id}\n {e}")
+        # SubhaloParticles is expecting a dict with part_types - df
+        d = {}
+        columns = list(processed_particles.columns)
+        for part_type in part_types:
+            filtered_columns = [column for column in columns if part_type in column]
+            renamed_columns = [column.replace(f'{part_type}.', '') for column in filtered_columns]
+            rename_dict = dict(zip(filtered_columns, renamed_columns))
+            tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
+            d[part_type] = tmp
+
+        particle_data = SubhaloParticles(d, self.catalog.fields.particles)
+        return particle_data
 
 
 

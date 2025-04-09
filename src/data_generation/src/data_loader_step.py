@@ -3,6 +3,7 @@ from typing import Tuple, List, Optional, Callable, Any
 import os
 
 import numpy as np
+from scipy.spatial import cKDTree
 from tqdm import tqdm
 
 from src.data_generation.src.cosmos import CosmosData
@@ -10,9 +11,9 @@ from src.data_generation.src.data_fetcher import DataFetcherFactory
 from omegaconf import DictConfig, ListConfig
 
 from src.data_generation.src.feature import FeatureProcessor
-from src.data_generation.src.halo import Halo
+from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.subhalo import SubhaloParticles, SubHalo
+from src.data_generation.src.subhalo import SubhaloParticles, SubHalo, SubhaloContext
 from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("DataLoader")
@@ -87,45 +88,47 @@ class DataLoader(PipelineStep):
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
         with (tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar):
-            for halo, subhalo_ctx, overlapping_halos in g:
-                logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos"
-                            f" and {len(overlapping_halos)} overlapping halos.")
+            transition_radius_list = []
+            for halo, subhalo_ctx in g:
+                logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
                 try:
-                    subhalo_particles = self._load_subhalo_particles_data(halo)
+                    # Load particles for all the subhalos in that halo
+                    halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
+
+                    # Load non-preprocessed particles for overlapping halos
+                    overlapping_subhalo_particles = self._load_particles_overlapping_subhalos(halo, subhalo_ctx)
+                    if overlapping_subhalo_particles is not None:
+                        halo_particles = halo_particles_no_overlapping + overlapping_subhalo_particles
+                    else:
+                        halo_particles = halo_particles_no_overlapping
 
                 except Exception as e:
                     pbar.update(1)  # Ensure progress bar updates even for skipped halos
                     logger.error(f"Failed to load particle data for halo {halo.halo_id}: {e}")
                     continue
 
-                # Preprocessed particles for current halo
-                subhalo_particles.preprocess(halo)
-
-                # Load non-preprocessed particles for the primary subhalo of overlapping halos
-                overlapping_subhalo_particles = \
-                self._load_subhalo_particles_data_overlapping_halos(overlapping_halos)
-
-                input_feature.process(halo=halo, subhalo_particles=subhalo_particles,
-                                      overlapping_subhalo_particles=overlapping_subhalo_particles,
-                                      overlapping_halos=overlapping_halos)
-
-                output_feature.process(halo=halo, subhalo_particles=subhalo_particles,
-                                       overlapping_subhalo_particles=overlapping_subhalo_particles,
-                                       overlapping_halos=overlapping_halos)
+                # Preprocessed all particles for current halo
+                halo_particles.preprocess(halo)
+                input_feature.process(halo=halo, subhalo_particles=halo_particles)
+                output_feature.process(halo=halo, subhalo_particles=halo_particles)
                 icl_mask = output_feature.value
 
-                filtered_overlaping_particles = self._filter_overlapping_particles(overlapping_halos,
-                                                                                   overlapping_subhalo_particles, halo)
-
                 # Compute the transition radius, r = FOV / 2
-                # TODO needs update
-                transition_radius = output_feature.get_transition_radius(halo, subhalo_particles, icl_mask)
-                if transition_radius in (0, None):
-                    # Ignoring current halo
-                    logger.warning(f'Ignoring halo: {halo.halo_id}')
-                    continue
+                # TODO ANALYZE RADIUS AND USE JUST ONE
+                if hasattr(output_feature, 'get_transition_radius'):
+                    transition_radius = output_feature.get_transition_radius(halo, halo_particles_no_overlapping,
+                                                                             icl_mask)
+                    if transition_radius in (0, None):
+                        # Ignoring current halo
+                        logger.warning(f'Ignoring halo: {halo.halo_id}')
+                        continue
+                    else:
+                        transition_radius_list.append(transition_radius)
 
-                tmp = CosmosData(halo, subhalo_ctx, halo.fsub, subhalo_particles, filtered_overlaping_particles)
+                # Center subhalos positions respect to current halo, including overlapping subhalos
+                subhalo_ctx.preprocess(halo)
+
+                tmp = CosmosData(halo, subhalo_ctx, halo.fsub, halo_particles)
                 # Keep cosmos_data instance
                 vars(cosmos_data).update(vars(tmp))
 
@@ -133,7 +136,6 @@ class DataLoader(PipelineStep):
                 cosmos_data.metadata.update({"map": {"transition_radius": transition_radius,
                                                      "fov": transition_radius * 2
                                                      }})
-
                 if next_step is not None:
                     yield from next_step([(halo, subhalo_ctx)], **kwargs)
                 else:
@@ -141,8 +143,10 @@ class DataLoader(PipelineStep):
 
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo.halo_id}")
+        print(transition_radius_list)
 
-    def load_halo_subhalo_data(self) -> List[Tuple]:
+    def _load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
+                               overlapping_matrix: dict) -> List[Tuple]:
         """
         Loads halo data and yields each halo's ID along with its associated data.
 
@@ -151,75 +155,85 @@ class DataLoader(PipelineStep):
         list
             A list of tuples containing halo data and associated subhalo data for each halo ID.
         """
-        halo_context = self.fetcher.get_halos()
-        subhalo_context = self.fetcher.get_subhalos()
-
-        subhalo_context.preprocess(halo_context)
         result = []
 
         for id_halo in halo_context.halo_id:
             try:
                 halo = halo_context.get_halo_by_id(id_halo)
                 subhalo_ctx = subhalo_context.get_items_by_halo(id_halo)
-                # Find halo neighbours
-                overlapping_halos = halo_context.get_overlapping_halos(id_halo)
+                halo.add_children(subhalo_ctx)
+
+                # Find subhalo neighbours
+                overlapping_halo_subhalo_ids = overlapping_matrix.get(id_halo, {})
+
+                if overlapping_halo_subhalo_ids:
+                    overlapping_subhalos_df = subhalo_context.data.loc[overlapping_halo_subhalo_ids]
+                    overlapping_subhalo_ctx = SubhaloContext.from_dataframe(overlapping_subhalos_df)
+                    subhalo_ctx += overlapping_subhalo_ctx
             except Exception as e:
                 logger.error(e)
                 continue
-            result.append((halo, subhalo_ctx, overlapping_halos))
+            result.append((halo, subhalo_ctx))
         return result
 
-    def _load_subhalo_particles_data(self, halo: Halo) -> SubhaloParticles:
-        """
-        Loads subhalo particle data for a given subhalo ID.
-
-        Parameters:
-        -----------
-        id_subhalo : int
-            The ID of the subhalo for which particle data is to be loaded.
-
-        Yields:
-        -------
-        subhalo_particles
-            The particle data for the specified subhalo ID.
-        """
-        try:
-            subhalo_id = halo.fsub
-            halo_id = halo.halo_id
-            if hasattr(halo, 'group_number'):
-                subhalo_particles = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, group_number=halo.group_number)
+    def _load_particles_overlapping_subhalos(self, halo: Halo, subhalo_context: SubhaloContext) -> List[SubhaloParticles]:
+        overlapping_subhalos = subhalo_context.data[subhalo_context.data['id_parents'] != halo.halo_id]
+        subhalo_particles = None
+        if not overlapping_subhalos.empty:
+            if 'group_number' in subhalo_context.data:
+                halo_ids = overlapping_subhalos['group_number'].tolist()
             else:
-                subhalo_particles = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, halo_id=halo_id)
-            return subhalo_particles
-        except Exception as e:
-            logger.warning(f"Error fetching subhalo data for id {subhalo_id}: {e}")
-            raise ValueError(f"Invalid data for subhalo_id: {subhalo_id}, halo_id: {halo_id}")
+                halo_ids = overlapping_subhalos['id_parents'].tolist()
 
-    def _load_subhalo_particles_data_overlapping_halos(self, overlapping_halos: List[Halo]) -> List[SubhaloParticles]:
-        l = []
-        for neighbour_halo in overlapping_halos:
-            subhalo_particles = self._load_subhalo_particles_data(neighbour_halo)
-            l.append(subhalo_particles)
-        return l
+            subhalo_ids = overlapping_subhalos['subhalo_id'].tolist()
+            for i, subhalo_id in enumerate(subhalo_ids):
+                halo_id = halo_ids[i]
+                subhalo_particles_i = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, halo_id=halo_id)
 
-    def _filter_overlapping_particles(self, overlapping_halos: List[Halo],
-                                      overlapping_subhalo_particles: List[SubhaloParticles], halo: Halo):
+                if subhalo_particles is None:
+                    subhalo_particles = subhalo_particles_i
+                else:
+                    subhalo_particles += subhalo_particles_i
+        return subhalo_particles
 
-        overlapping_particles = None
+    @staticmethod
+    def _get_overlapping_halos(subhalo_context: SubhaloContext, halo_context: HaloContext):
+        subhalo_positions = np.vstack(subhalo_context.data['spos'])
+        subhalo_tree = cKDTree(subhalo_positions)
 
-        for i, halo_neighbour in enumerate(overlapping_halos):
-            # Filter particles that falls within current halo
-            distance = np.linalg.norm(overlapping_subhalo_particles[i].star_p - halo.gpos)
-            mask = distance < halo.r200
+        halo_positions = np.vstack(halo_context.data['gpos'])
+        halo_r200 = halo_context.data['r200'].values * 2  # Precompute r200 * 2
+        halo_ids = halo_context.data['halo_id'].values
+        id_parents = subhalo_context.data['id_parents'].values
+        subhalo_ids = subhalo_context.data['subhalo_id'].values
 
-            # Apply mask to all suitable numpy arrays in the object
-            for attr in vars(overlapping_subhalo_particles):
-                val = getattr(overlapping_subhalo_particles, attr)
-                if isinstance(val, np.ndarray) and val.shape[0] == mask.shape[0]:
-                    setattr(overlapping_subhalo_particles, attr, val[mask])
+        overlapping_matrix = {}
 
-            if overlapping_particles is None:
-                overlapping_particles = overlapping_subhalo_particles[mask]
+        for i, halo_position in enumerate(halo_positions):
+            # Get the radius (2 * r200 for the current halo)
+            r = halo_r200[i]
+            halo_id = halo_ids[i]
+
+            # Query the subhalo tree for nearby subhalos within the radius
+            nearby_sub_idxs = subhalo_tree.query_ball_point(halo_position, r)
+            if nearby_sub_idxs:
+                valid_subhalo_idxs = [subhalo_idx for subhalo_idx in nearby_sub_idxs if id_parents[subhalo_idx] != halo_id]
+                # Only keep valid subhalos
+                if valid_subhalo_idxs:
+                    '''
+                    if 'group_number' in subhalo_context.data:
+                        group_number_valid = subhalo_context.data.iloc[valid_subhalo_idxs]['group_number'].tolist()
+                        overlapping_matrix[halo_id] = list(
+                            zip(id_parents[valid_subhalo_idxs], group_number_valid, subhalo_ids[valid_subhalo_idxs]))
+                    else:
+                    '''
+                    overlapping_matrix[halo_id] = list(
+                        zip(id_parents[valid_subhalo_idxs], subhalo_ids[valid_subhalo_idxs]))
+                    logger.info(f'Halo {halo_id} has {len(valid_subhalo_idxs)} overlapping subhalos:')
+                    logger.info(f'------> {overlapping_matrix[halo_id]}')
+                else:
+                    overlapping_matrix[halo_id] = []
             else:
-                overlapping_particles += overlapping_subhalo_particles[mask]
-        return overlapping_particles
+                overlapping_matrix[halo_id] = []
+        return overlapping_matrix
+

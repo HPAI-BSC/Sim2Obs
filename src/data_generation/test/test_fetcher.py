@@ -3,17 +3,14 @@ import pickle
 import unittest
 
 import numpy as np
-import pandas as pd
 from dotenv import load_dotenv
 from hydra import initialize, compose
-import eagleSqlTools as sql
 from numpy.testing import assert_array_equal
 from omegaconf import OmegaConf
 
 from src.data_generation.src.data_fetcher import DataFetcherFactory
-from src.data_generation.src.halo import HaloContext
+from src.data_generation.src.halo import HaloContext, Halo
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
-from src.data_generation.src.utils import get_connection
 
 load_dotenv('../.env')
 
@@ -66,7 +63,7 @@ class TestFetcher(unittest.TestCase):
 
         # TODO update
         required_keys = ['G']
-        data_loader_dict = next((step for step in self.cfg_illustris.pipeline if step.name == 'data_loader'), None)
+        data_loader_dict = next((step for step in self.cfg_eagle.pipeline if step.name == 'data_loader'), None)
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
         self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
         self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
@@ -84,6 +81,7 @@ class TestFetcher(unittest.TestCase):
         self.assertAlmostEquals(halo_data_1.m200, self.halo_illustris.m200)
         self.assertAlmostEquals(halo_data_1.r200, self.halo_illustris.r200)
         assert_array_equal(halo_data_1.gpos, self.halo_illustris.gpos)
+        self.assertTrue(hasattr(halo_data_1, 'subhalo_ids'))
 
     def test_get_subhalos_illustris(self):
         subhalo_context_1 = self.fetcher_illustris.get_subhalos()
@@ -112,7 +110,10 @@ class TestFetcher(unittest.TestCase):
         self.assertIsInstance(subhalo_particles_1.star_v, np.ndarray)
 
     def test_get_p_halo_illustris(self):
-        halo_particles_1 = self.fetcher_illustris.get_p_halo(halo_id=0)
+        halo = self.halo_illustris
+        halo.subhalo_ids = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25,
+                            28, 29, 35, 36]
+        halo_particles_1 = self.fetcher_illustris.get_p_halo(halo=halo)
         self.assertIsInstance(halo_particles_1, SubhaloParticles)
         self.assertTrue(hasattr(halo_particles_1, "gas_m"))
         self.assertIsInstance(halo_particles_1.gas_m, np.ndarray)
@@ -163,7 +164,7 @@ class TestFetcher(unittest.TestCase):
         self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
         self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
 
-        subhalo_particles_2 = self.fetcher_eagle.get_p_subhalo(subhalo_id=0, group_number=2)
+        subhalo_particles_2 = self.fetcher_eagle.get_p_subhalo(subhalo_id=0, halo_id=2)
         self.assertEqual(len(subhalo_particles_2.gas_m), 2479560)
         self.assertEqual(len(subhalo_particles_2.star_m), 265076)
         self.assertIsInstance(subhalo_particles_2, SubhaloParticles)
@@ -180,7 +181,9 @@ class TestFetcher(unittest.TestCase):
         self.cfg_eagle.catalog.simulation_code = 'RefL0050N0752'
         self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
 
-        halo_particles_2 = self.fetcher_eagle.get_p_halo(group_number=2)
+        halo = Halo.empty_instance()
+        halo.subhalo_ids = [(2, 1), (2, 3), (2, 5)]
+        halo_particles_2 = self.fetcher_eagle.get_p_halo(halo=halo)
         self.assertIsInstance(halo_particles_2, SubhaloParticles)
         self.assertTrue(hasattr(halo_particles_2, "gas_m"))
         self.assertIsInstance(halo_particles_2.gas_m, np.ndarray)

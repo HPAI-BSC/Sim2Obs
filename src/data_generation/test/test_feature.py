@@ -55,7 +55,8 @@ class TestFeature(unittest.TestCase):
 
         expected_mask = np.ones((length, ), dtype=int)  # ICL mask
 
-        result = self.icl_processor.process(mock_halo_instance, mock_subhalo_particles_instance)
+        self.icl_processor.process(mock_halo_instance, mock_subhalo_particles_instance)
+        result = self.icl_processor.value
 
         self.assertEqual(result.shape, (length, ))
         self.assertTrue(np.all(np.isin(result, [0, 1])))  # Check if it's a binary mask
@@ -70,8 +71,8 @@ class TestFeature(unittest.TestCase):
         length = mock_subhalo_particles_instance.star_v.shape[0]
         expected_mask = np.ones((length, ), dtype=int)  # ICL mask
 
-        result = self.icl_processor.process(mock_halo_instance, mock_subhalo_particles_instance)
-
+        self.icl_processor.process(mock_halo_instance, mock_subhalo_particles_instance)
+        result = self.icl_processor.value
         self.assertEqual(result.shape, (length, ))
         self.assertTrue(np.all(np.isin(result, [0, 1])))  # Check if it's a binary mask
         assert_array_equal(result, expected_mask)
@@ -113,8 +114,8 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
         expected_shape = mock_subhalo_particles_instance.star_v.shape
 
-        result = self.vel_disp_processor.process(mock_halo.return_value, mock_subhalo_particles_instance)
-
+        self.vel_disp_processor.process(mock_halo.return_value, mock_subhalo_particles_instance)
+        result = self.vel_disp_processor.value
         self.assertEqual(result.shape, expected_shape)
         self.assertTrue(np.issubdtype(result.dtype, np.floating))
 
@@ -124,8 +125,8 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
         expected_shape = mock_subhalo_particles_instance.star_v.shape
 
-        result = self.vel_disp_processor.process(mock_halo.return_value, mock_subhalo_particles_instance)
-
+        self.vel_disp_processor.process(mock_halo.return_value, mock_subhalo_particles_instance)
+        result = self.vel_disp_processor.value
         self.assertEqual(result.shape, expected_shape)
         self.assertTrue(np.issubdtype(result.dtype, np.floating))
 
@@ -145,11 +146,11 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
         mock_halo.return_value = self.halo_illustris
-        self.vel_disp_processor.value = self.vel_disp_processor.process(mock_halo.return_value,
-                                                                        mock_subhalo_particles_instance)
+        self.vel_disp_processor.process(mock_halo.return_value, mock_subhalo_particles_instance)
 
         # Defined by Ilaria
-        bins, r = muse_bins_r(2 * 263.34, 2.02, 1)  # Computes bins and radius
+        r = 263.34
+        bins = muse_bins_r(2 * 263.34, 2.02, 1)  # Computes bins and radius
         ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
         # axis x-y
         vel_map, _, biny = self.vel_disp_processor.generate_map(mock_subhalo_particles_instance, bins,
@@ -160,8 +161,7 @@ class TestFeature(unittest.TestCase):
         mock_subhalo_particles_instance = self.subhalo_particles_eagle
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
 
-        self.vel_disp_processor.value = self.vel_disp_processor.process(mock_halo.return_value,
-                                                                        mock_subhalo_particles_instance)
+        self.vel_disp_processor.process(mock_halo.return_value, mock_subhalo_particles_instance)
         vel_map, _, biny = self.vel_disp_processor.generate_map(mock_subhalo_particles_instance, bins,
                                                                 ranging, axis=(0, 1))
         assert (len(vel_map)) == bins
@@ -176,13 +176,12 @@ class TestFeature(unittest.TestCase):
         mock_halo.return_value = self.halo_illustris
         mock_subhalo_particles_instance = self.subhalo_particles_illustris
         mock_subhalo_particles.return_value = mock_subhalo_particles_instance
-        icl_mask = self.icl_processor.process(mock_halo_instance, mock_subhalo_particles_instance)
-
-        self.icl_processor.get_transition_radius(mock_halo.return_value,
-                                                 mock_subhalo_particles.return_value,
-                                                 icl_mask)
-        print(icl_mask)
-
+        self.icl_processor.process(mock_halo_instance, mock_subhalo_particles_instance)
+        icl_mask = self.icl_processor.value
+        transition_radius = self.icl_processor.get_transition_radius(mock_halo.return_value,
+                                                                     mock_subhalo_particles.return_value,
+                                                                     icl_mask)
+        self.assertIsNotNone(transition_radius)
 
 
 
