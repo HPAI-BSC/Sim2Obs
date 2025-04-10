@@ -58,7 +58,11 @@ class Pipeline:
         input_feature = FeatureProcessorFactory.get_feature(feature_input, cfg=self.cfg)
         output_feature = FeatureProcessorFactory.get_feature(feature_output, cfg=self.cfg)
         data_loader = DataLoader(self.cfg)
-        halo_subhalo_list = data_loader.load_halo_subhalo_data()
+
+        halo_context = data_loader.fetcher.get_halos()
+        subhalo_context = data_loader.fetcher.get_subhalos()
+        overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
+        halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
 
         if n is not None:
             halo_subhalo_list = halo_subhalo_list[:n]

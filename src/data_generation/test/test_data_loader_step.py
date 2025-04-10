@@ -68,8 +68,8 @@ class TestDataLoaderStep(unittest.TestCase):
         self.dataLoader = DataLoader(self.cfg_illustris)
         halo_context = self.fetcher_illustris.get_halos()
         subhalo_context = self.fetcher_illustris.get_subhalos()
-        overlapping_matrix = self.dataLoader._get_overlapping_halos(subhalo_context, halo_context)
-        result = self.dataLoader._load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
+        overlapping_matrix = self.dataLoader.get_overlapping_halos(subhalo_context, halo_context)
+        result = self.dataLoader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         self.assertEqual(len(result), 83)
 
         for halo, subhalo_ctx in result:
@@ -80,8 +80,8 @@ class TestDataLoaderStep(unittest.TestCase):
         self.dataLoader = DataLoader(self.cfg_eagle)
         halo_context = self.fetcher_eagle.get_halos()
         subhalo_context = self.fetcher_eagle.get_subhalos()
-        overlapping_matrix = self.dataLoader._get_overlapping_halos(subhalo_context, halo_context)
-        result = self.dataLoader._load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
+        overlapping_matrix = self.dataLoader.get_overlapping_halos(subhalo_context, halo_context)
+        result = self.dataLoader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         self.assertEqual(len(result), 21)
 
         for halo_df, subhalo_df in result:
@@ -92,8 +92,8 @@ class TestDataLoaderStep(unittest.TestCase):
         self.dataLoader = DataLoader(self.cfg_flamingo)
         halo_context = self.fetcher_flamingo.get_halos()
         subhalo_context = self.fetcher_flamingo.get_subhalos()
-        overlapping_matrix = self.dataLoader._get_overlapping_halos(subhalo_context, halo_context)
-        result = self.dataLoader._load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
+        overlapping_matrix = self.dataLoader.get_overlapping_halos(subhalo_context, halo_context)
+        result = self.dataLoader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         self.assertEqual(len(result), 128967)
 
         for halo_df, subhalo_df, overlapping_subhalos in result:
@@ -104,8 +104,8 @@ class TestDataLoaderStep(unittest.TestCase):
         data_loader = DataLoader(self.cfg_illustris)
         subhalo_context = self.fetcher_illustris.get_subhalos()
         halo_context = self.fetcher_illustris.get_halos()
-        overlapping_matrix = data_loader._get_overlapping_halos(subhalo_context, halo_context)
-        halo_subhalo_list = data_loader._load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)[:5]
+        overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
+        halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)[:5]
 
         input_feature = VelocityDispersionProcessor()
         output_feature = ICLProcessor(cfg=self.cfg_illustris)
@@ -132,8 +132,8 @@ class TestDataLoaderStep(unittest.TestCase):
         data_loader = DataLoader(self.cfg_eagle)
         subhalo_context = self.fetcher_eagle.get_subhalos()
         halo_context = self.fetcher_eagle.get_halos()
-        overlapping_matrix = data_loader._get_overlapping_halos(subhalo_context, halo_context)
-        halo_subhalo_list = data_loader._load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)[:5]
+        overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
+        halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)[:5]
 
         input_feature = VelocityDispersionProcessor()
         output_feature = ICLProcessor(cfg=self.cfg_eagle)
@@ -173,7 +173,7 @@ class TestDataLoaderStep(unittest.TestCase):
         subhalo_ctx = SubhaloContext(subhalo_df, column_map=None)
 
         self.dataLoader = DataLoader(self.cfg_big_illustris)
-        result = self.dataLoader._get_overlapping_halos(subhalo_ctx, halo_ctx)
+        result = self.dataLoader.get_overlapping_halos(subhalo_ctx, halo_ctx)
         # Validate overlaps
         # Halo 1 overlaps with subhalo 101 (parent is 2)
         self.assertIn((2, 101), result[1])

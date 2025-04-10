@@ -145,7 +145,7 @@ class DataLoader(PipelineStep):
                 logger.info(f"Finished processing halo {halo.halo_id}")
         print(transition_radius_list)
 
-    def _load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
+    def load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
                                overlapping_matrix: dict) -> List[Tuple]:
         """
         Loads halo data and yields each halo's ID along with its associated data.
@@ -197,7 +197,7 @@ class DataLoader(PipelineStep):
         return subhalo_particles
 
     @staticmethod
-    def _get_overlapping_halos(subhalo_context: SubhaloContext, halo_context: HaloContext):
+    def get_overlapping_halos(subhalo_context: SubhaloContext, halo_context: HaloContext):
         subhalo_positions = np.vstack(subhalo_context.data['spos'])
         subhalo_tree = cKDTree(subhalo_positions)
 
@@ -220,13 +220,6 @@ class DataLoader(PipelineStep):
                 valid_subhalo_idxs = [subhalo_idx for subhalo_idx in nearby_sub_idxs if id_parents[subhalo_idx] != halo_id]
                 # Only keep valid subhalos
                 if valid_subhalo_idxs:
-                    '''
-                    if 'group_number' in subhalo_context.data:
-                        group_number_valid = subhalo_context.data.iloc[valid_subhalo_idxs]['group_number'].tolist()
-                        overlapping_matrix[halo_id] = list(
-                            zip(id_parents[valid_subhalo_idxs], group_number_valid, subhalo_ids[valid_subhalo_idxs]))
-                    else:
-                    '''
                     overlapping_matrix[halo_id] = list(
                         zip(id_parents[valid_subhalo_idxs], subhalo_ids[valid_subhalo_idxs]))
                     logger.info(f'Halo {halo_id} has {len(valid_subhalo_idxs)} overlapping subhalos:')
