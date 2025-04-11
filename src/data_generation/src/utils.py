@@ -369,8 +369,8 @@ def plot_transition_radius(transition_radius_list):
     plt.hist(transition_radius_list, bins=10, color='skyblue', edgecolor='black')
 
     # Add labels and title
-    plt.xlabel('Transition Radius')
-    plt.ylabel('Frequency')
+    plt.xlabel('Transition Radius [Kpc]')
+    plt.ylabel('Counts')
     plt.title('Histogram of Transition Radii')
 
     # Save the plot
