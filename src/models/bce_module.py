@@ -141,8 +141,8 @@ class BCELitModule(LightningModule):
             - A tensor of predictions.
             - A tensor of target labels.
         """
-        print("Model step...")
-        self._print_cuda_memory()
+        #print("Model step...")
+        #self._print_cuda_memory()
         x, y = batch
         preds = self.forward(x)
         #loss = self.criterion(preds, y)
@@ -196,6 +196,7 @@ class BCELitModule(LightningModule):
         self.train_rmse.reset()
         self.val_loss.reset()
         self.val_RASE.reset()
+        self._print_cuda_memory()
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single validation step on a batch of data from the validation set.
