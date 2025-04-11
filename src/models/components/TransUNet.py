@@ -613,7 +613,7 @@ class TransUNet(nn.Module):
         x = self.decoder(x, features)
         print(x.shape)
         logits = self.segmentation_head(x)
-        print(x.shape)
+        print(logits.shape)
         return logits
 
     def load_from(self, weights):
