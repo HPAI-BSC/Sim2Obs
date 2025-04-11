@@ -10,7 +10,7 @@
 #SBATCH -c 32               # Cores per task requested
 #SBATCH -t 00:01:00         # Run time (hh:mm:ss) - 30 min
 #SBATCH --account bsc70
-#SBATCH --qos=acc_debug
+#SBATCH --qos=acc_bsccs
 
 CURRENT_DIR=$(pwd)
 echo "Current directory: '$CURRENT_DIR'"
