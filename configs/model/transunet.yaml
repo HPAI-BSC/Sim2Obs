@@ -15,7 +15,7 @@ scheduler:
 
 net:
   _target_: src.models.components.TransUNet.TransUNet
-  n_channels: 3
+  n_channels: 1
   n_classes: 1
   img_size: 128
 

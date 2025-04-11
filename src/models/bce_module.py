@@ -145,6 +145,7 @@ class BCELitModule(LightningModule):
         #self._print_cuda_memory()
         x, y = batch
         preds = self.forward(x)
+        print(preds.shape, y.shape)
         #loss = self.criterion(preds, y)
         #loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
         y, preds = torch.sigmoid(y), torch.sigmoid(preds)
