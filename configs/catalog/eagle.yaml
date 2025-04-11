@@ -22,7 +22,7 @@ spatial_resolution: 2.66  # kpc # TODO see if this changes for our interest sim
 # ensure that bins use a proper resolution,
 #bin_size > spatial resolution *1.5-2 times
 # bin_size = 3.6, sp resolution = 2.02
-bin_spatial_resolution_scale: 2
+bin_spatial_resolution_scale: 1.5
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320

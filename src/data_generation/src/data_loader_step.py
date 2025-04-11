@@ -14,7 +14,7 @@ from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloParticles, SubHalo, SubhaloContext
-from src.data_generation.src.utils import setup_logger
+from src.data_generation.src.utils import setup_logger, plot_transition_radius
 
 logger = setup_logger("DataLoader")
 
@@ -89,6 +89,7 @@ class DataLoader(PipelineStep):
         """
         with (tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar):
             transition_radius_list = []
+
             for halo, subhalo_ctx in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
                 try:
@@ -143,7 +144,9 @@ class DataLoader(PipelineStep):
 
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo.halo_id}")
+
         print(transition_radius_list)
+        plot_transition_radius(transition_radius_list)
 
     def load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
                                overlapping_matrix: dict) -> List[Tuple]:

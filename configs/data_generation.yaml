@@ -21,9 +21,9 @@ pipeline:
     G: 4.30091e-6              # Gravitational constant in units of kpc Msun^-1 (km/s)^2
   #- name: rotate_step
   #  rotation_group: ${rotation_45}
-  - name: map_step
-    dim: 2 # new
-    n_zooms: 3
+  # - name: map_step
+  #  dim: 2 # new
+  #  n_zooms: 3
 
 
 

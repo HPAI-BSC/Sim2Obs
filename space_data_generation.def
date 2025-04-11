@@ -85,6 +85,7 @@ From: nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
     pip3 install eagleSqlTools
     pip3 install hydra_colorlog
     pip3 install tqdm==4.67.1
+    pip3 install swiftsimio==9.0.0
 
     # Step 2: Remove unneeded dependencies
     apt-get autoremove -y

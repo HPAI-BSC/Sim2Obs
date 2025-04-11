@@ -362,6 +362,24 @@ def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_sc
     return bins
 
 
+def plot_transition_radius(transition_radius_list):
+    import matplotlib.pyplot as plt
+    # Plot the histogram
+    plt.figure(figsize=(8, 6))
+    plt.hist(transition_radius_list, bins=10, color='skyblue', edgecolor='black')
+
+    # Add labels and title
+    plt.xlabel('Transition Radius')
+    plt.ylabel('Frequency')
+    plt.title('Histogram of Transition Radii')
+
+    # Save the plot
+    plt.savefig('transition_radius_histogram.png', dpi=300)
+
+    # Optionally show the plot
+    # plt.show()
+
+
 def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spatial_resolution_scale: float,
                              input_feature_name: str, output_feature_name: str):
     """
