@@ -602,18 +602,13 @@ class TransUNet(nn.Module):
         )
 
     def forward(self, x):
-        print('-')
-        print(x.shape)
         """
         if x.size()[1] == 1:
             x = x.repeat(1,3,1,1)
         """
         x, attn_weights, features = self.transformer(x)  # (B, n_patch, hidden)
-        print(x.shape)
         x = self.decoder(x, features)
-        print(x.shape)
         logits = self.segmentation_head(x)
-        print(logits.shape)
         return logits
 
     def load_from(self, weights):
