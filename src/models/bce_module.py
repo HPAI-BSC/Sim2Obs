@@ -149,6 +149,7 @@ class BCELitModule(LightningModule):
         #loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
         y, preds = torch.sigmoid(y), torch.sigmoid(preds)
         loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        print(loss.item())
         return loss, preds, y
 
     def training_step(
@@ -196,7 +197,7 @@ class BCELitModule(LightningModule):
         self.train_rmse.reset()
         self.val_loss.reset()
         self.val_RASE.reset()
-        self._print_cuda_memory()
+        #self._print_cuda_memory()
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single validation step on a batch of data from the validation set.
