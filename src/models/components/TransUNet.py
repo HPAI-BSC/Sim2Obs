@@ -606,9 +606,13 @@ class TransUNet(nn.Module):
         if x.size()[1] == 1:
             x = x.repeat(1,3,1,1)
         """
+        print(x.shape)
         x, attn_weights, features = self.transformer(x)  # (B, n_patch, hidden)
+        print(x.shape)
         x = self.decoder(x, features)
+        print(x.shape)
         logits = self.segmentation_head(x)
+        print(x.shape)
         return logits
 
     def load_from(self, weights):
