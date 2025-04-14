@@ -9,7 +9,7 @@ from lightning.pytorch.profilers import PyTorchProfiler
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig, open_dict
 from lightning.pytorch.tuner import Tuner
-from pytorch_lightning.profilers import AdvancedProfiler
+from ptflops import get_model_complexity_info
 
 
 #rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -78,7 +78,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
 
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler=AdvancedProfiler())
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler='simple')
 
     """
     # Find optimal batch size
@@ -111,7 +111,10 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if cfg.get("train"):
         log.info("Starting training!")
         trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg.get("ckpt_path"))
-        print(trainer.profiler.summary())
+        with torch.cuda.device(0):
+            macs, params = get_model_complexity_info(model, (1, 224, 224), as_strings=False)
+            flops = 2 * macs  # MACs -> FLOPs
+            print(f"Forward pass FLOPs per sample: {flops:,}")
 
     train_metrics = trainer.callback_metrics
 
