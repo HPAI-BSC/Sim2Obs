@@ -18,6 +18,7 @@ net:
   n_channels: 1
   n_classes: 1
   n_heads: 4
+  patch_size: 4
   mlp_dim: 3072
   img_size: 128
   segmentation_head_kernel_size: 1
