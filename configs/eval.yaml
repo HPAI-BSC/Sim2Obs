@@ -17,6 +17,9 @@ tags: ["dev"]
 commit_tag: "commit_hash"
 
 # passing checkpoint path is necessary for evaluation # last.skpt
+# BASELINE
+/gpfs/projects/bsc70/pipelines/space-coe/d400da3c/output/checkpoints/d400da3c/epoch_041.ckpt  # 14.04.25 Dianoga
+
 # -AttentionUNet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/81406481/output/checkpoints/81406481/epoch_044.ckpt  # 14.04.25 Dianoga
@@ -27,7 +30,7 @@ commit_tag: "commit_hash"
 
 # transunet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6fdf7f32/output/checkpoints/6fdf7f32/last.ckpt
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c2dc4e53/output/checkpoints/c2dc4e53/epoch_041.ckpt  # 14.04.25 Dianoga
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c2dc4e53/output/checkpoints/c2dc4e53/epoch_041.ckpt  # 14.04.25 Dianoga
 
 # - Unet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
