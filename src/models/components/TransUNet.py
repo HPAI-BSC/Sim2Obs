@@ -485,7 +485,9 @@ class DecoderCup(nn.Module):
             use_batchnorm=True,
         )
         in_channels = [head_channels] + list(decoder_channels[:-1])
+        print(f"in_channels: {in_channels}")
         out_channels = decoder_channels
+        print(f"out_channels: {out_channels}")
         self.n_skip = n_skip
 
         if n_skip != 0:
