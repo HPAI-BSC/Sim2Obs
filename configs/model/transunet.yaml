@@ -17,6 +17,8 @@ net:
   _target_: src.models.components.TransUNet.TransUNet
   n_channels: 1
   n_classes: 1
+  n_heads: 2
+  mlp_dim: 1024
   img_size: 128
 
 # compile model for faster training with pytorch 2.0
