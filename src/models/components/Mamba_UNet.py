@@ -976,7 +976,7 @@ class VSSM(nn.Module):
         x, x_downsample = self.forward_features(x)
         print('a')
         print(x.shape)
-        print(x_downsample.shape)
+        print(x_downsample)
         x = self.forward_up_features(x, x_downsample)
         print(x.shape)
         x = self.up_x4(x)
