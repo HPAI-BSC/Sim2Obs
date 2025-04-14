@@ -582,7 +582,7 @@ class TransUNet(nn.Module):
                  zero_head=False, vis=False, dropout_rate=0.1, attention_dropout_rate=0.1,
                  resnet_n_layers=None, resnet_width_factor=None, patch_grid=None, patch_size=16, classifier=None,
                  head_channels=512, decoder_channels=(256, 128, 64, 16), skip_channels=(256, 128, 64, 16), n_skip=0,
-                 n_classes=1):
+                 n_classes=1, segmentation_head_kernel_size=3):
         super().__init__()
         if skip_channels is None:
             skip_channels = [512, 256, 64, 16]
@@ -598,7 +598,7 @@ class TransUNet(nn.Module):
         self.segmentation_head = SegmentationHead(
             in_channels=decoder_channels[-1],
             out_channels=n_classes,
-            kernel_size=3,
+            kernel_size=segmentation_head_kernel_size,
         )
 
     def forward(self, x):
