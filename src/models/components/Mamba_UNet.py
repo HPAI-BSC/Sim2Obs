@@ -342,7 +342,9 @@ class FinalPatchExpand_X4(nn.Module):
         self.expand = nn.Linear(dim, 16 * dim, bias=False)
         self.output_dim = dim
         self.norm = norm_layer(self.output_dim)
-        self.compress = nn.Linear(16 * dim, dim, bias=False)
+        after_rearrange_features = (16 * dim) // (dim_scale * dim_scale)
+        self.compress = nn.Linear(after_rearrange_features, dim, bias=False)
+        #self.compress = nn.Linear(16 * dim, dim, bias=False)
 
     def forward(self, x):
         print(f"FinalPatchExpand X4: {x.shape}")
