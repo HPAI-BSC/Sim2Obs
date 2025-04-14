@@ -505,14 +505,20 @@ class DecoderCup(nn.Module):
         B, n_patch, hidden = hidden_states.size()  # reshape from (B, n_patch, hidden) to (B, h, w, hidden)
         h, w = int(np.sqrt(n_patch)), int(np.sqrt(n_patch))
         x = hidden_states.permute(0, 2, 1)
+        print(f'-decoder-')
+        print(x.shape)
         x = x.contiguous().view(B, hidden, h, w)
         x = self.conv_more(x)
+        print(x.shape)
         for i, decoder_block in enumerate(self.blocks):
             if features is not None:
                 skip = features[i] if (i < self.n_skip) else None
             else:
                 skip = None
             x = decoder_block(x, skip=skip)
+            print(f'-decoder block-')
+            print(x.shape)
+        print(x.shape)
         return x
 
 
