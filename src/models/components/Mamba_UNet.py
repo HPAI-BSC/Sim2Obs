@@ -960,17 +960,15 @@ class VSSM(nn.Module):
         return x
 
     def up_x4(self, x):
-        print('up_x4')
-        print(x.shape)
         if self.final_upsample == "expand_first":
             B, H, W, C = x.shape
             x = self.up(x)
-            print(x.shape)
             if self.patch_size == 1:
                 pass
             else:
-                x = x.view(B, 4 * H, 4 * W, -1)
-                print(x.shape)
+                #x = x.view(B, 4 * H, 4 * W, -1)
+                # Actually, this is not needed because FinalPatchExpand already fixes the dims
+                pass
             x = x.permute(0, 3, 1, 2)  # B,C,H,W
             x = self.output(x)
 
@@ -978,11 +976,8 @@ class VSSM(nn.Module):
 
     def forward(self, x):
         x, x_downsample = self.forward_features(x)
-        print(x.shape)
         x = self.forward_up_features(x, x_downsample)
-        print(x.shape)
         x = self.up_x4(x)
-        print(x.shape)
         return x
 
     def flops(self, shape=(3, 224, 224)):
