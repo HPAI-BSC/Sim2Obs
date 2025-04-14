@@ -9,6 +9,7 @@ from lightning.pytorch.profilers import PyTorchProfiler
 from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig, open_dict
 from lightning.pytorch.tuner import Tuner
+from pytorch_lightning.profilers import AdvancedProfiler
 
 
 #rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
@@ -77,7 +78,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
 
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler='simple')
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger, profiler=AdvancedProfiler())
 
     """
     # Find optimal batch size
@@ -110,6 +111,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if cfg.get("train"):
         log.info("Starting training!")
         trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg.get("ckpt_path"))
+        print(trainer.profiler.summary())
 
     train_metrics = trainer.callback_metrics
 
