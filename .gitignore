@@ -153,6 +153,7 @@ configs/local/default.yaml
 .aim
 
 # Local folders
+local
 local/data/
 local/output/
 temp
