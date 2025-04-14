@@ -2,7 +2,7 @@
 
 defaults:
   - _self_
-  - data: galaxy_eagle
+  - data: galaxy_dianoga_rotation45
   - model: transunet
   - logger:
   - trainer: default
@@ -23,7 +23,8 @@ commit_tag: "commit_hash"
 # ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
 
 # transunet
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6fdf7f32/output/checkpoints/6fdf7f32/last.ckpt
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6fdf7f32/output/checkpoints/6fdf7f32/last.ckpt
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c2dc4e53/output/checkpoints/c2dc4e53/epoch_041.ckpt
 
 # - Unet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
