@@ -49,7 +49,7 @@ From: nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
     pip3 install nbclient==0.8.0
     pip3 install nbconvert==7.7.3
     pip3 install nbformat==5.9.2
-    pip3 install numpy==1.24.3
+    pip3 install numpy==1.26.4
     pip3 install omegaconf==2.3.0
     pip3 install packaging==23.1
     pip3 install pandas==1.5.3
