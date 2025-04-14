@@ -974,8 +974,13 @@ class VSSM(nn.Module):
 
     def forward(self, x):
         x, x_downsample = self.forward_features(x)
+        print('a')
+        print(x.shape)
+        print(x_downsample.shape)
         x = self.forward_up_features(x, x_downsample)
+        print(x.shape)
         x = self.up_x4(x)
+        print(x.shape)
         return x
 
     def flops(self, shape=(3, 224, 224)):
