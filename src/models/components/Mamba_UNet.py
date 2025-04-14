@@ -1,5 +1,5 @@
 """
-Original code: https://github.com/ziyangwang007/Mamba-UNet
+Code adapted from: https://github.com/ziyangwang007/Mamba-UNet
 """
 
 
@@ -31,6 +31,7 @@ DropPath.__repr__ = lambda self: f"timm.DropPath({self.drop_prob})"
 try:
     from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, selective_scan_ref
 except:
+    import selective_scan_cuda
     class SelectiveScanFn(torch.autograd.Function):
 
         @staticmethod
@@ -378,7 +379,7 @@ class FinalPatchExpand_X1(nn.Module):
         self.compress = nn.Linear(16 * dim, dim, bias=False)
 
     def forward(self, x):
-        print(f"FinalPatchExpand X4: {x.shape}")
+        print(f"FinalPatchExpand X1: {x.shape}")
         x = self.expand(x)
         B, H, W, C = x.shape
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
