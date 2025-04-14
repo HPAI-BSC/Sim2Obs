@@ -111,6 +111,12 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     if cfg.get("train"):
         log.info("Starting training!")
         trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg.get("ckpt_path"))
+        """
+        with torch.cuda.device(0):
+            macs, params = get_model_complexity_info(model, (3, 224, 224), as_strings=False)
+            flops = 2 * macs  # MACs -> FLOPs
+            print(f"Forward pass FLOPs per sample: {flops:,}")
+        """
 
     train_metrics = trainer.callback_metrics
 
