@@ -362,7 +362,7 @@ def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_sc
     return bins
 
 
-def plot_transition_radius(transition_radius_list):
+def plot_transition_radius(cfg, transition_radius_list):
     import matplotlib.pyplot as plt
     # Plot the histogram
     plt.figure(figsize=(8, 6))
@@ -373,8 +373,9 @@ def plot_transition_radius(transition_radius_list):
     plt.ylabel('Counts')
     plt.title('Histogram of Transition Radii')
 
+    path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_{cfg.catalog.name}.png'
     # Save the plot
-    plt.savefig('transition_radius_histogram.png', dpi=300)
+    plt.savefig(path, dpi=300)
 
     # Optionally show the plot
     # plt.show()

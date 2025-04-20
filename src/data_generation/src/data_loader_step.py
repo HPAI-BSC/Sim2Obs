@@ -146,7 +146,7 @@ class DataLoader(PipelineStep):
                 logger.info(f"Finished processing halo {halo.halo_id}")
 
         print(transition_radius_list)
-        plot_transition_radius(transition_radius_list)
+        plot_transition_radius(self.cfg, transition_radius_list)
 
     def load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
                                overlapping_matrix: dict) -> List[Tuple]:
