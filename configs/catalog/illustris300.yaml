@@ -80,9 +80,3 @@ fields:
         output: "Msun/h"
         scaling: "x * 1e10"
         name: "m"
-    gas:
-      Masses:
-        input: "10^10 Msun/h"
-        output: "Msun/h"
-        scaling: "x * 1e10"
-        name: "m"
