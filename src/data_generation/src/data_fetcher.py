@@ -765,6 +765,8 @@ class Illustris300Fetcher(DataFetcher):
         data = {}
         for part_type in part_types:
             fields = list(self.catalog.fields.particles[part_type].keys())
+            print('_get_p_subhalo:')
+            print(path, self.catalog.snapnum, subhalo_id, part_type, fields)
             particles = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, part_type, fields=fields)
 
             # if numpy, convert it to a dict
