@@ -540,7 +540,7 @@ class Illustris300Fetcher(DataFetcher):
         # TODO check why this is printed several times
         import os
         print(f"Fetcher initialized in PID: {os.getpid()}")
-        traceback.print_stack(limit=5)  # Adjust limit as needed
+        logger.debug(traceback.print_stack(limit=5))
         logger.info(f"Illustris300Fetcher initialized.")
 
     def _get_fields(self):

@@ -1,3 +1,4 @@
+import traceback
 from typing import Tuple, List, Optional, Callable, Any
 import os
 
@@ -204,6 +205,8 @@ class DataLoader(PipelineStep):
                         subhalo_particles += subhalo_particles_i
                 except Exception as e:
                     logger.error(e)
+                    error_message = traceback.format_exc()
+                    logger.error(error_message)
                     continue
 
         logger.debug(f'Particles for overlapping subhalos: {subhalo_particles}')
