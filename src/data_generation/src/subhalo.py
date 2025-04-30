@@ -437,6 +437,14 @@ class SubhaloParticles:
         if hasattr(self, 'star_p'):
             self.star_p = rotate(z, axis, degree, self.star_p)
 
+    def __repr__(self):
+        lines = []
+        for attr_name, attr_value in self.__dict__.items():
+            if isinstance(attr_value, np.ndarray):
+                lines.append(f"{attr_name}: shape={attr_value.shape}, size={attr_value.size}")
+        return "\n".join(lines)
+
+
 
 
 

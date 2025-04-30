@@ -1,4 +1,3 @@
-import time
 from typing import Tuple, List, Optional, Callable, Any
 import os
 
@@ -8,7 +7,7 @@ from tqdm import tqdm
 
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_fetcher import DataFetcherFactory
-from omegaconf import DictConfig, ListConfig
+from omegaconf import DictConfig
 
 from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.halo import Halo, HaloContext
@@ -87,6 +86,7 @@ class DataLoader(PipelineStep):
         Tuple
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
+        logger.info('DataLoader step - Process method')
         with (tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar):
             transition_radius_list = []
 
@@ -158,6 +158,7 @@ class DataLoader(PipelineStep):
         list
             A list of tuples containing halo data and associated subhalo data for each halo ID.
         """
+        logger.debug('Add subhalo data of overlapping halos to each subhalo context ...')
         result = []
 
         for id_halo in halo_context.halo_id:
@@ -180,6 +181,7 @@ class DataLoader(PipelineStep):
         return result
 
     def _load_particles_overlapping_subhalos(self, halo: Halo, subhalo_context: SubhaloContext) -> List[SubhaloParticles]:
+        logger.debug('Loading particles for overlapping subhalos ...')
         overlapping_subhalos = subhalo_context.data[subhalo_context.data['id_parents'] != halo.halo_id]
         subhalo_particles = None
         if not overlapping_subhalos.empty:
@@ -197,10 +199,13 @@ class DataLoader(PipelineStep):
                     subhalo_particles = subhalo_particles_i
                 else:
                     subhalo_particles += subhalo_particles_i
+
+        logger.debug(f'Particles for overlapping subhalos: {subhalo_particles}')
         return subhalo_particles
 
     @staticmethod
     def get_overlapping_halos(subhalo_context: SubhaloContext, halo_context: HaloContext):
+        logger.debug('Getting overlapping halos ...')
         subhalo_positions = np.vstack(subhalo_context.data['spos'])
         subhalo_tree = cKDTree(subhalo_positions)
 
@@ -225,8 +230,8 @@ class DataLoader(PipelineStep):
                 if valid_subhalo_idxs:
                     overlapping_matrix[halo_id] = list(
                         zip(id_parents[valid_subhalo_idxs], subhalo_ids[valid_subhalo_idxs]))
-                    logger.info(f'Halo {halo_id} has {len(valid_subhalo_idxs)} overlapping subhalos:')
-                    logger.info(f'------> {overlapping_matrix[halo_id]}')
+                    logger.debug(f'Halo {halo_id} has {len(valid_subhalo_idxs)} overlapping subhalos:')
+                    logger.debug(f'------> {overlapping_matrix[halo_id]}')
                 else:
                     overlapping_matrix[halo_id] = []
             else:

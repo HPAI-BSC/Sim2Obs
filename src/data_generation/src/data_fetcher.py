@@ -536,7 +536,10 @@ class Illustris300Fetcher(DataFetcher):
             Configuration object containing catalog settings.
         """
         super().__init__(catalog, **kwargs)
-        logger.info(f"Illustris300Fetcher initialized with config: {catalog}")
+        # TODO check why this is printed several times
+        import os
+        print(f"Fetcher initialized in PID: {os.getpid()}")
+        logger.info(f"Illustris300Fetcher initialized.")
 
     def _get_fields(self):
         """
@@ -674,10 +677,9 @@ class Illustris300Fetcher(DataFetcher):
             processed_halos['subhalo_ids'] = processed_halos.apply(lambda halo: self.__get_children(halo,
                                                                                                     subhalo_context.data),
                                                                    axis=1)
-
-            logger.debug("Halo data fetched successfully.")
             self.column_map['subhalo_ids'] = 'subhalo_ids'
             halo_context = HaloContext(processed_halos, self.column_map)
+            logger.debug(f"Halo data fetched successfully: {halo_context.data['halo_id'].nunique()} halos.")
             return halo_context
         else:
             logger.warning("No halos found.")
@@ -733,8 +735,8 @@ class Illustris300Fetcher(DataFetcher):
             ]
 
             processed_subhalos = run_pipeline(subhalos, steps)
-            logger.debug("Subhalo data fetched successfully.")
             subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
+            logger.debug(f"Subhalo data fetched successfully: {len(subhalo_context.data)} subhalos.")
             return subhalo_context
         else:
             logger.warning("No subhalos found.")
@@ -765,8 +767,6 @@ class Illustris300Fetcher(DataFetcher):
         data = {}
         for part_type in part_types:
             fields = list(self.catalog.fields.particles[part_type].keys())
-            print('_get_p_subhalo:')
-            print(path, self.catalog.snapnum, subhalo_id, part_type, fields)
             particles = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, part_type, fields=fields)
 
             # if numpy, convert it to a dict
@@ -778,7 +778,12 @@ class Illustris300Fetcher(DataFetcher):
                 count = particles.get('count', None)
                 if count is None or count > 0:
                     data[part_type] = particles
-                    logger.debug(f"Particle data fetched successfully, particles retrieved")
+
+                    for key in particles:
+                        if isinstance(key, np.ndarray):
+                            num_particles = particles[key].shape[0]
+                            logger.debug(f"Particle data fetched successfully, particles retrieved: {num_particles}")
+                            break
                 else:
                     logger.debug(f'Subhalo {subhalo_id} does not have {part_type} particles.')
             else:
@@ -822,6 +827,7 @@ class Illustris300Fetcher(DataFetcher):
                 particles_halo = particles
             else:
                 particles_halo += particles
+        logger.debug(f"Particle data for halo {halo.halo_id}: {particles_halo}")
         return particles_halo
 
 
