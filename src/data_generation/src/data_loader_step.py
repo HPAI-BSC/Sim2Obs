@@ -184,7 +184,6 @@ class DataLoader(PipelineStep):
         logger.debug('Loading particles for overlapping subhalos ...')
         overlapping_subhalos = subhalo_context.data[subhalo_context.data['id_parents'] != halo.halo_id]
         subhalo_particles = None
-        try:
         if not overlapping_subhalos.empty:
             if 'group_number' in subhalo_context.data:
                 halo_ids = overlapping_subhalos['group_number'].tolist()
