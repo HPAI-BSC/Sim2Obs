@@ -191,10 +191,11 @@ class DataLoader(PipelineStep):
                 halo_ids = overlapping_subhalos['id_parents'].tolist()
 
             subhalo_ids = overlapping_subhalos['subhalo_id'].tolist()
+            logger.debug(f'Number of overlapping halos/subhalos: {len(subhalo_ids)}')
             for i, subhalo_id in enumerate(subhalo_ids):
                 try:
                     halo_id = halo_ids[i]
-                    logger.debug(f'Overlapping subhalo: {subhalo_particles}, halo_id: {halo_id}')
+                    logger.debug(f'Overlapping subhalo: {subhalo_id}, halo_id: {halo_id}')
                     subhalo_particles_i = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, halo_id=halo_id)
 
                     if subhalo_particles is None:

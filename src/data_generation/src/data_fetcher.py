@@ -1,6 +1,7 @@
 import copy
 import operator
 import os.path
+import traceback
 from abc import ABC, abstractmethod
 from typing import Any
 import swiftsimio as sw
@@ -539,6 +540,7 @@ class Illustris300Fetcher(DataFetcher):
         # TODO check why this is printed several times
         import os
         print(f"Fetcher initialized in PID: {os.getpid()}")
+        traceback.print_stack(limit=5)  # Adjust limit as needed
         logger.info(f"Illustris300Fetcher initialized.")
 
     def _get_fields(self):
