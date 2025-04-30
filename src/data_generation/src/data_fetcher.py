@@ -682,6 +682,7 @@ class Illustris300Fetcher(DataFetcher):
             self.column_map['subhalo_ids'] = 'subhalo_ids'
             halo_context = HaloContext(processed_halos, self.column_map)
             logger.debug(f"Halo data fetched successfully: {halo_context.data['halo_id'].nunique()} halos.")
+            logger.debug(f"{halo_context.data['halo_id'].max()}")
             return halo_context
         else:
             logger.warning("No halos found.")
