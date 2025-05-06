@@ -92,7 +92,7 @@ class DataLoader(PipelineStep):
         with (tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar):
             transition_radius_df = pd.DataFrame(data=[], columns=['halo', 'r200', 'transition_radius',
                                                                   'normalized_transition_radius (r/r200)'])
-
+            errors_overlapping = []
             for halo, subhalo_ctx in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
                 try:
@@ -100,7 +100,10 @@ class DataLoader(PipelineStep):
                     halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
 
                     # Load non-preprocessed particles for overlapping halos
-                    overlapping_subhalo_particles = self._load_particles_overlapping_subhalos(halo, subhalo_ctx)
+                    overlapping_subhalo_particles, subhalos_with_errors = \
+                        self._load_particles_overlapping_subhalos(halo, subhalo_ctx)
+
+                    errors_overlapping.extend(subhalos_with_errors)
                     if overlapping_subhalo_particles is not None:
                         halo_particles = halo_particles_no_overlapping + overlapping_subhalo_particles
                     else:
@@ -160,6 +163,7 @@ class DataLoader(PipelineStep):
         transition_radius_df.to_csv(path, index=False)
         summary_stats = transition_radius_df['transition_radius'].describe()
         logger.info(summary_stats)
+        logger.warning(f'Halo, subhalo accessing errors when getting overlapping particles: {errors_overlapping}')
 
     @staticmethod
     def load_halo_subhalo_data(subhalo_context: SubhaloContext, halo_context: HaloContext,
@@ -194,7 +198,7 @@ class DataLoader(PipelineStep):
             result.append((halo, subhalo_ctx))
         return result
 
-    def _load_particles_overlapping_subhalos(self, halo: Halo, subhalo_context: SubhaloContext) -> List[SubhaloParticles]:
+    def _load_particles_overlapping_subhalos(self, halo: Halo, subhalo_context: SubhaloContext) -> List:
         logger.debug('Loading particles for overlapping subhalos ...')
         overlapping_subhalos = subhalo_context.data[subhalo_context.data['id_parents'] != halo.halo_id]
         subhalo_particles = None
@@ -223,10 +227,8 @@ class DataLoader(PipelineStep):
                     error_message = traceback.format_exc()
                     logger.error(error_message)
                     continue
-
-        logger.debug(f'Particles for overlapping subhalos: {subhalo_particles}')
         logger.debug(f'Subhalos with accessing errors: {subhalos_with_errors}')
-        return subhalo_particles
+        return subhalo_particles, subhalos_with_errors
 
     @staticmethod
     def get_overlapping_halos(subhalo_context: SubhaloContext, halo_context: HaloContext):

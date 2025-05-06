@@ -1404,7 +1404,6 @@ class FlamingoFetcher(DataFetcher):
         HaloContext
             A context object containing halo data.
         """
-        logger.info("Fetching halo data...")
         halo_context = self._get_halos()
         return halo_context
 
@@ -1417,7 +1416,6 @@ class FlamingoFetcher(DataFetcher):
         SubhaloContext
             A context object containing subhalo data.
         """
-        logger.info("Fetching subhalo data...")
         subhalo_context = self._get_subhalos()
         return subhalo_context
 
@@ -1802,7 +1800,7 @@ class FlamingoFetcher(DataFetcher):
         ]
 
         processed_particles = run_pipeline(data, steps)
-        logger.debug("Halo data fetched successfully.")
+        logger.debug("Particles data fetched successfully.")
 
         # SubhaloParticles is expecting a dict with part_types - df
         d = {}

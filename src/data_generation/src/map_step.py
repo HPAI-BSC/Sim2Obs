@@ -366,8 +366,6 @@ class MapStep(PipelineStep):
         """
         rotation_axis = kwargs.get('rotation_axis', None)
         rotation_iteration = kwargs.get('rotation_iteration', None)
-        logger.debug(f'Rotation axis: {rotation_axis}, rotation_iteration: {rotation_iteration},'
-                     f' transition_radius: {cosmos_data.metadata["map"]["transition_radius"]}')
         for halo, _ in g:
             try:
                 # Compute number of bins and store it in the metadata
