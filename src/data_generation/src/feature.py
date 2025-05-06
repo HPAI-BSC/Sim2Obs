@@ -5,7 +5,6 @@ from typing import List
 import numpy as np
 import pandas as pd
 import joblib
-from matplotlib import pyplot as plt, ticker
 from omegaconf import DictConfig
 from scipy import stats
 from dotenv import load_dotenv, find_dotenv
@@ -394,7 +393,7 @@ class ICLProcessor(FeatureProcessor):
             logger.warning("No transition radius found; ICL never dominates.")
             transition_radius = None
 
-        return transition_radius
+        return transition_radius, normalized_transition_radius
 
     # TODO test this method do the same for velocity disp
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):

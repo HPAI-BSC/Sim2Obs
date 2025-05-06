@@ -3,6 +3,7 @@ from typing import Tuple, List, Optional, Callable, Any
 import os
 
 import numpy as np
+import pandas as pd
 from scipy.spatial import cKDTree
 from tqdm import tqdm
 
@@ -89,7 +90,8 @@ class DataLoader(PipelineStep):
         """
         logger.info('DataLoader step - Process method')
         with (tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar):
-            transition_radius_list = []
+            transition_radius_df = pd.DataFrame(data=[], columns=['halo', 'transition_radius',
+                                                                  'normalized_transition_radius'])
 
             for halo, subhalo_ctx in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
@@ -118,14 +120,17 @@ class DataLoader(PipelineStep):
                 # Compute the transition radius, r = FOV / 2
                 # TODO ANALYZE RADIUS AND USE JUST ONE
                 if hasattr(output_feature, 'get_transition_radius'):
-                    transition_radius = output_feature.get_transition_radius(halo, halo_particles_no_overlapping,
+                    transition_radius, normalized_transition_radius = output_feature.get_transition_radius(halo, halo_particles_no_overlapping,
                                                                              icl_mask)
                     if transition_radius in (0, None):
                         # Ignoring current halo
                         logger.warning(f'Ignoring halo: {halo.halo_id}')
                         continue
                     else:
-                        transition_radius_list.append(transition_radius)
+                        transition_radius_df.append({'halo': halo.halo_id,
+                                                     'transition_radius': transition_radius,
+                                                     'normalized_transition_radius': normalized_transition_radius},
+                                                    ignore_index=True)
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 subhalo_ctx.preprocess(halo)
@@ -146,10 +151,12 @@ class DataLoader(PipelineStep):
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo.halo_id}")
 
-        print(transition_radius_list)
-        plot_transition_radius(self.cfg, transition_radius_list)
+        plot_transition_radius(self.cfg, transition_radius['transition_radius'].tolist())
+        path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius{self.cfg.catalog.name}.csv'
+        transition_radius_df.to_csv(path, index=False)
 
-    def load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
+    @staticmethod
+    def load_halo_subhalo_data(subhalo_context: SubhaloContext, halo_context: HaloContext,
                                overlapping_matrix: dict) -> List[Tuple]:
         """
         Loads halo data and yields each halo's ID along with its associated data.
@@ -185,6 +192,7 @@ class DataLoader(PipelineStep):
         logger.debug('Loading particles for overlapping subhalos ...')
         overlapping_subhalos = subhalo_context.data[subhalo_context.data['id_parents'] != halo.halo_id]
         subhalo_particles = None
+        subhalos_with_errors = []
         if not overlapping_subhalos.empty:
             if 'group_number' in subhalo_context.data:
                 halo_ids = overlapping_subhalos['group_number'].tolist()
@@ -194,8 +202,8 @@ class DataLoader(PipelineStep):
             subhalo_ids = overlapping_subhalos['subhalo_id'].tolist()
             logger.debug(f'Number of overlapping halos/subhalos: {len(subhalo_ids)}')
             for i, subhalo_id in enumerate(subhalo_ids):
+                halo_id = halo_ids[i]
                 try:
-                    halo_id = halo_ids[i]
                     logger.debug(f'Overlapping subhalo: {subhalo_id}, halo_id: {halo_id}')
                     subhalo_particles_i = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, halo_id=halo_id)
 
@@ -204,6 +212,7 @@ class DataLoader(PipelineStep):
                     else:
                         subhalo_particles += subhalo_particles_i
                 except Exception as e:
+                    subhalos_with_errors.append((halo_id, subhalo_id))
                     logger.error(e)
                     error_message = traceback.format_exc()
                     logger.error(error_message)
