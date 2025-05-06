@@ -27,8 +27,14 @@ class Pipeline:
             A list of processing steps to be applied sequentially to the data.
         """
         self.cfg = cfg
-        self.data_loader = DataLoader(cfg)
         self.steps = steps
+
+        for step in self.steps:
+            if step.name == 'data_loader':
+                self.data_loader = step
+                break
+        else:
+            self.data_loader = DataLoader(self.cfg)
 
     def build_pipeline(self, steps, g, cosmos_data: CosmosData, input_feature: FeatureProcessor,
                        output_feature: FeatureProcessor, **kwargs):
@@ -56,12 +62,11 @@ class Pipeline:
         feature_input, feature_output = self.cfg.feature_names
         input_feature = FeatureProcessorFactory.get_feature(feature_input, cfg=self.cfg)
         output_feature = FeatureProcessorFactory.get_feature(feature_output, cfg=self.cfg)
-        data_loader = DataLoader(self.cfg)
 
-        halo_context = data_loader.fetcher.get_halos()
-        subhalo_context = data_loader.fetcher.get_subhalos()
-        overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
-        halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
+        halo_context = self.data_loader.fetcher.get_halos()
+        subhalo_context = self.data_loader.fetcher.get_subhalos()
+        overlapping_matrix = self.data_loader.get_overlapping_halos(subhalo_context, halo_context)
+        halo_subhalo_list = self.data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
 
         if n is not None:
             halo_subhalo_list = halo_subhalo_list[:n]

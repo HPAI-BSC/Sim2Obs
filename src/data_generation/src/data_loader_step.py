@@ -90,8 +90,8 @@ class DataLoader(PipelineStep):
         """
         logger.info('DataLoader step - Process method')
         with (tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar):
-            transition_radius_df = pd.DataFrame(data=[], columns=['halo', 'transition_radius',
-                                                                  'normalized_transition_radius'])
+            transition_radius_df = pd.DataFrame(data=[], columns=['halo', 'r200', 'transition_radius',
+                                                                  'normalized_transition_radius (r/r200)'])
 
             for halo, subhalo_ctx in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
@@ -127,10 +127,13 @@ class DataLoader(PipelineStep):
                         logger.warning(f'Ignoring halo: {halo.halo_id}')
                         continue
                     else:
-                        transition_radius_df.append({'halo': halo.halo_id,
-                                                     'transition_radius': transition_radius,
-                                                     'normalized_transition_radius': normalized_transition_radius},
-                                                    ignore_index=True)
+                        new_row = pd.DataFrame([{
+                            'halo': halo.halo_id,
+                            'r200': halo.r200,
+                            'transition_radius': transition_radius,
+                            'normalized_transition_radius (r/r200)': normalized_transition_radius
+                        }])
+                        transition_radius_df = pd.concat([transition_radius_df, new_row], ignore_index=True)
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 subhalo_ctx.preprocess(halo)
@@ -151,9 +154,12 @@ class DataLoader(PipelineStep):
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo.halo_id}")
 
-        plot_transition_radius(self.cfg, transition_radius['transition_radius'].tolist())
+        plot_transition_radius(self.cfg, transition_radius_df['transition_radius'].tolist())
         path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius{self.cfg.catalog.name}.csv'
+        logger.info(f'Storing transition radius df at: {path}')
         transition_radius_df.to_csv(path, index=False)
+        summary_stats = transition_radius_df['transition_radius'].describe()
+        logger.info(summary_stats)
 
     @staticmethod
     def load_halo_subhalo_data(subhalo_context: SubhaloContext, halo_context: HaloContext,
@@ -219,6 +225,7 @@ class DataLoader(PipelineStep):
                     continue
 
         logger.debug(f'Particles for overlapping subhalos: {subhalo_particles}')
+        logger.debug(f'Subhalos with accessing errors: {subhalos_with_errors}')
         return subhalo_particles
 
     @staticmethod

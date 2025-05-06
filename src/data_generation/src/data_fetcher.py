@@ -537,10 +537,6 @@ class Illustris300Fetcher(DataFetcher):
             Configuration object containing catalog settings.
         """
         super().__init__(catalog, **kwargs)
-        # TODO check why this is printed several times
-        import os
-        print(f"Fetcher initialized in PID: {os.getpid()}")
-        logger.debug(traceback.print_stack(limit=5))
         logger.info(f"Illustris300Fetcher initialized.")
 
     def _get_fields(self):
@@ -682,7 +678,7 @@ class Illustris300Fetcher(DataFetcher):
             self.column_map['subhalo_ids'] = 'subhalo_ids'
             halo_context = HaloContext(processed_halos, self.column_map)
             logger.debug(f"Halo data fetched successfully: {halo_context.data['halo_id'].nunique()} halos.")
-            logger.debug(f"{halo_context.data['halo_id'].max()}")
+            logger.debug(f"Halo id max value: {halo_context.data['halo_id'].max()}")
             return halo_context
         else:
             logger.warning("No halos found.")

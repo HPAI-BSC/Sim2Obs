@@ -43,10 +43,9 @@ def get_pipeline_steps(cfg: DictConfig) -> List[PipelineStep]:
 @hydra.main(version_base="1.3", config_path="../configs", config_name="data_generation.yaml")
 def main(cfg: DictConfig) -> Any:
     steps = get_pipeline_steps(cfg)
-    print(f'Launching pipeline : {steps}')
     pipeline = Pipeline(cfg=cfg, steps=steps)
     # Execute the pipeline and capture the first 5 iterations
-    _ = pipeline.run(n=10)
+    _ = pipeline.run()
 
 
 if __name__ == "__main__":

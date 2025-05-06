@@ -49,6 +49,9 @@ def setup_logger(name: str) -> logging.Logger:
     if logger.hasHandlers():
         logger.handlers.clear()
 
+    # Prevent log propagation to avoid duplicate logs
+    logger.propagate = False
+
     console_handler = logging.StreamHandler()
 
     # Updated format string to ensure line number is not included
