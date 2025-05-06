@@ -573,7 +573,6 @@ class Illustris300Fetcher(DataFetcher):
         HaloContext
             A context object containing halo data.
         """
-        logger.info("Fetching halo data...")
         halo_context = self._get_halos()
         return halo_context
 
@@ -586,7 +585,6 @@ class Illustris300Fetcher(DataFetcher):
         SubhaloContext
             A context object containing subhalo data.
         """
-        logger.info("Fetching subhalo data...")
         subhalo_context = self._get_subhalos()
         return subhalo_context
 
@@ -806,7 +804,7 @@ class Illustris300Fetcher(DataFetcher):
         ]
 
         processed_particles = run_pipeline(data, steps)
-        logger.debug("Halo data fetched successfully.")
+        logger.debug("Particle data fetched successfully.")
         particle_data = SubhaloParticles(processed_particles, self.catalog.fields.particles)
         return particle_data
 
