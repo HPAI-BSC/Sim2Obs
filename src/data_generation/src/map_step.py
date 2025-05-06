@@ -82,6 +82,7 @@ class MapStep(PipelineStep):
         subhalo_particles = cosmos_data.subhalo_particles
         r = cosmos_data.metadata['map']['transition_radius']
         bins = cosmos_data.metadata['map']['bins']
+        logger.debug(f'Generating maps for r={r}, bins={bins} and num particles={len(subhalo_particles.star_p)}')
         if self.dim == 2:
             ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
 

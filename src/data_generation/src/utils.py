@@ -1,31 +1,27 @@
-import hashlib
 import logging
 import os
 import re
 from pathlib import Path
-from typing import List
 import eagleSqlTools as sql
 import h5py
-import numpy
 
 import numpy as np
-import pandas as pd
-from PIL import Image
 
 # do not delete
 import math
 
-from dotenv import load_dotenv, find_dotenv
+# from dotenv import load_dotenv, find_dotenv
 from omegaconf import DictConfig
 from scipy.spatial.distance import cosine
 
-
 # This will search for the .env file and load it if found
-dotenv_path = find_dotenv('../.env')
-if dotenv_path:
-    load_dotenv(dotenv_path)
-else:
-    print(".env file not found, skipping load.")
+# Uncomment to connect to eagle db for local test,
+# however MN5 does not have internet connection, then is not needed
+# dotenv_path = find_dotenv('../.env')
+# if dotenv_path:
+#    load_dotenv(dotenv_path)
+# else:
+#    print(".env file not found, skipping load.")
 
 
 def setup_logger(name: str) -> logging.Logger:
@@ -50,7 +46,7 @@ def setup_logger(name: str) -> logging.Logger:
         logger.handlers.clear()
 
     # Prevent log propagation to avoid duplicate logs
-    logger.propagate = False
+    # logger.propagate = False
 
     console_handler = logging.StreamHandler()
 
