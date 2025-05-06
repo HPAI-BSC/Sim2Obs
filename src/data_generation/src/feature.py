@@ -15,11 +15,12 @@ from src.data_generation.src.utils import setup_logger, rotate
 
 logger = setup_logger("FeatureProcessor")
 
-dotenv_path = find_dotenv('../.env')
-if dotenv_path:
-    load_dotenv(dotenv_path)
-else:
-    print(".env file not found, skipping load.")
+# Uncomment for local testing, internet connection required
+# dotenv_path = find_dotenv('../.env')
+# if dotenv_path:
+#    load_dotenv(dotenv_path)
+# else:
+#    print(".env file not found, skipping load.")
 
 
 class FeatureProcessor(ABC):
@@ -368,6 +369,7 @@ class ICLProcessor(FeatureProcessor):
         else:
             logger.warning("No transition radius found; ICL never dominates.")
             transition_radius = None
+            normalized_transition_radius = None
 
         return transition_radius, normalized_transition_radius
 

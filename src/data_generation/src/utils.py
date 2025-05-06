@@ -9,6 +9,7 @@ import numpy as np
 
 # do not delete
 import math
+import pandas as pd
 
 # from dotenv import load_dotenv, find_dotenv
 from omegaconf import DictConfig
@@ -485,3 +486,15 @@ def r500_to_r200(r500):
 def m500_to_m200(m500):
     """Convert M500c to M200c assuming NFW scaling"""
     return m500 * (1.54) ** 3  # M200c ≈ M500c * (R200c / R500c)^3
+
+
+def store_overlapping_matrix_as_df(cfg, overlapping_matrix):
+    df_list = []
+
+    for halo_id, tuple_list in overlapping_matrix.items():
+        temp_df = pd.DataFrame(tuple_list, columns=['halo', 'overlapping halo - subhalo'])
+        df_list.append(temp_df)
+
+    df = pd.concat(df_list, ignore_index=True)
+    path = cfg.paths.datasets_dir + f'/../logs/overlapping_halos_{cfg.catalog.name}.csv'
+    df.to_csv(path, index=False)

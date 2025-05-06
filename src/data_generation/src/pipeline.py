@@ -9,7 +9,7 @@ from src.data_generation.src.feature import FeatureProcessorFactory, FeatureProc
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
-from src.data_generation.src.utils import setup_logger
+from src.data_generation.src.utils import setup_logger, store_overlapping_matrix_as_df
 
 logger = setup_logger("Pipeline")
 
@@ -67,6 +67,8 @@ class Pipeline:
         subhalo_context = self.data_loader.fetcher.get_subhalos()
         overlapping_matrix = self.data_loader.get_overlapping_halos(subhalo_context, halo_context)
         halo_subhalo_list = self.data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
+
+        store_overlapping_matrix_as_df(self.cfg, overlapping_matrix)
 
         if n is not None:
             halo_subhalo_list = halo_subhalo_list[:n]

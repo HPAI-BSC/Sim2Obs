@@ -441,8 +441,8 @@ class SubhaloParticles:
         lines = []
         for attr_name, attr_value in self.__dict__.items():
             if isinstance(attr_value, np.ndarray):
-                lines.append(f"{attr_name}: shape={attr_value.shape}, size={attr_value.size}")
-        return "\n".join(lines)
+                lines.append(f"{attr_name}: shape={attr_value.shape}")
+        return " ".join(lines)
 
 
 
