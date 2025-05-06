@@ -492,7 +492,7 @@ def store_overlapping_matrix_as_df(cfg, overlapping_matrix):
     df_list = []
 
     for halo_id, tuple_list in overlapping_matrix.items():
-        temp_df = pd.DataFrame(tuple_list, columns=['halo', 'overlapping halo - subhalo'])
+        temp_df = pd.DataFrame(halo_id, tuple_list, columns=['halo', 'overlapping halo - subhalo'])
         df_list.append(temp_df)
 
     df = pd.concat(df_list, ignore_index=True)

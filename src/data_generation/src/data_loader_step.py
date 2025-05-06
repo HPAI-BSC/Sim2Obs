@@ -93,6 +93,7 @@ class DataLoader(PipelineStep):
             transition_radius_df = pd.DataFrame(data=[], columns=['halo', 'r200', 'transition_radius',
                                                                   'normalized_transition_radius (r/r200)'])
             errors_overlapping = []
+            halos_ignored = []
             for halo, subhalo_ctx in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
                 try:
@@ -127,6 +128,7 @@ class DataLoader(PipelineStep):
                                                                              icl_mask)
                     if transition_radius in (0, None):
                         # Ignoring current halo
+                        halos_ignored.append(halo.halo_id)
                         logger.warning(f'Ignoring halo: {halo.halo_id}')
                         continue
                     else:
@@ -158,12 +160,13 @@ class DataLoader(PipelineStep):
                 logger.info(f"Finished processing halo {halo.halo_id}")
 
         plot_transition_radius(self.cfg, transition_radius_df['transition_radius'].tolist())
-        path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius{self.cfg.catalog.name}.csv'
+        path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius_{self.cfg.catalog.name}.csv'
         logger.info(f'Storing transition radius df at: {path}')
         transition_radius_df.to_csv(path, index=False)
         summary_stats = transition_radius_df['transition_radius'].describe()
         logger.info(summary_stats)
         logger.warning(f'Halo, subhalo accessing errors when getting overlapping particles: {errors_overlapping}')
+        logger.warning(f'Halos ignored since ICL never dominates (transition radius is None): {halos_ignored}')
 
     @staticmethod
     def load_halo_subhalo_data(subhalo_context: SubhaloContext, halo_context: HaloContext,

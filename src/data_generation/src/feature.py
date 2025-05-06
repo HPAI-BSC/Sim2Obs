@@ -336,7 +336,7 @@ class ICLProcessor(FeatureProcessor):
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
         distance = np.sqrt((particle_position ** 2).sum(axis=1))
-        normalized_distance = distance #/ halo.r200
+        normalized_distance = distance
 
         # Compute cumulative mass profiles
         sorted_indices = np.argsort(normalized_distance)
@@ -373,7 +373,6 @@ class ICLProcessor(FeatureProcessor):
 
         return transition_radius, normalized_transition_radius
 
-    # TODO test this method do the same for velocity disp
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):
         """
         Process the IntraCluster Light (ICL) for a given halo and its particles.
