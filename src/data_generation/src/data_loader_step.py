@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 from scipy.spatial import cKDTree
 from tqdm import tqdm
 
@@ -116,16 +117,16 @@ class DataLoader(PipelineStep):
                     continue
 
                 # Preprocessed all particles for current halo
-                halo_particles.preprocess(halo)
-                input_feature.process(halo=halo, subhalo_particles=halo_particles)
-                output_feature.process(halo=halo, subhalo_particles=halo_particles)
+                halo_particles_no_overlapping.preprocess(halo)
+                input_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
+                output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
                 icl_mask = output_feature.value
 
                 # Compute the transition radius, r = FOV / 2
                 # TODO ANALYZE RADIUS AND USE JUST ONE
                 if hasattr(output_feature, 'get_transition_radius'):
-                    transition_radius, normalized_transition_radius = output_feature.get_transition_radius(halo, halo_particles_no_overlapping,
-                                                                             icl_mask)
+                    transition_radius, normalized_transition_radius =\
+                        output_feature.get_transition_radius(halo, halo_particles_no_overlapping, icl_mask)
                     if transition_radius in (0, None):
                         # Ignoring current halo
                         halos_ignored.append(halo.halo_id)
@@ -142,8 +143,9 @@ class DataLoader(PipelineStep):
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 subhalo_ctx.preprocess(halo)
-
+                halo_particles.preprocess(halo)
                 tmp = CosmosData(halo, subhalo_ctx, halo.fsub, halo_particles)
+
                 # Keep cosmos_data instance
                 vars(cosmos_data).update(vars(tmp))
 
@@ -267,4 +269,3 @@ class DataLoader(PipelineStep):
             else:
                 overlapping_matrix[halo_id] = []
         return overlapping_matrix
-

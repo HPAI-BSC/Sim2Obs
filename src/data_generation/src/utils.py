@@ -10,6 +10,7 @@ import numpy as np
 # do not delete
 import math
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # from dotenv import load_dotenv, find_dotenv
 from omegaconf import DictConfig
@@ -363,7 +364,6 @@ def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_sc
 
 
 def plot_transition_radius(cfg, transition_radius_list):
-    import matplotlib.pyplot as plt
     # Plot the histogram
     plt.figure(figsize=(8, 6))
     plt.hist(transition_radius_list, bins=10, color='skyblue', edgecolor='black')
@@ -379,6 +379,27 @@ def plot_transition_radius(cfg, transition_radius_list):
 
     # Optionally show the plot
     # plt.show()
+
+
+def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, halo_id):
+    # Plotting
+    plt.figure(figsize=(8, 5))
+    plt.plot(r_by_r200, icl_cumulative, label='ICL Cumulative Mass', color='orange')
+    plt.plot(r_by_r200, bcg_cumulative, label='BCG Cumulative Mass', color='blue')
+    plt.axvline(x=r_by_r200[np.argmax(icl_cumulative > bcg_cumulative)], color='green', linestyle='--',
+                label='Transition Radius')
+    plt.xlabel('r / r200')
+    plt.ylabel('Cumulative Mass (M☉)')
+    plt.title(f'Cumulative Mass Profiles for Halo {0}')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/transition_radius_cumsum_{halo_id}.png'
+    # Save the plot
+    plt.savefig(path, dpi=300)
+
+    #plt.show()
 
 
 def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spatial_resolution_scale: float,

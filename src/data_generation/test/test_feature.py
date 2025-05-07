@@ -2,10 +2,13 @@ import os
 import pickle
 import unittest
 from unittest.mock import patch
+
+from matplotlib import pyplot as plt
 from numpy.testing import assert_array_equal
 
 import numpy as np
 from hydra import initialize, compose
+
 from src.data_generation.src.feature import ICLProcessor, VelocityDispersionProcessor
 from src.data_generation.src.utils import muse_bins_r
 
@@ -182,6 +185,3 @@ class TestFeature(unittest.TestCase):
                                                                      mock_subhalo_particles.return_value,
                                                                      icl_mask)
         self.assertIsNotNone(transition_radius)
-
-
-
