@@ -364,21 +364,21 @@ def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_sc
 
 
 def plot_transition_radius(cfg, transition_radius_list):
-    # Plot the histogram
+    # Remove None or non-positive values before taking the log
+    transition_radius_list = [r for r in transition_radius_list if r and r > 0]
+
+    # Take the log10 of transition radius values
+    log_transition_radius = np.log10(transition_radius_list)
+
     plt.figure(figsize=(8, 6))
-    plt.hist(transition_radius_list, bins=10, color='skyblue', edgecolor='black')
+    plt.hist(log_transition_radius, bins=50, color='skyblue', edgecolor='black')
 
-    # Add labels and title
-    plt.xlabel('Transition Radius [Kpc]')
+    plt.xlabel(r'$\log_{10}(\mathrm{Transition\ Radius\ [kpc]})$')
     plt.ylabel('Counts')
-    plt.title('Histogram of Transition Radii')
+    plt.title('Histogram of Log Transition Radii')
 
-    path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_{cfg.catalog.name}.png'
-    # Save the plot
+    path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_log_{cfg.catalog.name}.png'
     plt.savefig(path, dpi=300)
-
-    # Optionally show the plot
-    # plt.show()
 
 
 def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo_id):
