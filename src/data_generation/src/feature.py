@@ -453,18 +453,10 @@ class ICLProcessor(FeatureProcessor):
         # Temporal
         if halo.halo_id in [0, 1, 4]:
             r_by_r200 = sorted_distances / halo.r200
+            log_r = np.log10(r_by_r200)
 
             # Build cumsum profiles
-            plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, transition_index[max_pos], halo.halo_id)
-
-            # Build mass weighted pdf
-            bin_centers, icl_pdf, bcg_pdf = self.compute_mass_weighted_pdf(halo, subhalo_particles, icl_mask)
-            plot_icl_bcg_mass_pdf(icl_pdf, bcg_pdf, bin_centers, halo.halo_id)
-
-            # Build density profile
-            r, density_total, density_icl, density_bcg = self.compute_density_profile(halo, subhalo_particles, icl_mask)
-            plot_icl_bcg_density_profile(r, density_total, density_icl, density_bcg, halo.halo_id)
-
+            plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, log_r, transition_index[max_pos], halo.halo_id)
         return transition_radius, normalized_transition_radius
 
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):

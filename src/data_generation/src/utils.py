@@ -388,7 +388,7 @@ def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo
     plt.plot(r_by_r200, bcg_cumulative, label='BCG Cumulative Mass', color='blue')
     plt.axvline(r_by_r200[t_idx], color='red', linestyle='--', label='Transition radius')
     plt.scatter(r_by_r200[t_idx], icl_cumulative[t_idx], color='red', zorder=5)
-    plt.xlabel('r / r200')
+    plt.xlabel('log(r / r200)')
     plt.ylabel('Cumulative Mass (M☉)')
     plt.title(f'Cumulative Mass Profiles for Halo {halo_id}')
     plt.legend()
