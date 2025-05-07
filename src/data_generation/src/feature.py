@@ -402,6 +402,13 @@ class ICLProcessor(FeatureProcessor):
         float or None
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
+        # TEMPORAL
+        if halo.halo_id in [0, 1, 4]:
+            path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/halo_{halo.halo_id}.joblib'
+            joblib.dump(halo, path)
+            path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/subhalo_particles_{halo.halo_id}.joblib'
+            joblib.dump(subhalo_particles, path)
+
         logger.debug(f'Computing transition radius for: {halo.halo_id}')
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
