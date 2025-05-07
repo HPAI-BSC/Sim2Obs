@@ -11,9 +11,7 @@ from dotenv import load_dotenv, find_dotenv
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
-from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles, plot_icl_bcg_mass_pdf, \
-    plot_icl_bcg_density_profile
-
+from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles
 logger = setup_logger("FeatureProcessor")
 
 # Uncomment for local testing, internet connection required
@@ -408,6 +406,8 @@ class ICLProcessor(FeatureProcessor):
             joblib.dump(halo, path)
             path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/subhalo_particles_{halo.halo_id}.joblib'
             joblib.dump(subhalo_particles, path)
+            path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/icl_mask_{halo.halo_id}.joblib'
+            joblib.dump(icl_mask, path)
 
         logger.debug(f'Computing transition radius for: {halo.halo_id}')
         particle_position = subhalo_particles.star_p
