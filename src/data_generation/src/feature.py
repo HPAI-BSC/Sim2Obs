@@ -461,10 +461,8 @@ class ICLProcessor(FeatureProcessor):
         # Temporal
         if halo.halo_id in [0, 1, 4]:
             r_by_r200 = sorted_distances / halo.r200
-            log_r = np.log10(r_by_r200)
-
             # Build cumsum profiles
-            plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, log_r, transition_index[max_pos], halo.halo_id)
+            plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, transition_index[max_pos], halo.halo_id)
         return transition_radius, normalized_transition_radius
 
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):

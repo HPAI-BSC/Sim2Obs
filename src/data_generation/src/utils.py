@@ -394,11 +394,8 @@ def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-
     path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/transition_radius_cumsum_{halo_id}.png'
-    # Save the plot
     plt.savefig(path, dpi=300)
-
     #plt.show()
 
 
@@ -414,9 +411,7 @@ def plot_icl_bcg_mass_pdf(icl_pdf, bcg_pdf, bin_centers, halo_id):
     plt.tight_layout()
 
     path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/mass_weighted_pdf_{halo_id}.png'
-    # Save the plot
     plt.savefig(path, dpi=300)
-    #plt.show()
 
 
 def plot_icl_bcg_density_profile(r, density_total, density_icl, density_bcg, halo_id):
@@ -436,9 +431,7 @@ def plot_icl_bcg_density_profile(r, density_total, density_icl, density_bcg, hal
     plt.show()
 
     path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/density_profile_{halo_id}.png'
-    # Save the plot
     plt.savefig(path, dpi=300)
-    #plt.show()
 
 
 def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spatial_resolution_scale: float,
