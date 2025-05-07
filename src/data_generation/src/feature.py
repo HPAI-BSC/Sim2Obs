@@ -429,6 +429,7 @@ class ICLProcessor(FeatureProcessor):
         # Identify transition radius where ICL surpasses BCG
         transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
         logger.debug(f'transition index: {transition_index}')
+        logger.debug(f'sorted distances by the first id=0 in transition index: {sorted_distances[:transition_index[0]]}')
 
         max_pos = -1
         if len(transition_index) > 0:
