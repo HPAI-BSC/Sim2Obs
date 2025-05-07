@@ -333,7 +333,7 @@ class ICLProcessor(FeatureProcessor):
         float or None
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
-        print(f'Computing transition radius for: {halo.halo_id}')
+        logger.debug(f'Computing transition radius for: {halo.halo_id}')
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
         distance = np.sqrt((particle_position ** 2).sum(axis=1))
@@ -342,6 +342,10 @@ class ICLProcessor(FeatureProcessor):
         # Compute cumulative mass profiles
         sorted_indices = np.argsort(normalized_distance)
         # TODO check this feature exists
+        if not hasattr(subhalo_particles, 'star_m'):
+            raise ValueError('The object subhalos_particles should have an attribute called star_m in order to'
+                             ' compute the transition radius')
+
         masses = subhalo_particles.star_m[sorted_indices]
         sorted_distances = normalized_distance[sorted_indices]
         sorted_icl_mask = icl_mask[sorted_indices]
@@ -350,16 +354,16 @@ class ICLProcessor(FeatureProcessor):
         # Compute cumulative counts for ICL and BCG
         icl_cumulative = np.cumsum(sorted_icl_mask * masses)
         bcg_cumulative = np.cumsum(inverse_icl_mask * masses)
-        print('icl cumulative', icl_cumulative)
-        print('bcg cumulative', bcg_cumulative)
+        logger.debug('icl cumulative', icl_cumulative)
+        logger.debug('bcg cumulative', bcg_cumulative)
 
         # Identify transition radius where ICL surpasses BCG
         transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
-        print(f'transition index: {transition_index[:20]}')
+        logger.debug(f'transition index: {transition_index[:20]}')
 
+        max_pos = -1
         if len(transition_index) > 0:
             max_diff = -1
-            max_pos = -1
             for i, index in enumerate(transition_index):
                 if i > 0:
                     diff = transition_index[i] - transition_index[i - 1]
@@ -379,7 +383,8 @@ class ICLProcessor(FeatureProcessor):
         # Temporal
         if halo.halo_id in [0, 1, 4]:
             r_by_r200 = sorted_distances / halo.r200
-            plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, halo.halo_id)
+            #plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, halo.halo_id)
+            plot_icl_bcg_profiles(icl_cumulative[:max_pos], bcg_cumulative[:max_pos], r_by_r200, halo.halo_id)
 
         return transition_radius, normalized_transition_radius
 
