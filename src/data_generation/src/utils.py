@@ -381,16 +381,16 @@ def plot_transition_radius(cfg, transition_radius_list):
     # plt.show()
 
 
-def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, halo_id):
+def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo_id):
     # Plotting
     plt.figure(figsize=(8, 5))
     plt.plot(r_by_r200, icl_cumulative, label='ICL Cumulative Mass', color='orange')
     plt.plot(r_by_r200, bcg_cumulative, label='BCG Cumulative Mass', color='blue')
-    plt.axvline(x=r_by_r200[np.argmax(icl_cumulative > bcg_cumulative)], color='green', linestyle='--',
-                label='Transition Radius')
+    plt.axvline(r_by_r200[t_idx], color='red', linestyle='--', label='Transition radius')
+    plt.scatter(r_by_r200[t_idx], icl_cumulative[t_idx], color='red', zorder=5)
     plt.xlabel('r / r200')
     plt.ylabel('Cumulative Mass (M☉)')
-    plt.title(f'Cumulative Mass Profiles for Halo {0}')
+    plt.title(f'Cumulative Mass Profiles for Halo {halo_id}')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
@@ -399,6 +399,45 @@ def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, halo_id):
     # Save the plot
     plt.savefig(path, dpi=300)
 
+    #plt.show()
+
+
+def plot_icl_bcg_mass_pdf(icl_pdf, bcg_pdf, bin_centers, halo_id):
+    plt.figure(figsize=(8, 5))
+    plt.plot(bin_centers, icl_pdf, label='ICL Cumulative Mass', color='orange')
+    plt.plot(bin_centers, bcg_pdf, label='BCG Cumulative Mass', color='blue')
+    plt.xlabel('r / r200')
+    plt.ylabel('Mass-weighted PDF')
+    plt.title(f'log/r/R200) Halo {halo_id}')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/mass_weighted_pdf_{halo_id}.png'
+    # Save the plot
+    plt.savefig(path, dpi=300)
+    #plt.show()
+
+
+def plot_icl_bcg_density_profile(r, density_total, density_icl, density_bcg, halo_id):
+    plt.figure(figsize=(8, 5))
+    plt.plot(r, density_total, label="Total", color="black")
+    if density_icl is not None:
+        plt.plot(r, density_icl, label="ICL", color="orange")
+        plt.plot(r, density_bcg, label="BCG", color="blue")
+
+    plt.yscale("log")
+    plt.xlabel("r / R200")
+    plt.ylabel("Density (M☉ / kpc³)")
+    plt.title(f"Stellar Mass Density Profile - Halo {halo_id}")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/density_profile_{halo_id}.png'
+    # Save the plot
+    plt.savefig(path, dpi=300)
     #plt.show()
 
 

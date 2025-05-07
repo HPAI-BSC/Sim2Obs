@@ -11,7 +11,8 @@ from dotenv import load_dotenv, find_dotenv
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
-from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles
+from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles, plot_icl_bcg_mass_pdf, \
+    plot_icl_bcg_density_profile
 
 logger = setup_logger("FeatureProcessor")
 
@@ -310,7 +311,75 @@ class ICLProcessor(FeatureProcessor):
         return icl_mask
 
     @staticmethod
-    def get_transition_radius(halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
+    def compute_mass_weighted_pdf(halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray, bins=50,
+                                  r200_normalization=True):
+        logger.debug(f'Computing mass-weighted PDFs for: {halo.halo_id}')
+
+        # Compute distances from center
+        particle_position = subhalo_particles.star_p
+        distance = np.sqrt((particle_position ** 2).sum(axis=1))
+
+        # Optionally normalize by r200
+        if r200_normalization:
+            distance /= halo.r200
+            logger.debug("Distances normalized by r200")
+
+        # Use log bins for PDF
+        log_r = np.log10(distance + 1e-5)  # avoid log(0)
+        bin_edges = np.linspace(log_r.min(), log_r.max(), bins + 1)
+        bin_centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
+
+        if not hasattr(subhalo_particles, 'star_m'):
+            raise ValueError("subhalo_particles must have a 'star_m' attribute.")
+
+        masses = subhalo_particles.star_m
+
+        # Separate ICL and BCG
+        icl_mass = masses[icl_mask == 1]
+        icl_r = log_r[icl_mask == 1]
+
+        bcg_mass = masses[icl_mask == 0]
+        bcg_r = log_r[icl_mask == 0]
+
+        # Compute histograms (mass-weighted PDFs)
+        icl_pdf, _ = np.histogram(icl_r, bins=bin_edges, weights=icl_mass, density=True)
+        bcg_pdf, _ = np.histogram(bcg_r, bins=bin_edges, weights=bcg_mass, density=True)
+        return bin_centers, icl_pdf, bcg_pdf
+
+    @staticmethod
+    def compute_density_profile(halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray, bins=50,
+                                r_max_factor=1.5):
+        # Distances from center
+        position = subhalo_particles.star_p
+        masses = subhalo_particles.star_m
+        r = np.sqrt((position ** 2).sum(axis=1))  # in kpc
+
+        # Normalize by r200
+        r_norm = r / halo.r200
+
+        # Define radial bins (linear)
+        bin_edges = np.linspace(0, r_max_factor, bins + 1)
+        bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
+        # Compute shell volumes
+        shell_volumes = (4 / 3) * np.pi * (bin_edges[1:] ** 3 - bin_edges[:-1] ** 3)
+
+        # Density for all stars
+        density_total, _ = np.histogram(r_norm, bins=bin_edges, weights=masses)
+        density_total = density_total / shell_volumes  # in Msun/kpc^3 (if r is in kpc)
+
+        if icl_mask is not None:
+            density_icl, _ = np.histogram(r_norm[icl_mask == 1], bins=bin_edges, weights=masses[icl_mask == 1])
+            density_icl = density_icl / shell_volumes
+
+            density_bcg, _ = np.histogram(r_norm[icl_mask == 0], bins=bin_edges, weights=masses[icl_mask == 0])
+            density_bcg = density_bcg / shell_volumes
+        else:
+            density_icl = density_bcg = None
+
+        return bin_centers, density_total, density_icl, density_bcg
+
+    def get_transition_radius(self, halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
         """
         Computes the transition radius where the intracluster light (ICL) dominates over the brightest cluster galaxy (BCG).
 
@@ -354,12 +423,12 @@ class ICLProcessor(FeatureProcessor):
         # Compute cumulative counts for ICL and BCG
         icl_cumulative = np.cumsum(sorted_icl_mask * masses)
         bcg_cumulative = np.cumsum(inverse_icl_mask * masses)
-        logger.debug('icl cumulative', icl_cumulative)
-        logger.debug('bcg cumulative', bcg_cumulative)
+        logger.debug(f'icl cumulative: {icl_cumulative}', icl_cumulative)
+        logger.debug(f'bcg cumulative: {bcg_cumulative}', bcg_cumulative)
 
         # Identify transition radius where ICL surpasses BCG
         transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
-        logger.debug(f'transition index: {transition_index[:20]}')
+        logger.debug(f'transition index: {transition_index}')
 
         max_pos = -1
         if len(transition_index) > 0:
@@ -371,6 +440,7 @@ class ICLProcessor(FeatureProcessor):
                         max_diff = diff
                         max_pos = i
 
+            logger.debug(f'Index for the transition radius: {transition_index[max_pos]}')
             transition_radius = sorted_distances[transition_index[max_pos]]
             normalized_transition_radius = transition_radius / halo.r200
             logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
@@ -383,8 +453,17 @@ class ICLProcessor(FeatureProcessor):
         # Temporal
         if halo.halo_id in [0, 1, 4]:
             r_by_r200 = sorted_distances / halo.r200
-            #plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, halo.halo_id)
-            plot_icl_bcg_profiles(icl_cumulative[:max_pos], bcg_cumulative[:max_pos], r_by_r200, halo.halo_id)
+
+            # Build cumsum profiles
+            plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, transition_index[max_pos], halo.halo_id)
+
+            # Build mass weighted pdf
+            bin_centers, icl_pdf, bcg_pdf = self.compute_mass_weighted_pdf(halo, subhalo_particles, icl_mask)
+            plot_icl_bcg_mass_pdf(icl_pdf, bcg_pdf, bin_centers, halo.halo_id)
+
+            # Build density profile
+            r, density_total, density_icl, density_bcg = self.compute_density_profile(halo, subhalo_particles, icl_mask)
+            plot_icl_bcg_density_profile(r, density_total, density_icl, density_bcg, halo.halo_id)
 
         return transition_radius, normalized_transition_radius
 
