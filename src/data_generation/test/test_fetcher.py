@@ -47,17 +47,20 @@ class TestFetcher(unittest.TestCase):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
             self.cfg_flamingo = compose(config_name="data_generation.yaml")
+            self.cfg_millenium = compose(config_name="data_generation.yaml")
 
             # Load the local config for paths and assign them
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_illustris.paths = local_config.paths
             self.cfg_eagle.paths = local_config.paths
             self.cfg_flamingo.paths = local_config.paths
+            self.cfg_millenium.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
             self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
+            self.cfg_millenium.catalog = compose("catalog/millenium.yaml")['catalog']
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -67,6 +70,7 @@ class TestFetcher(unittest.TestCase):
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
         self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
         self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
+        self.fetcher_millenium = DataFetcherFactory.get_data_fetcher(self.cfg_millenium.catalog, **attr_dict)
         self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
 
     def test_get_halos_illustris(self):
@@ -225,6 +229,16 @@ class TestFetcher(unittest.TestCase):
         self.assertTrue(hasattr(halo_particles_1, "star_v"))
         self.assertIsInstance(halo_particles_1.star_v, np.ndarray)
 
+    def test_get_halos_millenium(self):
+        halo_context_1 = self.fetcher_millenium.get_halos()
+        self.assertIsInstance(halo_context_1, HaloContext)
+        self.assertEqual(len(halo_context_1.data), 11208)
+
+    def test_get_subhalos_millenium(self):
+        subhalo_context_1 = self.fetcher_millenium.get_subhalos()
+        self.assertIsInstance(subhalo_context_1, SubhaloContext)
+        self.assertEqual(len(subhalo_context_1.data), 1178)
+
     def test_eagle_simulation_codes(self):
         simulation_codes = ['RefL0025N0376',    # nok
                             'RefL0025N0752',    # nok
@@ -258,6 +272,25 @@ class TestFetcher(unittest.TestCase):
                            'SubhaloHalfmassRadType', 'SubhaloMassType', 'SubhaloGrNr']
         values = self.fetcher_illustris._get_fields()
         self.assertListEqual(values, expected_fields)
+
+    def test_get_items_by_halo(self):
+        # Millenium
+        # Get subhalos context
+        subhalo_context_1 = self.fetcher_millenium.get_subhalos()
+        id_parents = subhalo_context_1.data['id_parents'].unique()
+        print(f'Number of halo parents: {len(id_parents)}')
+
+        halo_context_1 = self.fetcher_millenium.get_halos()
+        halo_ids = halo_context_1.data['halo_id'].unique()
+        print(f'Number of halos: {len(halo_ids)}')
+
+        diff = set(halo_ids) - set(id_parents)
+        print(f'Number of halos with no subhalos linked: {len(diff)}')
+
+
+
+
+
 
 
 
