@@ -400,15 +400,6 @@ class ICLProcessor(FeatureProcessor):
         float or None
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
-        # TEMPORAL
-        if halo.halo_id in [0, 1, 4]:
-            path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/halo_{halo.halo_id}.joblib'
-            joblib.dump(halo, path)
-            path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/subhalo_particles_{halo.halo_id}.joblib'
-            joblib.dump(subhalo_particles, path)
-            path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/icl_mask_{halo.halo_id}.joblib'
-            joblib.dump(icl_mask, path)
-
         logger.debug(f'Computing transition radius for: {halo.halo_id}')
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
@@ -417,7 +408,6 @@ class ICLProcessor(FeatureProcessor):
 
         # Compute cumulative mass profiles
         sorted_indices = np.argsort(normalized_distance)
-        # TODO check this feature exists
         if not hasattr(subhalo_particles, 'star_m'):
             raise ValueError('The object subhalos_particles should have an attribute called star_m in order to'
                              ' compute the transition radius')
@@ -430,8 +420,8 @@ class ICLProcessor(FeatureProcessor):
         # Compute cumulative counts for ICL and BCG
         icl_cumulative = np.cumsum(sorted_icl_mask * masses)
         bcg_cumulative = np.cumsum(inverse_icl_mask * masses)
-        logger.debug(f'icl cumulative: {icl_cumulative}', icl_cumulative)
-        logger.debug(f'bcg cumulative: {bcg_cumulative}', bcg_cumulative)
+        logger.debug(f'icl cumulative: {icl_cumulative}')
+        logger.debug(f'bcg cumulative: {bcg_cumulative}')
 
         # Identify transition radius where ICL surpasses BCG
         transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
@@ -443,6 +433,7 @@ class ICLProcessor(FeatureProcessor):
             max_diff = -1
             for i, index in enumerate(transition_index):
                 if i > 0:
+                    logger.debug(sorted_distances[transition_index[i]])
                     diff = transition_index[i] - transition_index[i - 1]
                     if diff > max_diff:
                         max_diff = diff
