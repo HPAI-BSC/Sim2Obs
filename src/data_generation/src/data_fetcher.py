@@ -702,17 +702,25 @@ class Illustris300Fetcher(DataFetcher):
             logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
-        if 'SubhaloGrNr' not in self.halo_fields:
-            self.subhalo_fields.append('SubhaloGrNr')
+        group_attr = ''
+        if 'illustris-300' in self.catalog.path:
+            group_attr = 'SubhaloGrNr'
+        elif 'millenium' in self.catalog.path:
+            group_attr = 'SubhaloGroupNr'
+        else:
+            raise NotImplementedError('Please check the path used in your configuration.')
+
+        if group_attr not in self.halo_fields:
+            self.subhalo_fields.append(group_attr)
             OmegaConf.set_struct(self.catalog, False)
-            self.catalog.fields.subhalo["SubhaloGrNr"] = {
+            self.catalog.fields.subhalo[group_attr] = {
                 "input": None,
                 "output": None,
                 "scaling": None,
                 "name": "id_parents"
             }
             OmegaConf.set_struct(self.catalog, True)
-            self.column_map['SubhaloGrNr'] = 'id_parents'
+            self.column_map[group_attr] = 'id_parents'
 
         subhalos = il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=fields)
 
