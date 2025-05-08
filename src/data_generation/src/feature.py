@@ -429,7 +429,6 @@ class ICLProcessor(FeatureProcessor):
             max_diff = -1
             for i, index in enumerate(transition_index):
                 if i > 0:
-                    logger.debug(sorted_distances[transition_index[i]])
                     diff = transition_index[i] - transition_index[i - 1]
                     if diff > max_diff:
                         max_diff = diff

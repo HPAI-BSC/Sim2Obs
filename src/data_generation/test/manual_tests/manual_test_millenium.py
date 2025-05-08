@@ -16,7 +16,6 @@ class TestMilleniumData(unittest.TestCase):
         print(len(halos['Group_M_Crit200']))
 
     def test_load_subhalos(self):
-        # TODO SubhaloGrNr not working ?
         subhalo_fields = ['SubhaloPos', 'SubhaloHalfmassRadType', 'SubhaloMassType', 'SubhaloGroupNr']
         subhalos = il.groupcat.loadSubhalos(self.path, self.snapnum, fields=subhalo_fields)
         print(len(subhalos['SubhaloPos']))
