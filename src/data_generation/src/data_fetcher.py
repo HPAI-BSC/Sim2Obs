@@ -703,7 +703,7 @@ class Illustris300Fetcher(DataFetcher):
             raise Exception(f'The path {path} does not exist.')
 
         group_attr = ''
-        if 'illustris-300' in self.catalog.path:
+        if 'illustris300' in self.catalog.path:
             group_attr = 'SubhaloGrNr'
         elif 'millenium' in self.catalog.path:
             group_attr = 'SubhaloGroupNr'
