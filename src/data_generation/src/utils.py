@@ -382,13 +382,14 @@ def plot_transition_radius(cfg, transition_radius_list, log_normalization=True):
         plt.xlabel(r'$\log_{10}(\mathrm{Transition\ Radius\ [kpc]})$')
         plt.ylabel('Counts')
         plt.title('Histogram of Log Transition Radii')
+        path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_log_{name}.png'
     else:
         plt.hist(transition_radius_list, bins=50, color='skyblue', edgecolor='black')
         plt.xlabel(r'(\mathrm{Transition\ Radius\ [kpc]})$')
         plt.ylabel('Counts')
         plt.title('Histogram of Transition Radii')
+        path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_{name}.png'
 
-    path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_log_{name}.png'
     plt.savefig(path, dpi=300)
 
 

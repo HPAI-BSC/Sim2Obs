@@ -168,7 +168,6 @@ class DataLoader(PipelineStep):
         dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
         name = self.cfg.catalog.path.replace(dataset_dir, '')
         name = name.replace('/', '_')
-
         path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius_{name}.csv'
         logger.info(f'Storing transition radius df at: {path}')
         transition_radius_df.to_csv(path, index=False)
