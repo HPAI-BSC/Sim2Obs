@@ -420,13 +420,9 @@ class ICLProcessor(FeatureProcessor):
         # Compute cumulative counts for ICL and BCG
         icl_cumulative = np.cumsum(sorted_icl_mask * masses)
         bcg_cumulative = np.cumsum(inverse_icl_mask * masses)
-        logger.debug(f'icl cumulative: {icl_cumulative}')
-        logger.debug(f'bcg cumulative: {bcg_cumulative}')
 
         # Identify transition radius where ICL surpasses BCG
         transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
-        logger.debug(f'transition index: {transition_index}')
-        logger.debug(f'sorted distances by the first id=0 in transition index: {sorted_distances[:transition_index[0]]}')
 
         max_pos = -1
         if len(transition_index) > 0:
@@ -448,12 +444,6 @@ class ICLProcessor(FeatureProcessor):
             logger.warning("No transition radius found; ICL never dominates.")
             transition_radius = None
             normalized_transition_radius = None
-
-        # Temporal
-        if halo.halo_id in [0, 1, 4]:
-            r_by_r200 = sorted_distances / halo.r200
-            # Build cumsum profiles
-            plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, transition_index[max_pos], halo.halo_id)
         return transition_radius, normalized_transition_radius
 
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):
