@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - paths: gpfs
-  - catalog: millenium
+  - catalog: flamingo
   - extras: default
   - hydra: default
 
