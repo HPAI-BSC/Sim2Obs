@@ -377,7 +377,9 @@ def plot_transition_radius(cfg, transition_radius_list):
     plt.ylabel('Counts')
     plt.title('Histogram of Log Transition Radii')
 
-    path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_log_{cfg.catalog.name}.png'
+    full_sha = os.getenv("CI_COMMIT_SHA", "")
+    short_sha = full_sha[:8] if full_sha else None
+    path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_log_{short_sha}.png'
     plt.savefig(path, dpi=300)
 
 
