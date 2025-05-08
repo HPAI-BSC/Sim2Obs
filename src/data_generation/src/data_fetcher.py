@@ -1454,13 +1454,14 @@ class FlamingoFetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data.
         """
+        halo = kwargs.get('halo', None)
+        if halo is None:
+            logger.error("halo must be provided in kwargs")
+            raise ValueError("halo must be provided in kwargs")
+
         halo_id = kwargs.get('halo_id', None)
-
-        if halo_id is None:
-            logger.error("halo_id must be provided in kwargs")
-            raise ValueError("halo_id must be provided in kwargs")
-
         logger.info(f"Fetching particle data for subhalo: {halo_id}")
+
         return self._get_p_halo(halo_id)
 
     def _validate_and_process_fields(self, soap: SWIFTDataset, fields, super_key, mask=None, n_rows=None):
