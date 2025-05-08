@@ -7,14 +7,14 @@ g_2_solar: 1.989e33
 
 snapnum: 26          # redshift 0.18
 
-#simulation_code: RefL0050N0752
-#path: ${paths.datasets_dir}/eagle/RefL0050N0752
+simulation_code: RefL0050N0752
+path: ${paths.datasets_dir}/eagle/RefL0050N0752
 
 #simulation_code: AGNdT9L0050N0752
 #path: ${paths.datasets_dir}/eagle/AGNdT9L0050N0752
 
-simulation_code: RefL0100N1504
-path: ${paths.datasets_dir}/eagle/RefL0100N1504
+#simulation_code: RefL0100N1504
+#path: ${paths.datasets_dir}/eagle/RefL0100N1504
 
 
 spatial_resolution: 2.66  # kpc # TODO see if this changes for our interest sim
