@@ -253,6 +253,12 @@ class TestFetcher(unittest.TestCase):
         query = self.fetcher_eagle._build_query(table='subhalo')
         self.assertNotEqual(query, None)
 
+    def test_get_fields(self):
+        expected_fields = ['Group_M_Crit200', 'Group_R_Crit200', 'GroupPos', 'GroupFirstSub', 'SubhaloPos',
+                           'SubhaloHalfmassRadType', 'SubhaloMassType', 'SubhaloGrNr']
+        values = self.fetcher_illustris._get_fields()
+        self.assertListEqual(values, expected_fields)
+
 
 
 

@@ -559,10 +559,12 @@ class Illustris300Fetcher(DataFetcher):
           specifies the snapshot number.
 
         """
-        path = self.catalog.path + '/output'
-        halo_fields = list(il.groupcat.loadHalos(path, self.catalog.snapnum, fields=None).keys())
-        subhalo_fields = list(il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=None).keys())
-        return halo_fields + subhalo_fields
+        values = OmegaConf.select(self.catalog, "fields")
+        fields = []
+        for key in values:
+            if key in ['halo', 'subhalo']:
+                fields.extend(list(values[key].keys()))
+        return fields
 
     def get_halos(self, *args, **kwargs) -> HaloContext:
         """

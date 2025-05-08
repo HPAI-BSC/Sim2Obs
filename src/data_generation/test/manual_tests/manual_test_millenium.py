@@ -42,6 +42,13 @@ class TestMilleniumData(unittest.TestCase):
         df = df.sort_values(by=0, ascending=False)
         print(f'Halo ids with errors: {len(errors_id)}')
 
+    def test_get_fields(self):
+        halo_fields = list(il.groupcat.loadHalos(self.path, self.snapnum, fields=None).keys())
+        subhalo_fields = list(il.groupcat.loadSubhalos(self.path, self.snapnum, fields=None).keys())
+
+        print(halo_fields)
+        print(subhalo_fields)
+
 
 
 
