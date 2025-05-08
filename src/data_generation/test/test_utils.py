@@ -76,6 +76,17 @@ class TestUtils(unittest.TestCase):
         print(indices)  # ➝ [0, 1]
         print(halo_ids[indices])  # ➝ [100, 101] ← you get the actual halo IDs here
 
+    def test_plot_transition_radius(self):
+        # Initialize Hydra and load configuration
+        with initialize(config_path="configs"):
+            # Initialize the cfg_illustris and cfg_eagle
+            cfg_illustris = compose(config_name="data_generation.yaml")
+            cfg_eagle = compose(config_name="data_generation.yaml")
+            cfg_flamingo = compose(config_name="data_generation.yaml")
+            cfg_millenium = compose(config_name="data_generation.yaml")
+
+        transition_radius_list = np.arange(10)
+        plot_transition_radius(cfg_illustris, transition_radius_list, log_normalization=True)
 
 
 

@@ -363,23 +363,32 @@ def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_sc
     return bins
 
 
-def plot_transition_radius(cfg, transition_radius_list):
-    # Remove None or non-positive values before taking the log
-    transition_radius_list = [r for r in transition_radius_list if r and r > 0]
+def plot_transition_radius(cfg, transition_radius_list, log_normalization=True):
+    plt.figure(figsize=(8, 6))
+
+    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
+    name = cfg.catalog.path.replace(dataset_dir, '')
+    name = name.replace('/', '_')
+
+    print(name)
 
     # Take the log10 of transition radius values
-    log_transition_radius = np.log10(transition_radius_list)
+    if log_normalization:
+        # Remove None or non-positive values before taking the log
+        transition_radius_list = [r for r in transition_radius_list if r and r > 0]
+        log_transition_radius = np.log10(transition_radius_list)
+        plt.hist(log_transition_radius, bins=50, color='skyblue', edgecolor='black')
 
-    plt.figure(figsize=(8, 6))
-    plt.hist(log_transition_radius, bins=50, color='skyblue', edgecolor='black')
+        plt.xlabel(r'$\log_{10}(\mathrm{Transition\ Radius\ [kpc]})$')
+        plt.ylabel('Counts')
+        plt.title('Histogram of Log Transition Radii')
+    else:
+        plt.hist(transition_radius_list, bins=50, color='skyblue', edgecolor='black')
+        plt.xlabel(r'(\mathrm{Transition\ Radius\ [kpc]})$')
+        plt.ylabel('Counts')
+        plt.title('Histogram of Transition Radii')
 
-    plt.xlabel(r'$\log_{10}(\mathrm{Transition\ Radius\ [kpc]})$')
-    plt.ylabel('Counts')
-    plt.title('Histogram of Log Transition Radii')
-
-    full_sha = os.getenv("CI_COMMIT_SHA", "")
-    short_sha = full_sha[:8] if full_sha else None
-    path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_log_{short_sha}.png'
+    path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_log_{name}.png'
     plt.savefig(path, dpi=300)
 
 

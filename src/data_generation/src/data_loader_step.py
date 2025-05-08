@@ -161,12 +161,17 @@ class DataLoader(PipelineStep):
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo.halo_id}")
 
-        plot_transition_radius(self.cfg, transition_radius_df['normalized_transition_radius (r/r200)'].tolist())
+        transition_radius_l = transition_radius_df['normalized_transition_radius (r/r200)'].tolist()
+        plot_transition_radius(self.cfg, transition_radius_l)
+        plot_transition_radius(self.cfg, transition_radius_l, log_normalization=False)
+
         path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius_{self.cfg.catalog.name}.csv'
         logger.info(f'Storing transition radius df at: {path}')
         transition_radius_df.to_csv(path, index=False)
+
         summary_stats = transition_radius_df['transition_radius'].describe()
         logger.info(summary_stats)
+
         logger.warning(f'Halo, subhalo accessing errors when getting overlapping particles {len(errors_overlapping)}:'
                        f' {errors_overlapping}')
         logger.warning(f'Halos ignored since ICL never dominates (transition radius is None) {len(halos_ignored)}: '
