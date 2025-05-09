@@ -436,6 +436,16 @@ class ICLProcessor(FeatureProcessor):
 
             logger.debug(f'Index for the transition radius: {transition_index[max_pos]}')
             transition_radius = sorted_distances[transition_index[max_pos]]
+
+            if int(transition_radius) == 170771:
+                logger.debug('Saving max transition radius ...')
+                path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/halo_{halo.halo_id}.joblib'
+                joblib.dump(halo, path)
+                path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/subhalo_particles_{halo.halo_id}.joblib'
+                joblib.dump(subhalo_particles, path)
+                path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/icl_mask_{halo.halo_id}.joblib'
+                joblib.dump(icl_mask, path)
+
             normalized_transition_radius = transition_radius / halo.r200
             logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
                          f'({round(normalized_transition_radius, 2)} % r200), r200: {halo.r200}')

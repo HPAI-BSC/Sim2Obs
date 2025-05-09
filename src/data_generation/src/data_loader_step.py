@@ -172,7 +172,12 @@ class DataLoader(PipelineStep):
         logger.info(f'Storing transition radius df at: {path}')
         transition_radius_df.to_csv(path, index=False)
 
+        logger.debug('transition_radius [kpc]')
         summary_stats = transition_radius_df['transition_radius'].describe()
+        logger.info(summary_stats)
+
+        logger.debug('normalized_transition_radius (r/r200)')
+        summary_stats = transition_radius_df['normalized_transition_radius (r/r200)'].describe()
         logger.info(summary_stats)
 
         logger.warning(f'Halo, subhalo accessing errors when getting overlapping particles {len(errors_overlapping)}:'
