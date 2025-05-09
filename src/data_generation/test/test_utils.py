@@ -88,5 +88,21 @@ class TestUtils(unittest.TestCase):
         transition_radius_list = np.arange(10)
         plot_transition_radius(cfg_illustris, transition_radius_list, log_normalization=True)
 
+    def test_overlapping_matrix_as_df(self):
+        overlapping_matrix = {
+            1: [(3, 101), (4, 102)],
+            2: [(5, 201)]
+        }
+        # Initialize Hydra and load configuration
+        with initialize(config_path="configs"):
+            # Initialize the cfg_illustris and cfg_eagle
+            cfg_illustris = compose(config_name="data_generation.yaml")
+            cfg_eagle = compose(config_name="data_generation.yaml")
+            cfg_flamingo = compose(config_name="data_generation.yaml")
+            cfg_millenium = compose(config_name="data_generation.yaml")
+
+        store_overlapping_matrix_as_df(cfg_illustris, overlapping_matrix)
+
+
 
 

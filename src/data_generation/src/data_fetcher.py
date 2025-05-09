@@ -537,7 +537,7 @@ class Illustris300Fetcher(DataFetcher):
             Configuration object containing catalog settings.
         """
         super().__init__(catalog, **kwargs)
-        logger.info(f"Illustris300Fetcher initialized.")
+        logger.info(f"IllustrisFetcher initialized with config: {catalog.path}")
 
     def _get_fields(self):
         """
@@ -852,7 +852,7 @@ class EagleFetcher(DataFetcher):
             Configuration object containing catalog settings.
         """
         super().__init__(catalog, **kwargs)
-        logger.info(f"EagleFetcher initialized with config: {catalog}")
+        logger.info(f"EagleFetcher initialized with config: {catalog.path}")
 
     def get_halos(self, *args, **kwargs) -> HaloContext:
         """
@@ -1399,6 +1399,7 @@ class EagleFetcher(DataFetcher):
 class FlamingoFetcher(DataFetcher):
     def __init__(self, catalog: DictConfig, **kwargs):
         super().__init__(catalog, **kwargs)
+        logger.info(f"FlamingoFetcher initialized with config: {catalog.path}")
         self.fof_subhalos = None
         self.particles = None
         self.load_files()

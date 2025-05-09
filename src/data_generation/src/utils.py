@@ -379,13 +379,13 @@ def plot_transition_radius(cfg, transition_radius_list, log_normalization=True):
         log_transition_radius = np.log10(transition_radius_list)
         plt.hist(log_transition_radius, bins=50, color='skyblue', edgecolor='black')
 
-        plt.xlabel(r'$\log_{10}(\mathrm{Transition\ Radius\ [kpc]})$')
+        plt.xlabel(r'$\log_{10}(\mathrm{Transition\ Radius\ r/R200})$')
         plt.ylabel('Counts')
         plt.title('Histogram of Log Transition Radii')
         path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_log_{name}.png'
     else:
         plt.hist(transition_radius_list, bins=50, color='skyblue', edgecolor='black')
-        plt.xlabel(r'(\mathrm{Transition\ Radius\ [kpc]})$')
+        plt.xlabel('Transition Radius r/R200')
         plt.ylabel('Counts')
         plt.title('Histogram of Transition Radii')
         path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_{name}.png'
@@ -554,12 +554,15 @@ def m500_to_m200(m500):
 
 
 def store_overlapping_matrix_as_df(cfg, overlapping_matrix):
-    df_list = []
+    df = pd.DataFrame(data=[], columns=['halo id', 'overlapping (halo id, subhalo id)'])
 
     for halo_id, tuple_list in overlapping_matrix.items():
-        temp_df = pd.DataFrame(halo_id, tuple_list, columns=['halo', 'overlapping halo - subhalo'])
-        df_list.append(temp_df)
+        temp_df = pd.DataFrame([[halo_id, tuple_list]], columns=['halo id', 'overlapping (halo id, subhalo id)'])
+        df = pd.concat([df, temp_df], ignore_index=True)
 
-    df = pd.concat(df_list, ignore_index=True)
-    path = cfg.paths.datasets_dir + f'/../logs/overlapping_halos_{cfg.catalog.name}.csv'
+    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
+    name = cfg.catalog.path.replace(dataset_dir, '')
+    name = name.replace('/', '_')
+
+    path = cfg.paths.datasets_dir + f'/../logs/overlapping_halos_{name}.csv'
     df.to_csv(path, index=False)
