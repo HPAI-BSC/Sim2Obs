@@ -92,7 +92,7 @@ class DataLoader(PipelineStep):
         logger.info('DataLoader step - Process method')
 
         lbox = None
-        if 'Lbox' in self.cfg:
+        if 'Lbox' in self.cfg.catalog:
             lbox = self.cfg['Lbox']
             logger.info(f'Lbox: {lbox}')
 
