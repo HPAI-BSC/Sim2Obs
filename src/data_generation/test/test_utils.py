@@ -1,7 +1,13 @@
 import unittest
 
 import numpy as np
-from src.data_generation.src.utils import read_dataset, to_list, to_list_in_batches
+from hydra import initialize, compose
+from rootutils import rootutils
+
+rootutils.setup_root(__file__, pythonpath=True)
+
+from src.data_generation.src.utils import read_dataset, to_list, to_list_in_batches, plot_transition_radius, \
+    store_overlapping_matrix_as_df
 
 
 def assert_dicts_equal(dict1, dict2, atol=1e-8):

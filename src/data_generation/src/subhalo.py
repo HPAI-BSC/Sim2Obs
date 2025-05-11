@@ -140,6 +140,7 @@ class SubhaloContext:
             indexing &= self.data['group_number'] == halo.group_number
         if 'spos' in self.data:
             # Normalize subhalo positions respect to the center of its halo
+            self.data = self.data.copy()
             self.data.loc[indexing, 'spos'] = self.data.loc[indexing, 'spos'].apply(lambda row: row - halo.gpos)
         # ...
 

@@ -398,7 +398,7 @@ def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo
     plt.figure(figsize=(8, 5))
     plt.plot(r_by_r200, icl_cumulative, label='ICL Cumulative Mass', color='orange')
     plt.plot(r_by_r200, bcg_cumulative, label='BCG Cumulative Mass', color='blue')
-    plt.axvline(r_by_r200[t_idx], color='red', linestyle='--', label='Transition radius')
+    #plt.axvline(r_by_r200[t_idx], color='red', linestyle='--', label='Transition radius')
     plt.scatter(r_by_r200[t_idx], icl_cumulative[t_idx], color='red', zorder=5)
     plt.xlabel('log(r / r200)')
     plt.ylabel('Cumulative Mass (M☉)')
@@ -408,7 +408,7 @@ def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo
     plt.tight_layout()
     path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/transition_radius_cumsum_{halo_id}.png'
     plt.savefig(path, dpi=300)
-    #plt.show()
+    plt.show()
 
 
 def plot_icl_bcg_mass_pdf(icl_pdf, bcg_pdf, bin_centers, halo_id):
@@ -566,3 +566,43 @@ def store_overlapping_matrix_as_df(cfg, overlapping_matrix):
 
     path = cfg.paths.datasets_dir + f'/../logs/overlapping_halos_{name}.csv'
     df.to_csv(path, index=False)
+
+
+def apply_pbc(particle_positions, Lbox):
+    """
+    Apply Periodic Boundary Conditions (PBC) to the particle positions.
+    Particle positions are assumed to be in the range [0, Lbox] before correction.
+
+    Args:
+    - particle_positions: A NumPy array of shape (N, 3), where N is the number of particles.
+    - Lbox: The size of the box (float), must be in kpc/h.
+
+    Returns:
+    - corrected_positions: The PBC-corrected particle positions (shape N, 3).
+    """
+    corrected_positions = (particle_positions + Lbox / 2) % Lbox - Lbox / 2
+    return corrected_positions
+
+
+def check_and_apply_pbc_to_particles(halo_center, particles, Lbox):
+    """
+    Apply PBC only to particles that are within Lbox/2 distance from the halo center.
+
+    Args:
+    - halo_center: The center of the halo (3D vector).
+    - particles: A NumPy array of shape (N, 3), where N is the number of particles.
+    - Lbox: The size of the box (float).
+
+    Returns:
+    - pbc_corrected_particles: The particles with PBC applied if within distance Lbox/2.
+    """
+    # Compute the distance from the halo center to each particle
+    distances = np.linalg.norm(particles - halo_center, axis=1)
+
+    # Create a mask for particles within Lbox/2 distance from the halo center
+    mask_within_box = distances < (Lbox / 2)
+
+    # Apply PBC correction only to particles within Lbox/2 distance
+    corrected_particles = np.copy(particles)
+    corrected_particles[mask_within_box] = apply_pbc(particles[mask_within_box], Lbox)
+    return corrected_particles, mask_within_box

@@ -3,6 +3,7 @@ subhalo_error_id: 4294967295
 snapnum: 84       # redshift 0.2
 a: 0.8333     # redshift 0.2
 H: 0.6774
+Lbox: 300000 # box size in kpc/h
 
 spatial_resolution: 1.480 # kpc
 # bin_size = spatial_resolution * 1 ->

@@ -1,16 +1,22 @@
 import os
+
+from matplotlib import pyplot as plt
+from rootutils import rootutils
+
+rootutils.setup_root(__file__, pythonpath=True)
+
 import pickle
 import unittest
 from unittest.mock import patch
 
-from matplotlib import pyplot as plt
+import joblib
 from numpy.testing import assert_array_equal
 
 import numpy as np
 from hydra import initialize, compose
 
 from src.data_generation.src.feature import ICLProcessor, VelocityDispersionProcessor
-from src.data_generation.src.utils import muse_bins_r
+from src.data_generation.src.utils import muse_bins_r, check_and_apply_pbc_to_particles
 
 
 class TestFeature(unittest.TestCase):
@@ -185,3 +191,74 @@ class TestFeature(unittest.TestCase):
                                                                      mock_subhalo_particles.return_value,
                                                                      icl_mask)
         self.assertIsNotNone(transition_radius)
+
+    def test_exploration_transition_radius(self):
+        def plot_particles(x, y, z, halo_center):
+            # Create a 3D scatter plot
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+
+            # Plot all the particles
+            ax.scatter(x, y, z, c='r', marker='o')  # Particles in red
+
+            # Plot the halo center with a different color (e.g., blue) and a larger marker
+            ax.scatter(halo_center[0], halo_center[1], halo_center[2], c='b', marker='*',
+                       s=100)  # Halo center in blue, larger marker
+
+            # Add labels for clarity
+            ax.set_xlabel('X Label')
+            ax.set_ylabel('Y Label')
+            ax.set_zlabel('Z Label')
+            plt.show()
+
+        self.icl_processor = ICLProcessor(self.cfg_illustris)
+
+        halo_id = 4178
+        path = f'../../../transition_radius_exploration/halo_{halo_id}.joblib'
+        halo = joblib.load(path)
+        path = f'../../../transition_radius_exploration/subhalo_particles_{halo_id}.joblib'
+        # Already preprocessed position = position - halo position
+        subhalo_particles = joblib.load(path)
+        path = f'../../../transition_radius_exploration/icl_mask_{halo_id}.joblib'
+        icl_mask = joblib.load(path)
+
+        transition_radius, normalized_transition_radius =\
+            self.icl_processor.get_transition_radius(halo, subhalo_particles, icl_mask)
+        print(transition_radius, normalized_transition_radius)
+
+        # -------
+        box_size = 300.0  # Mpc/h (TNG300 box size)
+        box_kpc = box_size * 1000
+        corrected_particles, mask_within_box = check_and_apply_pbc_to_particles(halo.gpos, subhalo_particles.star_p,
+                                                                                box_kpc)
+        # -------
+        inside_box = np.all((corrected_particles >= -box_kpc / 2) &
+                            (corrected_particles <= box_kpc / 2))
+        print(inside_box)
+
+        x = corrected_particles[:, 0]
+        y = corrected_particles[:, 1]
+        z = corrected_particles[:, 2]
+        plot_particles(x, y, z, halo_center=[0, 0, 0])
+
+        subhalo_particles.star_p = corrected_particles
+        transition_radius, normalized_transition_radius =\
+            self.icl_processor.get_transition_radius(halo, subhalo_particles, icl_mask)
+        print(transition_radius, normalized_transition_radius)
+
+    def test_pbc(self):
+        Lbox = 10.0  # kpc / h
+        halo_center = np.array([9.5, 5.0, 5.0])  # Halo center position
+        particles = np.array([[9.5, 5.0, 5.0], [11.0, 5.0, 5.0], [-11.0, 5.0, 5.0], [4.5, 5.0, 5.0]])
+
+        # Apply PBC only to particles within Lbox/2 distance from the halo center
+        corrected_particles, mask_within_box = check_and_apply_pbc_to_particles(halo_center, particles, Lbox)
+
+        print("Corrected particle positions:")
+        print(corrected_particles)
+
+        print("\nParticles within Lbox/2 distance from the halo center:")
+        print(particles[mask_within_box])
+
+        print("\nParticles outside Lbox/2 distance from the halo center:")
+        print(particles[~mask_within_box])

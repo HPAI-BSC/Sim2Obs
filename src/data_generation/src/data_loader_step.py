@@ -16,7 +16,7 @@ from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloParticles, SubHalo, SubhaloContext
-from src.data_generation.src.utils import setup_logger, plot_transition_radius
+from src.data_generation.src.utils import setup_logger, plot_transition_radius, check_and_apply_pbc_to_particles
 
 logger = setup_logger("DataLoader")
 
@@ -143,6 +143,13 @@ class DataLoader(PipelineStep):
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 subhalo_ctx.preprocess(halo)
+
+                if 'Lbox' in self.cfg:
+                    lbox = self.cfg['Lbox']
+                    logger.debug(f'Checking and applying pbc to particles, lbox: {lbox}')
+                    corrected_positions = check_and_apply_pbc_to_particles(halo.gpos, halo_particles.star_p, lbox)
+                    halo_particles.star_p = corrected_positions
+
                 halo_particles.preprocess(halo)
                 tmp = CosmosData(halo, subhalo_ctx, halo.fsub, halo_particles)
 
