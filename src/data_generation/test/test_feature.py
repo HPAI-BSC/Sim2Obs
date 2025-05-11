@@ -16,7 +16,7 @@ import numpy as np
 from hydra import initialize, compose
 
 from src.data_generation.src.feature import ICLProcessor, VelocityDispersionProcessor
-from src.data_generation.src.utils import muse_bins_r, check_and_apply_pbc_to_particles
+from src.data_generation.src.utils import muse_bins_r
 
 
 class TestFeature(unittest.TestCase):
@@ -225,40 +225,3 @@ class TestFeature(unittest.TestCase):
         transition_radius, normalized_transition_radius =\
             self.icl_processor.get_transition_radius(halo, subhalo_particles, icl_mask)
         print(transition_radius, normalized_transition_radius)
-
-        # -------
-        box_size = 300.0  # Mpc/h (TNG300 box size)
-        box_kpc = box_size * 1000
-        corrected_particles, mask_within_box = check_and_apply_pbc_to_particles(halo.gpos, subhalo_particles.star_p,
-                                                                                box_kpc)
-        # -------
-        inside_box = np.all((corrected_particles >= -box_kpc / 2) &
-                            (corrected_particles <= box_kpc / 2))
-        print(inside_box)
-
-        x = corrected_particles[:, 0]
-        y = corrected_particles[:, 1]
-        z = corrected_particles[:, 2]
-        plot_particles(x, y, z, halo_center=[0, 0, 0])
-
-        subhalo_particles.star_p = corrected_particles
-        transition_radius, normalized_transition_radius =\
-            self.icl_processor.get_transition_radius(halo, subhalo_particles, icl_mask)
-        print(transition_radius, normalized_transition_radius)
-
-    def test_pbc(self):
-        Lbox = 10.0  # kpc / h
-        halo_center = np.array([9.5, 5.0, 5.0])  # Halo center position
-        particles = np.array([[9.5, 5.0, 5.0], [11.0, 5.0, 5.0], [-11.0, 5.0, 5.0], [4.5, 5.0, 5.0]])
-
-        # Apply PBC only to particles within Lbox/2 distance from the halo center
-        corrected_particles, mask_within_box = check_and_apply_pbc_to_particles(halo_center, particles, Lbox)
-
-        print("Corrected particle positions:")
-        print(corrected_particles)
-
-        print("\nParticles within Lbox/2 distance from the halo center:")
-        print(particles[mask_within_box])
-
-        print("\nParticles outside Lbox/2 distance from the halo center:")
-        print(particles[~mask_within_box])

@@ -16,7 +16,7 @@ from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloParticles, SubHalo, SubhaloContext
-from src.data_generation.src.utils import setup_logger, plot_transition_radius, check_and_apply_pbc_to_particles
+from src.data_generation.src.utils import setup_logger, plot_transition_radius
 
 logger = setup_logger("DataLoader")
 
@@ -90,22 +90,37 @@ class DataLoader(PipelineStep):
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
         logger.info('DataLoader step - Process method')
+
+        lbox = None
+        if 'Lbox' in self.cfg:
+            lbox = self.cfg['Lbox']
+            logger.info(f'Lbox: {lbox}')
+
+        halo_context = self.fetcher.get_halos()
+
         with (tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar):
             transition_radius_df = pd.DataFrame(data=[], columns=['halo', 'r200', 'transition_radius',
                                                                   'normalized_transition_radius (r/r200)'])
             errors_overlapping = []
             halos_ignored = []
+            # Note that subhalos here contains overlapping subhalos
             for halo, subhalo_ctx in g:
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
                 try:
                     # Load particles for all the subhalos in that halo
                     halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
 
-                    # Load non-preprocessed particles for overlapping halos
-                    overlapping_subhalo_particles, subhalos_with_errors = \
-                        self._load_particles_overlapping_subhalos(halo, subhalo_ctx)
+                    # Preprocessed all particles for current halo
+                    halo_particles_no_overlapping.preprocess(halo, lbox)
 
+                    # Load preprocessed particles for overlapping halos
+                    overlapping_subhalo_particles, subhalos_with_errors = \
+                        self._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
+
+                    # Detect any errors during the retrival
                     errors_overlapping.extend(subhalos_with_errors)
+
+                    # Group all the particles together
                     if overlapping_subhalo_particles is not None:
                         halo_particles = halo_particles_no_overlapping + overlapping_subhalo_particles
                     else:
@@ -116,8 +131,7 @@ class DataLoader(PipelineStep):
                     logger.error(f"Failed to load particle data for halo {halo.halo_id}: {e}")
                     continue
 
-                # Preprocessed all particles for current halo
-                halo_particles_no_overlapping.preprocess(halo)
+                # Compute features with preprocessed and non-overlapping particles
                 input_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
                 output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
                 icl_mask = output_feature.value
@@ -142,23 +156,13 @@ class DataLoader(PipelineStep):
                         transition_radius_df = pd.concat([transition_radius_df, new_row], ignore_index=True)
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
-                subhalo_ctx.preprocess(halo)
-
-                if 'Lbox' in self.cfg:
-                    lbox = self.cfg['Lbox']
-                    logger.debug(f'Checking and applying pbc to particles, lbox: {lbox}')
-                    corrected_positions = check_and_apply_pbc_to_particles(halo.gpos, halo_particles.star_p, lbox)
-                    halo_particles.star_p = corrected_positions
-                else:
-                    logger.warning('No Lbox has been specified in the config, no pbc will be applied.')
-
-                halo_particles.preprocess(halo)
+                subhalo_ctx.preprocess(halo, lbox)
                 tmp = CosmosData(halo, subhalo_ctx, halo.fsub, halo_particles)
 
                 # Keep cosmos_data instance
                 vars(cosmos_data).update(vars(tmp))
 
-                # Add new metadata for map generating
+                # Add new metadata for map generating -> TODO remove this
                 cosmos_data.metadata.update({"map": {"transition_radius": transition_radius,
                                                      "fov": transition_radius * 2
                                                      }})
@@ -227,7 +231,8 @@ class DataLoader(PipelineStep):
             result.append((halo, subhalo_ctx))
         return result
 
-    def _load_particles_overlapping_subhalos(self, halo: Halo, subhalo_context: SubhaloContext) -> List:
+    def _load_particles_overlapping_subhalos(self, halo: Halo, subhalo_context: SubhaloContext,
+                                             halo_context: HaloContext, lbox: float = None):
         logger.debug('Loading particles for overlapping subhalos ...')
         overlapping_subhalos = subhalo_context.data[subhalo_context.data['id_parents'] != halo.halo_id]
         subhalo_particles = None
@@ -245,6 +250,12 @@ class DataLoader(PipelineStep):
                 try:
                     logger.debug(f'Overlapping subhalo: {subhalo_id}, halo_id: {halo_id}')
                     subhalo_particles_i = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, halo_id=halo_id)
+
+                    # Get halo of this particles
+                    halo = halo_context.get_halo_by_id(halo_id)
+
+                    # Preprocess the particles according to their halo center
+                    subhalo_particles_i.preprocess(halo, lbox)
 
                     if subhalo_particles is None:
                         subhalo_particles = subhalo_particles_i

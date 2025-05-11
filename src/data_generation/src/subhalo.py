@@ -3,9 +3,8 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig
-from scipy.spatial import cKDTree
 
-from src.data_generation.src.halo import HaloContext, Halo
+from src.data_generation.src.halo import Halo
 from src.data_generation.src.utils import rotate, dict_depth, setup_logger
 
 
@@ -123,7 +122,7 @@ class SubhaloContext:
             # Set a multi-index for efficient querying
             self.data.set_index(["id_parents", "subhalo_id"], inplace=True, drop=False)
 
-    def preprocess(self, halo: Halo):
+    def preprocess(self, halo: Halo, lbox: float = None):
         """
         ...
         Parameters:
@@ -131,6 +130,15 @@ class SubhaloContext:
         halo_context : HaloContext
             A HaloContext object providing necessary information for preprocessing.
         """
+        def apply_pbc_correction(subhalo_pos, halo_center, lbox):
+            delta = subhalo_pos - halo_center  # Compute the relative position
+            distance = np.linalg.norm(delta)  # Calculate the distance
+
+            if lbox is not None and distance > lbox / 2:
+                # Apply PBC correction
+                delta = (delta + lbox / 2) % lbox - lbox / 2
+            return delta  # Just return the corrected relative position
+
         # TODO Add missing columns
         indexing = self.data['id_parents'] == halo.halo_id
         is_full_false = np.sum(indexing)
@@ -141,7 +149,10 @@ class SubhaloContext:
         if 'spos' in self.data:
             # Normalize subhalo positions respect to the center of its halo
             self.data = self.data.copy()
-            self.data.loc[indexing, 'spos'] = self.data.loc[indexing, 'spos'].apply(lambda row: row - halo.gpos)
+            self.data.loc[indexing, 'spos'] = self.data.loc[indexing, 'spos'].apply(
+                lambda row: apply_pbc_correction(row, halo.gpos, lbox)
+            )
+            #self.data.loc[indexing, 'spos'] = self.data.loc[indexing, 'spos'].apply(lambda row: row - halo.gpos)
         # ...
 
     def rotate(self, z, axis, degree):
@@ -339,6 +350,8 @@ class SubhaloParticles:
     __init__(m, p, v, scale_factor=None, init=True):
         Initializes the SubhaloParticles object with particle mass, position, and velocity data.
     """
+    logger = setup_logger("SubhhaloParticles")
+
     def __init__(self, data: dict, column_map: DictConfig) -> None:
         """
         Initialize the SubhaloParticles object with particle mass, position, and velocity data.
@@ -408,18 +421,29 @@ class SubhaloParticles:
                 continue
         return self.__class__(data=data, column_map=None)
 
-    def preprocess(self, halo: Halo):
+    def preprocess(self, halo: Halo, lbox: float = None):
         """
-        Preprocesses the particle data, such as normalizing positions.
+        Preprocesses the particle data by normalizing star particle positions with respect to the halo center.
+        If lbox is provided, applies periodic boundary condition (PBC) correction using the minimum image convention.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         halo : Halo
-            The Halo object that provides the necessary data for preprocessing.
+            The Halo object providing the central position for normalization.
+        lbox : float, optional
+            Size of the simulation box (in kpc/h). If provided, PBC correction is applied.
         """
         # Normalize positions respect to the center of its halo
-        if hasattr(self, 'star_p'):
-            self.star_p = self.star_p - halo.gpos
+        if hasattr(self, 'star_p') and self.star_p is not None:
+            delta = self.star_p - halo.gpos
+
+            # Calculate the distance from the particle to the halo center
+            distance = np.linalg.norm(delta)
+
+            if lbox is not None and distance > lbox / 2:
+                delta = (delta + lbox / 2) % lbox - lbox / 2
+            self.star_p = delta
+
         # ...
 
     def rotate(self, z, axis, degree):
