@@ -438,10 +438,18 @@ class ICLProcessor(FeatureProcessor):
             transition_radius = sorted_distances[transition_index[max_pos]]
             normalized_transition_radius = transition_radius / halo.r200
 
-            if int(transition_radius) == 170771:
+            if int(transition_radius) == 129293:
                 logger.debug('Saving max transition radius ...')
                 r_by_r200 = sorted_distances / halo.r200
                 log_r = np.log10(r_by_r200)
+
+                path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/halo_{halo.halo_id}.joblib'
+                joblib.dump(halo, path)
+                path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/subhalo_particles_{halo.halo_id}.joblib'
+                joblib.dump(subhalo_particles, path)
+                path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/icl_mask_{halo.halo_id}.joblib'
+                joblib.dump(icl_mask, path)
+
                 # Build cumsum profiles
                 plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, log_r, transition_index[max_pos], halo.halo_id)
 
