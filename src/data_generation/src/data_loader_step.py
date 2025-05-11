@@ -93,7 +93,7 @@ class DataLoader(PipelineStep):
 
         lbox = None
         if 'Lbox' in self.cfg.catalog:
-            lbox = self.cfg['Lbox']
+            lbox = self.cfg.catalog['Lbox']
             logger.info(f'Lbox: {lbox}')
 
         halo_context = self.fetcher.get_halos()
