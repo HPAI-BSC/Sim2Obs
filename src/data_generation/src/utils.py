@@ -60,6 +60,9 @@ def setup_logger(name: str) -> logging.Logger:
     return logger
 
 
+logger = setup_logger("Utils")
+
+
 def get_connection():
     """
     Establishes a connection to the EAGLE SQL database using credentials from environment variables.
@@ -601,6 +604,8 @@ def check_and_apply_pbc_to_particles(halo_center, particles, Lbox):
 
     # Create a mask for particles within Lbox/2 distance from the halo center
     mask_within_box = distances < (Lbox / 2)
+    num_corrected = np.sum(mask_within_box)
+    logger.debug(f'Number of particles corrected: {num_corrected}')
 
     # Apply PBC correction only to particles within Lbox/2 distance
     corrected_particles = np.copy(particles)

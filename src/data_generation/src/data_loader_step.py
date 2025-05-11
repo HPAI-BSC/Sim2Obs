@@ -149,6 +149,8 @@ class DataLoader(PipelineStep):
                     logger.debug(f'Checking and applying pbc to particles, lbox: {lbox}')
                     corrected_positions = check_and_apply_pbc_to_particles(halo.gpos, halo_particles.star_p, lbox)
                     halo_particles.star_p = corrected_positions
+                else:
+                    logger.warning('No Lbox has been specified in the config, no pbc will be applied.')
 
                 halo_particles.preprocess(halo)
                 tmp = CosmosData(halo, subhalo_ctx, halo.fsub, halo_particles)
