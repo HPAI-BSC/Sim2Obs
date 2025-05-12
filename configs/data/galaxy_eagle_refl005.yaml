@@ -1,6 +1,6 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
-data_dir: ${paths.datasets_dir}/eagle/RefL0050N0752/no_rotation_s1.8/VelocityDispersion
-target_maskdir: ${paths.datasets_dir}/eagle/RefL0050N0752/no_rotation_s1.8/IntraClusterLight
+data_dir: ${paths.datasets_dir}/eagle/RefL0050N0752/no_rotation_s1.5/VelocityDispersion
+target_maskdir: ${paths.datasets_dir}/eagle/RefL0050N0752/no_rotation_s1.5/IntraClusterLight
 dataset: eagle
 batch_size: 8
 train_val_test_split: [.85, .05, .10]
