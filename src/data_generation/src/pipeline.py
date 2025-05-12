@@ -68,9 +68,9 @@ class Pipeline:
         subhalo_context = self.data_loader.fetcher.get_subhalos()
 
         # TODO
-        path = self.cfg.paths.datasets_dir + f'/../logs/halo_context_RefL0100N1504.csv'
+        path = self.cfg.paths.datasets_dir + f'/../logs/halo_context_millenium_MTNG-L125-1080-A.csv'
         halo_context.data.to_csv(path)
-        path = self.cfg.paths.datasets_dir + f'/../logs/subhalo_context_RefL0100N1504.csv'
+        path = self.cfg.paths.datasets_dir + f'/../logs/subhalo_context_millenium_MTNG-L125-1080-A.csv'
         subhalo_context.data.to_csv(path)
 
         # Clean subhalo context to remove subhalos that belong to halos that do not exist
