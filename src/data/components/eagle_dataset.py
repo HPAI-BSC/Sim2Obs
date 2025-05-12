@@ -26,7 +26,7 @@ class EagleDataset(GalaxyDataset):
 
         if self.mask_interlopers:
             image = image[..., 0] * (1-image)[..., 1]
-            label = label * (1-image)[...,1]
+            label = label[..., 0] * (1-label)[..., 1]
         # resize image to 128x128
         image = torch.tensor(image)
         label = torch.tensor(label)
