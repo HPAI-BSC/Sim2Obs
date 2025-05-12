@@ -144,8 +144,8 @@ class SubhaloContext:
                 under_half = corrected_delta < (-lbox / 2)
 
                 # Apply correction only to the out-of-bound coordinates
-                corrected_delta[over_half] -= lbox / 2
-                corrected_delta[under_half] += lbox / 2
+                corrected_delta[over_half] -= lbox
+                corrected_delta[under_half] += lbox
 
                 # Count how many corrections per axis (x, y, z)
                 num_corrected_per_axis = np.sum(over_half | under_half, axis=0)
@@ -462,8 +462,8 @@ class SubhaloParticles:
                 under_half = corrected_delta < (-lbox / 2)
 
                 # Apply correction only to the out-of-bound coordinates
-                corrected_delta[over_half] -= lbox / 2
-                corrected_delta[under_half] += lbox / 2
+                corrected_delta[over_half] -= lbox
+                corrected_delta[under_half] += lbox
 
                 # Count how many corrections per axis (x, y, z)
                 num_corrected_per_axis = np.sum(over_half | under_half, axis=0)
