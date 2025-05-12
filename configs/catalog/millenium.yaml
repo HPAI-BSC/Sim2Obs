@@ -4,7 +4,6 @@ snapnum: 237       # redshift 0.25
 a: 0.8
 H: 0.6774
 
-fov: 526.68   # 2 * 263.34 kpc
 spatial_resolution: 2.02 # kpc
 
 # bin_size = spatial_resolution * 1 ->
