@@ -214,6 +214,7 @@ class DataLoader(PipelineStep):
                 halo = halo_context.get_halo_by_id(id_halo)
                 subhalo_ctx = subhalo_context.get_items_by_halo(id_halo)
                 halo.add_children(subhalo_ctx)
+                logger.debug(f'Halo: {halo.halo_id}, subhalos: {len(subhalo_ctx.data)}')
 
                 # Find subhalo neighbours
                 overlapping_halo_subhalo_ids = overlapping_matrix.get(id_halo, {})
