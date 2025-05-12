@@ -257,16 +257,20 @@ class DataLoader(PipelineStep):
                 try:
                     logger.debug(f'Overlapping subhalo: {subhalo_id}, halo_id: {halo_id}')
                     subhalo_particles_i = self.fetcher.get_p_subhalo(subhalo_id=subhalo_id, halo_id=halo_id)
+                    logger.debug(f'Overlapping particles: {subhalo_particles_i}')
 
                     # Get halo of this particles
+                    logger.debug('Getting halo')
                     halo = halo_context.get_halo_by_id(halo_id)
 
                     # Preprocess the particles according to their halo center
+                    logger.debug('Preprocessing halo')
                     subhalo_particles_i.preprocess(halo, lbox)
 
                     if subhalo_particles is None:
                         subhalo_particles = subhalo_particles_i
                     else:
+                        logger.debug('Update subhalos particles with +')
                         subhalo_particles += subhalo_particles_i
                 except Exception as e:
                     subhalos_with_errors.append((halo_id, subhalo_id))
