@@ -46,6 +46,7 @@ class DataLoader(PipelineStep):
         cfg : DictConfig
             The configuration object containing parameters for the data fetching process.
         """
+        logger.debug(f"Process ID: {os.getpid()}")
         attr_list = self._build_data_loader_configuration(cfg)
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
         self.cfg = cfg

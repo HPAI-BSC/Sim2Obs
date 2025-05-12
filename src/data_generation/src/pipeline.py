@@ -39,11 +39,14 @@ class Pipeline:
 
     def build_pipeline(self, steps, g, cosmos_data: CosmosData, input_feature: FeatureProcessor,
                        output_feature: FeatureProcessor, **kwargs):
+        logger.debug('build_pipeline')
 
         if not steps:  # Base case: no steps left to apply
             return g
 
         # Get the current step and apply it
+        logger.debug(f"Recursion depth: {len(steps)}")
+
         current_step = steps[0]
 
         # Apply the current step, passing the generator and extra_param
@@ -71,8 +74,6 @@ class Pipeline:
         subhalo_context.remove_subhalos_belonging_unvalid_halos(halo_context)
         overlapping_matrix = self.data_loader.get_overlapping_halos(subhalo_context, halo_context)
         halo_subhalo_list = self.data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
-
-        logger.debug(halo_subhalo_list[:10])
 
         if n is not None:
             halo_subhalo_list = halo_subhalo_list[:n]
