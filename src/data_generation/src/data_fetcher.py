@@ -727,8 +727,6 @@ class Illustris300Fetcher(DataFetcher):
             self.column_map[group_attr] = 'id_parents'
 
         subhalos = il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=fields)
-        path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/raw_subhalos.joblib'
-        joblib.dump(subhalos, path)
 
         if isinstance(subhalos, np.ndarray):
             tmp = subhalos

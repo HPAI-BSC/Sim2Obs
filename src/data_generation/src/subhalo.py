@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from omegaconf import DictConfig
 
-from src.data_generation.src.halo import Halo
+from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.utils import rotate, dict_depth, setup_logger
 
 
@@ -286,25 +286,11 @@ class SubhaloContext:
         except KeyError:
             raise Exception(f"No subhalos found for halo_id={halo_id}.")
 
-    # TODO REMOVE ?
-    def get_overlapping_subhalos(self, halo: Halo):
-        halo_r200 = halo.r200
-        halo_gpos = halo.gpos
-
-        # Distances are NOT PREPROCESSED
-
-        # Get subhalos of different halos, not current one
-        tmp = self.data[self.data['id_parents'] != halo.halo_id]
-
-        # Convert positions back to numpy 3D
-        positions = np.vstack(tmp['spos'])
-
-        # Compute Euclidean distance between halo center
-        distances = np.linalg.norm(positions - halo_gpos, axis=1)
-
-        # Find halos whose distance is less than the sum of radii * 2
-        overlapping_subhalo = tmp[distances <= (halo_r200*2)]
-        return overlapping_subhalo
+    def remove_subhalos_belonging_unvalid_halos(self, halo_context: HaloContext):
+        halo_ids = halo_context.data['halo_id'].unique()
+        logger.debug(f"Number of subhalos before filtering: {len(self.data)}")
+        self.data = self.data[self.data['id_parents'].isin(halo_ids)]
+        logger.debug(f"Number of subhalos after filtering: {len(self.data)}")
 
     def __add__(self, other):
         if not isinstance(other, self.__class__):
