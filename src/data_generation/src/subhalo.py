@@ -468,7 +468,7 @@ class SubhaloParticles:
 
                 # Count how many corrections per axis (x, y, z)
                 num_corrected_per_axis = np.sum(over_half | under_half, axis=0)
-                print(f"Particles corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}, halo: {halo.halo_id}")
+                logger.debug(f"Particles corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}, halo: {halo.halo_id}")
                 delta = corrected_delta
 
         self.star_p = delta
