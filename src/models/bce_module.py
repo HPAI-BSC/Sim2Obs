@@ -132,20 +132,21 @@ class BCELitModule(LightningModule):
         # Compute flops
         from ptflops import get_model_complexity_info
 
+        print('_'*10)
         # Calculate FLOPs and parameters
         macs, params = get_model_complexity_info(
             self.net,
             (1, 128, 128),  # Input shape (C, H, W)
-            as_strings=True,
+            as_strings=False,
             print_per_layer_stat=True,
             verbose=True
         )
         print('_'*10)
-        print(f"Computational complexity: {macs}")
-        print(f"Forward FLOPs: {macs * 2}")
+        print(f"Computational complexity: {macs} MACs")
+        print(f"Forward FLOPs: {macs * 2} FLOPs")
         # Estimate backward pass (typically 2-3× forward)
         backward_flops = macs * 2 * 2.5
-        print(f"Backward FLOPs: {backward_flops}")
+        print(f"Backward FLOPs: {backward_flops} FLOPs")
         print(f"Number of parameters: {params}")
         print('_'*10)
 
