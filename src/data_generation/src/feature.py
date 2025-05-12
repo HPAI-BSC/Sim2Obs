@@ -400,6 +400,15 @@ class ICLProcessor(FeatureProcessor):
         float or None
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
+        # TEMPORAL
+        if halo.halo_id in [0]:
+            path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/halo_{halo.halo_id}_MTNG-L125-1080-A.joblib'
+            joblib.dump(halo, path)
+            path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/subhalo_particles_{halo.halo_id}_MTNG-L125-1080-A.joblib'
+            joblib.dump(subhalo_particles, path)
+            path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/icl_mask_{halo.halo_id}_MTNG-L125-1080-A.joblib'
+            joblib.dump(icl_mask, path)
+
         logger.debug(f'Computing transition radius for: {halo.halo_id}')
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
@@ -437,23 +446,6 @@ class ICLProcessor(FeatureProcessor):
             logger.debug(f'Index for the transition radius: {transition_index[max_pos]}')
             transition_radius = sorted_distances[transition_index[max_pos]]
             normalized_transition_radius = transition_radius / halo.r200
-
-            '''
-            if int(transition_radius) == 129293:
-                logger.debug('Saving max transition radius ...')
-                r_by_r200 = sorted_distances / halo.r200
-                log_r = np.log10(r_by_r200)
-
-                path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/halo_{halo.halo_id}.joblib'
-                joblib.dump(halo, path)
-                path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/subhalo_particles_{halo.halo_id}.joblib'
-                joblib.dump(subhalo_particles, path)
-                path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/icl_mask_{halo.halo_id}.joblib'
-                joblib.dump(icl_mask, path)
-
-                # Build cumsum profiles
-                plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, log_r, transition_index[max_pos], halo.halo_id)
-            '''
             logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
                          f'({round(normalized_transition_radius, 2)} % r200), r200: {halo.r200}')
         else:
