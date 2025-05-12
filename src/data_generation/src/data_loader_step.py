@@ -110,12 +110,15 @@ class DataLoader(PipelineStep):
                 logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
                 try:
                     # Load particles for all the subhalos in that halo
+                    logger.info(f"Get particles")
                     halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
 
+                    logger.info(f"Preprocess particles")
                     # Preprocessed all particles for current halo
                     halo_particles_no_overlapping.preprocess(halo, lbox)
 
                     # Load preprocessed particles for overlapping halos
+                    logger.info(f"Check overlappings")
                     overlapping_subhalo_particles, subhalos_with_errors = \
                         self._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
 
@@ -134,6 +137,7 @@ class DataLoader(PipelineStep):
                     continue
 
                 # Compute features with preprocessed and non-overlapping particles
+                logger.info(f"Compute features")
                 input_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
                 output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
                 icl_mask = output_feature.value
@@ -157,6 +161,7 @@ class DataLoader(PipelineStep):
                         transition_radius_df = pd.concat([transition_radius_df, new_row], ignore_index=True)
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
+                logger.info(f"Preprocess subhalo_ctx")
                 subhalo_ctx.preprocess(halo, lbox)
                 tmp = CosmosData(halo, subhalo_ctx, halo.fsub, halo_particles)
 
@@ -166,6 +171,7 @@ class DataLoader(PipelineStep):
                 if next_step is not None:
                     yield from next_step([(halo, subhalo_ctx)], **kwargs)
                 else:
+                    logger.info(f"Execute yield")
                     yield input_feature, output_feature, cosmos_data
 
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
