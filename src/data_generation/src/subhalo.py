@@ -8,6 +8,9 @@ from src.data_generation.src.halo import Halo
 from src.data_generation.src.utils import rotate, dict_depth, setup_logger
 
 
+logger = setup_logger("SubhaloContext - SubhaloParticles")
+
+
 class SubHalo:
     """
     A class to represent a SubHalo object with dynamically set attributes.
@@ -80,8 +83,6 @@ class SubhaloContext:
     subhalo_id:
         Property to retrieve the `subhalo_id` column from the stored DataFrame.
     """
-    logger = setup_logger("SubhaloContext")
-
     def __init__(self, df: pd.DataFrame, column_map) -> None:
         """
         Initialize the SubhaloContext with properties of subhalos.
@@ -149,7 +150,8 @@ class SubhaloContext:
 
                 # Count how many corrections per axis (x, y, z)
                 num_corrected_per_axis = np.sum(over_half | under_half, axis=0)
-                print(f"Subhalos corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}")
+                if np.sum(num_corrected_per_axis) > 0:
+                    logger.debug(f"Subhalos corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}")
                 return corrected_delta
             return delta
 
@@ -364,8 +366,6 @@ class SubhaloParticles:
     __init__(m, p, v, scale_factor=None, init=True):
         Initializes the SubhaloParticles object with particle mass, position, and velocity data.
     """
-    logger = setup_logger("SubhhaloParticles")
-
     def __init__(self, data: dict, column_map: DictConfig) -> None:
         """
         Initialize the SubhaloParticles object with particle mass, position, and velocity data.
@@ -468,7 +468,8 @@ class SubhaloParticles:
 
                 # Count how many corrections per axis (x, y, z)
                 num_corrected_per_axis = np.sum(over_half | under_half, axis=0)
-                logger.debug(f"Particles corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}, halo: {halo.halo_id}")
+                if np.sum(num_corrected_per_axis) > 0:
+                    logger.debug(f"Particles corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}, halo: {halo.halo_id}")
                 delta = corrected_delta
 
         self.star_p = delta
