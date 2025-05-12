@@ -5,7 +5,7 @@
 defaults:
   - data: combined_dataset
   #- data: galaxy_illustris300
-  - model: mamba_unet
+  - model: transunet
   - callbacks: default
   - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
