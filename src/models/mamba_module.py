@@ -5,6 +5,7 @@ from lightning import LightningModule
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
+from ptflops import get_model_complexity_info
 
 torch.set_float32_matmul_precision('medium')
 
@@ -111,6 +112,33 @@ class MambaLitModule(LightningModule):
         self.val_rmse.reset()
         self.val_rase_best.reset()
         self.val_rmse_best.reset()
+
+        print(f"On train start")
+
+        print('_' * 25)
+        copy_for_analysis = type(self.net)()  # assumes default constructor works
+        copy_for_analysis.load_state_dict(self.net.state_dict())
+        copy_for_analysis.eval()
+        copy_for_analysis.to(next(self.net.parameters()).device)
+        # Calculate FLOPs and parameters
+        macs, params = get_model_complexity_info(
+            copy_for_analysis,
+            (1, 128, 128),  # Input shape (C, H, W)
+            as_strings=False,
+            print_per_layer_stat=True,
+            verbose=True
+        )
+        # Clean memory
+        del copy_for_analysis
+        torch.cuda.empty_cache()
+        print('_' * 25)
+        print(f"Computational complexity: {macs} MACs")
+        print(f"Forward FLOPs: {macs * 2 * 1e-9:.4f} GFLOPs")
+        # Estimate backward pass (typically 2-3× forward)
+        backward_flops = macs * 2 * 2.5
+        print(f"Backward FLOPs: {backward_flops * 1e-9:.4f} GFLOPs")
+        print(f"Number of parameters: {params}")
+        print('_' * 25)
 
     def model_step(
             self, batch: Tuple[torch.Tensor, torch.Tensor]

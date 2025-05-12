@@ -153,7 +153,7 @@ class BCELitModule(LightningModule):
         backward_flops = macs * 2 * 2.5
         print(f"Backward FLOPs: {backward_flops* 1e-9:.4f} GFLOPs")
         print(f"Number of parameters: {params}")
-        print('_'*20)
+        print('_'*25)
 
     def model_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor]

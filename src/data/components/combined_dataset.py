@@ -2,6 +2,7 @@ from src.data.components.dianoga_dataset import DianogaDataset
 from src.data.components.galaxy_dataset import GalaxyDataset
 from torch.utils.data import ConcatDataset, Subset
 import numpy as np
+import torch
 
 from src.data.components.illustris300_dataset import Illustris300Dataset
 from src.data.components.eagle_dataset import EagleDataset
@@ -38,7 +39,18 @@ class CombinedDataset(GalaxyDataset):
         return len(self.combined_dataset)
 
     def __getitem__(self, index):
-        return self.combined_dataset[index]
+        item = self.combined_dataset[index]
+
+        # Ensure all tensors are contiguous and consistent
+        if isinstance(item, dict):
+            return {k: v.contiguous() if isinstance(v, torch.Tensor) else v for k, v in item.items()}
+        elif isinstance(item, (list, tuple)):
+            return tuple(v.contiguous() if isinstance(v, torch.Tensor) else v for v in item)
+        elif isinstance(item, torch.Tensor):
+            return item.contiguous()
+        else:
+            return item
+
 
     def get_halo_ids(self):
         halo_ids = []
