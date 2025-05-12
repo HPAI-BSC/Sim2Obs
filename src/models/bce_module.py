@@ -135,7 +135,7 @@ class BCELitModule(LightningModule):
         # Calculate FLOPs and parameters
         macs, params = get_model_complexity_info(
             self.net,
-            (3, 224, 224),  # Input shape (C, H, W)
+            (1, 128, 128),  # Input shape (C, H, W)
             as_strings=True,
             print_per_layer_stat=True,
             verbose=True
