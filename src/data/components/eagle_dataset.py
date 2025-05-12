@@ -10,8 +10,9 @@ from src.data.components.galaxy_dataset import GalaxyDataset
 class EagleDataset(GalaxyDataset):
     name = 'eagle'
 
-    def __init__(self, image_dir, labels_dir, transform=None, **kwargs):
-        super().__init__(image_dir, labels_dir, transform, **kwargs)
+    def __init__(self, image_dir, labels_dir, transform=None, mask_interlopers=True, **kwargs):
+        super().__init__(image_dir, labels_dir, transform, mask_interlopers, **kwargs)
+        self.mask_interlopers = mask_interlopers
 
     def __getitem__(self, index):
         img_path = os.path.join(self.image_dir, self.images[index])
@@ -20,6 +21,11 @@ class EagleDataset(GalaxyDataset):
         image = images[f'arr_0']
         # resize image to 128x128
         image = torch.tensor(image)
+        print(image.shape)
+        if self.mask_interlopers:
+            print('a')
+            print(image[:,:,-1])
+            a = b
 
         labels = np.load(labels_path)
         label = labels[f'arr_0']
