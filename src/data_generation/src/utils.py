@@ -139,6 +139,7 @@ def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray
     try:
         for i in range(nfiles):
             file = os.path.join(path, snapshot_folder, f'{snapshot_folder.replace("snapshot", "snap")}.{i}.hdf5')
+            logger.debug(file)
             with h5py.File(file, 'r') as f:
                 tmp = f[f'PartType{itype}/{att}'][...]
                 data.append(tmp)
@@ -163,6 +164,7 @@ def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray
         logger.error(e)
         error_message = traceback.format_exc()
         logger.error(error_message)
+    logger.debug(f'Data read: {len(data)}')
     return data
 
 
