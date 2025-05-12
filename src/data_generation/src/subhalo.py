@@ -132,12 +132,25 @@ class SubhaloContext:
         """
         def apply_pbc_correction(subhalo_pos, halo_center, lbox):
             delta = subhalo_pos - halo_center  # Compute the relative position
-            distance = np.linalg.norm(delta)  # Calculate the distance
 
-            if lbox is not None and distance > lbox / 2:
-                # Apply PBC correction
-                delta = (delta + lbox / 2) % lbox - lbox / 2
-            return delta  # Just return the corrected relative position
+            if lbox is not None:
+                # Create a copy to avoid modifying original delta directly
+                corrected_delta = delta.copy()
+
+                # Prepare the mask, True => coordinate needs to be updated
+                # Particles that are more than half the box length in the positive direction
+                over_half = corrected_delta > (lbox / 2)
+                # Particles that are more than half the box length in the negative direction
+                under_half = corrected_delta < (-lbox / 2)
+
+                # Apply correction only to the out-of-bound coordinates
+                corrected_delta[over_half] -= lbox / 2
+                corrected_delta[under_half] += lbox / 2
+
+                # Count how many corrections per axis (x, y, z)
+                num_corrected_per_axis = np.sum(over_half | under_half, axis=0)
+                print(f"Subhalos corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}")
+                return corrected_delta
 
         # TODO Add missing columns
         indexing = self.data['id_parents'] == halo.halo_id
@@ -449,12 +462,12 @@ class SubhaloParticles:
                 under_half = corrected_delta < (-lbox / 2)
 
                 # Apply correction only to the out-of-bound coordinates
-                corrected_delta[over_half] -= lbox
-                corrected_delta[under_half] += lbox
+                corrected_delta[over_half] -= lbox / 2
+                corrected_delta[under_half] += lbox / 2
 
                 # Count how many corrections per axis (x, y, z)
                 num_corrected_per_axis = np.sum(over_half | under_half, axis=0)
-                print(f"Particles corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}")
+                print(f"Particles corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}, halo: {halo.halo_id}")
                 delta = corrected_delta
 
         self.star_p = delta
