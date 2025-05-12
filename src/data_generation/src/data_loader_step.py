@@ -172,7 +172,7 @@ class DataLoader(PipelineStep):
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo.halo_id}")
 
-        transition_radius_l = transition_radius_df['normalized_transition_radius (r/r200)'].tolist()
+        transition_radius_l = transition_radius_df['transition_radius'].tolist()
         plot_transition_radius(self.cfg, transition_radius_l)
         plot_transition_radius(self.cfg, transition_radius_l, log_normalization=False)
 
