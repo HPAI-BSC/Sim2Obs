@@ -35,7 +35,7 @@ From: nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
     pip3 install pydantic==1.10.11
     pip3 install websockets
     pip3 install einops
-    pip3 install mamba-ssm
+    pip3 install mamba-ssm==2.2.2
     pip3 install timm
     pip3 install fvcore
 
