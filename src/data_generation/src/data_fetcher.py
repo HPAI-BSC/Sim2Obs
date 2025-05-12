@@ -4,6 +4,8 @@ import os.path
 import traceback
 from abc import ABC, abstractmethod
 from typing import Any
+
+import joblib
 import swiftsimio as sw
 
 import eagleSqlTools as sql
@@ -705,8 +707,10 @@ class Illustris300Fetcher(DataFetcher):
         group_attr = ''
         if 'illustris300' in self.catalog.path:
             group_attr = 'SubhaloGrNr'
+            logger.debug(group_attr)
         elif 'millenium' in self.catalog.path:
             group_attr = 'SubhaloGroupNr'
+            logger.debug(group_attr)
         else:
             raise NotImplementedError('Please check the path used in your configuration.')
 
@@ -723,6 +727,8 @@ class Illustris300Fetcher(DataFetcher):
             self.column_map[group_attr] = 'id_parents'
 
         subhalos = il.groupcat.loadSubhalos(path, self.catalog.snapnum, fields=fields)
+        path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/raw_subhalos.joblib'
+        joblib.dump(subhalos, path)
 
         if isinstance(subhalos, np.ndarray):
             tmp = subhalos

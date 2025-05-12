@@ -66,11 +66,6 @@ class Pipeline:
         halo_context = self.data_loader.fetcher.get_halos()
         subhalo_context = self.data_loader.fetcher.get_subhalos()
 
-        path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/halo_context.csv'
-        halo_context.data.to_csv(path)
-        path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/subhalo_context.csv'
-        subhalo_context.data.to_csv(path)
-
         overlapping_matrix = self.data_loader.get_overlapping_halos(subhalo_context, halo_context)
         halo_subhalo_list = self.data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
 
