@@ -373,8 +373,6 @@ def plot_transition_radius(cfg, transition_radius_list, log_normalization=True):
     name = cfg.catalog.path.replace(dataset_dir, '')
     name = name.replace('/', '_')
 
-    print(name)
-
     # Take the log10 of transition radius values
     if log_normalization:
         # Remove None or non-positive values before taking the log
@@ -396,7 +394,11 @@ def plot_transition_radius(cfg, transition_radius_list, log_normalization=True):
     plt.savefig(path, dpi=300)
 
 
-def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo_id):
+def plot_icl_bcg_profiles(cfg, icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo_id):
+    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
+    name = cfg.catalog.path.replace(dataset_dir, '')
+    name = name.replace('/', '_')
+
     # Plotting
     plt.figure(figsize=(8, 5))
     plt.plot(r_by_r200, icl_cumulative, label='ICL Cumulative Mass', color='orange')
@@ -410,12 +412,16 @@ def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo
     plt.grid(True)
     plt.tight_layout()
     #path = f'transition_radius_cumsum_{halo_id}.png'
-    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/transition_radius_cumsum_{halo_id}.png'
+    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/transition_radius_cumsum_{halo_id}_{name}.png'
     plt.savefig(path, dpi=300)
     plt.show()
 
 
-def plot_icl_bcg_mass_pdf(icl_pdf, bcg_pdf, bin_centers, halo_id):
+def plot_icl_bcg_mass_pdf(cfg, icl_pdf, bcg_pdf, bin_centers, halo_id):
+    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
+    name = cfg.catalog.path.replace(dataset_dir, '')
+    name = name.replace('/', '_')
+
     plt.figure(figsize=(8, 5))
     plt.plot(bin_centers, icl_pdf, label='ICL Cumulative Mass', color='orange')
     plt.plot(bin_centers, bcg_pdf, label='BCG Cumulative Mass', color='blue')
@@ -426,11 +432,15 @@ def plot_icl_bcg_mass_pdf(icl_pdf, bcg_pdf, bin_centers, halo_id):
     plt.grid(True)
     plt.tight_layout()
 
-    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/mass_weighted_pdf_{halo_id}.png'
+    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/mass_weighted_pdf_{halo_id}_{name}.png'
     plt.savefig(path, dpi=300)
 
 
-def plot_icl_bcg_density_profile(r, density_total, density_icl, density_bcg, halo_id):
+def plot_icl_bcg_density_profile(cfg, r, density_total, density_icl, density_bcg, halo_id):
+    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
+    name = cfg.catalog.path.replace(dataset_dir, '')
+    name = name.replace('/', '_')
+
     plt.figure(figsize=(8, 5))
     plt.plot(r, density_total, label="Total", color="black")
     if density_icl is not None:
@@ -446,7 +456,7 @@ def plot_icl_bcg_density_profile(r, density_total, density_icl, density_bcg, hal
     plt.tight_layout()
     plt.show()
 
-    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/density_profile_{halo_id}.png'
+    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/density_profile_{halo_id}_{name}.png'
     plt.savefig(path, dpi=300)
 
 
