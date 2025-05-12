@@ -1336,6 +1336,7 @@ class EagleFetcher(DataFetcher):
 
         # Read particles data and change format
         for part_type in part_types:
+            logger.debug(f'Particle type: {part_type}')
             data_part_type = {}
             itype = self.__partTypeNum(part_type)
             OmegaConf.set_struct(self.catalog, False)
@@ -1349,11 +1350,13 @@ class EagleFetcher(DataFetcher):
 
             fields = list(self.catalog.fields.particles[part_type].keys())
             fields.append('SubGroupNumber')
+            logger.debug(fields)
             if not os.path.exists(path):
                 logger.error(f"The path {path} does not exist.")
                 raise Exception(f'The path {path} does not exist.')
 
             for field in fields:
+                logger.debug(f'Reading field: {field}')
                 column = read_dataset(itype, field, path)
                 data_part_type[field] = column
                 # Dealing with numpy arrays of > 1 dim for dataframe conversion afterward
@@ -1364,6 +1367,7 @@ class EagleFetcher(DataFetcher):
 
             # Filter by indexing
             tmp = pd.DataFrame(data_part_type)
+            logger.debug(len(tmp))
             # Create index with these two columns for speed
             tmp = tmp[(tmp["GroupNumber"].isin(group_number_list)) & (tmp['SubGroupNumber'].isin(subhalo_id_list))]
             if len(tmp) == 0:
