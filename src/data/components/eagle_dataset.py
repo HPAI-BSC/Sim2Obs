@@ -20,16 +20,15 @@ class EagleDataset(GalaxyDataset):
         labels_path = os.path.join(self.labels_dir, self.labels[index])
         images = np.load(img_path)
         image = images[f'arr_0']
-        if self.mask_interlopers:
-            print('a')
-            print(image[...,0].shape)
-            image = image[..., 0] * (1-image)[..., 1]
-            print(image.shape)
-        # resize image to 128x128
-        image = torch.tensor(image)
 
         labels = np.load(labels_path)
         label = labels[f'arr_0']
+
+        if self.mask_interlopers:
+            image = image[..., 0] * (1-image)[..., 1]
+            label = label * (1-image)[...,1]
+        # resize image to 128x128
+        image = torch.tensor(image)
         label = torch.tensor(label)
         # resize image to 128x128
         image = image.float().unsqueeze(0)
