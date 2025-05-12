@@ -1373,7 +1373,7 @@ class EagleFetcher(DataFetcher):
                                  f'and subhalo ids={subhalo_id_list}')
             tmp = tmp.drop(columns=['GroupNumber', 'SubGroupNumber'])
             particles[part_type] = tmp.to_dict(orient='list')
-
+            logger.debug(len(tmp))
         else:
             logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
 
@@ -1393,8 +1393,11 @@ class EagleFetcher(DataFetcher):
                                                     g=self.catalog.g, g_2_solar=self.catalog.g_2_solar),
             lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles)
         ]
+        logger.debug("Starting pipeline execution.")
         processed_particles = run_pipeline(particles, steps)
+        logger.debug("Pipeline execution finished.")
         halo_particles = SubhaloParticles(processed_particles, self.catalog.fields.particles)
+        logger.debug(f'Particles found: {halo_particles}')
         return halo_particles
 
 
