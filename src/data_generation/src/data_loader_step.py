@@ -135,9 +135,8 @@ class DataLoader(PipelineStep):
                 output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
                 icl_mask = output_feature.value
 
-                # Compute the transition radius, r = FOV / 2
-                # TODO ANALYZE RADIUS AND USE JUST ONE
-                if hasattr(output_feature, 'get_transition_radius'):
+                # Compute the transition radius, r = FOV / 2 if it's not in the config
+                if 'transition_radius' not in self.cfg.catalog and hasattr(output_feature, 'get_transition_radius'):
                     transition_radius, normalized_transition_radius =\
                         output_feature.get_transition_radius(halo, halo_particles_no_overlapping, icl_mask)
                     if transition_radius in (0, None):
@@ -161,10 +160,6 @@ class DataLoader(PipelineStep):
                 # Keep cosmos_data instance
                 vars(cosmos_data).update(vars(tmp))
 
-                # Add new metadata for map generating -> TODO remove this
-                cosmos_data.metadata.update({"map": {"transition_radius": transition_radius,
-                                                     "fov": transition_radius * 2
-                                                     }})
                 if next_step is not None:
                     yield from next_step([(halo, subhalo_ctx)], **kwargs)
                 else:
@@ -173,22 +168,23 @@ class DataLoader(PipelineStep):
                 pbar.update(1)  # Update the progress bar for each successfully processed halo
                 logger.info(f"Finished processing halo {halo.halo_id}")
 
-        transition_radius_l = transition_radius_df['transition_radius'].tolist()
-        plot_transition_radius(self.cfg, transition_radius_l)
-        plot_transition_radius(self.cfg, transition_radius_l, log_normalization=False)
+        if 'transition_radius' not in self.cfg.catalog:
+            transition_radius_l = transition_radius_df['transition_radius'].tolist()
+            plot_transition_radius(self.cfg, transition_radius_l)
+            plot_transition_radius(self.cfg, transition_radius_l, log_normalization=False)
 
-        dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
-        name = self.cfg.catalog.path.replace(dataset_dir, '')
-        name = name.replace('/', '_')
-        path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius_{name}.csv'
-        logger.info(f'Storing transition radius df at: {path}')
-        transition_radius_df.to_csv(path, index=False)
+            dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
+            name = self.cfg.catalog.path.replace(dataset_dir, '')
+            name = name.replace('/', '_')
+            path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius_{name}.csv'
+            logger.info(f'Storing transition radius df at: {path}')
+            transition_radius_df.to_csv(path, index=False)
 
-        logger.debug('transition_radius [kpc]')
-        summary_stats = transition_radius_df['transition_radius'].describe()
-        logger.info(summary_stats)
-        logger.info(np.percentile(transition_radius_df['transition_radius'], 90))
-        logger.info(np.percentile(transition_radius_df['transition_radius'], 95))
+            logger.debug('transition_radius [kpc]')
+            summary_stats = transition_radius_df['transition_radius'].describe()
+            logger.info(summary_stats)
+            logger.info(np.percentile(transition_radius_df['transition_radius'], 90))
+            logger.info(np.percentile(transition_radius_df['transition_radius'], 95))
 
         logger.debug('normalized_transition_radius (r/r200)')
         summary_stats = transition_radius_df['normalized_transition_radius (r/r200)'].describe()

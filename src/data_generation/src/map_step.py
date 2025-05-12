@@ -18,6 +18,8 @@ class MapStep(PipelineStep):
 
     def __init__(self, cfg: DictConfig):
         self.map_configuration = self._build_map_configuration(cfg)
+        # TODO ensure what to do when it's not specified
+        self.transition_radius = cfg.catalog.transition_radius
 
         # Compute bins and radius
         self.spatial_resolution = self.map_configuration['spatial_resolution']
@@ -80,7 +82,7 @@ class MapStep(PipelineStep):
             List: A list of tuples containing the generated maps for each projection.
         """
         subhalo_particles = cosmos_data.subhalo_particles
-        r = cosmos_data.metadata['map']['transition_radius']
+        r = self.transition_radius
         bins = cosmos_data.metadata['map']['bins']
         logger.debug(f'Generating maps for r={r}, bins={bins} and num particles={len(subhalo_particles.star_p)}')
         if self.dim == 2:
@@ -128,7 +130,7 @@ class MapStep(PipelineStep):
         # inside [-R_200, R_200] along the z axis
         subhalos: SubhaloContext = cosmos_data.subhalos
         spos = np.array(subhalos.data['spos'].tolist())
-        r = cosmos_data.metadata['map']['transition_radius']
+        r = self.transition_radius
         mask = (
                 (spos[:, 0] < r) &  # x condition
                 (spos[:, 1] < r) &  # y condition
@@ -173,7 +175,7 @@ class MapStep(PipelineStep):
             A boolean mask identifying interloper regions.
         """
         interlopers_mask = np.zeros(map_shape)
-        r = cosmos_data.metadata['map']['transition_radius']
+        r = self.transition_radius
         # Generate X and Y based on maschera's shape for consistency
         rows, cols = interlopers_mask.shape
         X, Y = np.meshgrid(
