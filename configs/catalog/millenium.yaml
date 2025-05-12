@@ -10,7 +10,7 @@ spatial_resolution: 2.02 # kpc
 # ensure that bins use a proper resolution,
 #bin_size > spatial resolution *1.5-2 times
 # bin_size = 3.6, sp resolution = 2.02
-bin_spatial_resolution_scale: 1
+bin_spatial_resolution_scale: 1.5
 
 # https://www.mtng-project.org/01_sims/
 
