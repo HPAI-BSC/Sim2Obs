@@ -97,6 +97,8 @@ class DataLoader(PipelineStep):
             logger.info(f'Lbox: {lbox}')
 
         halo_context = self.fetcher.get_halos()
+        path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/halo_context.csv'
+        halo_context.data.to_csv(path)
 
         with (tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar):
             transition_radius_df = pd.DataFrame(data=[], columns=['halo', 'r200', 'transition_radius',
