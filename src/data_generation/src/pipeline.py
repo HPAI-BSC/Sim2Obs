@@ -71,11 +71,6 @@ class Pipeline:
         overlapping_matrix = self.data_loader.get_overlapping_halos(subhalo_context, halo_context)
         halo_subhalo_list = self.data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
 
-        # TODO
-        #path = self.cfg.paths.datasets_dir + f'/../logs/halo_subhalo_list_RefL0100N1504.joblib'
-        #joblib.dump(halo_subhalo_list, path)
-        #store_overlapping_matrix_as_df(self.cfg, overlapping_matrix)
-
         if n is not None:
             halo_subhalo_list = halo_subhalo_list[:n]
 
