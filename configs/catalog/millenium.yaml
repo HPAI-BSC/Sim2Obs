@@ -13,7 +13,12 @@ spatial_resolution: 2.02 # kpc
 # bin_size = 3.6, sp resolution = 2.02
 bin_spatial_resolution_scale: 1
 
+# https://www.mtng-project.org/01_sims/
+
+# Lbox: 31.25 * 1000 # kpc/h
 # path: ${paths.datasets_dir}/millenium/MTNG-L31.25-270-A
+
+Lbox: 125 * 1000 # kpc/h
 path: ${paths.datasets_dir}/millenium/MTNG-L125-1080-A
 
 

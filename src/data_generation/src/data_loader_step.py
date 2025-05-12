@@ -188,6 +188,8 @@ class DataLoader(PipelineStep):
         logger.debug('transition_radius [kpc]')
         summary_stats = transition_radius_df['transition_radius'].describe()
         logger.info(summary_stats)
+        logger.info(np.percentile(transition_radius_df['transition_radius'], 90))
+        logger.info(np.percentile(transition_radius_df['transition_radius'], 95))
 
         logger.debug('normalized_transition_radius (r/r200)')
         summary_stats = transition_radius_df['normalized_transition_radius (r/r200)'].describe()
