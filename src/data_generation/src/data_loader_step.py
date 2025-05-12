@@ -97,6 +97,8 @@ class DataLoader(PipelineStep):
             logger.info(f'Lbox: {lbox}')
 
         halo_context = self.fetcher.get_halos()
+        logger.debug(len(g))
+
         with (tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar):
             transition_radius_df = pd.DataFrame(data=[], columns=['halo', 'r200', 'transition_radius',
                                                                   'normalized_transition_radius (r/r200)'])

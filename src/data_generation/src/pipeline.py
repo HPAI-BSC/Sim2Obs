@@ -67,22 +67,18 @@ class Pipeline:
         halo_context = self.data_loader.fetcher.get_halos()
         subhalo_context = self.data_loader.fetcher.get_subhalos()
 
-        # TODO
-        path = self.cfg.paths.datasets_dir + f'/../logs/halo_context_millenium_MTNG-L125-1080-A.csv'
-        halo_context.data.to_csv(path)
-        path = self.cfg.paths.datasets_dir + f'/../logs/subhalo_context_millenium_MTNG-L125-1080-A.csv'
-        subhalo_context.data.to_csv(path)
-
         # Clean subhalo context to remove subhalos that belong to halos that do not exist
         subhalo_context.remove_subhalos_belonging_unvalid_halos(halo_context)
         overlapping_matrix = self.data_loader.get_overlapping_halos(subhalo_context, halo_context)
         halo_subhalo_list = self.data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
 
+        logger.debug(halo_subhalo_list[:10])
 
         if n is not None:
             halo_subhalo_list = halo_subhalo_list[:n]
 
         steps = self.steps
+        logger.debug(steps)
         if len(steps) != 0:
             halo = Halo.empty_instance()
             subhalos = SubhaloContext(pd.DataFrame(), None)
