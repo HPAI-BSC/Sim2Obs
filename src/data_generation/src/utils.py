@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import traceback
 from pathlib import Path
 import eagleSqlTools as sql
 import h5py
@@ -127,34 +128,41 @@ def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray
     snapshot_folder = find_folders_with_snapshot(path)
     if not snapshot_folder:
         raise FileNotFoundError("Snapshot folder not found in the specified path.")
+    else:
+        logger.debug(snapshot_folder)
 
     # Update nfiles
     snapdir = os.path.join(path, snapshot_folder)
     nfiles = sum(1 for entry in Path(snapdir).iterdir() if entry.is_file())
+    logger.debug(f'nfiles: {nfiles}')
 
-    for i in range(nfiles):
-        file = os.path.join(path, snapshot_folder, f'{snapshot_folder.replace("snapshot", "snap")}.{i}.hdf5')
-        with h5py.File(file, 'r') as f:
-            tmp = f[f'PartType{itype}/{att}'][...]
-            data.append(tmp)
-            cgs = f[f'PartType{itype}/{att}'].attrs.get('CGSConversionFactor', 1)
-            aexp = f[f'PartType{itype}/{att}'].attrs.get('aexp-scale-exponent')
-            hexp = f[f'PartType{itype}/{att}'].attrs.get('h-scale-exponent')
-            var = f[f'PartType{itype}/{att}'].attrs.get('VarDescription')
-            # print(f'   file: {i}, cfg={cgs}, aexp={aexp}, hpex={hexp}')
+    try:
+        for i in range(nfiles):
+            file = os.path.join(path, snapshot_folder, f'{snapshot_folder.replace("snapshot", "snap")}.{i}.hdf5')
+            with h5py.File(file, 'r') as f:
+                tmp = f[f'PartType{itype}/{att}'][...]
+                data.append(tmp)
+                cgs = f[f'PartType{itype}/{att}'].attrs.get('CGSConversionFactor', 1)
+                aexp = f[f'PartType{itype}/{att}'].attrs.get('aexp-scale-exponent')
+                hexp = f[f'PartType{itype}/{att}'].attrs.get('h-scale-exponent')
+                var = f[f'PartType{itype}/{att}'].attrs.get('VarDescription')
+                # print(f'   file: {i}, cfg={cgs}, aexp={aexp}, hpex={hexp}')
 
-            a = f['Header'].attrs.get('Time')
-            h = f['Header'].attrs.get('HubbleParam')
+                a = f['Header'].attrs.get('Time')
+                h = f['Header'].attrs.get('HubbleParam')
 
-    if len(tmp.shape) > 1:
-        data = np.vstack(data)
-    else:
-        data = np.concatenate(data)
-
-    '''
-    if data.dtype not in (np.int32, np.int64):
-        data = np.multiply(data, cgs * a ** aexp * h ** hexp, dtype='f8')
-    '''
+        if len(tmp.shape) > 1:
+            data = np.vstack(data)
+        else:
+            data = np.concatenate(data)
+        '''
+        if data.dtype not in (np.int32, np.int64):
+            data = np.multiply(data, cgs * a ** aexp * h ** hexp, dtype='f8')
+        '''
+    except Exception as e:
+        logger.error(e)
+        error_message = traceback.format_exc()
+        logger.error(error_message)
     return data
 
 
