@@ -20,16 +20,11 @@ class EagleDataset(GalaxyDataset):
         labels_path = os.path.join(self.labels_dir, self.labels[index])
         images = np.load(img_path)
         image = images[f'arr_0']
-        print(image[..., -1])
-        print(image.shape)
         if self.mask_interlopers:
-            print('a')
-            print(image[..., -1])
-            image = image[..., 0] * image[..., 1]
+            image = image[..., 0] * (1-image)[..., 1]
             plt.imshow(image)
             plt.savefig("/gpfs/scratch/bsc70/hpai/storage/projects/space/eagle_interlop.png")
-        else:
-            print('b')
+            return
         # resize image to 128x128
         image = torch.tensor(image)
 
