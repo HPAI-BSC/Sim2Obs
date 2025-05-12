@@ -132,7 +132,7 @@ class BCELitModule(LightningModule):
         # Compute flops
         from ptflops import get_model_complexity_info
 
-        print('_'*10)
+        print('_'*20)
         copy_for_analysis = type(self.net)()  # assumes default constructor works
         copy_for_analysis.load_state_dict(self.net.state_dict())
         copy_for_analysis.eval()
@@ -148,14 +148,14 @@ class BCELitModule(LightningModule):
         # Clean memory
         del copy_for_analysis
         torch.cuda.empty_cache()
-        print('_'*10)
+        print('_'*20)
         print(f"Computational complexity: {macs} MACs")
-        print(f"Forward FLOPs: {macs * 2} FLOPs")
+        print(f"Forward FLOPs: {macs * 2 * 1e-9:.4f} GFLOPs")
         # Estimate backward pass (typically 2-3× forward)
         backward_flops = macs * 2 * 2.5
-        print(f"Backward FLOPs: {backward_flops} FLOPs")
+        print(f"Backward FLOPs: {backward_flops* 1e-9:.4f} GFLOPs")
         print(f"Number of parameters: {params}")
-        print('_'*10)
+        print('_'*20)
 
     def model_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor]
