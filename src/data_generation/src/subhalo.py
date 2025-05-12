@@ -441,7 +441,12 @@ class SubhaloParticles:
             if lbox is not None:
                 mask = np.any(np.abs(delta) > (lbox / 2), axis=1)
                 delta[mask] = (delta[mask] + lbox / 2) % lbox - lbox / 2
-            self.star_p = delta
+
+                # Count how many particles will be corrected
+                num_corrected = np.sum(mask)
+                print(f"Particles corrected due to PBC: {num_corrected} / {len(delta)}")
+
+        self.star_p = delta
 
         # ...
 
