@@ -17,7 +17,7 @@ bin_spatial_resolution_scale: 1
 # Lbox: 31.25 * 1000 # kpc/h
 # path: ${paths.datasets_dir}/millenium/MTNG-L31.25-270-A
 
-Lbox: 125 * 1000 # kpc/h
+Lbox: 125000 # kpc/h
 path: ${paths.datasets_dir}/millenium/MTNG-L125-1080-A
 
 
