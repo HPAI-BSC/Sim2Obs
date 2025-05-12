@@ -437,11 +437,10 @@ class SubhaloParticles:
         if hasattr(self, 'star_p') and self.star_p is not None:
             delta = self.star_p - halo.gpos
 
-            # Calculate the distance from the particle to the halo center
-            distance = np.linalg.norm(delta)
-
-            if lbox is not None and distance > lbox / 2:
-                delta = (delta + lbox / 2) % lbox - lbox / 2
+            # Calculate the distance from the particle to the halo cente
+            if lbox is not None:
+                mask = np.any(np.abs(delta) > (lbox / 2), axis=1)
+                delta[mask] = (delta[mask] + lbox / 2) % lbox - lbox / 2
             self.star_p = delta
 
         # ...

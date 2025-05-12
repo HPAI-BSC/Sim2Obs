@@ -409,6 +409,7 @@ def plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
+    #path = f'transition_radius_cumsum_{halo_id}.png'
     path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/transition_radius_cumsum_{halo_id}.png'
     plt.savefig(path, dpi=300)
     plt.show()

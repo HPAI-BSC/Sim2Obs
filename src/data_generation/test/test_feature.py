@@ -225,3 +225,10 @@ class TestFeature(unittest.TestCase):
         transition_radius, normalized_transition_radius =\
             self.icl_processor.get_transition_radius(halo, subhalo_particles, icl_mask)
         print(transition_radius, normalized_transition_radius)
+
+        # Extract x, y, z coordinates
+        x = subhalo_particles.star_p[:, 0]
+        y = subhalo_particles.star_p[:, 1]
+        z = subhalo_particles.star_p[:, 2]
+
+        plot_particles(x, y, z, halo_center=[0, 0, 0])

@@ -105,4 +105,30 @@ class TestSubHalo(unittest.TestCase):
         self.subhalo_context_illustris.preprocess(self.halo_context_illustris)
         self.subhalo_context_eagle.preprocess(self.halo_context_eagle)
 
+    def test_subhalo_particles_process(self):
+        lbox = 100.0
+        halo = Halo(halo_id=-1, fsub=None, gpos=[10.0, 10.0, 10.0])
+
+        star_p = np.array([
+            [15.0, 10.0, 10.0],  # Near, no correction
+            [95.0, 10.0, 10.0],  # Across PBC boundary on x-axis
+            [10.0, 95.0, 5.0],  # Across PBC on y
+            [10.0, 10.0, 95.0],  # Across PBC on z
+            [5.0, 10.0, 10.0]  # Near, no correction
+        ])
+        d = {'star_p': star_p}
+
+        subhalo_particles = SubhaloParticles(d, column_map=None)
+        subhalo_particles.preprocess(halo, lbox)
+
+        expected_relative_positions = np.array([
+            [5.0, 0.0, 0.0],
+            [-15.0, 0.0, 0.0],
+            [0.0, -15.0, -5.0],
+            [0.0, 0.0, -15.0],
+            [-5.0, 0.0, 0.0]
+        ])
+
+        np.testing.assert_allclose(subhalo_particles.star_p, expected_relative_positions, atol=1e-5)
+
 
