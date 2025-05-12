@@ -38,6 +38,9 @@ class EagleDataset(GalaxyDataset):
         for file in image_files:
             # Extract the halo ID from the filename using regex (assuming it's in the form 'halo_X')
             match = re.match(r'halo_(\d+)', file)
+            print(file)
+            print(match)
+            print(halo_ids_to_include)
             if match:
                 halo_id = int(match.group(1))
                 if halo_id in halo_ids_to_include:
