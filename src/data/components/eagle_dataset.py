@@ -1,5 +1,6 @@
 import os
 import re
+import matplotlib.pyplot as plt
 
 import numpy as np
 import torch
@@ -24,8 +25,10 @@ class EagleDataset(GalaxyDataset):
         print(image.shape)
         if self.mask_interlopers:
             print('a')
-            print(image[:,:,-1])
-            a = b
+            print(image[...,-1])
+            image = image[..., 0] * image[..., 1]
+            plt.imshow(image)
+            plt.savefig("/gpfs/scratch/bsc70/hpai/storage/projects/space/eagle_interlop.png")
 
         labels = np.load(labels_path)
         label = labels[f'arr_0']
