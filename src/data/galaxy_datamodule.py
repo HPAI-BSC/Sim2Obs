@@ -142,6 +142,7 @@ class GalaxyDataModule(LightningDataModule):
             test_ds = full_dataset.filter_by_halos(list(test_halos))
 
             print(f'train/val/test sizes: {(train_size, val_size, test_size)}')
+            print(f'train/val/test sizes: {(len(train_ds), len(val_ds), len(test_ds))}')
             predict_ds = PredictDataset(test_ds)
 
             self.data_train: Optional[Dataset] = train_ds
