@@ -20,6 +20,7 @@ class MapStep(PipelineStep):
         self.map_configuration = self._build_map_configuration(cfg)
         # TODO ensure what to do when it's not specified
         self.transition_radius = cfg.catalog.transition_radius
+        self.cfg = cfg
 
         # Compute bins and radius
         self.spatial_resolution = self.map_configuration['spatial_resolution']
@@ -369,31 +370,35 @@ class MapStep(PipelineStep):
         rotation_axis = kwargs.get('rotation_axis', None)
         rotation_iteration = kwargs.get('rotation_iteration', None)
         for halo, _ in g:
+            logger.debug(f'Halo: {halo.halo_id}, {cosmos_data.halo.halo_id}')
             try:
-                # Compute number of bins and store it in the metadata
-                fov = cosmos_data.metadata['map']['fov']
-                bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
-                cosmos_data.metadata['map']['bins'] = bins
-                logger.debug(f'Number of bins: {bins}')
+                if halo not in self.cfg.catalog.ignore_halos:
+                    # Compute number of bins and store it in the metadata
+                    fov = self.transition_radius * 2
+                    bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
+                    cosmos_data.metadata['map']['bins'] = bins
+                    logger.debug(f'Number of bins: {bins}')
 
-                interlopers_id = self._get_interlopers_id(cosmos_data)
-                io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
+                    interlopers_id = self._get_interlopers_id(cosmos_data)
+                    io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
 
-                if self.dim == 2:
-                    projections = ["xy", "yz", "xz"]
-                    for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
-                        projection_name = projections[j]
-                        input_feature.map = map_f_i
-                        output_feature.map = map_f_o
-                        self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, rotation_axis,
-                                                 rotation_iteration, cosmos_data, input_feature, output_feature)
-                elif self.dim == 3:
-                    pass
+                    if self.dim == 2:
+                        projections = ["xy", "yz", "xz"]
+                        for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
+                            projection_name = projections[j]
+                            input_feature.map = map_f_i
+                            output_feature.map = map_f_o
+                            self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, rotation_axis,
+                                                     rotation_iteration, cosmos_data, input_feature, output_feature)
+                    elif self.dim == 3:
+                        pass
 
-                if next_step is not None:
-                    yield from next_step(g)
+                    if next_step is not None:
+                        yield from next_step(g)
+                    else:
+                        yield input_feature, output_feature, cosmos_data
                 else:
-                    yield input_feature, output_feature, cosmos_data
+                    logger.debug(f'Ignoring halo: {cosmos_data.halo.halo_id}')
             except Exception as e:
                 logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
                 continue
