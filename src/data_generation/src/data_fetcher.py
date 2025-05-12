@@ -1092,7 +1092,7 @@ class EagleFetcher(DataFetcher):
             # Get subhalos ids
             processed_halos = run_pipeline(halos, steps)
             halo_context = HaloContext(processed_halos, column_map=self.column_map)
-            logger.debug("Halo data fetched successfully.")
+            logger.debug(f"Halo data fetched successfully: {len(halo_context.data)} halos.")
         else:
             logger.warning("No halo data found in Eagle database.")
             halo_context = HaloContext(pd.DataFrame(data=[]), column_map={})
@@ -1162,7 +1162,7 @@ class EagleFetcher(DataFetcher):
             processed_subhalos = run_pipeline(subhalos, steps)
             processed_subhalos = processed_subhalos.sort_values(by=['SubGroupNumber', 'GroupNumber'])
             subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
-            logger.debug("Subhalo data fetched successfully.")
+            logger.debug(f"Subhalo data fetched successfully: {len(subhalo_context.data)} subhalos.")
         else:
             logger.warning("No subhalo data found in Eagle database.")
             subhalo_context = SubhaloContext(pd.DataFrame(data=[]), self.column_map)
@@ -1658,6 +1658,7 @@ class FlamingoFetcher(DataFetcher):
             processed_halos = run_pipeline(halos, steps)
             logger.debug("Halo data fetched successfully.")
             halo_context = HaloContext(processed_halos, self.column_map)
+            logger.debug(f"Halo data fetched successfully: {len(halo_context.data)} halos.")
             return halo_context
 
         else:
@@ -1737,8 +1738,8 @@ class FlamingoFetcher(DataFetcher):
                 lambda subhalos: apply_filters(subhalos, filtered_conditions, self.catalog.fields.subhalo),
             ]
             processed_subhalos = run_pipeline(subhalos, steps)
-            logger.debug("Subhalo data fetched successfully.")
             subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
+            logger.debug(f"Subhalo data fetched successfully: {len(subhalo_context.data)} subhalos.")
             return subhalo_context
         else:
             logger.warning("No subhalos found.")
