@@ -12,8 +12,6 @@ class GalaxyDataset(Dataset, ABC):
         self.images = sorted(os.listdir(image_dir))
         self.labels = sorted(os.listdir(labels_dir))
 
-        print(len(self.images))
-
         if len(self.images) != len(self.labels):
             raise ValueError("Mismatch between number of images and labels.")
 

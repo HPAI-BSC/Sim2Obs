@@ -27,7 +27,7 @@ class EagleDataset(GalaxyDataset):
             print('a')
             print(image[...,-1])
             image = image[..., 0] * image[..., 1]
-            plt.imshow(image)
+            plt.imshow(image.detach().cpu().numpy())
             plt.savefig("/gpfs/scratch/bsc70/hpai/storage/projects/space/eagle_interlop.png")
 
         labels = np.load(labels_path)
