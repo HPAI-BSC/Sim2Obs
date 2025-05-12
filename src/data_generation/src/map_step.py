@@ -376,6 +376,10 @@ class MapStep(PipelineStep):
                     # Compute number of bins and store it in the metadata
                     fov = self.transition_radius * 2
                     bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
+
+                    if 'map' not in cosmos_data.metadata:
+                        cosmos_data.metadata['map'] = {}
+
                     cosmos_data.metadata['map']['bins'] = bins
                     logger.debug(f'Number of bins: {bins}')
 
