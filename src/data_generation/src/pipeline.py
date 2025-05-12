@@ -69,9 +69,9 @@ class Pipeline:
 
         # TODO
         path = self.cfg.paths.datasets_dir + f'/../logs/halo_context_RefL0100N1504.csv'
-        halo_context.to_csv(path)
+        halo_context.data.to_csv(path)
         path = self.cfg.paths.datasets_dir + f'/../logs/subhalo_context_RefL0100N1504.csv'
-        subhalo_context.to_csv(path)
+        subhalo_context.data.to_csv(path)
 
         # Clean subhalo context to remove subhalos that belong to halos that do not exist
         subhalo_context.remove_subhalos_belonging_unvalid_halos(halo_context)
