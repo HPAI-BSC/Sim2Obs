@@ -438,6 +438,7 @@ class ICLProcessor(FeatureProcessor):
             transition_radius = sorted_distances[transition_index[max_pos]]
             normalized_transition_radius = transition_radius / halo.r200
 
+            '''
             if int(transition_radius) == 129293:
                 logger.debug('Saving max transition radius ...')
                 r_by_r200 = sorted_distances / halo.r200
@@ -452,7 +453,7 @@ class ICLProcessor(FeatureProcessor):
 
                 # Build cumsum profiles
                 plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, log_r, transition_index[max_pos], halo.halo_id)
-
+            '''
             logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
                          f'({round(normalized_transition_radius, 2)} % r200), r200: {halo.r200}')
         else:

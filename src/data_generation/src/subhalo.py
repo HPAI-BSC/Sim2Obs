@@ -439,12 +439,23 @@ class SubhaloParticles:
 
             # Calculate the distance from the particle to the halo cente
             if lbox is not None:
-                mask = np.any(np.abs(delta) > (lbox / 2), axis=1)
-                delta[mask] = (delta[mask] + lbox / 2) % lbox - lbox / 2
+                # Create a copy to avoid modifying original delta directly
+                corrected_delta = delta.copy()
 
-                # Count how many particles will be corrected
-                num_corrected = np.sum(mask)
-                print(f"Particles corrected due to PBC: {num_corrected} / {len(delta)}")
+                # Prepare the mask, True => coordinate needs to be updated
+                # Particles that are more than half the box length in the positive direction
+                over_half = corrected_delta > (lbox / 2)
+                # Particles that are more than half the box length in the negative direction
+                under_half = corrected_delta < (-lbox / 2)
+
+                # Apply correction only to the out-of-bound coordinates
+                corrected_delta[over_half] -= lbox
+                corrected_delta[under_half] += lbox
+
+                # Count how many corrections per axis (x, y, z)
+                num_corrected_per_axis = np.sum(over_half | under_half, axis=0)
+                print(f"Particles corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}")
+                delta = corrected_delta
 
         self.star_p = delta
 
