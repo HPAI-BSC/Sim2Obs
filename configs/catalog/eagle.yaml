@@ -122,9 +122,3 @@ fields:
         output: "Msun/h"
         scaling: "(x * g) / g_2_solar"
         name: "m"
-    gas:
-      Mass:
-        input: "Msun/h"
-        output: "Msun/h"
-        scaling: "(x * g) / g_2_solar"
-        name: "m"
