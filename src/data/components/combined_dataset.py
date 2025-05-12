@@ -4,6 +4,7 @@ from torch.utils.data import ConcatDataset, Subset
 import numpy as np
 
 from src.data.components.illustris300_dataset import Illustris300Dataset
+from src.data.components.eagle_dataset import EagleDataset
 
 
 class CombinedDataset(GalaxyDataset):
@@ -17,15 +18,17 @@ class CombinedDataset(GalaxyDataset):
                 dataset = DianogaDataset(img_dir, label_dir, transform=transform)
             elif 'illustris' in img_dir:
                 dataset = Illustris300Dataset(img_dir, label_dir, transform=transform)
+            elif 'eagle' in img_dir:
+                dataset = EagleDataset(img_dir, label_dir, transform=transform)
             else:
                 dataset = None
             self.datasets.append(dataset)
         self.datasets = [dataset for dataset in self.datasets if dataset is not None]
-        print('_' * 8)
+        print('_' * 25)
         for dataset in self.datasets:
             print(len(dataset))
             print(dataset[0][0].shape, dataset[0][1].shape)
-        print('_' * 8)
+        print('_' * 25)
         combined_dataset = ConcatDataset(self.datasets)
         indices = list(range(len(combined_dataset)))
         np.random.shuffle(indices)
