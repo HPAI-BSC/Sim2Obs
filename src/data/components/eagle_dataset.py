@@ -21,7 +21,10 @@ class EagleDataset(GalaxyDataset):
         images = np.load(img_path)
         image = images[f'arr_0']
         if self.mask_interlopers:
+            print('a')
+            print(image[...,0].shape)
             image = image[..., 0] * (1-image)[..., 1]
+            print(image.shape)
         # resize image to 128x128
         image = torch.tensor(image)
 
