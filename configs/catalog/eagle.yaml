@@ -7,16 +7,16 @@ g_2_solar: 1.989e33
 
 snapnum: 26          # redshift 0.18
 
-Lbox: 50 * 1000 / 0.6774  # kpc/ h
+Lbox: 73811.63 # 50 * 1000 / 0.6774   kpc/h
 simulation_code: RefL0050N0752
 path: ${paths.datasets_dir}/eagle/RefL0050N0752
 
 # https://arxiv.org/pdf/1510.01320
-# Lbox: 50 * 1000 / 0.6774  # kpc/ h
+# Lbox: 73811.63 # 50 * 1000 / 0.6774 kpc/ h
 #simulation_code: AGNdT9L0050N0752
 #path: ${paths.datasets_dir}/eagle/AGNdT9L0050N0752
 
-# Lbox: 100 * 1000 / 0.6774  # kpc/ h
+# Lbox: 147623.26 # 100 * 1000 / 0.6774 kpc/ h
 #simulation_code: RefL0100N1504
 #path: ${paths.datasets_dir}/eagle/RefL0100N1504
 
