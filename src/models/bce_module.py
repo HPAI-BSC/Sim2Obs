@@ -130,8 +130,7 @@ class BCELitModule(LightningModule):
         print(f"On train start")
         self._print_cuda_memory()
 
-        print('_'*20)
-        """
+        print('_'*25)
         copy_for_analysis = type(self.net)()  # assumes default constructor works
         copy_for_analysis.load_state_dict(self.net.state_dict())
         copy_for_analysis.eval()
@@ -147,15 +146,7 @@ class BCELitModule(LightningModule):
         # Clean memory
         del copy_for_analysis
         torch.cuda.empty_cache()
-        """
-        macs, params = get_model_complexity_info(
-            self.net,
-            (1, 128, 128),  # Input shape (C, H, W)
-            as_strings=False,
-            print_per_layer_stat=True,
-            verbose=True
-        )
-        print('_'*20)
+        print('_'*25)
         print(f"Computational complexity: {macs} MACs")
         print(f"Forward FLOPs: {macs * 2 * 1e-9:.4f} GFLOPs")
         # Estimate backward pass (typically 2-3× forward)
