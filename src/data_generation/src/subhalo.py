@@ -151,6 +151,7 @@ class SubhaloContext:
                 num_corrected_per_axis = np.sum(over_half | under_half, axis=0)
                 print(f"Subhalos corrected due to PBC (x/y/z): {num_corrected_per_axis} / {len(delta)}")
                 return corrected_delta
+            return delta
 
         # TODO Add missing columns
         indexing = self.data['id_parents'] == halo.halo_id
