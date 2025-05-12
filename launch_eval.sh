@@ -17,5 +17,5 @@ echo "Current directory: '$CURRENT_DIR'"
 
 module load singularity
 singularity exec -B /gpfs/scratch/bsc70/hpai/storage/projects \
-                 --nv /gpfs/scratch/bsc70/hpai/storage/projects/space/singularity/space_v3.sif \
+                 --nv /gpfs/scratch/bsc70/hpai/storage/projects/space/singularity/space_v5.sif \
    bash -c "export PROJECT_ROOT='$CURRENT_DIR' && python src/eval.py"
