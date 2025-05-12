@@ -3,7 +3,7 @@ data_dir: ${paths.datasets_dir}/ilarias_dataset_v0/VelocityDispersion
 target_maskdir: ${paths.datasets_dir}/ilarias_dataset_v0/Labels
 dataset: dianoga
 batch_size: 64
-train_val_test_split: [.15, .75, .10]
+train_val_test_split: [.30, .6, .10]
 resize_shape: [128, 128]
 random_seed:  0
 num_workers: 8
