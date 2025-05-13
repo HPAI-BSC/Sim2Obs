@@ -27,7 +27,7 @@ class NumpyTransforms:
         img = self.random_horizontal_flip(img)
         img = self.random_vertical_flip(img)
         img = self.random_rotation(img)
-        img = self.random_resized_crop(img)
+        #img = self.random_resized_crop(img)
         img = self.resize(img)
 
         # Convert to tensor at the end (assuming PyTorch is needed)
