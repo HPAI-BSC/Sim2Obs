@@ -29,19 +29,14 @@ class CombinedDataset(GalaxyDataset):
         self.datasets = [dataset for dataset in self.datasets if dataset is not None]
         print('_' * 25)
         for dataset in self.datasets:
-            print(f"Dataset: {len(dataset)}. sample/target sizes: {(dataset[0][0].shape), (dataset[0][1].shape)}")
+            print(f"Dataset: {len(dataset)}. Sample/target sizes: {(dataset[0][0].shape), (dataset[0][1].shape)}")
         print('_' * 25)
+
         combined_dataset = ConcatDataset(self.datasets)
         indices = list(range(len(combined_dataset)))
         np.random.shuffle(indices)
-
-        print(f"FRACTION_DATA: {self.fraction_data}")
-        print(f"Total len: {len(combined_dataset)}")
         subset_len = int(len(combined_dataset) * self.fraction_data)
         selected_indices = indices[:subset_len]
-
-        print(f"Frac len: {len(selected_indices)}")
-
         self.combined_dataset = Subset(combined_dataset, selected_indices)
 
     def __len__(self):
@@ -74,6 +69,10 @@ class CombinedDataset(GalaxyDataset):
 
         filtered_combined_dataset = ConcatDataset(filtered_datasets)
         indices = list(range(len(filtered_combined_dataset)))
+
+        subset_len = int(len(filtered_combined_dataset) * self.fraction_data)
         np.random.shuffle(indices)
-        filtered_combined_dataset = Subset(filtered_combined_dataset, indices)
+        selected_indices = indices[:subset_len]
+
+        filtered_combined_dataset = Subset(filtered_combined_dataset, selected_indices)
         return filtered_combined_dataset
