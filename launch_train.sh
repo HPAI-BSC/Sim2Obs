@@ -10,7 +10,7 @@
 #SBATCH -c 32               # Cores per task requested
 #SBATCH -t 00:10:00         # Run time (hh:mm:ss) - 30 min
 #SBATCH --account bsc70
-#SBATCH --qos=acc_debug
+#SBATCH --qos=acc_bsccs
 
 CURRENT_DIR=$(pwd)
 echo "Current directory: '$CURRENT_DIR'"
@@ -22,5 +22,5 @@ sed -i "s/^commit_tag: .*/commit_tag: \"$COMMIT_HASH\"/" configs/train.yaml
 
 module load singularity
 singularity exec -B /gpfs/scratch/bsc70/hpai/storage/projects \
-                 --nv /gpfs/scratch/bsc70/hpai/storage/projects/space/singularity/space_v5.sif \
+                 --nv /gpfs/scratch/bsc70/hpai/storage/projects/space/singularity/space_v3.sif \
    bash -c 'export HYDRA_FULL_ERROR=1 && export PROJECT_ROOT='$CURRENT_DIR' && python src/train.py'

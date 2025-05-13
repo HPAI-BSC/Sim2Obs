@@ -5,7 +5,7 @@ from lightning import LightningModule
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
-from ptflops import get_model_complexity_info
+#from ptflops import get_model_complexity_info
 
 torch.set_float32_matmul_precision('medium')
 
@@ -95,6 +95,7 @@ class MambaLitModule(LightningModule):
         self.val_rase_best = MaxMetric()
         self.val_rmse_best = MaxMetric()
 
+        """
         print(f"On train init")
         macs, params = get_model_complexity_info(
             self.net,
@@ -113,6 +114,7 @@ class MambaLitModule(LightningModule):
         print(f"Backward FLOPs: {backward_flops * 1e-9:.4f} GFLOPs")
         print(f"Number of parameters: {params}")
         print('_' * 25)
+        """
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
