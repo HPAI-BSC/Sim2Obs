@@ -97,6 +97,8 @@ class NumpyTransforms:
             img = img[np.newaxis, :, :]
         else:  # RGB/RGBA
             img = img.transpose((2, 0, 1))
+        print("-->", img.shape)
+        print(type(img))
 
         #return torch.from_numpy(img).float()
         return torch.tensor(img).float()
