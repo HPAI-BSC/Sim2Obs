@@ -65,12 +65,16 @@ class NumpyTransforms:
         # Crop image
         cropped = img[y_start:y_start + new_height, x_start:x_start + new_width]
 
-        # Resize to target size
-        #return cv2.resize(cropped, self.resize_shape)
         return self.resize(cropped)
 
     def resize(self, img):
-        return cv2.resize(img, self.resize_shape)
+        print(type(img))
+        print(img.shape)
+        print(self.resize_shape)
+        resize_shape = self.resize_shape if isinstance(self.resize_shape, tuple) else (self.resize_shape, self.resize_shape)
+        print(resize_shape)
+        resize_shape = (int(self.resize_shape[0]), int(self.resize_shape[1]))
+        return cv2.resize(img, resize_shape)
 
 
     def to_tensor(self, img):
