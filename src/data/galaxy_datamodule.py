@@ -9,6 +9,78 @@ from lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import transforms
 
+import numpy as np
+from scipy import ndimage
+import cv2
+import random
+
+
+class NumpyTransforms:
+    def __init__(self, resize_shape):
+        self.resize_shape = resize_shape if isinstance(resize_shape, tuple) else (resize_shape, resize_shape)
+
+    def __call__(self, img):
+        """Apply all transforms in sequence"""
+
+        # Apply transforms
+        img = self.random_horizontal_flip(img)
+        img = self.random_vertical_flip(img)
+        img = self.random_rotation(img)
+        img = self.random_resized_crop(img)
+        img = self.resize(img)
+
+        # Convert to tensor at the end (assuming PyTorch is needed)
+        return self.to_tensor(img)
+
+    # Individual transform methods
+    def random_horizontal_flip(self, img, p=0.5):
+        if random.random() < p:
+            return np.fliplr(img).copy()
+        return img
+
+    def random_vertical_flip(self, img, p=0.5):
+        if random.random() < p:
+            return np.flipud(img).copy()
+        return img
+
+    def random_rotation(self, img, degrees=45):
+        angle = random.uniform(-degrees, degrees)
+        return ndimage.rotate(img, angle, reshape=False, mode='nearest')
+
+    def random_resized_crop(self, img, scale=(0.9, 1.0)):
+        height, width = img.shape[:2]
+
+        # Random scale factor
+        scale_factor = random.uniform(scale[0], scale[1])
+
+        # Compute new dimensions
+        new_height = int(height * scale_factor)
+        new_width = int(width * scale_factor)
+
+        # Random crop position
+        y_start = random.randint(0, max(0, height - new_height))
+        x_start = random.randint(0, max(0, width - new_width))
+
+        # Crop image
+        cropped = img[y_start:y_start + new_height, x_start:x_start + new_width]
+
+        # Resize to target size
+        return cv2.resize(cropped, self.resize_shape)
+
+    def resize(self, img):
+        return cv2.resize(img, self.resize_shape)
+
+    def to_tensor(self, img):
+        # Convert NumPy array to PyTorch tensor
+        # Make sure shape is [C, H, W] for PyTorch
+        if len(img.shape) == 2:  # Grayscale
+            img = img[np.newaxis, :, :]
+        else:  # RGB/RGBA
+            img = img.transpose((2, 0, 1))
+
+        import torch
+        return torch.from_numpy(img).float()
+
 
 class GalaxyDataModule(LightningDataModule):
     """
@@ -103,10 +175,12 @@ class GalaxyDataModule(LightningDataModule):
             ]
         )
 
+        self.transforms = NumpyTransforms(resize_shape=resize_shape)
+
         full_dataset = GalaxyDatasetFactory.get_dataset(dataset,
                                                         image_dir=data_dir,
                                                         labels_dir=target_maskdir,
-                                                        transform=self.train_transforms,
+                                                        transform=self.transforms,
                                                         mask_interlopers=mask_interlopers)
         torch.manual_seed(random_seed)
 

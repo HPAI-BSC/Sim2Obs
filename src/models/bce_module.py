@@ -87,6 +87,9 @@ class BCELitModule(LightningModule):
         self.val_rase_best = MaxMetric()
         self.val_rmse_best = MaxMetric()
 
+        # Estimate forward flops
+        self._estimate_flops()
+
 
     def _print_cuda_memory(self):
         if torch.cuda.is_available():
@@ -157,6 +160,54 @@ class BCELitModule(LightningModule):
         print(f"Number of parameters: {params}")
         print('_'*25)
         """
+
+    def _estimate_flops(self):
+        """
+        print(f"On train init")
+        macs, params = get_model_complexity_info(
+            self.net,
+            (1, 128, 128),  # Input shape (C, H, W)
+            as_strings=False,
+            print_per_layer_stat=True,
+            verbose=True
+        )
+        # Clean memory
+        torch.cuda.empty_cache()
+        print('_' * 25)
+        print(f"Computational complexity: {macs} MACs")
+        print(f"Forward FLOPs: {macs * 2 * 1e-9:.4f} GFLOPs")
+        # Estimate backward pass (typically 2-3× forward)
+        backward_flops = macs * 2 * 2.5
+        print(f"Backward FLOPs: {backward_flops * 1e-9:.4f} GFLOPs")
+        print(f"Number of parameters: {params}")
+        print('_' * 25)
+        """
+        import torch
+        from torch.profiler import profile, record_function, ProfilerActivity
+
+        # Example input
+        x = torch.randn(1, 1, 128, 128).cuda()
+
+        # Move model to CUDA
+        model = self.net.cuda()
+        model.eval()
+
+        with profile(
+                activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                with_flops=True,
+                record_shapes=True,
+        ) as prof:
+            with torch.no_grad():
+                with record_function("model_inference"):
+                    model(x)
+
+        # Print total FLOPs
+        #print(prof.key_averages().table(sort_by="flops", row_limit=10))
+        print('_'*25)
+        total_flops = sum([e.flops for e in prof.key_averages() if e.flops is not None])
+        print(f"Total forward FLOPs: {total_flops / 1e9:.2f} GFLOPs")
+        print(f"Backward FLOPs: {total_flops * 2.5 / 1e9:.2f} GFLOPs")
+        print('_'*25)
 
 
     def model_step(
