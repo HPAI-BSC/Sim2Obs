@@ -3,7 +3,7 @@
 defaults:
   - _self_
   - data: galaxy_dianoga_rotation45
-  - model: transunet
+  - model: mamba_unet
   - logger:
   - trainer: default
   - paths: gpfs
