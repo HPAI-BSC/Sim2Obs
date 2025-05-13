@@ -85,6 +85,7 @@ class NumpyTransforms:
     def to_tensor(self, img):
         # Convert NumPy array to PyTorch tensor
         # Make sure shape is [C, H, W] for PyTorch
+        print(img.shape)
         if len(img.shape) == 2:  # Grayscale
             img = img[np.newaxis, :, :]
         else:  # RGB/RGBA
