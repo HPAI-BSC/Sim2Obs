@@ -68,6 +68,19 @@ def plot_predictions(predictions, ground_truths, output_path):
     plt.close(fig)
 
 
+def plot_single_pred(pred, output_path):
+    if isinstance(pred, torch.Tensor):
+        pred = pred.permute(1, 2, 0).detach().cpu().numpy()
+    else:
+        pred = np.transpose(pred, (1, 2, 0))
+
+    plt.imshow(pred, cmap="viridis")
+    plt.tight_layout()
+
+    plt.savefig(f'{output_path}/prediction_sample.png')
+    plt.close()
+
+
 @utils.task_wrapper
 def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """Evaluates given checkpoint on a datamodule testset.
@@ -109,17 +122,24 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
 
     # for predictions use trainer.predict(...)
-    predictions = trainer.predict(model=model, dataloaders=datamodule.predict_dataloader(), ckpt_path=cfg.ckpt_path)
+    if cfg.save_predictions:
+        predictions = trainer.predict(model=model, dataloaders=datamodule.predict_dataloader(), ckpt_path=cfg.ckpt_path)
 
-    pred0, pred1, pred2 = predictions[0][0], predictions[0][1], predictions[0][2]
-    preds = [pred0, pred1, pred2]
+        for pred in predictions:
 
-    for imgs, labels in datamodule.test_dataloader():
-        gts = [labels[0], labels[1], labels[2]] # Get the first two in the batch
-        break
 
-    output_path = cfg.paths.output_dir
-    plot_predictions(preds, gts, output_path)
+
+        """
+        pred0, pred1, pred2 = predictions[0][0], predictions[0][1], predictions[0][2]
+        preds = [pred0, pred1, pred2]
+    
+        for imgs, labels in datamodule.test_dataloader():
+            gts = [labels[0], labels[1], labels[2]] # Get the first two in the batch
+            break
+            
+        output_path = cfg.paths.output_dir
+        plot_predictions(preds, gts, output_path)
+        """
 
     metric_dict = trainer.callback_metrics
 
