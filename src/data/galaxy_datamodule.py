@@ -68,9 +68,6 @@ class NumpyTransforms:
         return self.resize(cropped)
 
     def resize(self, img):
-        print(type(img))
-        print(img.shape)
-        print(self.resize_shape)
         if isinstance(self.resize_shape, tuple):
             if isinstance(self.resize_shape[0], list):
                 if len(self.resize_shape[0]) == 2:
@@ -82,7 +79,6 @@ class NumpyTransforms:
         else:
             resize_shape = (self.resize_shape, self.resize_shape)
 
-        print(resize_shape)
         return cv2.resize(img, resize_shape)
 
 
@@ -94,7 +90,8 @@ class NumpyTransforms:
         else:  # RGB/RGBA
             img = img.transpose((2, 0, 1))
 
-        return torch.from_numpy(img).float()
+        #return torch.from_numpy(img).float()
+        return torch.tensor(img).float()
 
 
 class GalaxyDataModule(LightningDataModule):
