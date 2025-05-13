@@ -13,7 +13,8 @@ import numpy as np
 from scipy import ndimage
 #import cv2
 import random
-from skimage.transform import resize
+#from skimage.transform import resize
+from PIL import Image
 
 
 class NumpyTransforms:
@@ -67,10 +68,31 @@ class NumpyTransforms:
 
         # Resize to target size
         #return cv2.resize(cropped, self.resize_shape)
-        return resize(cropped, self.resize_shape)
+        return self.resize_with_pil(cropped)
 
+    """
     def resize(self, img):
         return resize(img, self.resize_shape)
+    """
+
+    def resize(self, img):
+        return self.resize_with_pil(img)
+
+    def resize_with_pil(self, img):
+        """Resize using PIL instead of OpenCV"""
+        # Convert numpy to PIL
+        if len(img.shape) == 3:
+            # For RGB images
+            pil_img = Image.fromarray((img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8))
+        else:
+            # For grayscale or label images
+            pil_img = Image.fromarray(img.astype(np.uint8))
+
+        resized_pil = pil_img.resize(self.resize_shape)
+
+        resized_np = np.array(resized_pil)
+        return resized_np
+
 
     def to_tensor(self, img):
         # Convert NumPy array to PyTorch tensor
@@ -80,7 +102,6 @@ class NumpyTransforms:
         else:  # RGB/RGBA
             img = img.transpose((2, 0, 1))
 
-        import torch
         return torch.from_numpy(img).float()
 
 
