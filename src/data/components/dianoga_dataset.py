@@ -31,8 +31,10 @@ class DianogaDataset(GalaxyDataset):
         #image = image.float().unsqueeze(0)
         #label = label.float().unsqueeze(0)
 
-        image = np.expand_dims(image, axis=0)
-        label = np.expand_dims(label, axis=0)
+        image = np.expand_dims(image, axis=0).astype(np.uint8)
+        label = np.expand_dims(label, axis=0).astype(np.uint8)
+
+        print(type(image), image.shape)
 
         image = Image.fromarray(image)
         label = Image.fromarray(label)
