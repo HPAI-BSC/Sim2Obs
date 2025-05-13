@@ -71,9 +71,16 @@ class NumpyTransforms:
         print(type(img))
         print(img.shape)
         print(self.resize_shape)
-        resize_shape = self.resize_shape if isinstance(self.resize_shape, tuple) else (self.resize_shape, self.resize_shape)
+        if isinstance(self.resize_shape, tuple):
+            if isinstance(self.resize_shape[0], list):
+                if len(self.resize_shape[0]) == 2:
+                    resize_shape = self.resize_shape[0]
+                else:
+                    resize_shape = (self.resize_shape[0][0], self.resize_shape[0][1])
+        else:
+            resize_shape = (self.resize_shape, self.resize_shape)
+
         print(resize_shape)
-        resize_shape = (int(self.resize_shape[0]), int(self.resize_shape[1]))
         return cv2.resize(img, resize_shape)
 
 
