@@ -106,7 +106,7 @@ class GalaxyDataModule(LightningDataModule):
         full_dataset = GalaxyDatasetFactory.get_dataset(dataset,
                                                         image_dir=data_dir,
                                                         labels_dir=target_maskdir,
-                                                        transform=self.train_transforms,
+                                                        transform=None,
                                                         mask_interlopers=mask_interlopers)
         torch.manual_seed(random_seed)
 
