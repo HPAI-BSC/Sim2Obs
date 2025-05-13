@@ -21,7 +21,7 @@ net:
   patch_size: 16
   mlp_dim: 3072
   img_size: 128
-  segmentation_head_kernel_size: 1
+  segmentation_head_kernel_size: 3
 
 # compile model for faster training with pytorch 2.0
 compile: false
