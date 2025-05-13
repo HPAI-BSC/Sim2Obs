@@ -11,8 +11,9 @@ from torchvision.transforms import transforms
 
 import numpy as np
 from scipy import ndimage
-import cv2
+#import cv2
 import random
+from skimage.transform import resize
 
 
 class NumpyTransforms:
@@ -65,10 +66,11 @@ class NumpyTransforms:
         cropped = img[y_start:y_start + new_height, x_start:x_start + new_width]
 
         # Resize to target size
-        return cv2.resize(cropped, self.resize_shape)
+        #return cv2.resize(cropped, self.resize_shape)
+        return resize(cropped, self.resize_shape)
 
     def resize(self, img):
-        return cv2.resize(img, self.resize_shape)
+        return resize(img, self.resize_shape)
 
     def to_tensor(self, img):
         # Convert NumPy array to PyTorch tensor
