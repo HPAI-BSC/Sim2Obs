@@ -1,6 +1,6 @@
 import os
 import re
-import matplotlib.pyplot as plt
+from PIL import Image
 
 import numpy as np
 import torch
@@ -31,6 +31,9 @@ class EagleDataset(GalaxyDataset):
         #image = image.float().unsqueeze(0)
         image = np.expand_dims(image, axis=0)
         label = np.expand_dims(label, axis=0)
+
+        image = Image.fromarray(image)
+        label = Image.fromarray(label)
         if self.transform:
             image = self.transform(image)
             label = self.transform(label)
