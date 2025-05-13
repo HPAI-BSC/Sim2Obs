@@ -79,13 +79,15 @@ class NumpyTransforms:
         else:
             resize_shape = (self.resize_shape, self.resize_shape)
 
-        return cv2.resize(img, resize_shape)
+        resized = cv2.resize(img, resize_shape)
+        print("-", resized.shape)
+        return resized
 
 
     def to_tensor(self, img):
         # Convert NumPy array to PyTorch tensor
         # Make sure shape is [C, H, W] for PyTorch
-        print(img.shape)
+        print("->", img.shape)
         if len(img.shape) == 2:  # Grayscale
             img = img[np.newaxis, :, :]
         else:  # RGB/RGBA
