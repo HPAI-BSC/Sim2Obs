@@ -35,8 +35,12 @@ class CombinedDataset(GalaxyDataset):
         indices = list(range(len(combined_dataset)))
         np.random.shuffle(indices)
 
+        print(f"FRACTION_DATA: {self.fraction_data}")
+        print(f"Total len: {len(combined_dataset)}")
         subset_len = int(len(combined_dataset) * self.fraction_data)
         selected_indices = indices[:subset_len]
+
+        print(f"Frac len: {len(selected_indices)}")
 
         self.combined_dataset = Subset(combined_dataset, selected_indices)
 
