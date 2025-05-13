@@ -74,9 +74,11 @@ class NumpyTransforms:
         if isinstance(self.resize_shape, tuple):
             if isinstance(self.resize_shape[0], list):
                 if len(self.resize_shape[0]) == 2:
-                    resize_shape = self.resize_shape[0]
-                else:
                     resize_shape = (self.resize_shape[0][0], self.resize_shape[0][1])
+                elif len(self.resize_shape[0]) == 1:
+                    resize_shape = (self.resize_shape[0], self.resize_shape[1])
+                else:
+                    resize_shape = (128, 128)
         else:
             resize_shape = (self.resize_shape, self.resize_shape)
 
