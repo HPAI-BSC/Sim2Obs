@@ -41,6 +41,8 @@ class CombinedDataset(GalaxyDataset):
     def __getitem__(self, index):
         item = self.combined_dataset[index]
 
+        print(f"Index {index} shape: {item.shape}")
+
         # Ensure all tensors are contiguous and consistent
         if isinstance(item, dict):
             return {k: v.contiguous() if isinstance(v, torch.Tensor) else v for k, v in item.items()}
