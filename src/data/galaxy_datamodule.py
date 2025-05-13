@@ -147,7 +147,8 @@ class GalaxyDataModule(LightningDataModule):
         random_seed: int = 0,
         num_workers: int = 0,
         pin_memory: int = False,
-        mask_interlopers: bool = True
+        mask_interlopers: bool = True,
+        fraction_data: float = 1.0,
     ) -> None:
         """Initialize a `GalaxyDataModule`.
 
@@ -198,7 +199,8 @@ class GalaxyDataModule(LightningDataModule):
                                                         image_dir=data_dir,
                                                         labels_dir=target_maskdir,
                                                         transform=self.transforms,
-                                                        mask_interlopers=mask_interlopers)
+                                                        mask_interlopers=mask_interlopers,
+                                                        fraction_data=fraction_data)
         torch.manual_seed(random_seed)
 
         if train_val_test_split == (None, None, None):
