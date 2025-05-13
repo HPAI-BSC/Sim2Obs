@@ -106,7 +106,7 @@ class GalaxyDataModule(LightningDataModule):
         full_dataset = GalaxyDatasetFactory.get_dataset(dataset,
                                                         image_dir=data_dir,
                                                         labels_dir=target_maskdir,
-                                                        transform=None,
+                                                        transform=self.train_transforms,
                                                         mask_interlopers=mask_interlopers)
         torch.manual_seed(random_seed)
 
@@ -142,8 +142,8 @@ class GalaxyDataModule(LightningDataModule):
             test_ds = full_dataset.filter_by_halos(list(test_halos))
 
             print('_' * 25)
-            print(f'train/val/test sizes: {(train_size, val_size, test_size)}')
-            print(f'train/val/test sizes: {(len(train_ds), len(val_ds), len(test_ds))}')
+            print(f'train/val/test sizes -- # halos: {(train_size, val_size, test_size)}')
+            print(f'train/val/test sizes -- # maps: {(len(train_ds), len(val_ds), len(test_ds))}')
             print('_' * 25)
             predict_ds = PredictDataset(test_ds)
 
