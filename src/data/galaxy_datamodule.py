@@ -195,7 +195,6 @@ class GalaxyDataModule(LightningDataModule):
 
         self.transforms = NumpyTransforms(resize_shape=resize_shape)
 
-        print(f"FRAC: {fraction_data}")
         full_dataset = GalaxyDatasetFactory.get_dataset(dataset,
                                                         image_dir=data_dir,
                                                         labels_dir=target_maskdir,

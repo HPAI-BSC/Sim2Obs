@@ -3,7 +3,7 @@
 defaults:
   - _self_
   - data: galaxy_dianoga_rotation45
-  - model: transunet
+  - model: mamba_unet
   - logger:
   - trainer: default
   - paths: gpfs
@@ -29,12 +29,12 @@ save_predictions: True
 
 # -Mamba
 # ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/4e897f5c/output/checkpoints/4e897f5c/epoch_010.ckpt  # 14.04.25 Dianoga
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/4e897f5c/output/checkpoints/4e897f5c/last.ckpt  # 14.04.25 Dianoga
 
 
 # transunet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6fdf7f32/output/checkpoints/6fdf7f32/last.ckpt
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c2dc4e53/output/checkpoints/c2dc4e53/epoch_041.ckpt  # 14.04.25 Dianoga
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c2dc4e53/output/checkpoints/c2dc4e53/epoch_041.ckpt  # 14.04.25 Dianoga
 
 # - Unet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
