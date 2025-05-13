@@ -32,8 +32,6 @@ class EagleDataset(GalaxyDataset):
         image = np.expand_dims(image, axis=0)
         label = np.expand_dims(label, axis=0)
 
-        image = Image.fromarray(image)
-        label = Image.fromarray(label)
         if self.transform:
             image = self.transform(image)
             label = self.transform(label)
