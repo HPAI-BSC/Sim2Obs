@@ -128,8 +128,10 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
         log.info("Saving predictions...")
         output_path = cfg.paths.output_dir
-        for i, pred in enumerate(predictions):
-            plot_single_pred(pred, i, output_path)
+        for batch_idx, batch in enumerate(predictions):
+            for i, pred in enumerate(batch):
+                global_idx = batch_idx * len(batch) + i
+                plot_single_pred(pred, global_idx, output_path)
         log.info(f"Predictions saved to {output_path}")
 
 
