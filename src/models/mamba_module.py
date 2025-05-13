@@ -95,6 +95,10 @@ class MambaLitModule(LightningModule):
         self.val_rase_best = MaxMetric()
         self.val_rmse_best = MaxMetric()
 
+        self._estimate_flops()
+
+
+    def _estimate_flops(self):
         """
         print(f"On train init")
         macs, params = get_model_complexity_info(
@@ -115,6 +119,29 @@ class MambaLitModule(LightningModule):
         print(f"Number of parameters: {params}")
         print('_' * 25)
         """
+        import torch
+        from torch.profiler import profile, record_function, ProfilerActivity
+
+        # Example input
+        x = torch.randn(1, 1, 128, 128).cuda()
+
+        # Move model to CUDA
+        model = self.net.cuda()
+        model.eval()
+
+        with profile(
+                activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                with_flops=True,
+                record_shapes=True,
+        ) as prof:
+            with torch.no_grad():
+                with record_function("model_inference"):
+                    model(x)
+
+        # Print total FLOPs
+        print(prof.key_averages().table(sort_by="flops", row_limit=10))
+        total_flops = sum([e.flops for e in prof.key_averages() if e.flops is not None])
+        print(f"Total FLOPs: {total_flops / 1e9:.2f} GFLOPs")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
