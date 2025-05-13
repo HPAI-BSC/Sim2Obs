@@ -68,7 +68,7 @@ def plot_predictions(predictions, ground_truths, output_path):
     plt.close(fig)
 
 
-def plot_single_pred(pred, output_path):
+def plot_single_pred(pred, i, output_path):
     if isinstance(pred, torch.Tensor):
         pred = pred.permute(1, 2, 0).detach().cpu().numpy()
     else:
@@ -77,7 +77,7 @@ def plot_single_pred(pred, output_path):
     plt.imshow(pred, cmap="viridis")
     plt.tight_layout()
 
-    plt.savefig(f'{output_path}/prediction_sample.png')
+    plt.savefig(f'{output_path}/img_{i}.png')
     plt.close()
 
 
@@ -123,10 +123,14 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     # for predictions use trainer.predict(...)
     if cfg.save_predictions:
+        log.info("Predicting...")
         predictions = trainer.predict(model=model, dataloaders=datamodule.predict_dataloader(), ckpt_path=cfg.ckpt_path)
 
-        for pred in predictions:
-
+        log.info("Saving predictions...")
+        output_path = cfg.paths.output_dir
+        for i, pred in enumerate(predictions):
+            plot_single_pred(pred, i, output_path)
+        log.info(f"Predictions saved to {output_path}")
 
 
         """
