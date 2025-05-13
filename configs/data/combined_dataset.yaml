@@ -19,4 +19,4 @@ resize_shape: [128, 128]
 random_seed:  0
 num_workers: 8
 pin_memory: True
-fraction_data: 1
+fraction_data: 0.05
