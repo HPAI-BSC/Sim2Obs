@@ -886,14 +886,14 @@ class VSSM(nn.Module):
         self.norm = norm_layer(self.num_features)
         self.norm_up = norm_layer(self.embed_dim)
 
-        print(f'--> {self.final_upsample}')
+        #print(f'--> {self.final_upsample}')
         if self.final_upsample == "expand_first":
-            print("---final upsample expand_first---")
+            #print("---final upsample expand_first---")
             self.up = FinalPatchExpand_X4(dim_scale=self.patch_size, dim=self.embed_dim)
             self.output = nn.Conv2d(in_channels=self.embed_dim, out_channels=self.num_classes, kernel_size=1,
                                     bias=False)
         else:
-            print("No final upsample")
+            #print("No final upsample")
             self.up = lambda x: x
 
         self.apply(self._init_weights)
