@@ -6,7 +6,7 @@ from lightning import LightningModule
 from torchmetrics import MaxMetric, MeanMetric
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
-from ptflops import get_model_complexity_info
+#from ptflops import get_model_complexity_info
 
 
 torch.set_float32_matmul_precision('medium')
@@ -127,6 +127,8 @@ class BCELitModule(LightningModule):
         self.val_rmse.reset()
         self.val_rase_best.reset()
         self.val_rmse_best.reset()
+
+        """
         print(f"On train start")
         self._print_cuda_memory()
 
@@ -154,6 +156,7 @@ class BCELitModule(LightningModule):
         print(f"Backward FLOPs: {backward_flops* 1e-9:.4f} GFLOPs")
         print(f"Number of parameters: {params}")
         print('_'*25)
+        """
 
     def model_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor]
