@@ -11,9 +11,11 @@ from src.data.components.eagle_dataset import EagleDataset
 class CombinedDataset(GalaxyDataset):
     name = 'combined'
 
-    def __init__(self, image_dir, labels_dir, transform=None, **kwargs):
+    def __init__(self, image_dir, labels_dir, transform=None, fraction_data=1, **kwargs):
+        np.random.seed(42)
         # image_dirs and label_dirs should be lists of the datasets that we are combining.
         self.datasets = []
+        self.fraction_data = fraction_data
         for img_dir, label_dir in zip(image_dir, labels_dir):
             if 'dianoga' in img_dir or 'ilarias' in img_dir:
                 dataset = DianogaDataset(img_dir, label_dir, transform=transform)
@@ -27,13 +29,16 @@ class CombinedDataset(GalaxyDataset):
         self.datasets = [dataset for dataset in self.datasets if dataset is not None]
         print('_' * 25)
         for dataset in self.datasets:
-            print(len(dataset))
-            print(dataset[0][0].shape, dataset[0][1].shape)
+            print(f"Dataset: {len(dataset)}. sample/target sizes: {(dataset[0][0].shape), (dataset[0][1].shape)}")
         print('_' * 25)
         combined_dataset = ConcatDataset(self.datasets)
         indices = list(range(len(combined_dataset)))
         np.random.shuffle(indices)
-        self.combined_dataset = Subset(combined_dataset, indices)
+
+        subset_len = int(len(combined_dataset) * self.fraction_data)
+        selected_indices = indices[:subset_len]
+
+        self.combined_dataset = Subset(combined_dataset, selected_indices)
 
     def __len__(self):
         return len(self.combined_dataset)

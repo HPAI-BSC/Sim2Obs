@@ -8,7 +8,7 @@
 #SBATCH -n 1
 #SBATCH --gres=gpu:1
 #SBATCH -c 32               # Cores per task requested
-#SBATCH -t 12:00:00         # Run time (hh:mm:ss) - 30 min
+#SBATCH -t 00:10:00         # Run time (hh:mm:ss) - 30 min
 #SBATCH --account bsc70
 #SBATCH --qos=acc_bsccs
 
