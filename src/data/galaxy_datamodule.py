@@ -98,7 +98,7 @@ class NumpyTransforms:
         else:  # RGB/RGBA
             img = img.transpose((2, 0, 1))
         print("-->", img.shape)
-        img = np.ascontiguousarray(img)
+        img = np.ascontiguousarray(img).astype(np.float64)
 
         #return torch.from_numpy(img).float()
         return torch.tensor(img).float()
