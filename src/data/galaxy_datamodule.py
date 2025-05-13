@@ -79,6 +79,11 @@ class NumpyTransforms:
         else:
             resize_shape = (self.resize_shape, self.resize_shape)
 
+        if len(img.shape) == 3:
+            img = img[0,:,:]
+
+        print("img_shape", img.shape)
+        print("resize_shape", resize_shape)
         resized = cv2.resize(img, resize_shape)
         print("-", resized.shape)
         return resized
