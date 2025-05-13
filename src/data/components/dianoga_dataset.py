@@ -18,19 +18,23 @@ class DianogaDataset(GalaxyDataset):
         labels_path = os.path.join(self.labels_dir, self.labels[index])
         images = np.load(img_path)
         image = images[f'arr_0']
-        # resize image to 128x128
-        image = image[1:129, 1:129]
-        image = torch.tensor(image)
+        ## resize image to 128x128
+        #image = image[1:129, 1:129]
+        #image = torch.tensor(image)
 
         labels = np.load(labels_path)
         label = labels[f'arr_0']
-        label = torch.tensor(label)
+        #label = torch.tensor(label)
         # resize image to 128x128
-        label = label[1:129, 1:129]
-        image = image.float().unsqueeze(0)
+        #label = label[1:129, 1:129]
+        #image = image.float().unsqueeze(0)
+        #label = label.float().unsqueeze(0)
+
+        image = np.expand_dims(image, axis=0)
+        label = np.expand_dims(label, axis=0)
         if self.transform:
             image = self.transform(image)
-        label = label.float().unsqueeze(0)
+            label = self.transform(label)
         return image, label
 
     @staticmethod
