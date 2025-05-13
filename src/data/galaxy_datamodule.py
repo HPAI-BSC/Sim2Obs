@@ -83,7 +83,8 @@ class NumpyTransforms:
         # Convert numpy to PIL
         if len(img.shape) == 3:
             # For RGB images
-            pil_img = Image.fromarray((img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8))
+            #pil_img = Image.fromarray((img).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8))
+            pil_img = Image.fromarray(img.astype(np.uint8))
         else:
             # For grayscale or label images
             pil_img = Image.fromarray(img.astype(np.uint8))
