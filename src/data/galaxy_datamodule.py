@@ -80,24 +80,19 @@ class NumpyTransforms:
             resize_shape = (self.resize_shape, self.resize_shape)
 
         if len(img.shape) == 3:
-            img = img[0,:,:]
+            img = img[0, :, :]
 
-        print("img_shape", img.shape)
-        print("resize_shape", resize_shape)
         resized = cv2.resize(img, resize_shape)
-        print("-", resized.shape)
         return resized
 
 
     def to_tensor(self, img):
         # Convert NumPy array to PyTorch tensor
         # Make sure shape is [C, H, W] for PyTorch
-        print("->", img.shape)
         if len(img.shape) == 2:  # Grayscale
             img = img[np.newaxis, :, :]
         else:  # RGB/RGBA
             img = img.transpose((2, 0, 1))
-        print("-->", img.shape)
         img = np.ascontiguousarray(img).astype(np.float64)
 
         #return torch.from_numpy(img).float()
