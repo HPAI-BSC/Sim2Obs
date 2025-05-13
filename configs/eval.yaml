@@ -29,7 +29,7 @@ save_predictions: True
 
 # -Mamba
 # ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
-chkp_path: /gpfs/projects/bsc70/pipelines/space-coe/4e897f5c/output/checkpoints/4e897f5c/epoch_010.ckpt  # 14.04.25 Dianoga
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/4e897f5c/output/checkpoints/4e897f5c/epoch_010.ckpt  # 14.04.25 Dianoga
 
 
 # transunet
