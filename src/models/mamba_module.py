@@ -95,6 +95,25 @@ class MambaLitModule(LightningModule):
         self.val_rase_best = MaxMetric()
         self.val_rmse_best = MaxMetric()
 
+        print(f"On train init")
+        macs, params = get_model_complexity_info(
+            self.net,
+            (1, 128, 128),  # Input shape (C, H, W)
+            as_strings=False,
+            print_per_layer_stat=True,
+            verbose=True
+        )
+        # Clean memory
+        torch.cuda.empty_cache()
+        print('_' * 25)
+        print(f"Computational complexity: {macs} MACs")
+        print(f"Forward FLOPs: {macs * 2 * 1e-9:.4f} GFLOPs")
+        # Estimate backward pass (typically 2-3× forward)
+        backward_flops = macs * 2 * 2.5
+        print(f"Backward FLOPs: {backward_flops * 1e-9:.4f} GFLOPs")
+        print(f"Number of parameters: {params}")
+        print('_' * 25)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
 
@@ -113,6 +132,7 @@ class MambaLitModule(LightningModule):
         self.val_rase_best.reset()
         self.val_rmse_best.reset()
 
+        """
         print(f"On train start")
 
         print('_' * 25)
@@ -122,14 +142,14 @@ class MambaLitModule(LightningModule):
         copy_for_analysis.to(next(self.net.parameters()).device)
         # Calculate FLOPs and parameters
         macs, params = get_model_complexity_info(
-            copy_for_analysis,
+            code_for_analysis,
             (1, 128, 128),  # Input shape (C, H, W)
             as_strings=False,
             print_per_layer_stat=True,
             verbose=True
         )
         # Clean memory
-        del copy_for_analysis
+        #del copy_for_analysis
         torch.cuda.empty_cache()
         print('_' * 25)
         print(f"Computational complexity: {macs} MACs")
@@ -139,6 +159,7 @@ class MambaLitModule(LightningModule):
         print(f"Backward FLOPs: {backward_flops * 1e-9:.4f} GFLOPs")
         print(f"Number of parameters: {params}")
         print('_' * 25)
+        """
 
     def model_step(
             self, batch: Tuple[torch.Tensor, torch.Tensor]
