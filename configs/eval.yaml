@@ -2,7 +2,7 @@
 
 defaults:
   - _self_
-  - data: galaxy_eagle_refl005
+  - data: combined_dataset
   - model: unet
   - logger:
   - trainer: default
