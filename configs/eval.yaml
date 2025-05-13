@@ -2,7 +2,7 @@
 
 defaults:
   - _self_
-  - data: combined_dataset
+  - data: galaxy_dianoga_rotation45
   - model: unet
   - logger:
   - trainer: default
@@ -37,7 +37,8 @@ commit_tag: "commit_hash"
 # - Unet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
 #ckpt_path: ${oc.env:PROJECT_ROOT}/local/ckpt/19b3ea5f/last.ckpt #Unet local
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/5c014fc5/output/checkpoints/5c014fc5/epoch_043.ckpt  # 14.04.25 Dianoga
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/5c014fc5/output/checkpoints/5c014fc5/epoch_043.ckpt  # 14.04.25 Dianoga
+clpt_path: /gpfs/projects/bsc70/pipelines/space-coe/499ff89d/output/checkpoints/499ff89d/epoch_047.ckpt  # 13.05.25 Combined
 
 
 
