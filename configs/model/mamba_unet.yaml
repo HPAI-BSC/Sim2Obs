@@ -17,7 +17,7 @@ net:
   _target_: src.models.components.Mamba_UNet.MambaUNet
   config:
     patch_size: 1
-    in_chains: 1
+    in_chains: 2
     embed_dim: 1024
     depths: [1, 1, 1, 1]
     mlp_ratio:
@@ -26,7 +26,7 @@ net:
     patch_norm: True
     use_checkpoint: False
     final_upsample: expand_first  # From [None, 'expand_first']
-  num_classes: 1 # aka num out channels
+  num_classes: 2 # aka num out channels
   zero_head: False
   vis: False
 
