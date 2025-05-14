@@ -38,7 +38,7 @@ ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e5d676db/output/checkpoints/e5d676db/last.ckpt  # 13.05.25 Combined 0.25
 
 # Mamba ps 4
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6b3045df/output/checkpoints/6b3045df/last.ckpt
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6b3045df/output/checkpoints/6b3045df/last.ckpt  # 13.05.25 Combined 1
 
 # Mamba ps 8
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/31e9b4aa/output/checkpoints/31e9b4aa/last.ckpt
