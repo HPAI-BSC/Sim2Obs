@@ -2,8 +2,8 @@
 
 defaults:
   - _self_
-  - data: combined_dataset
-  #- data: galaxy_dianoga_rotation45.yaml
+  #- data: combined_dataset
+  - data: galaxy_dianoga_rotation45.yaml
   - model: mamba_unet
   - logger:
   - trainer: default
