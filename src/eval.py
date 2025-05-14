@@ -45,11 +45,15 @@ def plot_predictions(predictions, ground_truths, output_path):
     i = 0
     for pred, gt in zip(predictions, ground_truths):
         if isinstance(pred, torch.Tensor):
-            pred = pred.permute(1, 2, 0).detach().cpu().numpy()
+            #pred = pred.permute(1, 2, 0).detach().cpu().numpy()
+            pred = pred.permute(1, 2, 0).detach().cpu()
+            pred = np.array(pred.tolist())
         else:
             pred = np.transpose(pred, (1, 2, 0))
         if isinstance(gt, torch.Tensor):
-            gt = gt.permute(1, 2, 0).detach().cpu().numpy()
+            #gt = gt.permute(1, 2, 0).detach().cpu().numpy()
+            gt = gt.permute(1, 2, 0).detach().cpu()
+            gt = np.array(gt.tolist())
         else:
             gt = np.transpose(pred, (1, 2, 0))
         print(pred.shape, gt.shape)
@@ -70,7 +74,9 @@ def plot_predictions(predictions, ground_truths, output_path):
 
 def plot_single_pred(pred, i, output_path):
     if isinstance(pred, torch.Tensor):
-        pred = pred.permute(1, 2, 0).detach().cpu().numpy()
+        #pred = pred.permute(1, 2, 0).detach().cpu().numpy()
+        pred = pred.permute(1, 2, 0).detach().cpu()
+        pred = np.array(pred.tolist())
     else:
         pred = np.transpose(pred, (1, 2, 0))
 

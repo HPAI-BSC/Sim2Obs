@@ -2,8 +2,8 @@
 
 defaults:
   - _self_
-  #- data: combined_dataset
-  - data: galaxy_dianoga_rotation45.yaml
+  - data: combined_dataset
+  #- data: galaxy_dianoga_rotation45.yaml
   - model: mamba_unet
   - logger:
   - trainer: default
@@ -31,7 +31,7 @@ save_predictions: True
 # -Mamba
 # ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/4e897f5c/output/checkpoints/4e897f5c/last.ckpt  # 14.04.25 Dianoga
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/6e8b2ef3/last.ckpt  # 13.05.25 Combined
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/6e8b2ef3/last.ckpt  # 13.05.25 Combined
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/6e8b2ef3/epoch_035.ckpt  # 13.05.25 Combined
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c8eb9369/output/checkpoints/c8eb9369/epoch_035.ckpt  # 13.05.25 Combined 0.05
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e5d676db/output/checkpoints/e5d676db/epoch_031.ckpt  # 13.05.25 Combined 0.05
@@ -39,8 +39,8 @@ ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e5d676db/output/checkpoints/e5d676db/last.ckpt  # 13.05.25 Combined 0.25
 
 # Mamba ps 4
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6b3045df/output/checkpoints/6b3045df/last.ckpt  # 13.05.25 Combined 1
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/2812444c/output/checkpoints/2812444c/epoch_036.ckpt  # 13.05.25 Combined 0.25
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6b3045df/output/checkpoints/6b3045df/last.ckpt  # 13.05.25 Combined 1
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/2812444c/output/checkpoints/2812444c/epoch_036.ckpt  # 13.05.25 Combined 0.25
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/7cf3fbb0/output/checkpoints/7cf3fbb0/epoch_021.ckpt  # 13.05.25 Combined 0.1
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/1e86dcee/output/checkpoints/1e86dcee/epoch_034.ckpt  # 13.05.25 Combined 0.05
 
