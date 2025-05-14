@@ -3,8 +3,8 @@
 # specify here default configuration
 # order of defaults determines the order in which configs override each other
 defaults:
-  #- data: galaxy_dianoga_rotation45
-  - data: combined_dataset
+  - data: galaxy_dianoga_rotation45
+  #- data: combined_dataset
   #- data: galaxy_illustris300
   - model: mamba_unet
   - callbacks: default
