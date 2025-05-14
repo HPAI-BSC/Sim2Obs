@@ -24,9 +24,9 @@ class NumpyTransforms:
         """Apply all transforms in sequence"""
 
         # Apply transforms
-        img = self.random_horizontal_flip(img)
-        img = self.random_vertical_flip(img)
-        img = self.random_rotation(img)
+        #img = self.random_horizontal_flip(img)
+        #img = self.random_vertical_flip(img)
+        #img = self.random_rotation(img)
         #img = self.random_resized_crop(img)
         img = self.resize(img)
 
