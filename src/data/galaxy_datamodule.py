@@ -229,6 +229,15 @@ class GalaxyDataModule(LightningDataModule):
             val_halos = set(halo_ids[train_size:train_size + val_size])
             test_halos = set(halo_ids[train_size + val_size:])
 
+            print(f"TRAIN HALOS")
+            print(train_halos)
+
+            print("VAL HALOS")
+            print(val_halos)
+
+            print("TEST HALOS")
+            print(test_halos)
+
             # Apply filtering
             train_ds = full_dataset.filter_by_halos(list(train_halos))
             val_ds = full_dataset.filter_by_halos(list(val_halos))
