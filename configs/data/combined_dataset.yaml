@@ -1,12 +1,12 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
 data_dir:
-  #- ${paths.datasets_dir}/ilarias_dataset_v0/VelocityDispersion
+  - ${paths.datasets_dir}/ilarias_dataset_v0/VelocityDispersion
   - ${paths.datasets_dir}/eagle/RefL0050N0752/no_rotation_s1.5/VelocityDispersion
   - ${paths.datasets_dir}/eagle/AGNdT9L0050N0752/no_rotation_s1.5/VelocityDispersion
   - ${paths.datasets_dir}/illustris300/no_rotation_s1.5_v1/VelocityDispersion
   #- ${paths.datasets_dir}/illustris300/rotation_120/VelocityDispersion
 target_maskdir:
-  #- ${paths.datasets_dir}/ilarias_dataset_v0/Labels
+  - ${paths.datasets_dir}/ilarias_dataset_v0/Labels
   - ${paths.datasets_dir}/eagle/RefL0050N0752/no_rotation_s1.5/IntraClusterLight
   - ${paths.datasets_dir}/eagle/AGNdT9L0050N0752/no_rotation_s1.5/IntraClusterLight
   - ${paths.datasets_dir}/illustris300/no_rotation_s1.5_v1/IntraClusterLight
@@ -14,7 +14,7 @@ target_maskdir:
 dataset: combined
 mask_interlopers: True
 batch_size: 32
-train_val_test_split: [.70, .10, .20]
+train_val_test_split: [.85, .05, .10]
 resize_shape: [128, 128]
 random_seed:  0
 num_workers: 8
