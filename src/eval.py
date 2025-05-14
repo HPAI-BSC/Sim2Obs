@@ -132,26 +132,27 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         log.info("Predicting...")
         predictions = trainer.predict(model=model, dataloaders=datamodule.predict_dataloader(), ckpt_path=cfg.ckpt_path)
 
+        pred0, pred1, pred2 = predictions[0][0], predictions[0][1], predictions[0][2]
+        preds = [pred0, pred1, pred2]
+
+        for imgs, labels in datamodule.test_dataloader():
+            gts = [labels[0], labels[1], labels[2]]  # Get the first two in the batch
+            break
+
+        output_path = cfg.paths.output_dir
+        plot_predictions(preds, gts, output_path)
+
+        """
         log.info("Saving predictions...")
         output_path = cfg.paths.output_dir
         for batch_idx, batch in enumerate(predictions):
             for i, pred in enumerate(batch):
                 global_idx = batch_idx * len(batch) + i
                 plot_single_pred(pred, global_idx, output_path)
+        """
         log.info(f"Predictions saved to {output_path}")
 
 
-        """
-        pred0, pred1, pred2 = predictions[0][0], predictions[0][1], predictions[0][2]
-        preds = [pred0, pred1, pred2]
-    
-        for imgs, labels in datamodule.test_dataloader():
-            gts = [labels[0], labels[1], labels[2]] # Get the first two in the batch
-            break
-            
-        output_path = cfg.paths.output_dir
-        plot_predictions(preds, gts, output_path)
-        """
 
     metric_dict = trainer.callback_metrics
 
