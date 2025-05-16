@@ -1,11 +1,9 @@
 import copy
 import operator
 import os.path
-import traceback
 from abc import ABC, abstractmethod
 from typing import Any
 
-import joblib
 import swiftsimio as sw
 
 import eagleSqlTools as sql

@@ -5,6 +5,11 @@ import unittest
 from typing import Generator
 from unittest.mock import patch, MagicMock
 
+from rootutils import rootutils
+
+rootutils.setup_root(__file__, pythonpath=True)
+
+import joblib
 import numpy as np
 import pandas as pd
 from numpy.testing import assert_array_equal
@@ -126,6 +131,42 @@ class TestMapStep(unittest.TestCase):
             input_feature=self.mock_input_feature,
             output_feature=self.mock_output_feature,
             cosmos_data=self.mock_cosmos_data,
+            g=self.mock_generator_illustris(),
+            **kwargs,
+            next_step=None
+        )
+
+        _ = list(generator)
+
+    def test_map_process_illustris_halo_0(self):
+        vel_disp_processor = VelocityDispersionProcessor()
+        icl_processor = ICLProcessor(self.cfg_illustris)
+
+        halo_id = 0
+        path = f'../../../transition_radius_exploration/halo_{halo_id}.joblib'
+        halo = joblib.load(path)
+        path = f'../../../transition_radius_exploration/subhalo_particles_{halo_id}.joblib'
+        # Already preprocessed position = position - halo position
+        subhalo_particles = joblib.load(path)
+        path = f'../../../transition_radius_exploration/icl_mask_{halo_id}.joblib'
+        icl_mask = joblib.load(path)
+
+        subhalo_context_df = pd.read_csv('../../../transition_radius_exploration/subhalo_context.csv')
+        subhalo_context = SubhaloContext.from_dataframe(subhalo_context_df)
+        subhalo_ctx = subhalo_context.get_items_by_halo(halo_id=0)
+        subhalo_ctx.data['spos'] = np.array([35854.684, 39975.055, 123546.44])
+        subhalo_ctx.data = subhalo_ctx.data.to_frame().T
+        vel_disp_processor.value = subhalo_particles.star_v
+        icl_processor.value = icl_mask
+
+        cosmos_data = CosmosData(halo, subhalo_ctx, halo.fsub, subhalo_particles)
+        self.map_step = MapStep(self.cfg_illustris)
+        self.map_step.map_configuration['root_path'] = '../test/data/illustris'
+        kwargs = {'rotation_axis': 0, 'rotation_iteration': 0, 'dim': 2}
+        generator = self.map_step.process(
+            input_feature=vel_disp_processor,
+            output_feature=icl_processor,
+            cosmos_data=cosmos_data,
             g=self.mock_generator_illustris(),
             **kwargs,
             next_step=None

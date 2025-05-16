@@ -1,6 +1,10 @@
 import pickle
 import unittest
 
+from rootutils import rootutils
+
+rootutils.setup_root(__file__, pythonpath=True)
+
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -185,6 +189,18 @@ class TestDataLoaderStep(unittest.TestCase):
         # Should only contain external subhalos
         self.assertNotIn((1, 101), result[1])
         self.assertNotIn((2, 102), result[2])
+
+    def test_load_particles_overlapping_subhalos(self):
+        data_loader = DataLoader(self.cfg_eagle)
+        subhalo_context = self.fetcher_eagle.get_subhalos()
+        halo_context = self.fetcher_eagle.get_halos()
+        halo = halo_context.get_halo_by_id(halo_id=26000000000000)
+        subhalo_ctx = subhalo_context.get_items_by_halo(halo_id=26000000000000)
+        lbox = 147623.26  # 100 * 1000 / 0.6774 kpc/ h
+        overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
+        overlapping_subhalo_particles, subhalos_with_errors =\
+            data_loader._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
+
 
 
 

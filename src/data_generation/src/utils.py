@@ -377,9 +377,32 @@ def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_sc
 
 
 def plot_transition_radius(cfg, transition_radius_list, log_normalization=True):
-    plt.figure(figsize=(8, 6))
+    """
+    Plots and saves a histogram of transition radius values, optionally using a log10 scale.
 
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
+    The function filters out invalid values (e.g. None or non-positive) when log-normalization is applied,
+    then plots the histogram and saves it as a PNG file in the logs directory.
+
+    Parameters:
+    ----------
+    cfg : object
+        Configuration object containing path attributes:
+        - cfg.paths.datasets_dir : str, base path to datasets
+        - cfg.catalog.path : str, full path to the dataset catalog file
+
+    transition_radius_list : list of float
+        List of transition radii (typically normalized by R200) to be plotted.
+
+    log_normalization : bool, optional (default=True)
+        If True, applies a log10 transformation to the data before plotting.
+
+    Returns:
+    -------
+    None
+        The function saves the histogram plot as a PNG file and does not return any value.
+    """
+    plt.figure(figsize=(8, 6))
+    dataset_dir = cfg.paths.datasets_dir
     name = cfg.catalog.path.replace(dataset_dir, '')
     name = name.replace('/', '_')
 
@@ -405,69 +428,56 @@ def plot_transition_radius(cfg, transition_radius_list, log_normalization=True):
 
 
 def plot_icl_bcg_profiles(cfg, icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo_id):
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
-    name = cfg.catalog.path.replace(dataset_dir, '')
-    name = name.replace('/', '_')
+    """
+    Plots and saves the cumulative mass profiles of ICL and BCG components for a given halo.
 
+    The function visualizes the cumulative mass as a function of normalized radius (r/r200),
+    highlighting the transition radius with a vertical line and a scatter point.
+
+    Parameters:
+    ----------
+    cfg : object
+        Configuration object containing the path information, particularly:
+        - cfg.paths.datasets_dir : str, base directory path to datasets.
+
+    icl_cumulative : array-like
+        Cumulative mass profile of the intracluster light (ICL) component.
+
+    bcg_cumulative : array-like
+        Cumulative mass profile of the brightest cluster galaxy (BCG) component.
+
+    r_by_r200 : array-like
+        Radii normalized by r200, corresponding to the mass profiles.
+
+    t_idx : int
+        Index of the transition radius in the `r_by_r200` array.
+
+    halo_id : int or str
+        Identifier of the halo being analyzed (used in the plot title and filename).
+
+    Returns:
+    -------
+    None
+        The function saves the plot as a PNG file in the logs directory and displays it,
+        but does not return any value.
+    """
+    dataset_dir = cfg.paths.datasets_dir
     # Plotting
     plt.figure(figsize=(8, 5))
     plt.plot(r_by_r200, icl_cumulative, label='ICL Cumulative Mass', color='orange')
     plt.plot(r_by_r200, bcg_cumulative, label='BCG Cumulative Mass', color='blue')
-    #plt.axvline(r_by_r200[t_idx], color='red', linestyle='--', label='Transition radius')
+    plt.axvline(r_by_r200[t_idx], color='red', linestyle='--', label='Transition radius')
     plt.scatter(r_by_r200[t_idx], icl_cumulative[t_idx], color='red', zorder=5)
-    plt.xlabel('log(r / r200)')
+    plt.xlabel('r')
     plt.ylabel('Cumulative Mass (M☉)')
     plt.title(f'Cumulative Mass Profiles for Halo {halo_id}')
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
     #path = f'transition_radius_cumsum_{halo_id}.png'
-    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/transition_radius_cumsum_{halo_id}_{name}.png'
+    path = dataset_dir + '../logs/transition_radius_cumsum_{halo_id}.png'
     plt.savefig(path, dpi=300)
     plt.show()
-
-
-def plot_icl_bcg_mass_pdf(cfg, icl_pdf, bcg_pdf, bin_centers, halo_id):
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
-    name = cfg.catalog.path.replace(dataset_dir, '')
-    name = name.replace('/', '_')
-
-    plt.figure(figsize=(8, 5))
-    plt.plot(bin_centers, icl_pdf, label='ICL Cumulative Mass', color='orange')
-    plt.plot(bin_centers, bcg_pdf, label='BCG Cumulative Mass', color='blue')
-    plt.xlabel('r / r200')
-    plt.ylabel('Mass-weighted PDF')
-    plt.title(f'log/r/R200) Halo {halo_id}')
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-
-    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/mass_weighted_pdf_{halo_id}_{name}.png'
-    plt.savefig(path, dpi=300)
-
-
-def plot_icl_bcg_density_profile(cfg, r, density_total, density_icl, density_bcg, halo_id):
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
-    name = cfg.catalog.path.replace(dataset_dir, '')
-    name = name.replace('/', '_')
-
-    plt.figure(figsize=(8, 5))
-    plt.plot(r, density_total, label="Total", color="black")
-    if density_icl is not None:
-        plt.plot(r, density_icl, label="ICL", color="orange")
-        plt.plot(r, density_bcg, label="BCG", color="blue")
-
-    plt.yscale("log")
-    plt.xlabel("r / R200")
-    plt.ylabel("Density (M☉ / kpc³)")
-    plt.title(f"Stellar Mass Density Profile - Halo {halo_id}")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-    path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/density_profile_{halo_id}_{name}.png'
-    plt.savefig(path, dpi=300)
 
 
 def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spatial_resolution_scale: float,
@@ -512,6 +522,29 @@ def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spati
 
 
 def to_list(d, column):
+    """
+    Converts data from a dictionary or NumPy array into a list.
+
+    Parameters:
+    ----------
+    d : dict or np.ndarray
+        - If dict: Assumes `d[column]` is an indexable object (e.g., NumPy array or list)
+          and extracts elements from it.
+        - If np.ndarray: Returns a list of elements directly from the array.
+
+    column : str
+        The key to access the desired data if `d` is a dictionary. Ignored if `d` is a NumPy array.
+
+    Returns:
+    -------
+    list
+        A list of elements extracted from the input data.
+
+    Raises:
+    ------
+    TypeError:
+        If `d` is neither a dict nor a NumPy array.
+    """
     if isinstance(d, dict):
         return [d[column][i] for i in range(d[column].shape[0])]
     elif isinstance(d, np.ndarray):
@@ -519,6 +552,32 @@ def to_list(d, column):
 
 
 def to_list_in_batches(d, column, batch_size=1000000):
+    """
+    Converts the values of a specific column in a DataFrame or similar structure to a list,
+    processing the data in batches to handle large datasets efficiently.
+
+    Parameters:
+    ----------
+    d : pandas.DataFrame or similar
+        The input data structure containing the column to convert.
+
+    column : str
+        The name of the column to extract and convert to a list.
+
+    batch_size : int, optional (default=1000000)
+        The number of rows to process in each batch.
+
+    Returns:
+    -------
+    result : list
+        A flattened list containing all the elements from the specified column,
+        aggregated batch by batch.
+
+    Notes:
+    -----
+    Assumes that a function `to_list(batch, column)` exists and returns a list of items
+    from the given batch.
+    """
     result = []
     # Loop over the data in batches
     for start in range(0, d[column].shape[0], batch_size):
@@ -578,13 +637,35 @@ def m500_to_m200(m500):
 
 
 def store_overlapping_matrix_as_df(cfg, overlapping_matrix):
+    """
+    Stores an overlapping matrix as a CSV file using a pandas DataFrame.
+
+    Each row of the DataFrame represents a halo and its list of overlapping (halo_id, subhalo_id) tuples.
+    The resulting CSV is saved under the `logs` directory relative to the dataset path defined in the configuration.
+
+    Parameters:
+    ----------
+    cfg : object
+        Configuration object with at least the following attributes:
+        - cfg.paths.datasets_dir : str, path to the datasets directory
+        - cfg.catalog.path : str, full path to the dataset catalog file
+
+    overlapping_matrix : dict
+        Dictionary where keys are halo IDs (int or str), and values are lists of tuples
+        representing overlapping halo-subhalo pairs in the format (halo_id, subhalo_id).
+
+    Returns:
+    -------
+    None
+        The function writes the DataFrame to a CSV file but does not return anything.
+    """
+    dataset_dir = cfg.paths.datasets_dir
     df = pd.DataFrame(data=[], columns=['halo id', 'overlapping (halo id, subhalo id)'])
 
     for halo_id, tuple_list in overlapping_matrix.items():
         temp_df = pd.DataFrame([[halo_id, tuple_list]], columns=['halo id', 'overlapping (halo id, subhalo id)'])
         df = pd.concat([df, temp_df], ignore_index=True)
 
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
     name = cfg.catalog.path.replace(dataset_dir, '')
     name = name.replace('/', '_')
 

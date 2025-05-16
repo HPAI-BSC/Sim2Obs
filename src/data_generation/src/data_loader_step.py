@@ -4,7 +4,6 @@ import os
 
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
 from scipy.spatial import cKDTree
 from tqdm import tqdm
 
@@ -15,7 +14,7 @@ from omegaconf import DictConfig
 from src.data_generation.src.feature import FeatureProcessor
 from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.subhalo import SubhaloParticles, SubHalo, SubhaloContext
+from src.data_generation.src.subhalo import SubhaloContext
 from src.data_generation.src.utils import setup_logger, plot_transition_radius
 
 logger = setup_logger("DataLoader")
@@ -53,6 +52,27 @@ class DataLoader(PipelineStep):
 
     @classmethod
     def _build_data_loader_configuration(cls, cfg: DictConfig) -> dict:
+        """
+        Extracts and validates the configuration for a specific data loader from the overall pipeline configuration.
+
+        This method checks whether the current class (`cls.name`) is specified as a step in the pipeline.
+        If so, it retrieves the corresponding configuration dictionary and ensures that all required keys are present.
+
+        Parameters:
+        ----------
+        cfg : DictConfig
+            The full Hydra configuration object containing the pipeline definition and associated parameters.
+
+        Returns:
+        -------
+        dict
+            The configuration dictionary corresponding to this data loader step in the pipeline.
+
+        Raises:
+        ------
+        ValueError
+            If the class name is not present in the pipeline, or if required configuration keys are missing.
+        """
         if cls.name not in [e['name'] for e in cfg.pipeline]:
             raise ValueError('Error, To execute a data_loader you must specify the map step in the pipeline of'
                              ' the configuration.')
@@ -182,7 +202,7 @@ class DataLoader(PipelineStep):
             plot_transition_radius(self.cfg, transition_radius_l)
             plot_transition_radius(self.cfg, transition_radius_l, log_normalization=False)
 
-            dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/'
+            dataset_dir = self.cfg.dataset_dir
             name = self.cfg.catalog.path.replace(dataset_dir, '')
             name = name.replace('/', '_')
             path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius_{name}.csv'
@@ -208,12 +228,34 @@ class DataLoader(PipelineStep):
     def load_halo_subhalo_data(subhalo_context: SubhaloContext, halo_context: HaloContext,
                                overlapping_matrix: dict) -> List[Tuple]:
         """
-        Loads halo data and yields each halo's ID along with its associated data.
+        Loads halo data and associated subhalo data, including overlapping subhalos from other halos.
 
-        Yields:
+        For each halo ID in the `halo_context`, the method:
+        - Retrieves the corresponding halo object.
+        - Retrieves its subhalos from `subhalo_context`.
+        - Attaches those subhalos to the halo.
+        - If the halo has overlapping subhalos (i.e., subhalos from other halos that are spatially near),
+          these are also retrieved and merged into the subhalo context.
+        - The final tuple of (halo, subhalo_ctx) is added to the result list.
+
+        Parameters:
+        ----------
+        subhalo_context : SubhaloContext
+            A context containing all subhalo data, with methods to filter subhalos by parent halo.
+
+        halo_context : HaloContext
+            A context containing all halo data and methods to retrieve halos by ID.
+
+        overlapping_matrix : dict
+            A dictionary mapping each halo ID to a list of tuples (parent_id, subhalo_id) representing
+            subhalos from other halos that overlap with the given halo.
+
+        Returns:
         -------
-        list
-            A list of tuples containing halo data and associated subhalo data for each halo ID.
+        List[Tuple]
+            A list of tuples, where each tuple contains:
+            - `Halo`: the halo object
+            - `SubhaloContext`: the context object containing the main and overlapping subhalos for the halo.
         """
         logger.debug('Add subhalo data of overlapping halos to each subhalo context ...')
         result = []
@@ -240,6 +282,44 @@ class DataLoader(PipelineStep):
 
     def _load_particles_overlapping_subhalos(self, halo: Halo, subhalo_context: SubhaloContext,
                                              halo_context: HaloContext, lbox: float = None):
+        """
+        Loads and preprocesses particle data for subhalos that overlap with a given halo
+        (i.e., subhalos that do not belong to the input halo).
+
+        For each overlapping subhalo, the method:
+        - Fetches particle data using the fetcher.
+        - Retrieves the parent halo.
+        - Preprocesses the particle data based on the halo's center and optional box size `lbox`.
+        - Aggregates all valid subhalo particles into a single object.
+
+        Parameters:
+        ----------
+        halo : Halo
+            The central halo whose overlapping subhalos are to be processed.
+
+        subhalo_context : SubhaloContext
+            Context object containing the subhalo data. Must include:
+            - 'subhalo_id'
+            - 'id_parents' (or optionally 'group_number')
+
+        halo_context : HaloContext
+            Context object that provides access to halo information and retrieval
+            via `get_halo_by_id`.
+
+        lbox : float, optional
+            Length of the simulation box. Used in preprocessing for periodic boundary
+            conditions. Default is None.
+
+        Returns:
+        -------
+        subhalo_particles : ParticleData or None
+            The combined particle data from all successfully processed overlapping subhalos.
+            If no subhalos are processed successfully, returns None.
+
+        subhalos_with_errors : list of tuple
+            A list of (halo_id, subhalo_id) tuples for which an error occurred during
+            particle fetching or preprocessing.
+        """
         logger.debug('Loading particles for overlapping subhalos ...')
         overlapping_subhalos = subhalo_context.data[subhalo_context.data['id_parents'] != halo.halo_id]
         subhalo_particles = None
@@ -283,6 +363,40 @@ class DataLoader(PipelineStep):
 
     @staticmethod
     def get_overlapping_halos(subhalo_context: SubhaloContext, halo_context: HaloContext):
+        """
+        Identifies overlapping halos based on spatial proximity of subhalos to halos.
+
+        This method uses a KD-Tree to efficiently query which subhalos lie within twice the R200
+        radius of each halo's center. It filters out subhalos that belong to the same halo
+        (based on parent ID) to identify only external overlapping subhalos.
+
+        Parameters:
+        ----------
+        subhalo_context : SubhaloContext
+            Context object containing subhalo data, including:
+            - 'spos': 3D positions of subhalos
+            - 'id_parents': Parent halo IDs of subhalos
+            - 'subhalo_id': Unique subhalo identifiers
+
+        halo_context : HaloContext
+            Context object containing halo data, including:
+            - 'gpos': 3D positions of halos
+            - 'r200': R200 radius values of halos
+            - 'halo_id': Unique halo identifiers
+
+        Returns:
+        -------
+        overlapping_matrix : dict
+            A dictionary mapping each halo ID to a list of tuples of the form:
+            (parent_halo_id, subhalo_id) representing overlapping subhalos that
+            fall within 2 × R200 of the halo and do not belong to it.
+
+            Example:
+            {
+                101: [(99, 3001), (102, 3002)],
+                102: []
+            }
+        """
         logger.debug('Getting overlapping halos ...')
         subhalo_positions = np.vstack(subhalo_context.data['spos'])
         subhalo_tree = cKDTree(subhalo_positions)

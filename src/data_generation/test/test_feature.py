@@ -38,15 +38,18 @@ class TestFeature(unittest.TestCase):
         with initialize(config_path="../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
+            self.cfg_millenium = compose(config_name="data_generation.yaml")
 
             # Load the local config for paths and assign them
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_illustris.paths = local_config.paths
             self.cfg_eagle.paths = local_config.paths
+            self.cfg_millenium.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
+            self.cfg_millenium.catalog = compose("catalog/millenium.yaml")['catalog']
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -211,15 +214,15 @@ class TestFeature(unittest.TestCase):
             ax.set_zlabel('Z Label')
             plt.show()
 
-        self.icl_processor = ICLProcessor(self.cfg_illustris)
+        self.icl_processor = ICLProcessor(self.cfg_millenium)
 
-        halo_id = 4178
-        path = f'../../../transition_radius_exploration/halo_{halo_id}.joblib'
+        halo_id = 1017
+        path = f'../../../transition_radius_exploration/halo_{halo_id}_MTNG-L125-1080-A.joblib'
         halo = joblib.load(path)
-        path = f'../../../transition_radius_exploration/subhalo_particles_{halo_id}.joblib'
+        path = f'../../../transition_radius_exploration/subhalo_particles_{halo_id}_MTNG-L125-1080-A.joblib'
         # Already preprocessed position = position - halo position
         subhalo_particles = joblib.load(path)
-        path = f'../../../transition_radius_exploration/icl_mask_{halo_id}.joblib'
+        path = f'../../../transition_radius_exploration/icl_mask_{halo_id}_MTNG-L125-1080-A.joblib'
         icl_mask = joblib.load(path)
 
         transition_radius, normalized_transition_radius =\
@@ -232,3 +235,35 @@ class TestFeature(unittest.TestCase):
         z = subhalo_particles.star_p[:, 2]
 
         plot_particles(x, y, z, halo_center=[0, 0, 0])
+
+    def test_generate_maps_halo_0(self):
+        self.vel_disp_processor = VelocityDispersionProcessor()
+        self.icl_processor = ICLProcessor(self.cfg_illustris)
+
+        halo_id = 0
+        path = f'../../../transition_radius_exploration/subhalo_particles_{halo_id}.joblib'
+        # Already preprocessed position = position - halo position
+        subhalo_particles = joblib.load(path)
+        path = f'../../../transition_radius_exploration/icl_mask_{halo_id}.joblib'
+        icl_mask = joblib.load(path)
+
+        r = 637.031
+        spatial_resolution = 1.480  # kpc
+        bin_spatial_resolution_scale = 1.5
+        bins = muse_bins_r(2 * r, spatial_resolution, bin_spatial_resolution_scale)  # Computes bins and radius
+        ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
+        # axis x-y
+        self.vel_disp_processor.value = subhalo_particles.star_v
+        vel_map, _, biny = self.vel_disp_processor.generate_map(subhalo_particles, bins, ranging, axis=(0, 2))
+        plt.imshow(vel_map)
+        plt.show()
+
+        self.icl_processor.value = icl_mask
+        icl_map, _, biny = self.icl_processor.generate_map(subhalo_particles, bins, ranging, axis=(0, 2))
+        plt.imshow(icl_map)
+        plt.show()
+
+
+
+
+

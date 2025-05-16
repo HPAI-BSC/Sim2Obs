@@ -1,8 +1,14 @@
 import pickle
 import unittest
+
 import numpy as np
 import pandas as pd
 
+from rootutils import rootutils
+
+rootutils.setup_root(__file__, pythonpath=True)
+
+from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloContext, SubHalo, SubhaloParticles
 
 
@@ -126,6 +132,22 @@ class TestSubHalo(unittest.TestCase):
         ])
 
         np.testing.assert_allclose(subhalo_particles.star_p, expected, atol=1e-5)
+
+    def test_raw_subhalos_eagle(self):
+        halos_df = pd.read_csv('../../../transition_radius_exploration/halo_context_RefL0100N1504.csv')
+        tmp = halos_df.describe()
+        subhalos_df = pd.read_csv('../../../transition_radius_exploration/subhalo_context_RefL0100N1504.csv')
+        tmp = subhalos_df.describe()
+        print()
+
+    def test_raw_subhalos_millenium(self):
+        halos_df = pd.read_csv('../../../transition_radius_exploration/halo_context_millenium_MTNG-L125-1080-A.csv')
+        tmp = halos_df.describe()
+        subhalos_df = pd.read_csv('../../../transition_radius_exploration/subhalo_context_millenium_MTNG-L125-1080-A.csv')
+        tmp = subhalos_df.describe()
+        print()
+
+
 
 
 

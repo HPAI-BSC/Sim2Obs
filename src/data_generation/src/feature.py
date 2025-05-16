@@ -5,13 +5,14 @@ from typing import List
 import numpy as np
 import pandas as pd
 import joblib
+from matplotlib import pyplot as plt
 from omegaconf import DictConfig
 from scipy import stats
 from dotenv import load_dotenv, find_dotenv
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
-from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles
+from src.data_generation.src.utils import setup_logger, rotate
 logger = setup_logger("FeatureProcessor")
 
 # Uncomment for local testing, internet connection required
@@ -307,75 +308,6 @@ class ICLProcessor(FeatureProcessor):
 
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
         return icl_mask
-
-    @staticmethod
-    def compute_mass_weighted_pdf(halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray, bins=50,
-                                  r200_normalization=True):
-        logger.debug(f'Computing mass-weighted PDFs for: {halo.halo_id}')
-
-        # Compute distances from center
-        particle_position = subhalo_particles.star_p
-        distance = np.sqrt((particle_position ** 2).sum(axis=1))
-
-        # Optionally normalize by r200
-        if r200_normalization:
-            distance /= halo.r200
-            logger.debug("Distances normalized by r200")
-
-        # Use log bins for PDF
-        log_r = np.log10(distance + 1e-5)  # avoid log(0)
-        bin_edges = np.linspace(log_r.min(), log_r.max(), bins + 1)
-        bin_centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
-
-        if not hasattr(subhalo_particles, 'star_m'):
-            raise ValueError("subhalo_particles must have a 'star_m' attribute.")
-
-        masses = subhalo_particles.star_m
-
-        # Separate ICL and BCG
-        icl_mass = masses[icl_mask == 1]
-        icl_r = log_r[icl_mask == 1]
-
-        bcg_mass = masses[icl_mask == 0]
-        bcg_r = log_r[icl_mask == 0]
-
-        # Compute histograms (mass-weighted PDFs)
-        icl_pdf, _ = np.histogram(icl_r, bins=bin_edges, weights=icl_mass, density=True)
-        bcg_pdf, _ = np.histogram(bcg_r, bins=bin_edges, weights=bcg_mass, density=True)
-        return bin_centers, icl_pdf, bcg_pdf
-
-    @staticmethod
-    def compute_density_profile(halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray, bins=50,
-                                r_max_factor=1.5):
-        # Distances from center
-        position = subhalo_particles.star_p
-        masses = subhalo_particles.star_m
-        r = np.sqrt((position ** 2).sum(axis=1))  # in kpc
-
-        # Normalize by r200
-        r_norm = r / halo.r200
-
-        # Define radial bins (linear)
-        bin_edges = np.linspace(0, r_max_factor, bins + 1)
-        bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-
-        # Compute shell volumes
-        shell_volumes = (4 / 3) * np.pi * (bin_edges[1:] ** 3 - bin_edges[:-1] ** 3)
-
-        # Density for all stars
-        density_total, _ = np.histogram(r_norm, bins=bin_edges, weights=masses)
-        density_total = density_total / shell_volumes  # in Msun/kpc^3 (if r is in kpc)
-
-        if icl_mask is not None:
-            density_icl, _ = np.histogram(r_norm[icl_mask == 1], bins=bin_edges, weights=masses[icl_mask == 1])
-            density_icl = density_icl / shell_volumes
-
-            density_bcg, _ = np.histogram(r_norm[icl_mask == 0], bins=bin_edges, weights=masses[icl_mask == 0])
-            density_bcg = density_bcg / shell_volumes
-        else:
-            density_icl = density_bcg = None
-
-        return bin_centers, density_total, density_icl, density_bcg
 
     def get_transition_radius(self, halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
         """

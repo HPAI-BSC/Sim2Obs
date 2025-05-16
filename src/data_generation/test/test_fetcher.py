@@ -2,6 +2,10 @@ import os
 import pickle
 import unittest
 
+from rootutils import rootutils
+
+rootutils.setup_root(__file__, pythonpath=True)
+
 import numpy as np
 from dotenv import load_dotenv
 from hydra import initialize, compose
