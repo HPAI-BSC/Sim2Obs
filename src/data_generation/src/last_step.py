@@ -19,6 +19,8 @@ class LastStep:
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
 
+        transition_radius_analysis = False
+
         # Collect statistics and errors
         data = {'halo_id': [], 'r200': [], 'transition_radius': [], 'normalized_transition_radius': []}
         errors = {'halo_id': [], 'error': [], 'step': []}
@@ -42,28 +44,26 @@ class LastStep:
                 if 'ICL never dominates' in element[0][1]:
                     ignored_halos += 1
 
-        transition_radius_df = pd.DataFrame.from_dict(data)
-
-        transition_radius_l = transition_radius_df['transition_radius'].tolist()
-        plot_transition_radius(self.cfg, transition_radius_l)
-        plot_transition_radius(self.cfg, transition_radius_l, log_normalization=False)
-
         dataset_dir = self.cfg.paths.datasets_dir
         name = self.cfg.catalog.path.replace(dataset_dir, '')
         name = name.replace('/', '_')
-        path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius_{name}.csv'
-        logger.info(f'Storing transition radius df at: {path}')
-        transition_radius_df.to_csv(path, index=False)
 
-        logger.debug('transition_radius [kpc]')
-        summary_stats = transition_radius_df['transition_radius'].describe()
-        logger.info(summary_stats)
-        logger.info(np.percentile(transition_radius_df['transition_radius'], 90))
-        logger.info(np.percentile(transition_radius_df['transition_radius'], 95))
-
-        logger.debug('normalized_transition_radius (r/r200)')
-        summary_stats = transition_radius_df['normalized_transition_radius'].describe()
-        logger.info(summary_stats)
+        if transition_radius_analysis:
+            transition_radius_df = pd.DataFrame.from_dict(data)
+            transition_radius_l = transition_radius_df['transition_radius'].tolist()
+            plot_transition_radius(self.cfg, transition_radius_l)
+            plot_transition_radius(self.cfg, transition_radius_l, log_normalization=False)
+            path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius_{name}.csv'
+            logger.info(f'Storing transition radius df at: {path}')
+            transition_radius_df.to_csv(path, index=False)
+            logger.debug('transition_radius [kpc]')
+            summary_stats = transition_radius_df['transition_radius'].describe()
+            logger.info(summary_stats)
+            logger.info(np.percentile(transition_radius_df['transition_radius'], 90))
+            logger.info(np.percentile(transition_radius_df['transition_radius'], 95))
+            logger.debug('normalized_transition_radius (r/r200)')
+            summary_stats = transition_radius_df['normalized_transition_radius'].describe()
+            logger.info(summary_stats)
 
         errors_df = pd.DataFrame.from_dict(errors)
         path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.csv'

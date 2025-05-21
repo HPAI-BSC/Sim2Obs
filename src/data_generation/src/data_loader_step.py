@@ -110,8 +110,6 @@ class DataLoader(PipelineStep):
             logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
             logger.info('-------------------------------------------------------------------------------------')
             try:
-                if halo.halo_id == 0:
-                    raise Exception('Errrrrooror')
                 feature_input_name, feature_output_name = self.cfg.feature_names
                 input_feature = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg)
                 output_feature = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg)
