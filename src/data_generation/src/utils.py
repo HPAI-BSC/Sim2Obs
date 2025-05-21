@@ -49,7 +49,7 @@ def setup_logger(name: str) -> logging.Logger:
         logger.handlers.clear()
 
     # Prevent log propagation to avoid duplicate logs
-    logger.propagate = False
+    # logger.propagate = False
 
     console_handler = logging.StreamHandler()
 

@@ -26,13 +26,14 @@ class LastStep:
         for element in results:
             if isinstance(element, tuple) and isinstance(element[2], ICLProcessor):
                 radius = element[2].transition_radius
-                normalized = radius / element[0].r200
-                data['halo_id'].append(element[0].halo_id)
-                data['r200'].append(element[0].r200)
-                data['transition_radius'].append(radius)
-                data['normalized_transition_radius'].append(normalized)
-                plot_icl_bcg_profiles(self.cfg, element[2].icl_cumulative, element[2].bcg_cumulative, element[2].log_r,
-                                      element[2].tr_index, element[0].halo_id)
+                if radius is not None:
+                    normalized = radius / element[0].r200
+                    data['halo_id'].append(element[0].halo_id)
+                    data['r200'].append(element[0].r200)
+                    data['transition_radius'].append(radius)
+                    data['normalized_transition_radius'].append(normalized)
+                    plot_icl_bcg_profiles(self.cfg, element[2].icl_cumulative, element[2].bcg_cumulative, element[2].log_r,
+                                          element[2].tr_index, element[0].halo_id)
             elif isinstance(element, list) and len(element) > 0:
                 errors['halo_id'].append(element[0][0].halo_id)
                 errors['error'].append(element[0][1])
