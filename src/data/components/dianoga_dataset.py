@@ -31,7 +31,7 @@ class DianogaDataset(GalaxyDataset):
         label = np.expand_dims(label, axis=0)
 
         test_path = "/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/label_before_transform.png"
-        plt.imshow(label)
+        plt.imshow(label.transpose(1,2,0))
         plt.savefig(test_path)
 
         if self.transform:
@@ -39,7 +39,7 @@ class DianogaDataset(GalaxyDataset):
             label = self.transform(label)
 
         test_path2 = "/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/label_after_transform.png"
-        plt.imshow(label)
+        plt.imshow(label.permute(1,2,0))
         plt.savefig(test_path2)
         return image, label
 
