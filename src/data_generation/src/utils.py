@@ -49,7 +49,7 @@ def setup_logger(name: str) -> logging.Logger:
         logger.handlers.clear()
 
     # Prevent log propagation to avoid duplicate logs
-    # logger.propagate = False
+    logger.propagate = False
 
     console_handler = logging.StreamHandler()
 
@@ -419,7 +419,7 @@ def plot_transition_radius(cfg, transition_radius_list, log_normalization=True):
         path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_log_{name}.png'
     else:
         plt.hist(transition_radius_list, bins=50, color='skyblue', edgecolor='black')
-        plt.xlabel('Transition Radius r/R200')
+        plt.xlabel('Transition Radius r')
         plt.ylabel('Counts')
         plt.title('Histogram of Transition Radii')
         path = cfg.paths.datasets_dir + f'/../logs/transition_radius_histogram_{name}.png'
@@ -474,10 +474,9 @@ def plot_icl_bcg_profiles(cfg, icl_cumulative, bcg_cumulative, r_by_r200, t_idx,
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    #path = f'transition_radius_cumsum_{halo_id}.png'
-    path = dataset_dir + '../logs/transition_radius_cumsum_{halo_id}.png'
+    path = dataset_dir + f'/../logs/transition_radius_cumsum_{halo_id}.png'
     plt.savefig(path, dpi=300)
-    plt.show()
+    #plt.show()
 
 
 def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spatial_resolution_scale: float,
@@ -671,4 +670,5 @@ def store_overlapping_matrix_as_df(cfg, overlapping_matrix):
 
     path = cfg.paths.datasets_dir + f'/../logs/overlapping_halos_{name}.csv'
     df.to_csv(path, index=False)
+
 

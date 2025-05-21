@@ -68,9 +68,7 @@ class RotateStep(PipelineStep):
 
         return rotate_step_dict.rotation_group
 
-    def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
-                cosmos_data: CosmosData, g: Generator, next_step: Callable[[Generator], Generator],
-                **kwargs):
+    def process(self, g: Generator, next_step: Callable[[Generator], Generator], **kwargs):
         """
         Rotates the data in the cosmos dataset and updates the features accordingly.
 
@@ -101,7 +99,8 @@ class RotateStep(PipelineStep):
         The method applies a series of rotations in specified directions and angles, updating the positions and velocities
         in the cosmos data, as well as updating the rotation-related metadata.
         """
-        for halo, subhalo_ctx in g:
+        errors = []
+        for halo, subhalo_ctx, cosmos_data in g:
             logger.info(f"Processing rotations for halo {halo.halo_id} ...")
             try:
                 iterations = 360 // int(self.rotation_angle)
@@ -115,20 +114,24 @@ class RotateStep(PipelineStep):
                         # Rotate the appropiate data in subhalos context, subhalo particles and input feature
                         cosmos_data.subhalos.rotate(self.z, rotation_axis, degree)
                         cosmos_data.subhalo_particles.rotate(self.z, rotation_axis, degree)
-                        input_feature.rotate(self.z, rotation_axis, degree)
+                        cosmos_data.input_feature.rotate(self.z, rotation_axis, degree)
                         cosmos_data.metadata['rotation'] = {'has_rotated': 1, 'angle': degree}
 
+                        # Got to the next step
                         if next_step is not None:
-                            logger.info(f"Generating maps for halo {halo.halo_id}, iteration={i}/{iterations-1},"
-                                        f" rotation_axis={rt_i}/{len(self.rotation_directions)-1}")
+                            logger.info(f"Generating maps for halo {halo.halo_id}, iteration={i}/{iterations - 1},"
+                                        f" rotation_axis={rt_i}/{len(self.rotation_directions) - 1}")
 
-                            yield from next_step([(halo, subhalo_ctx)], **kwargs)
+                            yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
                         else:
-                            yield input_feature, output_feature, cosmos_data
+                            yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
+
                         degree += self.rotation_angle
             except Exception as e:
                 logger.error(f"Failed to execute rotations for halo {cosmos_data.halo.halo_id}: {e}")
+                errors.append((halo, str(e), self.name))
                 continue
+        yield errors
 
 
 

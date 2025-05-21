@@ -610,7 +610,7 @@ class Illustris300Fetcher(DataFetcher):
             logger.error("subhalo_id must be provided in kwargs")
             raise ValueError("subhalo_id must be provided in kwargs")
 
-        logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
+        #logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
         return self._get_p_subhalo(subhalo_id)
 
     def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
@@ -619,7 +619,7 @@ class Illustris300Fetcher(DataFetcher):
             logger.error("halo must be provided in kwargs")
             raise ValueError("halo must be provided in kwargs")
 
-        logger.info(f"Fetching particle data for halo: {halo.halo_id}")
+        #logger.info(f"Fetching particle data for halo: {halo.halo_id}")
         return self._get_p_halo(halo)
 
     def __get_children(self, halo_row, subhalo_df):
@@ -678,7 +678,6 @@ class Illustris300Fetcher(DataFetcher):
             self.column_map['subhalo_ids'] = 'subhalo_ids'
             halo_context = HaloContext(processed_halos, self.column_map)
             logger.debug(f"Halo data fetched successfully: {halo_context.data['halo_id'].nunique()} halos.")
-            logger.debug(f"Halo id max value: {halo_context.data['halo_id'].max()}")
             return halo_context
         else:
             logger.warning("No halos found.")
@@ -763,7 +762,7 @@ class Illustris300Fetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data such as mass, coordinates, and velocities.
         """
-        logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
+        #logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
         path = self.catalog.path + '/output'
 
         if not os.path.exists(path):
@@ -789,7 +788,7 @@ class Illustris300Fetcher(DataFetcher):
                     for key in particles:
                         if isinstance(key, np.ndarray):
                             num_particles = particles[key].shape[0]
-                            logger.debug(f"Particle data fetched successfully, particles retrieved: {num_particles}")
+                            #logger.debug(f"Particle data fetched successfully, particles retrieved: {num_particles}")
                             break
                 else:
                     logger.debug(f'Subhalo {subhalo_id} does not have {part_type} particles.')
@@ -814,7 +813,7 @@ class Illustris300Fetcher(DataFetcher):
         ]
 
         processed_particles = run_pipeline(data, steps)
-        logger.debug("Particle data fetched successfully.")
+        #logger.debug("Particle data fetched successfully.")
         particle_data = SubhaloParticles(processed_particles, self.catalog.fields.particles)
         return particle_data
 
@@ -902,7 +901,7 @@ class EagleFetcher(DataFetcher):
             logger.error("halo_id must be provided in kwargs")
             raise ValueError("group_number must be provided in kwargs")
 
-        logger.info(f"Fetching particle data for subhalo: {subgroup_id}, Group_number: {group_number}")
+        #logger.info(f"Fetching particle data for subhalo: {subgroup_id}, Group_number: {group_number}")
         return self._get_p_subhalo(subgroup_id, group_number)
 
     def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
@@ -1289,7 +1288,8 @@ class EagleFetcher(DataFetcher):
             particles[part_type] = tmp.to_dict(orient='list')
 
         else:
-            logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
+            pass
+            #logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
 
         table = 'particles'
 
@@ -1377,7 +1377,8 @@ class EagleFetcher(DataFetcher):
             particles[part_type] = tmp.to_dict(orient='list')
             logger.debug(len(tmp))
         else:
-            logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
+            pass
+            #logger.debug(f"Particle data fetched successfully, {len(tmp)} particles retrieved.")
 
         table = 'particles'
 
@@ -1455,7 +1456,7 @@ class FlamingoFetcher(DataFetcher):
             logger.error("subhalo_id must be provided in kwargs")
             raise ValueError("subhalo_id must be provided in kwargs")
 
-        logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
+        #logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
         return self._get_p_subhalo(subhalo_id)
 
     def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
@@ -1478,7 +1479,7 @@ class FlamingoFetcher(DataFetcher):
             raise ValueError("halo must be provided in kwargs")
 
         halo_id = kwargs.get('halo_id', None)
-        logger.info(f"Fetching particle data for subhalo: {halo_id}")
+        #logger.info(f"Fetching particle data for subhalo: {halo_id}")
 
         return self._get_p_halo(halo_id)
 
@@ -1765,7 +1766,7 @@ class FlamingoFetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data such as mass, coordinates, and velocities.
         """
-        logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
+        #logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
 
         # Get the position for the subhalo
         subhalo_position = np.where(self.fof_subhalos.input_halos.halo_catalogue_index == subhalo_id)[0]
@@ -1848,7 +1849,7 @@ class FlamingoFetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data such as mass, coordinates, and velocities.
         """
-        logger.debug(f"Fetching particle data for halo: {halo_id}")
+        #logger.debug(f"Fetching particle data for halo: {halo_id}")
 
         # Get the position for the subhalo
         halo_position = np.where(self.fof_subhalos.input_halos.halo_catalogue_index == halo_id)[0]

@@ -1,5 +1,3 @@
-import numpy as np
-
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 
@@ -15,8 +13,12 @@ class CosmosData:
             'rotation': {
                 'has_rotated': None,
                 'angle': None
-            }
+            },
+            'map': {}
         }
+        self.input_feature = None
+        self.output_feature = None
+        self.errors = {}
 
     def __repr__(self):
         return f"CosmosData(halo={self.halo}, subhalos={self.subhalos}, rotation={self.metadata['rotation']})"

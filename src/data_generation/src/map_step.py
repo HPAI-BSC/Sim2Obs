@@ -18,7 +18,7 @@ class MapStep(PipelineStep):
 
     def __init__(self, cfg: DictConfig):
         self.map_configuration = self._build_map_configuration(cfg)
-        # TODO ensure what to do when it's not specified
+
         self.transition_radius = cfg.catalog.transition_radius
         self.cfg = cfg
 
@@ -335,8 +335,7 @@ class MapStep(PipelineStep):
         self._create_n_zooms(projection, rotation_axis, rotation_iteration, cosmos_data, input_feature, output_feature,
                              interlopers_mask)
 
-    def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
-                cosmos_data: CosmosData, g: Generator, next_step: Callable[[Generator], Generator], **kwargs):
+    def process(self, g: Generator, next_step: Callable[[Generator], Generator], **kwargs):
         """
         Main method to process projections for the given cosmos data, generating maps and processing them.
 
@@ -346,12 +345,6 @@ class MapStep(PipelineStep):
 
         Parameters:
         -----------
-        input_feature : FeatureProcessor
-            The feature processor object that holds the input features for projection.
-        output_feature : FeatureProcessor
-            The feature processor object that holds the output features after projection.
-        cosmos_data : CosmosData
-            The data object that contains the halo and subhalo information, including positions and velocities.
         g : Generator
             The generator that yields the data to be processed.
         next_step : Callable[[Generator], Generator]
@@ -369,7 +362,8 @@ class MapStep(PipelineStep):
         """
         rotation_axis = kwargs.get('rotation_axis', None)
         rotation_iteration = kwargs.get('rotation_iteration', None)
-        for halo, _ in g:
+        errors = []
+        for halo, _, cosmos_data in g:
             logger.debug(f'Halo: {halo.halo_id}, {cosmos_data.halo.halo_id}')
             try:
                 if halo not in self.cfg.catalog.ignore_halos:
@@ -377,10 +371,10 @@ class MapStep(PipelineStep):
                     fov = self.transition_radius * 2
                     bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
 
-                    if 'map' not in cosmos_data.metadata:
-                        cosmos_data.metadata['map'] = {}
-
+                    # Store num_bins
                     cosmos_data.metadata['map']['bins'] = bins
+                    input_feature = cosmos_data.input_feature
+                    output_feature = cosmos_data.output_feature
                     logger.debug(f'Number of bins: {bins}')
 
                     interlopers_id = self._get_interlopers_id(cosmos_data)
@@ -397,13 +391,17 @@ class MapStep(PipelineStep):
                     elif self.dim == 3:
                         pass
 
+                    # Got to the next step
                     if next_step is not None:
-                        yield from next_step(g)
+                        yield from next_step([(halo, _, cosmos_data)], **kwargs)
                     else:
-                        yield input_feature, output_feature, cosmos_data
+                        yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
                 else:
                     logger.debug(f'Ignoring halo: {cosmos_data.halo.halo_id}')
             except Exception as e:
                 logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
+                errors.append((halo, str(e), self.name))
                 continue
+        yield errors
+
 

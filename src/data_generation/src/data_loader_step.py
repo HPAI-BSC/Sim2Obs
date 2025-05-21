@@ -3,19 +3,17 @@ from typing import Tuple, List, Optional, Callable, Any
 import os
 
 import numpy as np
-import pandas as pd
 from scipy.spatial import cKDTree
-from tqdm import tqdm
 
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 from omegaconf import DictConfig
 
-from src.data_generation.src.feature import FeatureProcessor
+from src.data_generation.src.feature import FeatureProcessorFactory, attach_models_to_features
 from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.subhalo import SubhaloContext
-from src.data_generation.src.utils import setup_logger, plot_transition_radius
+from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
+from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("DataLoader")
 
@@ -45,7 +43,6 @@ class DataLoader(PipelineStep):
         cfg : DictConfig
             The configuration object containing parameters for the data fetching process.
         """
-        logger.debug(f"Process ID: {os.getpid()}")
         attr_list = self._build_data_loader_configuration(cfg)
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
         self.cfg = cfg
@@ -86,20 +83,12 @@ class DataLoader(PipelineStep):
                 raise ValueError(f"Error, missing required configuration key: {key}")
         return data_loader_dict
 
-    def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor,
-                cosmos_data: CosmosData, g: List[Tuple], next_step: Optional[Callable[[List[Tuple]], Any]],
-                **kwargs):
+    def process(self, g: List[Tuple], next_step: Optional[Callable[[List[Tuple]], Any]], **kwargs):
         """
         Processes the input and output features, updating the cosmos data for each halo and subhalo in the graph.
 
         Parameters:
         -----------
-        input_feature : FeatureProcessor
-            The processor for the input features to be processed.
-        output_feature : FeatureProcessor
-            The processor for the output features to be processed.
-        cosmos_data : CosmosData
-            The context and data related to the cosmos, which is used in the processing.
         g : List[Tuple]
             A list of tuples where each tuple contains halo data and its associated subhalo data.
         next_step : Optional[Callable[[List[Tuple]], Any]]
@@ -110,119 +99,66 @@ class DataLoader(PipelineStep):
         Tuple
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
-        logger.info('DataLoader step - Process method')
+        lbox = self.cfg.catalog.get('Lbox', None)
+        halo_context = kwargs.pop('halo_context', None)
+        models = kwargs.pop('models', None)
+        errors = []
 
-        lbox = None
-        if 'Lbox' in self.cfg.catalog:
-            lbox = self.cfg.catalog['Lbox']
-            logger.info(f'Lbox: {lbox}')
+        # Note that subhalos here contains overlapping subhalos
+        for halo, subhalo_ctx, cosmos_data in g:
+            logger.info('-------------------------------------------------------------------------------------')
+            logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
+            logger.info('-------------------------------------------------------------------------------------')
+            try:
+                if halo.halo_id == 0:
+                    raise Exception('Errrrrooror')
+                feature_input_name, feature_output_name = self.cfg.feature_names
+                input_feature = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg)
+                output_feature = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg)
+                attach_models_to_features([input_feature, output_feature], models)
 
-        halo_context = self.fetcher.get_halos()
-        logger.debug(len(g))
+                # Load particles for all the subhalos in that halo
+                halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
 
-        with (tqdm(total=len(g), desc="Processing Halos", unit="halo") as pbar):
-            transition_radius_df = pd.DataFrame(data=[], columns=['halo', 'r200', 'transition_radius',
-                                                                  'normalized_transition_radius (r/r200)'])
-            errors_overlapping = []
-            halos_ignored = []
-            # Note that subhalos here contains overlapping subhalos
-            for halo, subhalo_ctx in g:
-                logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
-                try:
-                    # Load particles for all the subhalos in that halo
-                    logger.info(f"Get particles")
-                    halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
+                # Preprocessed all particles for current halo
+                halo_particles_no_overlapping.preprocess(halo, lbox)
 
-                    logger.info(f"Preprocess particles")
-                    # Preprocessed all particles for current halo
-                    halo_particles_no_overlapping.preprocess(halo, lbox)
+                # Load preprocessed particles for overlapping halos
+                overlapping_subhalo_particles, subhalos_with_errors = \
+                    self._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
 
-                    # Load preprocessed particles for overlapping halos
-                    logger.info(f"Check overlappings")
-                    overlapping_subhalo_particles, subhalos_with_errors = \
-                        self._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
-
-                    # Detect any errors during the retrival
-                    errors_overlapping.extend(subhalos_with_errors)
-
-                    # Group all the particles together
-                    if overlapping_subhalo_particles is not None:
-                        halo_particles = halo_particles_no_overlapping + overlapping_subhalo_particles
-                    else:
-                        halo_particles = halo_particles_no_overlapping
-
-                except Exception as e:
-                    pbar.update(1)  # Ensure progress bar updates even for skipped halos
-                    logger.error(f"Failed to load particle data for halo {halo.halo_id}: {e}")
-                    continue
+                # Group all the particles together
+                if overlapping_subhalo_particles is not None:
+                    halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
+                else:
+                    halo_particles_overlapping = halo_particles_no_overlapping
 
                 # Compute features with preprocessed and non-overlapping particles
-                logger.info(f"Compute features")
+                logger.info(f"Computing features ...")
                 input_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
                 output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
-                icl_mask = output_feature.value
-
-                # Compute the transition radius, r = FOV / 2 if it's not in the config
-                if 'transition_radius' not in self.cfg.catalog and hasattr(output_feature, 'get_transition_radius'):
-                    transition_radius, normalized_transition_radius =\
-                        output_feature.get_transition_radius(halo, halo_particles_no_overlapping, icl_mask)
-                    if transition_radius in (0, None):
-                        # Ignoring current halo
-                        halos_ignored.append(halo.halo_id)
-                        logger.warning(f'Ignoring halo: {halo.halo_id}')
-                        continue
-                    else:
-                        new_row = pd.DataFrame([{
-                            'halo': halo.halo_id,
-                            'r200': halo.r200,
-                            'transition_radius': transition_radius,
-                            'normalized_transition_radius (r/r200)': normalized_transition_radius
-                        }])
-                        transition_radius_df = pd.concat([transition_radius_df, new_row], ignore_index=True)
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
-                logger.info(f"Preprocess subhalo_ctx")
                 subhalo_ctx.preprocess(halo, lbox)
-                tmp = CosmosData(halo, subhalo_ctx, halo.fsub, halo_particles)
+            except Exception as e:
+                logger.error(f"Error with {halo.halo_id}: {e}")
+                errors.append((halo, str(e), self.name))
+                continue
 
-                # Keep cosmos_data instance
-                vars(cosmos_data).update(vars(tmp))
+            # Update cosmos instance
+            cosmos_data.subhalos = subhalo_ctx
+            cosmos_data.subhalo_particles = halo_particles_overlapping
+            cosmos_data.input_feature = input_feature
+            cosmos_data.output_feature = output_feature
 
-                if next_step is not None:
-                    yield from next_step([(halo, subhalo_ctx)], **kwargs)
-                else:
-                    logger.info(f"Execute yield")
-                    yield input_feature, output_feature, cosmos_data
+            # Got to the next step
+            if next_step is not None:
+                yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
+            else:
+                yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
 
-                pbar.update(1)  # Update the progress bar for each successfully processed halo
-                logger.info(f"Finished processing halo {halo.halo_id}")
-
-        if 'transition_radius' not in self.cfg.catalog:
-            transition_radius_l = transition_radius_df['transition_radius'].tolist()
-            plot_transition_radius(self.cfg, transition_radius_l)
-            plot_transition_radius(self.cfg, transition_radius_l, log_normalization=False)
-
-            dataset_dir = self.cfg.dataset_dir
-            name = self.cfg.catalog.path.replace(dataset_dir, '')
-            name = name.replace('/', '_')
-            path = self.cfg.paths.datasets_dir + f'/../logs/transition_radius_{name}.csv'
-            logger.info(f'Storing transition radius df at: {path}')
-            transition_radius_df.to_csv(path, index=False)
-
-            logger.debug('transition_radius [kpc]')
-            summary_stats = transition_radius_df['transition_radius'].describe()
-            logger.info(summary_stats)
-            logger.info(np.percentile(transition_radius_df['transition_radius'], 90))
-            logger.info(np.percentile(transition_radius_df['transition_radius'], 95))
-
-        logger.debug('normalized_transition_radius (r/r200)')
-        summary_stats = transition_radius_df['normalized_transition_radius (r/r200)'].describe()
-        logger.info(summary_stats)
-
-        logger.warning(f'Halo, subhalo accessing errors when getting overlapping particles {len(errors_overlapping)}:'
-                       f' {errors_overlapping}')
-        logger.warning(f'Halos ignored since ICL never dominates (transition radius is None) {len(halos_ignored)}: '
-                       f'{halos_ignored}')
+            logger.info(f"Finished processing halo {halo.halo_id}")
+        yield errors
 
     @staticmethod
     def load_halo_subhalo_data(subhalo_context: SubhaloContext, halo_context: HaloContext,
@@ -264,8 +200,12 @@ class DataLoader(PipelineStep):
             try:
                 halo = halo_context.get_halo_by_id(id_halo)
                 subhalo_ctx = subhalo_context.get_items_by_halo(id_halo)
+
+                # Prepare a default cosmos_data placeholder to pass during pipeline build (adjust if needed)
+                subhalo_particles = SubhaloParticles({}, None)
+                cosmos_data = CosmosData(halo=halo, subhalo_id=halo.fsub, subhalos=subhalo_ctx,
+                                         subhalo_particles=subhalo_particles)
                 halo.add_children(subhalo_ctx)
-                logger.debug(f'Halo: {halo.halo_id}, subhalos: {len(subhalo_ctx.data)}')
 
                 # Find subhalo neighbours
                 overlapping_halo_subhalo_ids = overlapping_matrix.get(id_halo, {})
@@ -277,7 +217,7 @@ class DataLoader(PipelineStep):
             except Exception as e:
                 logger.error(e)
                 continue
-            result.append((halo, subhalo_ctx))
+            result.append((halo, subhalo_ctx, cosmos_data))
         return result
 
     def _load_particles_overlapping_subhalos(self, halo: Halo, subhalo_context: SubhaloContext,
@@ -340,17 +280,14 @@ class DataLoader(PipelineStep):
                     logger.debug(f'Overlapping particles: {subhalo_particles_i}')
 
                     # Get halo of this particles
-                    logger.debug('Getting halo')
                     halo = halo_context.get_halo_by_id(halo_id)
 
                     # Preprocess the particles according to their halo center
-                    logger.debug('Preprocessing halo')
                     subhalo_particles_i.preprocess(halo, lbox)
 
                     if subhalo_particles is None:
                         subhalo_particles = subhalo_particles_i
                     else:
-                        logger.debug('Update subhalos particles with +')
                         subhalo_particles += subhalo_particles_i
                 except Exception as e:
                     subhalos_with_errors.append((halo_id, subhalo_id))

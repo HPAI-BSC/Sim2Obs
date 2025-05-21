@@ -1,18 +1,19 @@
 import os
+import warnings
 from abc import ABC, abstractmethod
 from typing import List
 
 import numpy as np
 import pandas as pd
 import joblib
-from matplotlib import pyplot as plt
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from scipy import stats
-from dotenv import load_dotenv, find_dotenv
+from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import setup_logger, rotate
+
 logger = setup_logger("FeatureProcessor")
 
 # Uncomment for local testing, internet connection required
@@ -21,6 +22,41 @@ logger = setup_logger("FeatureProcessor")
 #    load_dotenv(dotenv_path)
 # else:
 #    print(".env file not found, skipping load.")
+
+
+# Add more models if any
+MODELS = {
+    'IntraClusterLight': 'src/data_generation/model/Best_Model-Random-3par.pkl'
+}
+
+
+def load_model(path):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=ConvergenceWarning)
+        warnings.simplefilter("ignore", category=DataConversionWarning)
+        warnings.simplefilter("ignore", category=UserWarning)
+
+        project_root = os.getenv('PROJECT_ROOT')
+        model = joblib.load(os.path.join(project_root, path))
+    return model
+
+
+def load_models(features):
+    models = {}
+    for feature in features:
+        feature_name = feature['name']
+        if feature_name in MODELS:
+            model_path = MODELS[feature_name]
+            model = load_model(model_path)
+            models[feature_name] = model
+    return models
+
+
+def attach_models_to_features(features: list, models: dict):
+    for feature in features:
+        feature_name = getattr(feature, 'name', None)  # or use feature.__class__.__name__
+        if feature_name in models:
+            feature.model = models[feature_name]
 
 
 class FeatureProcessor(ABC):
@@ -106,7 +142,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
         map ([]): Velocity Dispersion map.
         value ([]): Placeholder for storing computed value.
     """
-    def __init__(self):
+    def __init__(self, kwargs):
         self.name = 'VelocityDispersion'
         self.map = []
         self.value = []
@@ -217,19 +253,20 @@ class ICLProcessor(FeatureProcessor):
         cfg (DictConfig): Configuration object for retrieving constant G.
         value (None): Placeholder for storing computed value.
     """
-    def __init__(self, cfg: DictConfig):
+    def __init__(self, cfg: DictConfig, kwargs):
+        # TODO init with the cfg if exists
+        self.transition_radius = None
         self.name = 'IntraClusterLight'
-
-        project_root = os.getenv('PROJECT_ROOT')
-        if not project_root:
-            raise EnvironmentError("PROJECT_ROOT is not set in the environment variables.")
         self.cfg = cfg
         self.map = []
         self.value = []
-        self.model = joblib.load(os.path.join(project_root, 'src/data_generation/model/Best_Model-Random-3par.pkl'))
+        self.model = None
 
         attr_list = self._build_configuration(cfg, ['G'])
         for key, value in attr_list.items():
+            setattr(self, key, value)
+
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
     def _predict(self, v_delta: np.ndarray, distance: np.ndarray, halo: Halo):
@@ -278,15 +315,12 @@ class ICLProcessor(FeatureProcessor):
 
         # Use the trained model to make predictions on the data
         # The model predicts whether each particle belongs to BCG (label 1) or ICL (label 0)
-        logger.info("Labeling particles ...")
         final_predictions = self.model.predict(Data.to_numpy())
         return final_predictions
 
     def _compute_icl_mask(self, halo: Halo, subhalo_particles: SubhaloParticles):
         particle_velocity = subhalo_particles.star_v
         particle_position = subhalo_particles.star_p
-
-        logger.info(f'Processing ICL for Halo ID {halo.halo_id}.')
 
         v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
         # Computing the Euclidean distance from the new origin to each particle,
@@ -309,7 +343,7 @@ class ICLProcessor(FeatureProcessor):
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
         return icl_mask
 
-    def get_transition_radius(self, halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
+    def _compute_transition_radius(self, cfg: DictConfig, halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
         """
         Computes the transition radius where the intracluster light (ICL) dominates over the brightest cluster galaxy (BCG).
 
@@ -374,8 +408,18 @@ class ICLProcessor(FeatureProcessor):
         else:
             logger.warning("No transition radius found; ICL never dominates.")
             transition_radius = None
-            normalized_transition_radius = None
-        return transition_radius, normalized_transition_radius
+
+        # To analyze cumsum profiles
+        r_by_r200 = sorted_distances #/ halo.r200
+        self.log_r = np.log10(r_by_r200)
+        self.icl_cumulative = icl_cumulative
+        self.bcg_cumulative = bcg_cumulative
+        self.tr_index = transition_index[max_pos]
+
+        # Store values within the feature
+        self.transition_radius = transition_radius
+        if transition_radius in (0, None):
+            raise Exception(f'Ignoring halo: {halo.halo_id}, ICL never dominates')
 
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):
         """
@@ -390,8 +434,15 @@ class ICLProcessor(FeatureProcessor):
         Raises:
             ValueError: If the scaled particle data is empty.
         """
+        # Non overlapping particles
         icl_mask = self._compute_icl_mask(halo, subhalo_particles)
         self.value = icl_mask
+
+        if hasattr(self, 'transition_radius_compute'):
+            if self.transition_radius_compute:
+                self._compute_transition_radius(self.cfg, halo, subhalo_particles, icl_mask)
+            elif self.cfg.catalog.get('transition_radius', None) is None:
+                logger.error('Error, you must define a transition radius for generating the maps')
 
     def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
@@ -474,7 +525,7 @@ class StellarMassDensityProcessor(FeatureProcessor):
         map ([]): Velocity Dispersion map.
         value ([]): Placeholder for storing computed value.
     """
-    def __init__(self):
+    def __init__(self, kwargs):
         self.name = 'StellarMassDensity'
         self.map = []
         self.value = []
@@ -580,7 +631,7 @@ class DMMassDensityProcessor(FeatureProcessor):
         map ([]): Velocity Dispersion map.
         value ([]): Placeholder for storing computed value.
     """
-    def __init__(self):
+    def __init__(self, kwargs):
         self.name = 'DMMassDensity'
         self.map = []
         self.value = []
@@ -689,12 +740,12 @@ class FeatureProcessorFactory:
         get_feature: Returns an instance of the required FeatureProcessor.
     """
     @staticmethod
-    def get_feature(feature: str, **kwargs) -> FeatureProcessor:
+    def get_feature(feature: DictConfig, **kwargs) -> FeatureProcessor:
         """
         Get an instance of the appropriate FeatureProcessor based on the feature name.
 
         Args:
-            feature (str): The feature type ('velocity_dispersion' or 'icl').
+            feature (DictConfig): The feature type ('velocity_dispersion' or 'icl').
             **kwargs: Additional keyword arguments passed to the feature processor.
 
         Returns:
@@ -703,16 +754,26 @@ class FeatureProcessorFactory:
         Raises:
             ValueError: If an invalid feature name is provided.
         """
-        # Add more feature processors as needed
-        feature_processors = {
-            'velocity_dispersion': VelocityDispersionProcessor(),
-            'icl': ICLProcessor(cfg=kwargs.get('cfg', None)),
-            'stellar_mass_density': StellarMassDensityProcessor(),
-            'dark_matter_mass_density': DMMassDensityProcessor()
-            # Add more features if required
-        }
 
-        if feature not in feature_processors:
-            raise ValueError(f"Invalid feature name {feature} provided")
+        cfg = kwargs.get('cfg', None)
+        # Add more feature processors as needed
+        feature_name = feature['name']
+        kwargs = feature.copy()
+        OmegaConf.set_struct(kwargs, False)
+        del kwargs['name']
+
+        match feature_name:
+            case 'VelocityDispersion':
+                feature_processor = VelocityDispersionProcessor(kwargs=kwargs)
+            case'IntraClusterLight':
+                feature_processor = ICLProcessor(cfg=cfg, kwargs=kwargs)
+            case 'StellarMassDensity':
+                feature_processor = StellarMassDensityProcessor(kwargs=kwargs)
+            case 'DarkMatterMassDensity':
+                feature_processor = DMMassDensityProcessor(kwargs=kwargs)
+            # Add more features if required
+            case _:
+                raise ValueError(f"Invalid feature name {feature} provided")
+
         logger.info(f"Feature processor '{feature}' created.")
-        return feature_processors[feature]
+        return feature_processor

@@ -1,9 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable
 
-from src.data_generation.src.cosmos import CosmosData
-from src.data_generation.src.feature import FeatureProcessor
-
 
 class PipelineStep(ABC):
     """
@@ -25,19 +22,12 @@ class PipelineStep(ABC):
         This method should be implemented by subclasses to define specific processing logic.
     """
     @abstractmethod
-    def process(self, input_feature: FeatureProcessor, output_feature: FeatureProcessor, cosmos_data: CosmosData,
-                g: Any, next_step: Callable[[Any], 'Any'], **kwargs):
+    def process(self, g: Any, next_step: Callable[[Any], 'Any'], **kwargs):
         """
         Process the input and output features, along with cosmos data, and apply the next step in the pipeline.
 
         Parameters
         ----------
-        input_feature : FeatureProcessor
-            The processor for the input features to be processed.
-        output_feature : FeatureProcessor
-            The processor for the output features to be processed.
-        cosmos_data : CosmosData
-            The context and data related to the cosmos, which is used in the processing.
         g : Any
             The data or generator passed through the pipeline.
         next_step : Callable[[Any], 'Any']
