@@ -6,11 +6,18 @@ import torch
 from PIL import Image
 from matplotlib import pyplot as plt
 
-folder_path = '../../../../local/data/datasets/illustris300/no_rotation_s1.5/VelocityDispersion'
+#folder_path = '../../../../local/data/datasets/millenium/MTNG-L31.25-270-A/no_rotation_s1.5/VelocityDispersion'
+#folder_path = '../../../../local/data/datasets/millenium/MTNG-L31.25-270-A/no_rotation_s1.5/IntraClusterLight'
+
+#folder_path = '../../../../local/data/datasets/illustris300/no_rotation_s1.5/VelocityDispersion'
 #folder_path = '../../../../local/data/datasets/illustris300/no_rotation_s1.5/IntraClusterLight'
 
 #folder_path = '../../../../local/data/datasets/eagle/RefL0050N0752/no_rotation_s1.5/VelocityDispersion'
 #folder_path = '../../../../local/data/datasets/eagle/RefL0050N0752/no_rotation_s1.5/IntraClusterLight'
+
+#folder_path = '../../../../local/data/datasets/eagle/AGNdT9L0050N0752/no_rotation_s1.5/VelocityDispersion'
+folder_path = '../../../../local/data/datasets/eagle/AGNdT9L0050N0752/no_rotation_s1.5/IntraClusterLight'
+
 
 npz_files = glob.glob(os.path.join(folder_path, "*.npz"))
 
