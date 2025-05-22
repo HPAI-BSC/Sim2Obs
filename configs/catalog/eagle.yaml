@@ -7,10 +7,10 @@ g_2_solar: 1.989e33
 
 snapnum: 26          # redshift 0.18
 
-# Lbox: 73811.63 # 50 * 1000 / 0.6774   kpc/h
+Lbox: 73811.63 # 50 * 1000 / 0.6774   kpc/h
 transition_radius: 501.135 # kpc
-#simulation_code: RefL0050N0752
-#path: ${paths.datasets_dir}/eagle/RefL0050N0752
+simulation_code: RefL0050N0752
+path: ${paths.datasets_dir}/eagle/RefL0050N0752
 ignore_halos: [26000000000009]
 
 # https://arxiv.org/pdf/1510.01320
@@ -20,9 +20,9 @@ ignore_halos: [26000000000009]
 # path: ${paths.datasets_dir}/eagle/AGNdT9L0050N0752
 # ignore_halos: [26000000000013]
 
-Lbox: 147623.26 # 100 * 1000 / 0.6774 kpc/ h
-simulation_code: RefL0100N1504
-path: ${paths.datasets_dir}/eagle/RefL0100N1504
+#Lbox: 147623.26 # 100 * 1000 / 0.6774 kpc/ h
+#simulation_code: RefL0100N1504
+#path: ${paths.datasets_dir}/eagle/RefL0100N1504
 
 spatial_resolution: 2.66  # kpc
 # bin_size = spatial_resolution * 1 ->
