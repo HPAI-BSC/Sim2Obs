@@ -3,7 +3,7 @@ import pickle
 import shutil
 import unittest
 from typing import Generator
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from rootutils import rootutils
 rootutils.setup_root(__file__, pythonpath=True)
@@ -15,7 +15,6 @@ import joblib
 import numpy as np
 import pandas as pd
 from numpy.testing import assert_array_equal
-from scipy import stats
 
 from hydra import initialize, compose
 

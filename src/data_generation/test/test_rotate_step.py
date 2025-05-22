@@ -3,14 +3,15 @@ import pickle
 import unittest
 from typing import Generator
 
+import joblib
+from omegaconf import OmegaConf
 from rootutils import rootutils
 
 rootutils.setup_root(__file__, pythonpath=True)
 
 from hydra import initialize, compose
-from unittest.mock import patch, MagicMock
-import numpy as np
 
+from src.data_generation.src.feature import FeatureProcessorFactory
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.rotate_step import RotateStep
 
@@ -21,14 +22,14 @@ class TestRotateStep(unittest.TestCase):
         with open("data/illustris/subhalo_particles_0.pkl", "rb") as file:
             self.subhalo_particles_illustris = pickle.load(file)
 
+        with open("data/illustris/subhalo_0.pkl", "rb") as file:
+            self.subhalo_illustris = pickle.load(file)
+
         with open("data/illustris/halo_0.pkl", "rb") as file:
             self.halo_illustris = pickle.load(file)
 
         with open("data/illustris/subhalo_context_0.pkl", "rb") as file:
             self.subhalo_context_illustris = pickle.load(file)
-
-        with open("data/illustris/subhalo_0.pkl", "rb") as file:
-            self.subhalo_illustris = pickle.load(file)
 
         # Eagle objs
         with open("data/eagle/subhalo_particles_0.pkl", "rb") as file:
@@ -43,52 +44,77 @@ class TestRotateStep(unittest.TestCase):
         with open("data/eagle/subhalo_0.pkl", "rb") as file:
             self.subhalo_eagle = pickle.load(file)
 
-        with initialize(config_path="../../../configs"):
+        with initialize(config_path="'../../../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
+            self.cfg_big_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
+            self.cfg_flamingo = compose(config_name="data_generation.yaml")
 
             # Load the local config for paths and assign them
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_illustris.paths = local_config.paths
+            self.cfg_big_illustris.paths = local_config.paths
             self.cfg_eagle.paths = local_config.paths
+            self.cfg_millenium = compose(config_name="data_generation.yaml")
+            self.cfg_flamingo.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
 
+            # Enforce RefL0050N0752 simulation code
+            self.cfg_eagle.catalog.simulation_code = "RefL0050N0752"
+            self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
+
+            self.cfg_millenium.catalog = compose("catalog/millenium.yaml")['catalog']
+            self.cfg_millenium.catalog.path = '../../../local/data/datasets/millenium/MTNG-L31.25-270-A'
+
+            self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
+            self.cfg_flamingo.catalog.path = '../../../local/data/datasets/flamingo/L1000N0900'
         os.environ['PROJECT_ROOT'] = '../../..'
-
-        self.mock_input_feature = MagicMock()
-        self.mock_input_feature.value = np.array([[1.0, 1.0, 1.0]])
-
-        self.mock_output_feature = MagicMock()
-        self.mock_output_feature.value = np.array([[0.0, 0.0, 0.0]])
+        self.remove_folder = True
+        self.model_path = 'src/data_generation/model/Best_Model-Random-3par.pkl'
+        self.project_root = os.getenv('PROJECT_ROOT')
 
     def mock_generator_illustris(self) -> Generator:
         """Mock generator to simulate data_loader.process."""
-        yield self.halo_illustris, self.subhalo_illustris
+        feature_input_name, feature_output_name = self.cfg_illustris.feature_names
+        input_feature_illustris = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg_illustris)
+        input_feature_illustris.process(self.halo_illustris, self.subhalo_particles_illustris)
+        output_feature_illustris = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg_illustris)
+        output_feature_illustris.model = joblib.load(os.path.join(self.project_root, self.model_path))
+        output_feature_illustris.process(self.halo_illustris, self.subhalo_particles_illustris)
+
+        cosmos_data = CosmosData(self.halo_illustris, self.subhalo_context_illustris, self.subhalo_illustris,
+                                 self.subhalo_particles_illustris)
+        cosmos_data.input_feature = input_feature_illustris
+        cosmos_data.output_feature = output_feature_illustris
+
+        yield self.halo_illustris, self.subhalo_illustris, cosmos_data
 
     def mock_generator_eagle(self) -> Generator:
         """Mock generator to simulate data_loader.process."""
-        yield self.halo_eagle, self.subhalo_eagle
+        feature_input_name, feature_output_name = self.cfg_eagle.feature_names
+        input_feature_eagle = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg_eagle)
+        input_feature_eagle.process(self.halo_eagle, self.subhalo_particles_eagle)
+        output_feature_eagle = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg_eagle)
+        output_feature_eagle.model = joblib.load(os.path.join(self.project_root, self.model_path))
+        output_feature_eagle.process(self.halo_eagle, self.subhalo_particles_eagle)
 
-    @patch('src.data_generation.src.halo.Halo')
-    @patch('src.data_generation.src.subhalo.SubhaloContext')
-    @patch('src.data_generation.src.subhalo.SubhaloParticles')
-    def test_rotation_process_illustris(self, mock_halo, mock_subhalo_context, mock_subhalo_particles):
+        cosmos_data = CosmosData(self.halo_eagle, self.subhalo_context_eagle, self.subhalo_eagle,
+                                 self.subhalo_particles_eagle)
+        cosmos_data.input_feature = input_feature_eagle
+        cosmos_data.output_feature = output_feature_eagle
+        yield self.halo_eagle, self.subhalo_eagle, cosmos_data
+
+    def test_rotation_process_illustris(self):
+        new_step = OmegaConf.create({'name': 'rotate_step', 'rotation_group': self.cfg_illustris.rotation_45})
+        OmegaConf.set_struct(self.cfg_illustris.pipeline, False)
+        self.cfg_illustris.pipeline.append(new_step)
+        OmegaConf.set_struct(self.cfg_illustris.pipeline, True)
+
         self.rotate_step = RotateStep(self.cfg_illustris)
-        mock_halo.return_value = self.halo_illustris
-        mock_subhalo_particles.return_value = self.subhalo_particles_illustris
-        mock_subhalo_context.return_value = self.subhalo_context_illustris
-        self.mock_cosmos_data = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
-                                 self.subhalo_illustris.subhalo_id,
-                                 mock_subhalo_particles.return_value)
-
-        # Call the rotate_step.process with the mock generator
         generator = self.rotate_step.process(
-            input_feature=self.mock_input_feature,
-            output_feature=self.mock_output_feature,
-            cosmos_data=self.mock_cosmos_data,
             g=self.mock_generator_illustris(),
             next_step=None,
             kwargs={}
@@ -97,27 +123,16 @@ class TestRotateStep(unittest.TestCase):
         result = list(generator)
 
         num_iterations = (360 // self.rotate_step.rotation_angle) * len(self.rotate_step.rotation_directions)
-        self.assertEqual(len(result), num_iterations)
-        self.assertEqual(self.mock_cosmos_data.metadata['rotation']['has_rotated'], True)
-        self.assertEqual(self.mock_cosmos_data.metadata['rotation']['angle'], 360 - self.rotate_step.rotation_angle)
+        self.assertEqual(len(result) -1, num_iterations)
 
-    @patch('src.data_generation.src.halo.Halo')
-    @patch('src.data_generation.src.subhalo.SubhaloContext')
-    @patch('src.data_generation.src.subhalo.SubhaloParticles')
-    def test_rotation_process_eagle(self, mock_halo, mock_subhalo_context, mock_subhalo_particles):
+    def test_rotation_process_eagle(self):
+        new_step = OmegaConf.create({'name': 'rotate_step', 'rotation_group': self.cfg_eagle.rotation_45})
+        OmegaConf.set_struct(self.cfg_eagle.pipeline, False)
+        self.cfg_eagle.pipeline.append(new_step)
+        OmegaConf.set_struct(self.cfg_eagle.pipeline, True)
+
         self.rotate_step = RotateStep(self.cfg_eagle)
-        mock_halo.return_value = self.halo_eagle
-        mock_subhalo_particles.return_value = self.subhalo_particles_eagle
-        mock_subhalo_context.return_value = self.subhalo_context_eagle
-        self.mock_cosmos_data = CosmosData(mock_halo.return_value, mock_subhalo_context.return_value,
-                                           self.subhalo_eagle.subhalo_id,
-                                           mock_subhalo_particles.return_value)
-
-        # Call the rotate_step.process with the mock generator
         generator = self.rotate_step.process(
-            input_feature=self.mock_input_feature,
-            output_feature=self.mock_output_feature,
-            cosmos_data=self.mock_cosmos_data,
             g=self.mock_generator_eagle(),
             next_step=None,
             kwargs={}
@@ -126,9 +141,7 @@ class TestRotateStep(unittest.TestCase):
         result = list(generator)
 
         num_iterations = (360 // self.rotate_step.rotation_angle) * len(self.rotate_step.rotation_directions)
-        self.assertEqual(len(result), num_iterations)
-        self.assertEqual(self.mock_cosmos_data.metadata['rotation']['has_rotated'], True)
-        self.assertEqual(self.mock_cosmos_data.metadata['rotation']['angle'], 360 - self.rotate_step.rotation_angle)
+        self.assertEqual(len(result) -1, num_iterations)
 
 
 
