@@ -39,7 +39,8 @@ class DianogaDataset(GalaxyDataset):
             label = self.transform(label)
 
         test_path2 = "/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/label_after_transform.png"
-        plt.imshow(label.permute(1,2,0))
+        print(label.shape)
+        plt.imshow(label.permute(1,2,0).cpu().numpy())
         plt.savefig(test_path2)
         return image, label
 
