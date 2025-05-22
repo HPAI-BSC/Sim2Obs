@@ -42,6 +42,7 @@ class DianogaDataset(GalaxyDataset):
         print(label.shape)
         plt.imshow(label.permute(1,2,0).cpu().numpy())
         plt.savefig(test_path2)
+        label = ""
         return image, label
 
     @staticmethod
