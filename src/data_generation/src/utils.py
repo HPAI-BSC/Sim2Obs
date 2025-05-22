@@ -79,6 +79,7 @@ def get_connection():
     return con
 
 
+# TODO optimize
 def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray:
     """
     Reads and processes data from HDF5 snapshot files for a specific particle type and attribute.
@@ -129,17 +130,18 @@ def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray
     if not snapshot_folder:
         raise FileNotFoundError("Snapshot folder not found in the specified path.")
     else:
-        logger.debug(snapshot_folder)
+        pass
+        #logger.debug(snapshot_folder)
 
     # Update nfiles
     snapdir = os.path.join(path, snapshot_folder)
     nfiles = sum(1 for entry in Path(snapdir).iterdir() if entry.is_file())
-    logger.debug(f'nfiles: {nfiles}')
+    #logger.debug(f'nfiles: {nfiles}')
 
     try:
         for i in range(nfiles):
             file = os.path.join(path, snapshot_folder, f'{snapshot_folder.replace("snapshot", "snap")}.{i}.hdf5')
-            logger.debug(file)
+            #logger.debug(file)
             with h5py.File(file, 'r') as f:
                 tmp = f[f'PartType{itype}/{att}'][...]
                 data.append(tmp)
@@ -164,7 +166,6 @@ def read_dataset(itype: int, att: str, path: str, nfiles: int =16) -> np.ndarray
         logger.error(e)
         error_message = traceback.format_exc()
         logger.error(error_message)
-    logger.debug(f'Data read: {len(data)}')
     return data
 
 

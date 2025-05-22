@@ -108,8 +108,15 @@ class TestSubHalo(unittest.TestCase):
         with open("data/eagle/halo_context_0.pkl", "rb") as file:
             self.halo_context_eagle = pickle.load(file)
 
-        self.subhalo_context_illustris.preprocess(self.halo_context_illustris)
-        self.subhalo_context_eagle.preprocess(self.halo_context_eagle)
+        # Choose a halo to preprocess to
+        halo_id = 0
+        subhalo_ctx_illustris = self.subhalo_context_illustris.get_items_by_halo(halo_id)
+        halo_illustris = self.halo_context_illustris.get_halo_by_id(halo_id)
+        subhalo_ctx_illustris.preprocess(halo_illustris)
+        halo_id = 26000000000000
+        subhalo_ctx_eagle = self.subhalo_context_eagle.get_items_by_halo(halo_id)
+        halo_eagle = self.halo_context_eagle.get_halo_by_id(halo_id)
+        subhalo_ctx_eagle.preprocess(halo_eagle)
 
     def test_subhalo_particles_process(self):
         lbox = 100.0

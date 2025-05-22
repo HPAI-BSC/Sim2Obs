@@ -13,9 +13,9 @@ from hydra import initialize, compose
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 from src.data_generation.src.data_loader_step import DataLoader
-from src.data_generation.src.feature import VelocityDispersionProcessor, ICLProcessor, FeatureProcessor
+from src.data_generation.src.feature import VelocityDispersionProcessor, ICLProcessor, load_models
 from src.data_generation.src.halo import Halo, HaloContext
-from src.data_generation.src.subhalo import SubhaloParticles, SubhaloContext
+from src.data_generation.src.subhalo import SubhaloContext
 
 load_dotenv('../.env')
 
@@ -33,13 +33,22 @@ class TestDataLoaderStep(unittest.TestCase):
             self.cfg_illustris.paths = local_config.paths
             self.cfg_big_illustris.paths = local_config.paths
             self.cfg_eagle.paths = local_config.paths
+            self.cfg_millenium = compose(config_name="data_generation.yaml")
             self.cfg_flamingo.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
-            self.cfg_big_illustris.catalog = compose("catalog/bigillustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
+
+            # Enforce RefL0050N0752 simulation code
+            self.cfg_eagle.catalog.simulation_code = "RefL0050N0752"
+            self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
+
+            self.cfg_millenium.catalog = compose("catalog/millenium.yaml")['catalog']
+            self.cfg_millenium.catalog.path = '../../../local/data/datasets/millenium/MTNG-L31.25-270-A'
+
             self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
+            self.cfg_flamingo.catalog.path = '../../../local/data/datasets/flamingo/L1000N0900'
 
         # Illustris objs
         with open("data/illustris/subhalo_particles_0.pkl", "rb") as file:
@@ -76,9 +85,10 @@ class TestDataLoaderStep(unittest.TestCase):
         result = self.dataLoader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         self.assertEqual(len(result), 83)
 
-        for halo, subhalo_ctx in result:
+        for halo, subhalo_ctx, cosmos_data in result:
             self.assertIsInstance(halo, Halo)
             self.assertIsInstance(subhalo_ctx, SubhaloContext)
+            self.assertIsInstance(cosmos_data, CosmosData)
 
     def test_load_halo_data_eagle(self):
         self.dataLoader = DataLoader(self.cfg_eagle)
@@ -88,9 +98,10 @@ class TestDataLoaderStep(unittest.TestCase):
         result = self.dataLoader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         self.assertEqual(len(result), 21)
 
-        for halo_df, subhalo_df in result:
+        for halo_df, subhalo_df, cosmos_data in result:
             self.assertIsInstance(halo_df, Halo)
             self.assertIsInstance(subhalo_df, SubhaloContext)
+            self.assertIsInstance(cosmos_data, CosmosData)
 
     def no_test_load_halo_data_flamingo(self):
         self.dataLoader = DataLoader(self.cfg_flamingo)
@@ -109,56 +120,44 @@ class TestDataLoaderStep(unittest.TestCase):
         subhalo_context = self.fetcher_illustris.get_subhalos()
         halo_context = self.fetcher_illustris.get_halos()
         overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
-        halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)[:5]
+        n = 1
+        halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)[:n]
+        models = load_models(self.cfg_eagle.feature_names)
 
-        input_feature = VelocityDispersionProcessor()
-        output_feature = ICLProcessor(cfg=self.cfg_illustris)
-        halo = Halo.empty_instance()
-        cosmos_data = CosmosData(halo=halo, subhalo_id=-1, subhalos=None, subhalo_particles=None)
-        generator = data_loader.process(input_feature, output_feature, cosmos_data, g=halo_subhalo_list, next_step=None)
+        generator = data_loader.process(halo_subhalo_list, None, **{'halo_context': halo_context, 'models': models})
         results = []
         try:
             for result in generator:
                 results.append(result)
         except StopIteration:
-            pass  # You can assert here if you expect no more items
+            pass
 
         self.assertNotEqual(results, [])
-        self.assertIsInstance(results[0][0], FeatureProcessor)  # Assert the input_feature
-        self.assertIsInstance(results[0][1], FeatureProcessor)  # Assert the output_feature
-        self.assertIsInstance(results[0][2], CosmosData)  # Assert the cosmos_data
-        self.assertNotEqual(len(results[0][0].value), 0)
-        self.assertNotEqual(len(results[0][1].value), 0)
-        self.assertIsInstance(results[0][2].subhalo_particles, SubhaloParticles)
-        self.assertIsInstance(results[0][2].subhalos, SubhaloContext)
+        self.assertIsInstance(results[0][0], Halo)
+        self.assertIsInstance(results[0][1], VelocityDispersionProcessor)
+        self.assertIsInstance(results[0][2], ICLProcessor)
 
     def test_process_eagle(self):
         data_loader = DataLoader(self.cfg_eagle)
         subhalo_context = self.fetcher_eagle.get_subhalos()
         halo_context = self.fetcher_eagle.get_halos()
         overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
-        halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)[:5]
+        n = 1
+        halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)[:n]
+        models = load_models(self.cfg_eagle.feature_names)
 
-        input_feature = VelocityDispersionProcessor()
-        output_feature = ICLProcessor(cfg=self.cfg_eagle)
-        halo = Halo.empty_instance()
-        cosmos_data = CosmosData(halo=halo, subhalo_id=-1, subhalos=None, subhalo_particles=None)
-        generator = data_loader.process(input_feature, output_feature, cosmos_data, g=halo_subhalo_list, next_step=None)
+        generator = data_loader.process(halo_subhalo_list, None, **{'halo_context': halo_context,  'models': models})
         results = []
         try:
             for result in generator:
                 results.append(result)
         except StopIteration:
-            pass  # You can assert here if you expect no more items
+            pass
 
         self.assertNotEqual(results, [])
-        self.assertIsInstance(results[0][0], FeatureProcessor)  # Assert the input_feature
-        self.assertIsInstance(results[0][1], FeatureProcessor)  # Assert the output_feature
-        self.assertIsInstance(results[0][2], CosmosData)  # Assert the cosmos_data
-        self.assertNotEqual(len(results[0][0].value), 0)
-        self.assertNotEqual(len(results[0][1].value), 0)
-        self.assertIsInstance(results[0][2].subhalo_particles, SubhaloParticles)
-        self.assertIsInstance(results[0][2].subhalos, SubhaloContext)
+        self.assertIsInstance(results[0][0], Halo)
+        self.assertIsInstance(results[0][1], VelocityDispersionProcessor)
+        self.assertIsInstance(results[0][2], ICLProcessor)
 
     def test_get_overlapping_halos(self):
         halo_df = pd.DataFrame({

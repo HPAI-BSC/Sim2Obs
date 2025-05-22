@@ -244,7 +244,6 @@ class SubhaloContext:
             If the provided `subhalo_id` (and `halo_id` if given) is not found in the DataFrame.
         """
         try:
-            # TODO update ?
             # Query using the multi-index
             if halo_id is not None:
                 if 'group_number' in self.data:
@@ -252,8 +251,10 @@ class SubhaloContext:
                     result = self.data.loc[(self.data['group_number'] == halo_id) &
                                            (self.data['subhalo_id'] == subhalo_id)].to_dict()
                     return SubHalo(**result)
-                else:
-                    raise ValueError()
+                elif 'id_parents' in self.data:
+                    result = self.data.loc[(self.data['id_parents'] == halo_id) &
+                                           (self.data['subhalo_id'] == subhalo_id)].to_dict()
+                    return SubHalo(**result)
             else:
                 # For Illustris-like single-index lookup, query all matching rows
                 result = self.data.xs(subhalo_id, level="subhalo_id", drop_level=False).to_dict()

@@ -2,8 +2,11 @@ import os
 import pickle
 import unittest
 
+from rootutils import rootutils
+
+rootutils.setup_root(__file__, pythonpath=True)
+
 import numpy as np
-import requests
 from hydra import initialize, compose
 
 from src.data_generation.src.data_fetcher import DataFetcherFactory
@@ -24,18 +27,21 @@ class TestHalo(unittest.TestCase):
         with open("data/illustris/subhalo_context_0.pkl", "rb") as file:
             self.subhalo_context_illustris = pickle.load(file)
 
-        '''
-
-        with initialize(config_path="configs"):
-            # Initialize the cfg_illustris and cfg_eagle
+        with initialize(config_path="../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
+            self.cfg_eagle = compose(config_name="data_generation.yaml")
+            self.cfg_millenium = compose(config_name="data_generation.yaml")
 
             # Load the local config for paths and assign them
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_illustris.paths = local_config.paths
+            self.cfg_eagle.paths = local_config.paths
+            self.cfg_millenium.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
+            self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
+            self.cfg_millenium.catalog = compose("catalog/millenium.yaml")['catalog']
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -43,7 +49,6 @@ class TestHalo(unittest.TestCase):
         data_loader_dict = next((step for step in self.cfg_illustris.pipeline if step.name == 'data_loader'), None)
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
         self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
-        '''
 
     def test_missing_required_attributes(self):
         """Test that the Halo class raises an error if required attributes are missing."""

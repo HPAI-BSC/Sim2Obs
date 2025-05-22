@@ -3,6 +3,10 @@ import pickle
 import unittest
 from typing import Generator
 
+from rootutils import rootutils
+
+rootutils.setup_root(__file__, pythonpath=True)
+
 from hydra import initialize, compose
 from unittest.mock import patch, MagicMock
 import numpy as np

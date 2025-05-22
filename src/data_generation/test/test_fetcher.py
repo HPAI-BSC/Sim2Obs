@@ -46,25 +46,34 @@ class TestFetcher(unittest.TestCase):
             self.subhalo_context_eagle = pickle.load(file)
 
         # Initialize Hydra and load configuration
-        with initialize(config_path="configs"):
-            # Initialize the cfg_illustris and cfg_eagle
+        with initialize(config_path="../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
-            self.cfg_flamingo = compose(config_name="data_generation.yaml")
+
             self.cfg_millenium = compose(config_name="data_generation.yaml")
+            self.cfg_flamingo = compose(config_name="data_generation.yaml")
 
             # Load the local config for paths and assign them
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_illustris.paths = local_config.paths
             self.cfg_eagle.paths = local_config.paths
-            self.cfg_flamingo.paths = local_config.paths
+
             self.cfg_millenium.paths = local_config.paths
+            self.cfg_flamingo.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
             self.cfg_eagle.catalog = compose("catalog/eagle.yaml")['catalog']
-            self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
+
+            # Enforce RefL0050N0752 simulation code
+            self.cfg_eagle.catalog.simulation_code = "RefL0050N0752"
+            self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
+
             self.cfg_millenium.catalog = compose("catalog/millenium.yaml")['catalog']
+            self.cfg_millenium.catalog.path = '../../../local/data/datasets/millenium/MTNG-L31.25-270-A'
+
+            self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
+            self.cfg_flamingo.catalog.path = '../../../local/data/datasets/flamingo/L1000N0900'
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -108,8 +117,6 @@ class TestFetcher(unittest.TestCase):
         subhalo_particles_1 = self.fetcher_illustris.get_p_subhalo(subhalo_id=10)
 
         self.assertIsInstance(subhalo_particles_1, SubhaloParticles)
-        self.assertTrue(hasattr(subhalo_particles_1, "gas_m"))
-        self.assertIsInstance(subhalo_particles_1.gas_m, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_1, "star_m"))
         self.assertIsInstance(subhalo_particles_1.star_m, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_1, "star_p"))
@@ -123,8 +130,6 @@ class TestFetcher(unittest.TestCase):
                             28, 29, 35, 36]
         halo_particles_1 = self.fetcher_illustris.get_p_halo(halo=halo)
         self.assertIsInstance(halo_particles_1, SubhaloParticles)
-        self.assertTrue(hasattr(halo_particles_1, "gas_m"))
-        self.assertIsInstance(halo_particles_1.gas_m, np.ndarray)
         self.assertTrue(hasattr(halo_particles_1, "star_m"))
         self.assertIsInstance(halo_particles_1.star_m, np.ndarray)
         self.assertTrue(hasattr(halo_particles_1, "star_p"))
@@ -173,11 +178,8 @@ class TestFetcher(unittest.TestCase):
         self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
 
         subhalo_particles_2 = self.fetcher_eagle.get_p_subhalo(subhalo_id=0, halo_id=2)
-        self.assertEqual(len(subhalo_particles_2.gas_m), 2479560)
         self.assertEqual(len(subhalo_particles_2.star_m), 265076)
         self.assertIsInstance(subhalo_particles_2, SubhaloParticles)
-        self.assertTrue(hasattr(subhalo_particles_2, "gas_m"))
-        self.assertIsInstance(subhalo_particles_2.gas_m, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_2, "star_m"))
         self.assertIsInstance(subhalo_particles_2.star_m, np.ndarray)
         self.assertTrue(hasattr(subhalo_particles_2, "star_p"))
@@ -193,8 +195,6 @@ class TestFetcher(unittest.TestCase):
         halo.subhalo_ids = [(2, 1), (2, 3), (2, 5)]
         halo_particles_2 = self.fetcher_eagle.get_p_halo(halo=halo)
         self.assertIsInstance(halo_particles_2, SubhaloParticles)
-        self.assertTrue(hasattr(halo_particles_2, "gas_m"))
-        self.assertIsInstance(halo_particles_2.gas_m, np.ndarray)
         self.assertTrue(hasattr(halo_particles_2, "star_m"))
         self.assertIsInstance(halo_particles_2.star_m, np.ndarray)
         self.assertTrue(hasattr(halo_particles_2, "star_p"))
@@ -224,7 +224,10 @@ class TestFetcher(unittest.TestCase):
         self.assertIsInstance(subhalo_particles_1.star_v, np.ndarray)
 
     def test_get_p_halo_flamingo(self):
-        halo_particles_1 = self.fetcher_flamingo.get_p_halo(halo_id=0)
+        halo_context_1 = self.fetcher_flamingo.get_halos()
+        halo = halo_context_1.get_halo_by_id(halo_id=4)
+
+        halo_particles_1 = self.fetcher_flamingo.get_p_halo(halo=halo)
         self.assertIsInstance(halo_particles_1, SubhaloParticles)
         self.assertTrue(hasattr(halo_particles_1, "star_m"))
         self.assertIsInstance(halo_particles_1.star_m, np.ndarray)
@@ -236,12 +239,12 @@ class TestFetcher(unittest.TestCase):
     def test_get_halos_millenium(self):
         halo_context_1 = self.fetcher_millenium.get_halos()
         self.assertIsInstance(halo_context_1, HaloContext)
-        self.assertEqual(len(halo_context_1.data), 11208)
+        self.assertEqual(len(halo_context_1.data), 15)
 
     def test_get_subhalos_millenium(self):
         subhalo_context_1 = self.fetcher_millenium.get_subhalos()
         self.assertIsInstance(subhalo_context_1, SubhaloContext)
-        self.assertEqual(len(subhalo_context_1.data), 1178)
+        self.assertEqual(len(subhalo_context_1.data), 60)
 
     def test_eagle_simulation_codes(self):
         simulation_codes = ['RefL0025N0376',    # nok

@@ -1478,10 +1478,7 @@ class FlamingoFetcher(DataFetcher):
             logger.error("halo must be provided in kwargs")
             raise ValueError("halo must be provided in kwargs")
 
-        halo_id = kwargs.get('halo_id', None)
-        #logger.info(f"Fetching particle data for subhalo: {halo_id}")
-
-        return self._get_p_halo(halo_id)
+        return self._get_p_halo(halo)
 
     def _validate_and_process_fields(self, soap: SWIFTDataset, fields, super_key, mask=None, n_rows=None):
         """
@@ -1834,7 +1831,7 @@ class FlamingoFetcher(DataFetcher):
         particle_data = SubhaloParticles(d, self.catalog.fields.particles)
         return particle_data
 
-    def _get_p_halo(self, halo_id: int) -> SubhaloParticles:
+    def _get_p_halo(self, halo: Halo) -> SubhaloParticles:
         """
         Fetches particle data for a specific halo.
 
@@ -1852,16 +1849,16 @@ class FlamingoFetcher(DataFetcher):
         #logger.debug(f"Fetching particle data for halo: {halo_id}")
 
         # Get the position for the subhalo
-        halo_position = np.where(self.fof_subhalos.input_halos.halo_catalogue_index == halo_id)[0]
+        halo_position = np.where(self.fof_subhalos.input_halos.halo_catalogue_index == halo.halo_id)[0]
 
         if len(halo_position) > 0:
             host_halo_index = self.fof_subhalos.soap.host_halo_index[halo_position[0]]
         else:
-            raise ValueError(f'Subhalo: {halo_id} is not a primary subhalo')
+            raise ValueError(f'Subhalo: {halo.halo_id} is not a primary subhalo')
 
         if host_halo_index != -1:
             # Not a primary index
-            raise ValueError(f'Subhalo: {halo_id} is not a primary subhalo')
+            raise ValueError(f'Subhalo: {halo.halo_id} is not a primary subhalo')
 
         # Add halo_catalogue_index for all the particle types
         for part_type in self.particle_fields:
@@ -1883,11 +1880,11 @@ class FlamingoFetcher(DataFetcher):
         for part_type in part_types:
             particles_of_type = getattr(self.particles, part_type)
             # Mask to get particles belonging to the primary subhalo
-            particles_mask_primary = particles_of_type.halo_catalogue_index == halo_id
+            particles_mask_primary = particles_of_type.halo_catalogue_index == halo.halo_id
             is_full_false = np.sum(particles_mask_primary)
 
             # Get satellite subhalos
-            satellites_mask = self.fof_subhalos.soap.host_halo_index == halo_id
+            satellites_mask = self.fof_subhalos.soap.host_halo_index == halo.halo_id
 
             # Loop over the halo_catalogue_index of the satellites to get all bound particles
             satellites_idx_array = self.fof_subhalos.input_halos.halo_catalogue_index[satellites_mask]
@@ -1897,7 +1894,7 @@ class FlamingoFetcher(DataFetcher):
             type_mask[part_type] = particles_mask
 
             if np.all(particles_mask_satellites == False):
-                logger.warning(f'Halo {halo_id} has no satellites.')
+                logger.warning(f'Halo {halo.halo_id} has no satellites.')
 
         particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
         filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}

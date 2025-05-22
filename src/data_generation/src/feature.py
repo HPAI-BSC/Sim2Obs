@@ -343,7 +343,7 @@ class ICLProcessor(FeatureProcessor):
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
         return icl_mask
 
-    def _compute_transition_radius(self, cfg: DictConfig, halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
+    def _compute_transition_radius(self, halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
         """
         Computes the transition radius where the intracluster light (ICL) dominates over the brightest cluster galaxy (BCG).
 
@@ -440,7 +440,7 @@ class ICLProcessor(FeatureProcessor):
 
         if hasattr(self, 'transition_radius_compute'):
             if self.transition_radius_compute:
-                self._compute_transition_radius(self.cfg, halo, subhalo_particles, icl_mask)
+                self._compute_transition_radius(halo, subhalo_particles, icl_mask)
             elif self.cfg.catalog.get('transition_radius', None) is None:
                 logger.error('Error, you must define a transition radius for generating the maps')
 
