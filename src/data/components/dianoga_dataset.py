@@ -44,6 +44,9 @@ class DianogaDataset(GalaxyDataset):
         plt.imshow(label.permute(1,2,0).cpu().numpy(), cmap='viridis')
         plt.savefig(test_path2)
         plt.close()
+        import time
+        time.sleep(5)
+        print("Saved successfully!")
         self.this_fn_does_not_exist()
         return image, label
 
