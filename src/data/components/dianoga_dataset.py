@@ -44,7 +44,7 @@ class DianogaDataset(GalaxyDataset):
         plt.imshow(label.permute(1,2,0).cpu().numpy(), cmap='viridis')
         plt.savefig(test_path2)
         plt.close()
-        a = b
+        label,image = "",""
         return image, label
 
     @staticmethod
