@@ -4,7 +4,7 @@ snapnum: 84       # redshift 0.2
 a: 0.8333     # redshift 0.2
 H: 0.6774
 # https://www.tng-project.org/data/docs/background/
-Lbox: 205000 # box size in kpc/h
+#Lbox: 205000 # box size in kpc/h
 
 transition_radius: 637.031 # kpc
 spatial_resolution: 1.480 # kpc
