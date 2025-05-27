@@ -19,7 +19,7 @@ class LastStep:
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
 
-        transition_radius_analysis = False
+        transition_radius_analysis = True
 
         # Collect statistics and errors
         data = {'halo_id': [], 'r200': [], 'transition_radius': [], 'normalized_transition_radius': []}
