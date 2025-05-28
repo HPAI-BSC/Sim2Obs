@@ -157,10 +157,11 @@ class PairedTransformNumpy:
             label = TF.vflip(label)
 
         # Random rotation with same angle
-        angle = random.uniform(-45, 45)
+        angle = random.sample([-90, 0, 90],k=1)[0]
         image = TF.rotate(image, angle)
         label = TF.rotate(label, angle)
 
+        """
         # Random resized crop with same parameters
         # Get crop parameters once and apply to both
         _, h, w = image.shape
@@ -187,6 +188,7 @@ class PairedTransformNumpy:
         # Apply crop and resize to both
         image = TF.resized_crop(image, i, j, crop_h, crop_w, self.resize_shape)
         label = TF.resized_crop(label, i, j, crop_h, crop_w, self.resize_shape)
+        """
 
         # Final resize (might be redundant after RandomResizedCrop, but keeping for consistency)
         image = TF.resize(image, self.resize_shape)
