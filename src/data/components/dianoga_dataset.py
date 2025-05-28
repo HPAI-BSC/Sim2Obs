@@ -27,7 +27,9 @@ class DianogaDataset(GalaxyDataset):
         labels = np.load(labels_path)
         label = labels[f'arr_0'].astype('float64')
 
+        print('a')
         print(np.mean(label))
+        print(label.shape)
 
         #image = np.expand_dims(image, axis=0)
         #label = np.expand_dims(label, axis=0)
@@ -47,6 +49,7 @@ class DianogaDataset(GalaxyDataset):
         print(label.shape)
         plt.imshow(label.permute(1,2,0).cpu().numpy(), cmap='viridis')
         plt.savefig(test_path2)
+        plt.colorbar()
         plt.close()
         import time
         time.sleep(5)
