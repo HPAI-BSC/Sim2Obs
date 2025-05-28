@@ -56,7 +56,6 @@ def plot_predictions(predictions, ground_truths, output_path):
             gt = np.array(gt.tolist())
         else:
             gt = np.transpose(pred, (1, 2, 0))
-        print(pred.shape, gt.shape)
         axes[0, i].imshow(pred)
         axes[0, i].axis('off')
         axes[0, i].set_title(f'Prediction {i}')
@@ -126,8 +125,6 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     log.info("Starting testing!")
 
     trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
-
-    print("Done testing!!!")
 
     # for predictions use trainer.predict(...)
     if cfg.save_predictions:

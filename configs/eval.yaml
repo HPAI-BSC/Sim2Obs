@@ -3,7 +3,7 @@
 defaults:
   - _self_
   #- data: combined_dataset
-  - data: galaxy_dianoga_rotation45.yaml
+  - data: galaxy_eagle_refl005.yaml
   - model: mamba_unet
   - logger:
   - trainer: default
@@ -17,7 +17,7 @@ tags: ["dev"]
 
 commit_tag: "commit_hash"
 
-save_predictions: False
+save_predictions: True
 
 # passing checkpoint path is necessary for evaluation # last.skpt
 # BASELINE

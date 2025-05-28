@@ -18,24 +18,26 @@ class EagleDataset(GalaxyDataset):
     def __getitem__(self, index):
         img_path = os.path.join(self.image_dir, self.images[index])
         labels_path = os.path.join(self.labels_dir, self.labels[index])
+
         images = np.load(img_path)
-        image = images[f'arr_0']
+        image = images[f'arr_0'].astype('float64')
 
         labels = np.load(labels_path)
-        label = labels[f'arr_0']
+        label = labels[f'arr_0'].astype('float64')
 
         if self.mask_interlopers:
             image = image[..., 0] * (1-image)[..., 1]
             label = label[..., 0] * (1-label)[..., 1]
 
-        #image = image.float().unsqueeze(0)
-        image = np.expand_dims(image, axis=0)
-        label = np.expand_dims(label, axis=0)
+        import matplotlib.pyplot as plt
+        test_path = "/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/label_after_transform.png"
+        plt.imshow(label, cmap='viridis')
+        plt.savefig(test_path)
+        plt.close()
 
         if self.transform:
-            image = self.transform(image)
-            label = self.transform(label)
-        #label = label.float().unsqueeze(0)
+            image, label = self.transform(image, label)
+
         return image, label
 
     @staticmethod
