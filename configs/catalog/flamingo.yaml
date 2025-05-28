@@ -6,6 +6,7 @@ g: 1.989e43
 
 snapnum: 73          # redshift 0.2
 
+Lbox: 677400 # box size in kpc/h from 1 cGkp
 simulation_code: L1000N0900
 path: ${paths.datasets_dir}/flamingo/L1000N0900
 
