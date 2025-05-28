@@ -132,8 +132,8 @@ class PairedTransformNumpy:
         """
 
         # Convert numpy arrays to tensors
-        image = torch.from_numpy(image).float()
-        label = torch.from_numpy(label).float()
+        image = torch.tensor(image).float()
+        label = torch.tensor(label).float()
 
         # Ensure proper tensor format (C, H, W)
         if image.dim() == 2:  # (H, W) -> (1, H, W)
@@ -193,78 +193,6 @@ class PairedTransformNumpy:
         label = TF.resize(label, self.resize_shape)
 
         return image, label
-
-
-class PairedTransforms:
-    """
-    Custom transform class that applies identical transformations to both image and label
-    for image-to-image reconstruction tasks.
-    """
-    def __init__(self, resize_shape):
-        """
-        Args:
-            resize_shape: Target size for resize and crop operations
-        """
-        self.resize_shape = resize_shape
-
-    def __call__(self, image, label):
-        """
-        Apply same transformations to both image and label.
-
-        Args:
-            image: PIL Image
-            label: PIL Image
-
-        Returns:
-            tuple: (transformed_image, transformed_label) as torch tensors
-        """
-
-        # Random horizontal flip with same probability
-        if random.random() < 0.5:
-            image = TF.hflip(image)
-            label = TF.hflip(label)
-
-        # Random vertical flip with same probability
-        if random.random() < 0.5:
-            image = TF.vflip(image)
-            label = TF.vflip(label)
-
-        # Random rotation with same angle
-        angle = random.uniform(-45, 45)
-        image = TF.rotate(image, angle)
-        label = TF.rotate(label, angle)
-
-        # Random resized crop with same parameters
-        i, j, h, w = transforms.RandomResizedCrop.get_params(
-            image, scale=(0.95, 1.0), ratio=(0.75, 1.33)
-        )
-        image = TF.resized_crop(image, i, j, h, w, self.resize_shape)
-        label = TF.resized_crop(label, i, j, h, w, self.resize_shape)
-
-        # Resize (this might be redundant after RandomResizedCrop, but keeping it as in original)
-        image = TF.resize(image, self.resize_shape)
-        label = TF.resize(label, self.resize_shape)
-
-        # Convert to tensor
-        image = self._safe_to_tensor(image)
-        label = self._safe_to_tensor(label)
-
-        return image, label
-
-    def _safe_to_tensor(self, pil_img):
-        try:
-            return TF.to_tensor(pil_img)
-        except TypeError:
-            if pil_img.mode != 'RGB':
-                pil_img = pil_img.convert('RGB')
-
-            # Convert PIL to list, then directly to tensor
-            img_array = list(pil_img.getdata())
-            h, w = pil_img.size[1], pil_img.size[0]  # PIL uses (w, h)
-            print(np.array(img_array).shape)
-            tensor = torch.tensor(img_array, dtype=torch.float32)
-            tensor = tensor.view(h, w, 1).permute(2, 0, 1) / 255.0
-            return tensor
 
 
 class GalaxyDataModule(LightningDataModule):
