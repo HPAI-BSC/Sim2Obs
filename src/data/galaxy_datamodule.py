@@ -167,7 +167,7 @@ class PairedTransforms:
             img_array = list(pil_img.getdata())
             h, w = pil_img.size[1], pil_img.size[0]  # PIL uses (w, h)
             tensor = torch.tensor(img_array, dtype=torch.float32)
-            tensor = tensor.view(h, w, 3).permute(2, 0, 1) / 255.0
+            tensor = tensor.view(h, w, 1).permute(2, 0, 1) / 255.0
             return tensor
 
 
@@ -280,8 +280,6 @@ class GalaxyDataModule(LightningDataModule):
         torch.manual_seed(random_seed)
         random.seed(random_seed)
         np.random.seed(random_seed)
-
-        print('aa')
 
         if train_val_test_split == (None, None, None):
             self.data_train: Optional[Dataset] = None

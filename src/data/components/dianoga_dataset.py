@@ -33,8 +33,10 @@ class DianogaDataset(GalaxyDataset):
 
         #image = np.expand_dims(image, axis=0)
         #label = np.expand_dims(label, axis=0)
-        image = Image.fromarray(image)
-        label = Image.fromarray(label)
+        #image = Image.fromarray(image)
+        #label = Image.fromarray(label)
+        image = Image.fromarray((image * 255).astype(np.uint8), mode='L')
+        label = Image.fromarray((label * 255).astype(np.uint8), mode='L')
 
         test_path = "/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/label_before_transform.png"
         plt.imshow(label, cmap='viridis')
