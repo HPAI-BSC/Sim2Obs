@@ -3,6 +3,13 @@ import unittest
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from hydra import initialize, compose
+import os
+from rootutils import rootutils
+
+rootutils.setup_root(__file__, pythonpath=True)
+
+from src.data_generation.src.data_fetcher import DataFetcherFactory
 
 
 class TestFlamingoData(unittest.TestCase):
@@ -13,6 +20,7 @@ class TestFlamingoData(unittest.TestCase):
 
         self.fof_subhalos = sw.load(fof_subhalos_file)
         self.data = sw.load(particles_file)
+        self.filtered_halos = None
 
     def test_load_fof(self):
         # get fof halo positions
@@ -27,13 +35,33 @@ class TestFlamingoData(unittest.TestCase):
         r200.convert_to_physical()
         r200 *= self.h
 
-        halo_center = self.fof_subhalos.input_halos_fof.centres
+        halo_center = self.fof_subhalos.input_halos.halo_centre
         halo_center.convert_to_units('kpc')
         halo_center.convert_to_physical()
         halo_center *= self.h
 
-        n = len(self.fof_subhalos.spherical_overdensity_200_crit.soradius)
-        primary_subhalos_id = np.arange(n)
+        halo_id = np.arange(len(halo_center))
+
+        # Count how many halos are after mass filtering
+        are_massive = m200 > 1e13 * 0.6774
+        are_primary = self.fof_subhalos.soap.host_halo_index == -1
+        final_sample_size = are_massive & are_primary
+        n = np.sum(final_sample_size)
+        print(n)
+
+        # Filtered values
+        m200 = m200[final_sample_size]
+        r200 = r200[final_sample_size]
+        halo_center = halo_center[final_sample_size]
+        halo_id = halo_id[final_sample_size]
+
+        self.filtered_halos = pd.DataFrame(data=[], columns=[])
+        self.filtered_halos['m200'] = m200
+        self.filtered_halos['r200'] = r200
+        self.filtered_halos['gpos'] = [halo_center[i] for i in range(halo_center.shape[0])]
+        self.filtered_halos['halo_id'] = halo_id
+        self.filtered_halos.to_csv('expected_halos_flamingo_L1000N0900.csv', index=False)
+        print()
 
     def test_plot_fof_mass_num_subhalos(self):
         m200_array = self.fof_subhalos.spherical_overdensity_200_crit.total_mass
@@ -71,13 +99,10 @@ class TestFlamingoData(unittest.TestCase):
         plt.show()
 
     def test_get_subhalo_by_fof(self):
-        fof_id = 4
-
         # Get stellar mass, half_mass_radius_stars and coordinates for all the subhalos
         stellar_mass_array = self.fof_subhalos.bound_subhalo.stellar_mass
         stellar_mass_array.convert_to_units('Msun')
         stellar_mass_array.convert_to_physical()
-        stellar_mass_array *= self.h
 
         shmr_array = self.fof_subhalos.bound_subhalo.half_mass_radius_stars
         shmr_array.convert_to_units('kpc')
@@ -89,19 +114,35 @@ class TestFlamingoData(unittest.TestCase):
         coordinates_array.convert_to_physical()
         coordinates_array *= self.h
 
-        # Retrieve data for the primary subhalo, correct
-        stellar_mass = stellar_mass_array[fof_id]
-        shmr = shmr_array[fof_id]
-        coordinates = coordinates_array[fof_id]
+        subhalo_id = np.arange(len(stellar_mass_array))
+        id_parents = self.fof_subhalos.soap.host_halo_index.value
 
-        # TODO Retrieve data for the subhalo satellites, correct
-        satellites_mask = self.fof_subhalos.soap.host_halo_index == fof_id
-        n_satellites = np.sum(satellites_mask)
+        # Filtered values
+        are_massive = stellar_mass_array > 1e10
+        are_child = self.fof_subhalos.soap.host_halo_index != -1
+        final_sample_size = are_massive & are_child
+        n = np.sum(final_sample_size)
+        print(n)
 
-        satellite_coordiantes = coordinates_array[satellites_mask]
-        satellite_shmr = shmr_array[satellites_mask]
-        satellite_stellar_mass = stellar_mass_array[satellites_mask]
-        print(stellar_mass, shmr, coordinates)
+        stellar_mass_array = stellar_mass_array[final_sample_size]
+        shmr_array = shmr_array[final_sample_size]
+        coordinates_array = coordinates_array[final_sample_size]
+        subhalo_id = subhalo_id[final_sample_size]
+        id_parents = id_parents[final_sample_size]
+
+        filtered_subhalos = pd.DataFrame(data=[], columns=[])
+        filtered_subhalos['mstr'] = stellar_mass_array
+        filtered_subhalos['shmr'] = shmr_array
+        filtered_subhalos['spos'] = [coordinates_array[i] for i in range(coordinates_array.shape[0])]
+        filtered_subhalos['subhalo_id'] = subhalo_id
+        filtered_subhalos['id_parents'] = id_parents
+        filtered_subhalos.to_csv('expected_subhalos_flamingo_L1000N0900.csv', index=False)
+
+        # --------
+        fof_id = 4
+        children_mask = id_parents == 4
+        children_list = subhalo_id[children_mask]
+        print()
 
     def test_load_particles(self):
         # Load data for star particles
@@ -189,5 +230,55 @@ class TestFlamingoData(unittest.TestCase):
         ax.grid(True)
         fig.savefig("particles_vs_mass.png", dpi=300, bbox_inches="tight")  # Save as PNG
         plt.show()
+
+    def test_fetcher_flamingo(self):
+        with initialize(config_path="../../../../configs"):
+            self.cfg_flamingo = compose(config_name="data_generation.yaml")
+            # Load the local config for paths and assign them
+            local_config = compose(config_name="paths/local.yaml")
+            self.cfg_flamingo.paths = local_config.paths
+            self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
+            self.cfg_flamingo.catalog.path = '../../../../local/data/datasets/flamingo/L1000N0900'
+
+        os.environ['PROJECT_ROOT'] = '../../..'
+
+        required_keys = ['G']
+        data_loader_dict = next((step for step in self.cfg_flamingo.pipeline if step.name == 'data_loader'), None)
+        attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
+        self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
+
+        # Non filtered primary halos ids
+        expected_num_halos = 128967
+        all_primary_halos_id_mask = self.fof_subhalos.soap.host_halo_index == -1
+
+        # Halos
+        halo_context_1 = self.fetcher_flamingo.get_halos()
+        halos_df = halo_context_1.data
+        halos_df = halos_df.reset_index(drop=True)
+        halos_df = halos_df.sort_values(by='halo_id')
+        halos_df.to_csv('halos_flamingo_L1000N0900.csv', index=False)
+
+        #halos_df = pd.read_csv('halos_flamingo_L1000N0900.csv')
+        id_primary_halos = halos_df['halo_id'].unique()
+        self.assertEqual(len(id_primary_halos), expected_num_halos)
+
+        # Subhalos
+        expected_num_subhalos = 2084586
+        subhalo_context_1 = self.fetcher_flamingo.get_subhalos()
+        subhalos_df = subhalo_context_1.data
+        subhalos_df = subhalos_df.reset_index(drop=True)
+        subhalos_df = subhalos_df.sort_values(by='id_parents')
+        subhalos_df.to_csv('subhalos_flamingo_L1000N0900.csv', index=False)
+        #subhalos_df = pd.read_csv('subhalos_flamingo_L1000N0900.csv')
+        id_parents = subhalos_df['id_parents']
+
+        error_parents = set(id_parents) - set(id_primary_halos)
+
+        # Example case fof=4
+        expected_child_list = [4, 20, 75, 112, 162]
+        child_list = subhalos_df[subhalos_df['id_parents'] == 4]['subhalo_id'].tolist()
+        tmp = subhalo_context_1.get_items_by_halo(4)
+        self.assertSetEqual(set(expected_child_list), set(child_list))
+
 
 
