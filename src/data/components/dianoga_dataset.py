@@ -25,7 +25,7 @@ class DianogaDataset(GalaxyDataset):
         #image = torch.tensor(image)
 
         labels = np.load(labels_path)
-        label = labels[f'arr_0']
+        label = labels[f'arr_0'].astype('float64')
 
         print(np.mean(label))
 
