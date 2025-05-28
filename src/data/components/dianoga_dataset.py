@@ -51,10 +51,7 @@ class DianogaDataset(GalaxyDataset):
         plt.savefig(test_path2)
         plt.colorbar()
         plt.close()
-        import time
-        time.sleep(5)
-        print("Saved successfully!")
-        self.this_fn_does_not_exist()
+
         return image, label
 
     @staticmethod

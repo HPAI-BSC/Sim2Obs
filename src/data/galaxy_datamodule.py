@@ -279,6 +279,7 @@ class GalaxyDataModule(LightningDataModule):
                                                         fraction_data=fraction_data)
         torch.manual_seed(random_seed)
         random.seed(random_seed)
+        np.random.seed(random_seed)
 
         print('aa')
 
