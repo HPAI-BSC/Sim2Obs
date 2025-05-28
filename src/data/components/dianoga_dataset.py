@@ -19,13 +19,13 @@ class DianogaDataset(GalaxyDataset):
         labels_path = os.path.join(self.labels_dir, self.labels[index])
 
         images = np.load(img_path)
-        image = images[f'arr_0'].astype(np.uint8)
+        image = images[f'arr_0']
         ## resize image to 128x128
         #image = image[1:129, 1:129]
         #image = torch.tensor(image)
 
         labels = np.load(labels_path)
-        label = labels[f'arr_0'].astype(np.uint8)
+        label = labels[f'arr_0']
 
         #image = np.expand_dims(image, axis=0)
         #label = np.expand_dims(label, axis=0)
