@@ -152,10 +152,20 @@ class PairedTransforms:
         label = TF.resize(label, self.resize_shape)
 
         # Convert to tensor
-        image = TF.to_tensor(image)
-        label = TF.to_tensor(label)
+        image = self._safe_to_tensor(image)
+        label = self._safe_to_tensor(label)
 
         return image, label
+
+    def _safe_to_tensor(self, pil_img):
+        try:
+            return TF.to_tensor(pil_img)
+        except TypeError:
+            # Fallback to manual conversion
+            np_img = np.array(pil_img)
+            if np_img.ndim == 2:  # grayscale
+                np_img = np_img[:, :, None]
+            return torch.from_numpy(np_img.transpose(2, 0, 1)).float() / 255.0
 
 
 class GalaxyDataModule(LightningDataModule):
