@@ -141,7 +141,7 @@ class PairedTransforms:
 
         # Random resized crop with same parameters
         i, j, h, w = transforms.RandomResizedCrop.get_params(
-            image, scale=(0.9, 1.0), ratio=(0.75, 1.33)
+            image, scale=(0.95, 1.0), ratio=(0.75, 1.33)
         )
         image = TF.resized_crop(image, i, j, h, w, self.resize_shape)
         label = TF.resized_crop(label, i, j, h, w, self.resize_shape)
@@ -166,6 +166,7 @@ class PairedTransforms:
             # Convert PIL to list, then directly to tensor
             img_array = list(pil_img.getdata())
             h, w = pil_img.size[1], pil_img.size[0]  # PIL uses (w, h)
+            print(img_array.shape)
             tensor = torch.tensor(img_array, dtype=torch.float32)
             tensor = tensor.view(h, w, 1).permute(2, 0, 1) / 255.0
             return tensor
