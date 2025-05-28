@@ -193,12 +193,12 @@ class GalaxyDataModule(LightningDataModule):
             ]
         )
 
-        self.transforms = NumpyTransforms(resize_shape=resize_shape)
+        #self.transforms = NumpyTransforms(resize_shape=resize_shape)
 
         full_dataset = GalaxyDatasetFactory.get_dataset(dataset,
                                                         image_dir=data_dir,
                                                         labels_dir=target_maskdir,
-                                                        transform=self.transforms,
+                                                        transform=self.train_transforms,
                                                         mask_interlopers=mask_interlopers,
                                                         fraction_data=fraction_data)
         torch.manual_seed(random_seed)
