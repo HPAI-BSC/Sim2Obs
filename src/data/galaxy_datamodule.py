@@ -278,6 +278,9 @@ class GalaxyDataModule(LightningDataModule):
                                                         mask_interlopers=mask_interlopers,
                                                         fraction_data=fraction_data)
         torch.manual_seed(random_seed)
+        random.seed(random_seed)
+
+        print('aa')
 
         if train_val_test_split == (None, None, None):
             self.data_train: Optional[Dataset] = None
