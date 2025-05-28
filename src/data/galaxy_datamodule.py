@@ -100,6 +100,101 @@ class NumpyTransforms:
         return torch.tensor(img).float()
 
 
+import torch
+import torchvision.transforms.functional as TF
+import random
+import math
+
+
+class PairedTransformNumpy:
+    """
+    Custom transform class that applies identical transformations to both image and label
+    working directly with numpy arrays (converted to tensors) for maximum efficiency.
+    """
+
+    def __init__(self, resize_shape):
+        """
+        Args:
+            resize_shape: Target size for resize and crop operations (height, width)
+        """
+        self.resize_shape = resize_shape
+
+    def __call__(self, image, label):
+        """
+        Apply same transformations to both image and label numpy arrays.
+
+        Args:
+            image: numpy array (H, W) or (H, W, C)
+            label: numpy array (H, W) or (H, W, C)
+
+        Returns:
+            tuple: (transformed_image, transformed_label) as torch tensors
+        """
+
+        # Convert numpy arrays to tensors
+        image = torch.from_numpy(image).float()
+        label = torch.from_numpy(label).float()
+
+        # Ensure proper tensor format (C, H, W)
+        if image.dim() == 2:  # (H, W) -> (1, H, W)
+            image = image.unsqueeze(0)
+        elif image.dim() == 3:  # (H, W, C) -> (C, H, W)
+            image = image.permute(2, 0, 1)
+
+        if label.dim() == 2:  # (H, W) -> (1, H, W)
+            label = label.unsqueeze(0)
+        elif label.dim() == 3:  # (H, W, C) -> (C, H, W)
+            label = label.permute(2, 0, 1)
+
+        # Random horizontal flip with same probability
+        if random.random() < 0.5:
+            image = TF.hflip(image)
+            label = TF.hflip(label)
+
+        # Random vertical flip with same probability
+        if random.random() < 0.5:
+            image = TF.vflip(image)
+            label = TF.vflip(label)
+
+        # Random rotation with same angle
+        angle = random.uniform(-45, 45)
+        image = TF.rotate(image, angle)
+        label = TF.rotate(label, angle)
+
+        # Random resized crop with same parameters
+        # Get crop parameters once and apply to both
+        _, h, w = image.shape
+        scale_min, scale_max = 0.9, 1.0
+        ratio_min, ratio_max = 0.75, 1.33
+
+        # Calculate crop size
+        area = h * w
+        target_area = random.uniform(scale_min, scale_max) * area
+        log_ratio = (math.log(ratio_min), math.log(ratio_max))
+        aspect_ratio = math.exp(random.uniform(*log_ratio))
+
+        crop_h = int(round(math.sqrt(target_area / aspect_ratio)))
+        crop_w = int(round(math.sqrt(target_area * aspect_ratio)))
+
+        # Ensure crop dimensions are within image bounds
+        crop_h = min(crop_h, h)
+        crop_w = min(crop_w, w)
+
+        # Random crop position
+        i = random.randint(0, h - crop_h)
+        j = random.randint(0, w - crop_w)
+
+        # Apply crop and resize to both
+        image = TF.resized_crop(image, i, j, crop_h, crop_w, self.resize_shape)
+        label = TF.resized_crop(label, i, j, crop_h, crop_w, self.resize_shape)
+
+        # Final resize (might be redundant after RandomResizedCrop, but keeping for consistency)
+        image = TF.resize(image, self.resize_shape)
+        label = TF.resize(label, self.resize_shape)
+
+        return image, label
+
+
 class PairedTransforms:
     """
     Custom transform class that applies identical transformations to both image and label
@@ -166,7 +261,7 @@ class PairedTransforms:
             # Convert PIL to list, then directly to tensor
             img_array = list(pil_img.getdata())
             h, w = pil_img.size[1], pil_img.size[0]  # PIL uses (w, h)
-            print(img_array.shape)
+            print(np.array(img_array).shape)
             tensor = torch.tensor(img_array, dtype=torch.float32)
             tensor = tensor.view(h, w, 1).permute(2, 0, 1) / 255.0
             return tensor
@@ -268,7 +363,7 @@ class GalaxyDataModule(LightningDataModule):
         )
         """
 
-        self.transforms = PairedTransforms(resize_shape=resize_shape)
+        self.transforms = PairedTransformNumpy(resize_shape=resize_shape)
 
         #self.transforms = NumpyTransforms(resize_shape=resize_shape)
 

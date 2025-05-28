@@ -19,7 +19,7 @@ class DianogaDataset(GalaxyDataset):
         labels_path = os.path.join(self.labels_dir, self.labels[index])
 
         images = np.load(img_path)
-        image = images[f'arr_0']
+        image = images[f'arr_0'].astype('float64')
         ## resize image to 128x128
         #image = image[1:129, 1:129]
         #image = torch.tensor(image)
@@ -35,8 +35,6 @@ class DianogaDataset(GalaxyDataset):
         #label = np.expand_dims(label, axis=0)
         #image = Image.fromarray(image)
         #label = Image.fromarray(label)
-        image = Image.fromarray((image * 255).astype(np.uint8), mode='L')
-        label = Image.fromarray((label * 255).astype(np.uint8), mode='L')
 
         test_path = "/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/label_before_transform.png"
         plt.imshow(label, cmap='viridis')
