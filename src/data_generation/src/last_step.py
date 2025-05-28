@@ -1,3 +1,6 @@
+import pickle
+
+import joblib
 import numpy as np
 import pandas as pd
 from omegaconf import DictConfig
@@ -18,6 +21,10 @@ class LastStep:
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
+
+        path = self.cfg.paths.datasets_dir + f'/../logs/results_illustris.joblib'
+        with open(path) as f:
+            joblib.dump(results, f)
 
         transition_radius_analysis = True
 
@@ -69,6 +76,7 @@ class LastStep:
         path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.csv'
         logger.info(f'Storing errors df at: {path}')
         errors_df.to_csv(path, index=False)
+        # TODO not working
         logger.error(f'Ignored halos during transition radius computation, ICL never dominates: {ignored_halos}')
 
 
