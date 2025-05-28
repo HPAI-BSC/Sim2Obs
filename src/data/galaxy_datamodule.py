@@ -146,6 +146,7 @@ class PairedTransformNumpy:
         elif label.dim() == 3:  # (H, W, C) -> (C, H, W)
             label = label.permute(2, 0, 1)
 
+        """
         # Random horizontal flip with same probability
         if random.random() < 0.5:
             image = TF.hflip(image)
@@ -157,9 +158,10 @@ class PairedTransformNumpy:
             label = TF.vflip(label)
 
         # Random rotation with same angle
-        angle = random.sample([-90, 0, 90],k=1)[0]
+        angle = random.sample([-90, 0, 0, 90],k=1)[0]
         image = TF.rotate(image, angle)
         label = TF.rotate(label, angle)
+        """
 
         """
         # Random resized crop with same parameters

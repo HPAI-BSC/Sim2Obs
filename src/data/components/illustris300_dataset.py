@@ -31,26 +31,19 @@ class Illustris300Dataset(GalaxyDataset):
         if not os.path.exists(img_path) or not os.path.exists(label_path):
             raise FileNotFoundError(f"Image or label file not found at index {index}")
 
-        # Process image and label
-        #image = self._load_and_process_npy(img_path)
-        #label = self._load_and_process_npy(label_path)
-
         images = np.load(img_path)
-        image = images[f'arr_0']
+        image = images[f'arr_0'].astype('float64')
 
         labels = np.load(label_path)
-        label = labels[f'arr_0']
+        label = labels[f'arr_0'].astype('float64')
 
         if self.mask_interlopers:
-            image = image[..., 0] * (1-image)[..., 1]
-            label = label[..., 0] * (1-label)[..., 1]
-
-        image = np.expand_dims(image, axis=0)
-        label = np.expand_dims(label, axis=0)
+            image = image[..., 0] * (1 - image)[..., 1]
+            label = label[..., 0] * (1 - label)[..., 1]
 
         if self.transform:
-            image = self.transform(image)
-            label = self.transform(label)
+            image, label = self.transform(image, label)
+
         return image, label
 
     def _load_and_process_npy(self, file_path):
