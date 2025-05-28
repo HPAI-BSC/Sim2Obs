@@ -17,7 +17,7 @@ tags: ["dev"]
 
 commit_tag: "commit_hash"
 
-save_predictions: True
+save_predictions: False
 
 # passing checkpoint path is necessary for evaluation # last.skpt
 # BASELINE

@@ -127,6 +127,8 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
 
+    print("Done testing!!!")
+
     # for predictions use trainer.predict(...)
     if cfg.save_predictions:
         log.info("Predicting...")
