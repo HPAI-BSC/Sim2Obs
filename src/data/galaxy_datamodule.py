@@ -105,7 +105,6 @@ class PairedTransforms:
     Custom transform class that applies identical transformations to both image and label
     for image-to-image reconstruction tasks.
     """
-
     def __init__(self, resize_shape):
         """
         Args:
@@ -161,11 +160,15 @@ class PairedTransforms:
         try:
             return TF.to_tensor(pil_img)
         except TypeError:
-            # Fallback to manual conversion
-            np_img = np.array(pil_img)
-            if np_img.ndim == 2:  # grayscale
-                np_img = np_img[:, :, None]
-            return torch.from_numpy(np_img.transpose(2, 0, 1)).float() / 255.0
+            if pil_img.mode != 'RGB':
+                pil_img = pil_img.convert('RGB')
+
+            # Convert PIL to list, then directly to tensor
+            img_array = list(pil_img.getdata())
+            h, w = pil_img.size[1], pil_img.size[0]  # PIL uses (w, h)
+            tensor = torch.tensor(img_array, dtype=torch.float32)
+            tensor = tensor.view(h, w, 3).permute(2, 0, 1) / 255.0
+            return tensor
 
 
 class GalaxyDataModule(LightningDataModule):
@@ -241,6 +244,7 @@ class GalaxyDataModule(LightningDataModule):
             resize_shape
         )  # comming from gydra is a OmegaConf.listconfig.ListConfig item
         # train data transformations
+        """
         self.train_transforms = transforms.Compose(
             [
                 transforms.RandomHorizontalFlip(p=0.5),
@@ -261,6 +265,7 @@ class GalaxyDataModule(LightningDataModule):
                 #transforms.Normalize((0.1307,), (0.3081,)),
             ]
         )
+        """
 
         self.transforms = PairedTransforms(resize_shape=resize_shape)
 
@@ -296,9 +301,12 @@ class GalaxyDataModule(LightningDataModule):
                 train_size = 1
                 val_size -= 1
 
-            train_halos = set(halo_ids[:train_size])
-            val_halos = set(halo_ids[train_size:train_size + val_size])
-            test_halos = set(halo_ids[train_size + val_size:])
+            # Randomly shuffle the halo_ids and split
+            shuffled_halo_ids = random.sample(halo_ids, len(halo_ids))
+
+            train_halos = set(shuffled_halo_ids[:train_size])
+            val_halos = set(shuffled_halo_ids[train_size:train_size + val_size])
+            test_halos = set(shuffled_halo_ids[train_size + val_size:])
 
             print(f"TRAIN HALOS")
             print(train_halos)
