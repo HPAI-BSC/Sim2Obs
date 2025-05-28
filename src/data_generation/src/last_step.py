@@ -23,7 +23,7 @@ class LastStep:
         logger.info('-------------------------------------------------------------------------------------')
 
         path = self.cfg.paths.datasets_dir + f'/../logs/results_illustris.joblib'
-        with open(path, 'w') as f:
+        with open(path, 'wb') as f:
             joblib.dump(results, f)
 
         transition_radius_analysis = True
