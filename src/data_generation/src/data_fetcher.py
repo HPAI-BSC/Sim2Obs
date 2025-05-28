@@ -1579,6 +1579,31 @@ class FlamingoFetcher(DataFetcher):
         halos = halos[halos['soap.host_halo_index'] == -1]
         return halos
 
+    def __filter_primary(self, halos, halos_ids):
+        """
+        Filter halos to retain only those that are the NON primary FoF halos.
+
+        This function removes non-primary subhalos by checking the `soap.host_halo_index` field.
+
+        Parameters:
+        -----------
+        halos : pandas.DataFrame or similar structured array
+            The dataset containing halo properties.
+
+        Returns:
+        --------
+        pandas.DataFrame
+            A filtered version of the input `halos` where only primary halos (FoFs) are retained.
+
+        Notes:
+        ------
+        - This method removes subhalos by keeping only entries where `soap.host_halo_index != -1`.
+        """
+        # Check just positions allocating fofs and primary subhalos
+        halos = halos[((halos['soap.host_halo_index'] == -1) & (halos.index.isin(halos_ids))) |
+                      (halos['soap.host_halo_index'].isin(halos_ids))]
+        return halos
+
     def load_files(self):
         """
         Load and validate the necessary dataset files for analysis.
@@ -1627,6 +1652,7 @@ class FlamingoFetcher(DataFetcher):
         logger.debug("Fetching halos from Flamingo...")
 
         self.column_map['input_halos.halo_centre'] = 'gpos'
+        self.column_map['soap.host_halo_index'] = 'is_primary'
 
         table = 'halo'
 
@@ -1726,9 +1752,44 @@ class FlamingoFetcher(DataFetcher):
             self.column_map['soap.host_halo_index'] = 'parent_id_satellite'
             OmegaConf.set_struct(self.catalog, True)
 
-        table = 'subhalo'
+        # TODO add fof as main subhalos
 
         if isinstance(self.fof_subhalos, SWIFTDataset):
+
+            if 'soap.host_halo_index' not in self.halo_fields:
+                OmegaConf.set_struct(self.catalog, False)
+
+                if 'soap' not in self.catalog.fields.halo:
+                    self.catalog.fields.halo["soap"] = {}
+
+                self.catalog.fields.halo["soap"]["host_halo_index"] = {
+                    "input": None,
+                    "output": None,
+                    "scaling": None,
+                    "name": "parent_id_satellite"
+                }
+                OmegaConf.set_struct(self.catalog, True)
+                self.halo_fields.append('soap.host_halo_index')
+
+            # Add parents as subhalos => check fof filtering
+            table = "halo"
+            halos = self._validate_and_process_fields(self.fof_subhalos, self.halo_fields, super_key='halo')
+            halo_conditions = self._get_attr(self.catalog.fields.halo, attr_name='filter', parent_key="")
+            filtered_conditions = {k: v for k, v in halo_conditions.items() if v is not None}
+            steps = [
+                lambda halos: assign_id(halos, 'halo_id'),
+                lambda halos: assign_id(halos, 'fsub'),
+                lambda halos: convert_to_dataframe(halos),
+                lambda halos: self.__filter_non_primary(halos),
+                lambda halos: apply_unit_conversion(halos, self.halo_fields, table, self.catalog),
+                lambda halos: apply_filters(halos, filtered_conditions, self.catalog.fields.halo),
+            ]
+            processed_halos = run_pipeline(halos, steps)
+            logger.debug("Halo data fetched successfully.")
+            halo_context = HaloContext(processed_halos, self.column_map)
+            halos_ids = halo_context.halo_id
+
+            table = 'subhalo'
             subhalos = self._validate_and_process_fields(self.fof_subhalos, self.subhalo_fields, super_key='subhalo')
             subhalo_conditions = self._get_attr(self.catalog.fields.subhalo, attr_name='filter', parent_key="")
             filtered_conditions = {k: v for k, v in subhalo_conditions.items() if v is not None}
@@ -1736,12 +1797,15 @@ class FlamingoFetcher(DataFetcher):
                 lambda subhalos: assign_id(subhalos, 'id_parents'),
                 lambda subhalos: assign_id(subhalos, 'subhalo_id'),
                 lambda subhalos: convert_to_dataframe(subhalos),
+                lambda subhalos: self.__filter_primary(subhalos, halos_ids),
                 lambda subhalos: self.__reindexing_satellites(subhalos),
                 lambda subhalos: apply_unit_conversion(subhalos, self.subhalo_fields, table, self.catalog),
                 lambda subhalos: apply_filters(subhalos, filtered_conditions, self.catalog.fields.subhalo),
             ]
             processed_subhalos = run_pipeline(subhalos, steps)
             subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
+
+
             logger.debug(f"Subhalo data fetched successfully: {len(subhalo_context.data)} subhalos.")
             return subhalo_context
         else:

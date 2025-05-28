@@ -17,6 +17,9 @@ bin_spatial_resolution_scale: 2     # bin_size = spatial_resolution * 1.8
 
 # Add per each feature its unit conversion + scalf, hubble (mandatory)
 # https://arxiv.org/pdf/1510.01320
+
+# Here "input" is used to do the conversion, please don't change the values, scaling is used to convert to /h
+
 fields:
   halo:
     spherical_overdensity_200_crit:
@@ -43,7 +46,7 @@ fields:
       halo_centre:
         input: "kpc"
         output: "kpc/h"
-        scaling: "x * 1e3 * a * h"
+        scaling: "x * h"
         name: "spos"
     bound_subhalo:
       stellar_mass:
