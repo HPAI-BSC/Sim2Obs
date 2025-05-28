@@ -12,6 +12,7 @@ from torchvision.transforms import transforms
 import numpy as np
 from scipy import ndimage
 import cv2
+import torchvision.transforms.functional as TF
 import random
 #from skimage.transform import resize
 
@@ -97,6 +98,64 @@ class NumpyTransforms:
 
         #return torch.from_numpy(img).float()
         return torch.tensor(img).float()
+
+
+class PairedTransforms:
+    """
+    Custom transform class that applies identical transformations to both image and label
+    for image-to-image reconstruction tasks.
+    """
+
+    def __init__(self, resize_shape):
+        """
+        Args:
+            resize_shape: Target size for resize and crop operations
+        """
+        self.resize_shape = resize_shape
+
+    def __call__(self, image, label):
+        """
+        Apply same transformations to both image and label.
+
+        Args:
+            image: PIL Image
+            label: PIL Image
+
+        Returns:
+            tuple: (transformed_image, transformed_label) as torch tensors
+        """
+
+        # Random horizontal flip with same probability
+        if random.random() < 0.5:
+            image = TF.hflip(image)
+            label = TF.hflip(label)
+
+        # Random vertical flip with same probability
+        if random.random() < 0.5:
+            image = TF.vflip(image)
+            label = TF.vflip(label)
+
+        # Random rotation with same angle
+        angle = random.uniform(-45, 45)
+        image = TF.rotate(image, angle)
+        label = TF.rotate(label, angle)
+
+        # Random resized crop with same parameters
+        i, j, h, w = transforms.RandomResizedCrop.get_params(
+            image, scale=(0.9, 1.0), ratio=(0.75, 1.33)
+        )
+        image = TF.resized_crop(image, i, j, h, w, self.resize_shape)
+        label = TF.resized_crop(label, i, j, h, w, self.resize_shape)
+
+        # Resize (this might be redundant after RandomResizedCrop, but keeping it as in original)
+        image = TF.resize(image, self.resize_shape)
+        label = TF.resize(label, self.resize_shape)
+
+        # Convert to tensor
+        image = TF.to_tensor(image)
+        label = TF.to_tensor(label)
+
+        return image, label
 
 
 class GalaxyDataModule(LightningDataModule):
@@ -193,12 +252,14 @@ class GalaxyDataModule(LightningDataModule):
             ]
         )
 
+        self.transforms = PairedTransforms(resize_shape=resize_shape)
+
         #self.transforms = NumpyTransforms(resize_shape=resize_shape)
 
         full_dataset = GalaxyDatasetFactory.get_dataset(dataset,
                                                         image_dir=data_dir,
                                                         labels_dir=target_maskdir,
-                                                        transform=self.train_transforms,
+                                                        transform=self.transforms,
                                                         mask_interlopers=mask_interlopers,
                                                         fraction_data=fraction_data)
         torch.manual_seed(random_seed)
