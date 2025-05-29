@@ -574,7 +574,10 @@ def plot_icl_bcg_profiles(cfg, icl_cumulative, bcg_cumulative, r_by_r200, t_idx,
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    path = dataset_dir + f'/../logs/transition_radius_cumsum_{halo_id}.png'
+
+    name = cfg.catalog.path.replace(dataset_dir, '')
+    name = name.replace('/', '_')
+    path = dataset_dir + f'/../logs/{name}_transition_radius_cumsum_{halo_id}.png'
     plt.savefig(path, dpi=300)
     #plt.show()
 

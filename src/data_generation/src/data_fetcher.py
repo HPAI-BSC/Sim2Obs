@@ -1910,17 +1910,7 @@ class FlamingoFetcher(DataFetcher):
         SubhaloParticles
             A context object containing particle data such as mass, coordinates, and velocities.
         """
-        #logger.debug(f"Fetching particle data for halo: {halo_id}")
-
-        # Get the position for the subhalo
-        halo_position = np.where(self.fof_subhalos.input_halos.halo_catalogue_index == halo.halo_id)[0]
-
-        if len(halo_position) > 0:
-            host_halo_index = self.fof_subhalos.soap.host_halo_index[halo_position[0]]
-        else:
-            raise ValueError(f'Subhalo: {halo.halo_id} is not a primary subhalo')
-
-        if host_halo_index != -1:
+        if halo.is_primary != -1:
             # Not a primary index
             raise ValueError(f'Subhalo: {halo.halo_id} is not a primary subhalo')
 
