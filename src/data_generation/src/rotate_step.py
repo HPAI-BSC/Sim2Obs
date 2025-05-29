@@ -104,7 +104,7 @@ class RotateStep(PipelineStep):
             logger.info(f"Processing rotations for halo {halo.halo_id} ...")
             try:
                 logger.info(f"Generating maps for halo {halo.halo_id} without rotation")
-                yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
+                #yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
 
                 logger.info(f"Starting rotations for halo {halo.halo_id} ...")
                 iterations = 360 // int(self.rotation_angle)
