@@ -171,7 +171,7 @@ class SubhaloContext:
             #self.data.loc[indexing, 'spos'] = self.data.loc[indexing, 'spos'].apply(lambda row: row - halo.gpos)
         # ...
 
-    def rotate(self, z, axis, degree):
+    def rotate(self, z, degree):
         """
         Rotates the subhalo positions based on the provided parameters.
 
@@ -186,7 +186,7 @@ class SubhaloContext:
         """
         if 'spos' in self.data.columns:
             spos = np.array(self.data['spos'].tolist())
-            subhalos_spos = rotate(z, axis, degree, spos)
+            subhalos_spos = rotate(z, degree, spos)
             self.data['spos'] = list([subhalos_spos[i] for i in range(subhalos_spos.shape[0])])
 
     @classmethod
@@ -463,7 +463,7 @@ class SubhaloParticles:
 
         # ...
 
-    def rotate(self, z, axis, degree):
+    def rotate(self, z, degree):
         """
         Rotates the particle positions based on the provided parameters.
 
@@ -477,7 +477,7 @@ class SubhaloParticles:
             Angle of rotation in degrees.
         """
         if hasattr(self, 'star_p'):
-            self.star_p = rotate(z, axis, degree, self.star_p)
+            self.star_p = rotate(z, degree, self.star_p)
 
     def __repr__(self):
         lines = []

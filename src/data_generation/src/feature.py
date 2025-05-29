@@ -83,11 +83,12 @@ class FeatureProcessor(ABC):
         pass
 
     # TODO update
-    def rotate(self, z, axis, degree):
+    #def rotate(self, z, axis, degree):  # Old rotate call
+    def rotate(self, z, degree):
         if len(self.value) == 0:
             logger.error('FeatureProcessor value is empty, call first process method.')
             raise Exception('FeatureProcessor value is empty, call first process method.')
-        self.value = rotate(z, axis, degree, self.value)
+        self.value = rotate(z, degree, self.value)
 
     # TODO update
     @abstractmethod

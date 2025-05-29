@@ -103,18 +103,21 @@ class RotateStep(PipelineStep):
         for halo, subhalo_ctx, cosmos_data in g:
             logger.info(f"Processing rotations for halo {halo.halo_id} ...")
             try:
+                logger.info(f"Generating maps for halo {halo.halo_id} without rotation")
+                yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
+
                 iterations = 360 // int(self.rotation_angle)
                 for rt_i, rotation_axis in enumerate(self.rotation_directions):
                     kwargs['rotation_axis'] = rt_i
-                    degree = 0
+                    degree = int(self.rotation_angle)
                     for i in range(iterations):
                         rotation_axis = np.array(rotation_axis)
                         kwargs['rotation_iteration'] = i
 
                         # Rotate the appropiate data in subhalos context, subhalo particles and input feature
-                        cosmos_data.subhalos.rotate(self.z, rotation_axis, degree)
-                        cosmos_data.subhalo_particles.rotate(self.z, rotation_axis, degree)
-                        cosmos_data.input_feature.rotate(self.z, rotation_axis, degree)
+                        cosmos_data.subhalos.rotate(rotation_axis, degree)
+                        cosmos_data.subhalo_particles.rotate(rotation_axis, degree)
+                        cosmos_data.input_feature.rotate(rotation_axis, degree)
                         cosmos_data.metadata['rotation'] = {'has_rotated': 1, 'angle': degree}
 
                         # Got to the next step
@@ -126,7 +129,8 @@ class RotateStep(PipelineStep):
                         else:
                             yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
 
-                        degree += self.rotation_angle
+                        #degree += self.rotation_angle
+
             except Exception as e:
                 logger.error(f"Failed to execute rotations for halo {cosmos_data.halo.halo_id}: {e}")
                 errors.append((halo, str(e), self.name))

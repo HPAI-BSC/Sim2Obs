@@ -232,8 +232,47 @@ def rotate_vector(v: np.ndarray, axis: np.ndarray, angle_: float) -> np.ndarray:
     return v_rot
 
 
-def get_transform_matrix(n: np.ndarray, axis: np.ndarray, normalized: bool = True) -> np.ndarray:
+def random_vector_at_angle(direction, angle_deg=45, length=1.0):
     """
+    Generates a random vector with an angle of angle_deg to direction.
+    The vector lies on a cone around the direction vector.
+    """
+    # Normalize direction vector
+    direction = np.array(direction, dtype=float)
+    direction = direction / np.linalg.norm(direction)
+
+    angle_rad = np.deg2rad(angle_deg)
+
+    # Find two orthogonal vectors to the direction (form a basis for the plane perpendicular to direction)
+    # Method: find a vector that's not parallel to direction, then use Gram-Schmidt
+    if abs(direction[0]) < 0.9:  # direction is not too close to x-axis
+        temp = np.array([1, 0, 0])
+    else:  # direction is close to x-axis, use y-axis instead
+        temp = np.array([0, 1, 0])
+
+    # First orthogonal vector (in the plane perpendicular to direction)
+    u1 = temp - np.dot(temp, direction) * direction
+    u1 = u1 / np.linalg.norm(u1)
+
+    # Second orthogonal vector (cross product gives another perpendicular vector)
+    u2 = np.cross(direction, u1)
+    u2 = u2 / np.linalg.norm(u2)  # Should already be normalized, but just in case
+
+    # Generate random angle in the perpendicular plane
+    theta = np.random.uniform(0, 2 * np.pi)
+
+    # The vector components:
+    # - Component along direction: length * cos(angle_rad)
+    # - Component in perpendicular plane: length * sin(angle_rad) * (random direction in plane)
+    parallel_component = length * np.cos(angle_rad) * direction
+    perpendicular_component = length * np.sin(angle_rad) * (np.cos(theta) * u1 + np.sin(theta) * u2)
+
+    return parallel_component + perpendicular_component
+
+
+def get_transform_matrix_old(n: np.ndarray, axis: np.ndarray, normalized: bool = True) -> np.ndarray:
+    """
+    OLD TRANSFORM MATRIX. NOT ROBUST ENOUGH, USE NEW VERSION
     Calculate the rotation matrix that aligns a given vector with the new z-axis.
 
     Parameters:
@@ -286,6 +325,66 @@ def get_transform_matrix(n: np.ndarray, axis: np.ndarray, normalized: bool = Tru
 
     return Q
 
+
+def get_transform_matrix(n: np.ndarray, axis: np.ndarray) -> np.ndarray:
+    """
+    Calculate the rotation matrix that aligns a given vector with the new z-axis.
+
+    Parameters:
+    -----------
+    n : np.ndarray
+        A vector representing the new z-axis direction. Should be a 1D array of length 3.
+    axis : np.ndarray
+        The original z-axis vector (should be a standard reference vector).
+
+    Returns:
+    --------
+    np.ndarray
+        A 3x3 rotation matrix that transforms the original coordinate system
+        to the new coordinate system aligned with the vector `n`.
+    """
+    # Normalize inputs
+    if np.linalg.norm(n) != 1.0:
+        n = n / np.linalg.norm(n)
+    axis = axis / np.linalg.norm(axis)  # Ensure axis is unit vector
+
+    # Handle colinear vectors
+    cos_theta = np.dot(axis, n)
+    cos_theta = np.clip(cos_theta, -1.0, 1.0)
+    theta = np.arccos(cos_theta)
+
+    b = np.cross(axis, n)
+    b_norm = np.linalg.norm(b)
+    tol = 1e-12
+
+    if b_norm < tol:
+        # Colinear case
+        if cos_theta > 0:  # Vectors are parallel
+            return np.eye(3)
+        else:  # Antiparallel: 180° rotation
+            # Find an arbitrary perpendicular axis
+            candidates = np.eye(3)
+            for candidate in candidates:
+                perp = candidate - np.dot(candidate, axis) * axis
+                if np.linalg.norm(perp) > tol:
+                    perp = perp / np.linalg.norm(perp)
+                    break
+            q0 = 0.0  # cos(90°)
+            q1, q2, q3 = perp  # sin(90°) * perp
+    else:
+        # General case
+        b = b / b_norm  # Normalize rotation axis
+        q0 = np.cos(theta / 2)
+        sin_half = np.sin(theta / 2)
+        q1, q2, q3 = sin_half * b
+
+    # Construct rotation matrix
+    Q = np.array([
+        [1 - 2 * (q2 ** 2 + q3 ** 2), 2 * (q1 * q2 - q0 * q3), 2 * (q1 * q3 + q0 * q2)],
+        [2 * (q1 * q2 + q0 * q3), 1 - 2 * (q1 ** 2 + q3 ** 2), 2 * (q2 * q3 - q0 * q1)],
+        [2 * (q1 * q3 - q0 * q2), 2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1 ** 2 + q2 ** 2)]
+    ])
+    return Q
 
 def rotate_3dvec(Q: np.ndarray, vec: np.ndarray) -> np.ndarray:
     """
@@ -602,8 +701,9 @@ def dict_depth(d, level=0):
     return max(dict_depth(v, level + 1) for v in d.values())
 
 
-def rotate(z, axis, degree, X):
+def rotate_old(z, axis, degree, X):
     """
+    THIS WAS THE OLD VERSION, WHICH ONLY ROTATED Z TO AXIS = [X,Y,Z] AND THEN 45 DEG ON THE XY PLANE; DO NOT USE IT.
     Helper function to rotate positions or velocities based on the provided axis and degree.
 
     Parameters:
@@ -624,6 +724,31 @@ def rotate(z, axis, degree, X):
     Q = get_transform_matrix(new_z, z, normalized=False)
     X_rot = np.float32(rotate_3dvec(Q, X))
     return X_rot
+
+
+def rotate(z, degree, X):
+    """
+    NEW ROTATE. GENERATES A RANDOM VECTOR NEW_Z WITH ANGLE(Z, NEW_Z) = DEGREE. THEN ROTATES X BY NEW_Z.
+    Helper function to rotate positions or velocities based on the provided axis and degree.
+
+    Parameters:
+    -----------
+    axis : np.ndarray
+        The axis around which the rotation is performed.
+    degree : float
+        The angle in degrees for the rotation.
+    X : np.ndarray
+        The array of positions or velocities to be rotated.
+
+    Returns:
+    --------
+    np.ndarray
+        The rotated array.
+    """
+    new_z = random_vector_at_angle(z, angle_deg=degree)
+    Q = get_transform_matrix(new_z, z, normalized=True)
+    X_rot = np.float32(rotate_3dvec(Q, X))
+    return X_rot, new_z
 
 
 def r500_to_r200(r500):
