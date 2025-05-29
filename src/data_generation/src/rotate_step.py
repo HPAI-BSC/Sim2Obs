@@ -114,11 +114,15 @@ class RotateStep(PipelineStep):
                         rotation_axis = np.array(rotation_axis)
                         kwargs['rotation_iteration'] = i
 
+                        logger.info(f"Iteration {i} of {iterations} for halo {halo.halo_id} in rotation axis {rt_i} with angle {degree} degrees")
+
                         # Rotate the appropiate data in subhalos context, subhalo particles and input feature
                         cosmos_data.subhalos.rotate(rotation_axis, degree)
                         cosmos_data.subhalo_particles.rotate(rotation_axis, degree)
                         cosmos_data.input_feature.rotate(rotation_axis, degree)
                         cosmos_data.metadata['rotation'] = {'has_rotated': 1, 'angle': degree}
+
+                        logger.info(f"Out - Iteration {i} of {iterations} for halo {halo.halo_id} in rotation axis {rt_i} with angle {degree} degrees")
 
                         # Got to the next step
                         if next_step is not None:
