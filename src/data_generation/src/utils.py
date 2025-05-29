@@ -748,8 +748,11 @@ def rotate(z, degree, X):
     np.ndarray
         The rotated array.
     """
+    print('a', z)
     new_z = random_vector_at_angle(z, angle_deg=degree)
+    print('b', new_z)
     Q = get_transform_matrix(new_z, z)
+    print('c', Q)
     X_rot = np.float32(rotate_3dvec(Q, X))
     return X_rot
 
