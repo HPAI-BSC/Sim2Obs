@@ -19,16 +19,16 @@ net:
     patch_size: 4
     in_chains: 1
     embed_dim: 1024
-    depths: [1, 1, 1, 1]
+    depths: [2, 2, 2, 2]
     mlp_ratio:
-    drop_rate: 0.01
-    drop_path_rate: 0.01
+    drop_rate: 0.2
+    drop_path_rate: 0.2
     patch_norm: True
     use_checkpoint: False
     final_upsample: expand_first  # From [None, 'expand_first']
   num_classes: 1 # aka num out channels
   zero_head: False
-  vis: True
+  vis: False
 
 # compile model for faster training with pytorch 2.0
 compile: false
