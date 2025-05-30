@@ -21,8 +21,8 @@ net:
     embed_dim: 1024
     depths: [1, 1, 1, 1]
     mlp_ratio:
-    drop_rate: 0.05
-    drop_path_rate: 0.05
+    drop_rate: 0.001
+    drop_path_rate: 0.001
     patch_norm: True
     use_checkpoint: False
     final_upsample: expand_first  # From [None, 'expand_first']
