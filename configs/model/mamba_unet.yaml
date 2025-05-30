@@ -27,8 +27,8 @@ net:
     use_checkpoint: False
     final_upsample: expand_first  # From [None, 'expand_first']
   num_classes: 1 # aka num out channels
-  zero_head: True
-  vis: False
+  zero_head: False
+  vis: True
 
 # compile model for faster training with pytorch 2.0
 compile: false
