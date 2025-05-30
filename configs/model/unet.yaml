@@ -1,5 +1,5 @@
-#_target_: src.models.bce_module.BCELitModule
-_target_: src.models.mse_module.MSELitModule
+_target_: src.models.bce_module.BCELitModule
+#_target_: src.models.mse_module.MSELitModule
 
 optimizer:
   _target_: torch.optim.Adam
