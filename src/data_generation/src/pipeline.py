@@ -12,7 +12,7 @@ from src.data_generation.src.utils import setup_logger
 logger = setup_logger("Pipeline")
 
 
-def get_generator(data_loader, n):
+def get_generator(data_loader, n=None, starting_idx=None):
     halo_context = data_loader.fetcher.get_halos()
     subhalo_context = data_loader.fetcher.get_subhalos()
 
@@ -21,7 +21,12 @@ def get_generator(data_loader, n):
     overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
     halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
 
-    halo_subhalo_list = halo_subhalo_list[:n]
+    if starting_idx is not None:
+        halo_subhalo_list = halo_subhalo_list[starting_idx:]
+
+    if n is not None:
+        halo_subhalo_list = halo_subhalo_list[:n]
+
     for halo_data in halo_subhalo_list:
         yield halo_data  # T
 
@@ -74,7 +79,7 @@ class Pipeline:
 
         return pipeline
 
-    def run(self, n=None) -> Any:
+    def run(self, n=None, starting_idx=None) -> Any:
         if not self.steps:
             logger.error("Error, please provide a non-empty pipeline, steps cannot be an empty list.")
             return None
@@ -86,7 +91,7 @@ class Pipeline:
 
         if len(step_list) > 0:
             data_loader = step_list[0]
-            input_gen = get_generator(data_loader, n)
+            input_gen = get_generator(data_loader, n, starting_idx)
         else:
             raise Exception()
 
