@@ -1,16 +1,14 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
 data_dir:
   - ${paths.datasets_dir}/ilarias_dataset_v0/VelocityDispersion
-  - ${paths.datasets_dir}/eagle/RefL0050N0752/no_rotation_s1.5/VelocityDispersion
-  - ${paths.datasets_dir}/eagle/AGNdT9L0050N0752/no_rotation_s1.5/VelocityDispersion
+  - ${paths.datasets_dir}/eagle/RefL0050N0752/rotation_45_s1.5/VelocityDispersion
+  #- ${paths.datasets_dir}/eagle/AGNdT9L0050N0752/rotation_45_s1.5/VelocityDispersion
   - ${paths.datasets_dir}/illustris300/no_rotation_s1.5_v1/VelocityDispersion
-  #- ${paths.datasets_dir}/illustris300/rotation_120/VelocityDispersion
 target_maskdir:
   - ${paths.datasets_dir}/ilarias_dataset_v0/Labels
-  - ${paths.datasets_dir}/eagle/RefL0050N0752/no_rotation_s1.5/IntraClusterLight
-  - ${paths.datasets_dir}/eagle/AGNdT9L0050N0752/no_rotation_s1.5/IntraClusterLight
+  - ${paths.datasets_dir}/eagle/RefL0050N0752/rotation_45_s1.5/IntraClusterLight
+  #- ${paths.datasets_dir}/eagle/AGNdT9L0050N0752/rotation_45_s1.5/IntraClusterLight
   - ${paths.datasets_dir}/illustris300/no_rotation_s1.5_v1/IntraClusterLight
-  #- ${paths.datasets_dir}/illustris300/rotation_120/IntraClusterLight
 dataset: combined
 mask_interlopers: True
 batch_size: 64
