@@ -1,6 +1,6 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
-data_dir: ${paths.datasets_dir}/illustris300/rotation_s1/VelocityDispersion
-target_maskdir: ${paths.datasets_dir}/illustris300/rotation_s1/IntraClusterLight
+data_dir: ${paths.datasets_dir}/illustris300/rotation_45_s1.5/VelocityDispersion
+target_maskdir: ${paths.datasets_dir}/illustris300/rotation_45_s1.5/IntraClusterLight
 mask_interlopers: True
 dataset: illustris-300
 batch_size: 64
