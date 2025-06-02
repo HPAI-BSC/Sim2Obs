@@ -17,12 +17,12 @@ net:
   _target_: src.models.components.Mamba_UNet.MambaUNet
   config:
     patch_size: 4
-    in_chains: 1
+    in_chains: 4
     embed_dim: 1024
-    depths: [1, 1, 1, 1]
+    depths: [2, 2, 2, 2]
     mlp_ratio:
-    drop_rate: 0.01
-    drop_path_rate: 0.01
+    drop_rate: 0.05
+    drop_path_rate: 0.05
     patch_norm: True
     use_checkpoint: False
     final_upsample: expand_first  # From [None, 'expand_first']
