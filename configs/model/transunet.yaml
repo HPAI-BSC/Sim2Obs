@@ -17,7 +17,7 @@ net:
   _target_: src.models.components.TransUNet.TransUNet
   n_channels: 1
   n_classes: 1
-  n_heads: 4
+  n_heads: 8
   patch_size: 16
   mlp_dim: 3072
   img_size: 128
