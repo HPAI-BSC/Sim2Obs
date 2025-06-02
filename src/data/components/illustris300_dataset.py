@@ -31,10 +31,21 @@ class Illustris300Dataset(GalaxyDataset):
         if not os.path.exists(img_path) or not os.path.exists(label_path):
             raise FileNotFoundError(f"Image or label file not found at index {index}")
 
-        images = np.load(img_path)
+        #images = np.load(img_path)
+        try:
+            images = np.load(img_path)
+        except EOFError as e:
+            print(f"[ERROR] Could not load file: {img_path}")
+            raise RuntimeError(f"Corrupted .npy file: {img_path}") from e
         image = images[f'arr_0'].astype('float64')
 
-        labels = np.load(label_path)
+        #labels = np.load(label_path)
+        try:
+            labels = np.load(label_path)
+        except EOFError as e:
+            print(f"[ERROR] Could not load file: {label_path}")
+            raise RuntimeError(f"Corrupted .npy file: {label_path}") from e
+
         label = labels[f'arr_0'].astype('float64')
 
         if self.mask_interlopers:
