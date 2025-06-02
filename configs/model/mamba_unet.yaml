@@ -18,7 +18,7 @@ net:
   config:
     patch_size: 4
     in_chains: 1
-    embed_dim: 1024
+    embed_dim: 2048
     depths: [1, 1, 1, 1]
     mlp_ratio:
     drop_rate: 0.01
