@@ -10,7 +10,7 @@ gradient_clip_val: 0.5
 accelerator: gpu
 devices: 1
 
-accumulate_grad_batches: 4
+accumulate_grad_batches: 8
 
 #callbacks:
 #  - _target_: lightning.pytorch.callbacks.DeviceStatsMonitor
@@ -20,10 +20,10 @@ accumulate_grad_batches: 4
 #    swa_lrs: 1e-2
 
 # (optional) mixed precision for extra speed-up
-# precision: 16
+precision: "bf16-mixed"
 
 # perform a validation loop every N training epochs
-check_val_every_n_epoch: 1
+check_val_every_n_epoch: 2
 
 # set True to to ensure deterministic results
 # makes training slower but gives more reproducibility than just setting seeds
