@@ -236,8 +236,9 @@ class BCELitModule(LightningModule):
         preds = self.forward(x)
         #loss = self.criterion(preds, y)
         #loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
-        y, preds = torch.sigmoid(y), torch.sigmoid(preds)
-        loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        #y, preds = torch.sigmoid(y), torch.sigmoid(preds)
+        #loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        loss = nn.functional.binary_cross_entropy_with_logits(preds, y, reduction='mean')
         return loss, preds, y
 
     def training_step(
