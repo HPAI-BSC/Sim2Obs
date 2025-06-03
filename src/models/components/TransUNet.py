@@ -485,9 +485,9 @@ class DecoderCup(nn.Module):
             use_batchnorm=True,
         )
         in_channels = [head_channels] + list(decoder_channels[:-1])
-        print(f"in_channels: {in_channels}")
+        #print(f"in_channels: {in_channels}")
         out_channels = decoder_channels
-        print(f"out_channels: {out_channels}")
+        #print(f"out_channels: {out_channels}")
         self.n_skip = n_skip
 
         if n_skip != 0:
@@ -507,20 +507,20 @@ class DecoderCup(nn.Module):
         B, n_patch, hidden = hidden_states.size()  # reshape from (B, n_patch, hidden) to (B, h, w, hidden)
         h, w = int(np.sqrt(n_patch)), int(np.sqrt(n_patch))
         x = hidden_states.permute(0, 2, 1)
-        print(f'-decoder-')
-        print(x.shape)
+        #print(f'-decoder-')
+        #print(x.shape)
         x = x.contiguous().view(B, hidden, h, w)
         x = self.conv_more(x)
-        print(x.shape)
+        #print(x.shape)
         for i, decoder_block in enumerate(self.blocks):
             if features is not None:
                 skip = features[i] if (i < self.n_skip) else None
             else:
                 skip = None
             x = decoder_block(x, skip=skip)
-            print(f'-decoder block-')
-            print(x.shape)
-        print(x.shape)
+            #print(f'-decoder block-')
+            #print(x.shape)
+        #print(x.shape)
         return x
 
 
@@ -614,13 +614,13 @@ class TransUNet(nn.Module):
         if x.size()[1] == 1:
             x = x.repeat(1,3,1,1)
         """
-        print(x.shape)
+        #print(x.shape)
         x, attn_weights, features = self.transformer(x)  # (B, n_patch, hidden)
-        print(x.shape)
+        #print(x.shape)
         x = self.decoder(x, features)
-        print(x.shape)
+        #print(x.shape)
         logits = self.segmentation_head(x)
-        print(x.shape)
+        #print(x.shape)
         return logits
 
     def load_from(self, weights):
