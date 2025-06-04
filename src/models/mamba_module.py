@@ -234,9 +234,6 @@ class MambaLitModule(LightningModule):
 
             plt.imshow(targets[0].permute(1, 2, 0).detach().to(torch.float32).cpu().numpy())
             plt.savefig(f"/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/tgt_{batch_idx}.png")
-
-            plt.imshow(targets.detach().to(torch.float32).cpu().numpy())
-            plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/tgt.png")
             plt.close()
 
         # update and log metrics
