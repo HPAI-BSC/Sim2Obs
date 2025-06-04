@@ -56,9 +56,9 @@ class Illustris300Dataset(GalaxyDataset):
             image, label = self.transform(image, label)
 
         import matplotlib.pyplot as plt
-        plt.imshow(image.permute(1,2,0))
+        plt.imshow(image.permute(1,2,0).detach().cpu().numpy())
         plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/img_after_transform.png")
-        plt.imshow(label.permute(1,2,0))
+        plt.imshow(label.permute(1,2,0).detach().cpu().numpy())
         plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/label_after_transform.png")
         plt.close()
 
