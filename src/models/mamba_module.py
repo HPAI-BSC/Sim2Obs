@@ -232,10 +232,10 @@ class MambaLitModule(LightningModule):
         self.train_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.train_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.train_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
-        self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/mae", self.train_mae, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/loss", self.train_loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/RASE", self.train_RASE, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/rmse", self.train_rmse, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/mae", self.train_mae, on_step=True, on_epoch=True, prog_bar=True)
 
         # return loss or backpropagation will fail
         return loss

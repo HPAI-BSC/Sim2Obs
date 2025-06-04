@@ -224,6 +224,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
             )
             input_ij = np.sqrt(input_ij / 3)
             input_ij[np.isnan(input_ij)] = 0
+            logger.debug(input_ij.shape, binx.shape, biny.shape)
             return input_ij, binx, biny
         else:
             # 3D
