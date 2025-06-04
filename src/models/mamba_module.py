@@ -208,6 +208,7 @@ class MambaLitModule(LightningModule):
         if batch_idx % 25 == 0:
             torch.cuda.empty_cache()
 
+        """
         if batch_idx % 1000 == 0:
             self.train_loss.reset()
             self.train_RASE.reset()
@@ -217,6 +218,7 @@ class MambaLitModule(LightningModule):
             self.val_RASE.reset()
             self.val_mae.reset()
             self.val_rmse.reset()
+        """
 
         """
         # Use gradient clipping to prevent memory spikes
