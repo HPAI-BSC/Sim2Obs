@@ -227,16 +227,17 @@ class MambaLitModule(LightningModule):
 
         loss, preds, targets = self.model_step(batch)
 
-        import matplotlib.pyplot as plt
-        plt.imshow(preds[0].permute(1,2,0).detach().to(torch.float32).cpu().numpy())
-        plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/preds.png")
+        if batch_idx % 500 == 0:
+            import matplotlib.pyplot as plt
+            plt.imshow(preds[0].permute(1, 2, 0).detach().to(torch.float32).cpu().numpy())
+            plt.savefig(f"/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/preds_{batch_idx}.png")
 
-        plt.imshow(targets[0].permute(1,2,0).detach().to(torch.float32).cpu().numpy())
-        plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/tgt.png")
+            plt.imshow(targets[0].permute(1, 2, 0).detach().to(torch.float32).cpu().numpy())
+            plt.savefig(f"/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/tgt_{batch_idx}.png")
 
-        plt.imshow(targets.detach().to(torch.float32).cpu().numpy())
-        plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/tgt.png")
-        plt.close()
+            plt.imshow(targets.detach().to(torch.float32).cpu().numpy())
+            plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/tgt.png")
+            plt.close()
 
         # update and log metrics
         self.train_loss(loss)
