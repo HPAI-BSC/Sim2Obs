@@ -12,8 +12,8 @@ variables:
   SINGULARITY_VERSION: 3.6.4
   AUTOLAUNCHER_VERSION: &AUTOLAUNCHER_VERSION dockerhub
   LAUNCH_IMAGE_NAME: ${CI_PROJECT_PATH}:${CI_COMMIT_SHORT_SHA}-${CI_COMMIT_REF_NAME}
-  #TAGS: mininostrum
-  TAGS: estufa
+  TAGS: mininostrum
+  #TAGS: estufa
 
 stages:
   - build
