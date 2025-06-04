@@ -53,9 +53,9 @@ def main(cfg: DictConfig) -> Any:
     steps = get_pipeline_steps(cfg)
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
-    # ILLUSTRIS
-    starting_idx = 3272
-    n = None
+    starting_idx = None
+    # Retrieve first 5 halos
+    n = 5
     _ = pipeline.run(n, starting_idx)
 
 
