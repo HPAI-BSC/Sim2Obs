@@ -55,13 +55,6 @@ class Illustris300Dataset(GalaxyDataset):
         if self.transform:
             image, label = self.transform(image, label)
 
-        import matplotlib.pyplot as plt
-        plt.imshow(image.permute(1,2,0).detach().cpu().numpy())
-        plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/img_after_transform.png")
-        plt.imshow(label.permute(1,2,0).detach().cpu().numpy())
-        plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/label_after_transform.png")
-        plt.close()
-
         return image, label
 
     def _load_and_process_npy(self, file_path):
