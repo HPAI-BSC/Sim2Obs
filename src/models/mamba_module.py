@@ -228,8 +228,11 @@ class MambaLitModule(LightningModule):
         loss, preds, targets = self.model_step(batch)
 
         import matplotlib.pyplot as plt
-        plt.imshow(preds.detach().to(torch.float32).cpu().numpy())
+        plt.imshow(preds[0].detach().to(torch.float32).cpu().numpy())
         plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/preds.png")
+
+        plt.imshow(targets[0].detach().to(torch.float32).cpu().numpy())
+        plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/tgt.png")
 
         plt.imshow(targets.detach().to(torch.float32).cpu().numpy())
         plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/tgt.png")
