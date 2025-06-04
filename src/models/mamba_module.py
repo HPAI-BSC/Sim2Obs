@@ -227,6 +227,14 @@ class MambaLitModule(LightningModule):
 
         loss, preds, targets = self.model_step(batch)
 
+        import matplotlib.pyplot as plt
+        plt.imshow(preds.detach().to(torch.float32))
+        plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/preds.png")
+
+        plt.imshow(targets.detach().to(torch.float32))
+        plt.savefig("/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/tgt.png")
+        plt.close()
+
         # update and log metrics
         self.train_loss(loss)
         self.train_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
