@@ -2,7 +2,7 @@ from typing import Any, Dict, Tuple
 
 import torch
 from lightning import LightningModule
-from torchmetrics import MaxMetric, MeanMetric
+from torchmetrics import MinMetric, MeanMetric, MeanAbsoluteError
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
 
@@ -69,15 +69,18 @@ class MSELitModule(LightningModule):
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
         # and Root Mean Squared Error Using Sliding Window
-        #self.train_RASE = RelativeAverageSpectralError(window_size=8)
+        self.train_RASE = RelativeAverageSpectralError(window_size=8)
         self.val_RASE = RelativeAverageSpectralError(window_size=8)
         self.test_RASE = RelativeAverageSpectralError(window_size=8)
 
-        
-        #self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
+        self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
 
+        # Ilaria was reporting ICL fraction as well
+        self.train_mae = MeanAbsoluteError()
+        self.val_mae = MeanAbsoluteError()
+        self.test_mae = MeanAbsoluteError()
 
         # for averaging loss across batches
         self.train_loss = MeanMetric()
@@ -85,8 +88,9 @@ class MSELitModule(LightningModule):
         self.test_loss = MeanMetric()
 
         # for tracking best so far validation RASE
-        self.val_rase_best = MaxMetric()
-        self.val_rmse_best = MaxMetric()
+        self.val_rase_best = MinMetric()
+        self.val_rmse_best = MinMetric()
+        self.val_mae_best = MinMetric()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
@@ -103,8 +107,10 @@ class MSELitModule(LightningModule):
         self.val_loss.reset()
         self.val_RASE.reset()
         self.val_rmse.reset()
+        self.val_mae.reset()
         self.val_rase_best.reset()
         self.val_rmse_best.reset()
+        self.val_mae_best.reset()
 
     def model_step(
         self, batch: Tuple[torch.Tensor, torch.Tensor]
@@ -120,6 +126,7 @@ class MSELitModule(LightningModule):
         """
         x, y = batch
         preds = self.forward(x)
+        preds, y = torch.sigmoid(preds), torch.sigmoid(y)
         loss = self.criterion(preds, y)
         return loss, preds, y
 
@@ -133,15 +140,31 @@ class MSELitModule(LightningModule):
         :param batch_idx: The index of the current batch.
         :return: A tensor of losses between model predictions and targets.
         """
+        self.trainer.optimizers[0].zero_grad(set_to_none=True)
+        if batch_idx % 25 == 0:
+            torch.cuda.empty_cache()
+
+        if batch_idx % 1000 == 0:
+            self.train_loss.reset()
+            self.train_RASE.reset()
+            self.train_rmse.reset()
+            self.train_mae.reset()
+            self.val_loss.reset()
+            self.val_RASE.reset()
+            self.val_mae.reset()
+            self.val_rmse.reset()
+
         loss, preds, targets = self.model_step(batch)
 
         # update and log metrics
-        self.train_loss(loss)
-        #self.train_RASE(preds.to(torch.float32), targets.to(torch.float32))
-        #self.train_rmse(preds.to(torch.float32), targets.to(torch.float32))
-        self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
-        #self.log("train/RASE", self.train_RASE, on_step=False, on_epoch=True, prog_bar=True)
-        #self.log("train/rmse", self.train_rmse, on_step=False, on_epoch=True, prog_bar=True)
+        self.train_loss(loss.detach())
+        self.train_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.train_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.train_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.log("train/loss", self.train_loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/RASE", self.train_RASE, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/rmse", self.train_rmse, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/mae", self.train_mae, on_step=True, on_epoch=True, prog_bar=True)
 
         # return loss or backpropagation will fail
         return loss
@@ -149,6 +172,15 @@ class MSELitModule(LightningModule):
     def on_train_epoch_end(self) -> None:
         "Lightning hook that is called when a training epoch ends."
         torch.cuda.empty_cache()
+        self.train_loss.reset()
+        self.train_RASE.reset()
+        self.train_rmse.reset()
+        self.train_mae.reset()
+        self.val_loss.reset()
+        self.val_RASE.reset()
+        self.val_mae.reset()
+        self.val_rmse.reset()
+        #self._print_cuda_memory()
         pass
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
@@ -162,23 +194,28 @@ class MSELitModule(LightningModule):
 
         # update and log metrics
         self.val_loss(loss)
-        self.val_RASE(preds.to(torch.float32), targets.to(torch.float32))
-        self.val_rmse(preds.to(torch.float32), targets.to(torch.float32))
+        self.val_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.val_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.val_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/RASE", self.val_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/mae", self.val_mae, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_validation_epoch_end(self) -> None:
         torch.cuda.empty_cache()
         "Lightning hook that is called when a validation epoch ends."
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
+        mae = self.val_mae.compute()
         self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
+        self.val_mae_best(mae)
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/rmse_best", self.val_rmse_best.compute(), sync_dist=True, prog_bar=True)
+        self.log("val/mae_best", self.val_mae_best.compute(), sync_dist=True, prog_bar=True)
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set.
@@ -191,11 +228,13 @@ class MSELitModule(LightningModule):
 
         # update and log metrics
         self.test_loss(loss)
-        self.test_RASE(preds.to(torch.float32), targets.to(torch.float32))
-        self.test_rmse(preds.to(torch.float32), targets.to(torch.float32))
+        self.test_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.test_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.test_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/RASE", self.test_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/rmse", self.test_rmse, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("test/mae", self.test_mae, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""

@@ -239,8 +239,8 @@ class BCELitModule(LightningModule):
         #y, preds = torch.sigmoid(y), torch.sigmoid(preds)
         #loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
         # Compute sigmoid before RASE, rmse and mae. Train loss as BCEwlogits more stable.
-        loss = nn.functional.binary_cross_entropy_with_logits(preds, y, reduction='mean')
         y, preds = torch.sigmoid(y), torch.sigmoid(preds)
+        loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
         return loss, preds, y
 
     def training_step(
