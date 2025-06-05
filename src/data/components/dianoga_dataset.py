@@ -35,6 +35,13 @@ class DianogaDataset(GalaxyDataset):
         if self.transform:
             image, label = self.transform(image, label)
 
+        import matplotlib.pyplot as plt
+        test_path = "/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/label_after__transform.png"
+        plt.imshow(label, cmap='viridis')
+        plt.colorbar()
+        plt.savefig(test_path)
+        plt.close()
+
         return image, label
 
     @staticmethod

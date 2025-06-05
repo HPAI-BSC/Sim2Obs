@@ -29,12 +29,6 @@ class EagleDataset(GalaxyDataset):
             image = image[..., 0] * (1-image)[..., 1]
             label = label[..., 0] * (1-label)[..., 1]
 
-        import matplotlib.pyplot as plt
-        test_path = "/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/label_after_transform.png"
-        plt.imshow(label, cmap='viridis')
-        plt.savefig(test_path)
-        plt.close()
-
         if self.transform:
             image, label = self.transform(image, label)
 
