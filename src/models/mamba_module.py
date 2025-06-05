@@ -191,9 +191,9 @@ class MambaLitModule(LightningModule):
             preds[torch.isnan(preds)] = 0.0
         #loss = self.criterion(preds, y)
         # We apply sigmoid both in loss computation and RASE etc computation. BCEwithlogits for better num stability.
-        loss = nn.functional.binary_cross_entropy_with_logits(preds, y, reduction='mean')
+        #loss = nn.functional.binary_cross_entropy_with_logits(preds, y, reduction='mean')
         y, preds = torch.sigmoid(y), torch.sigmoid(preds)
-        #loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
         #loss = nn.functional.binary_cross_entropy_with_logits(preds, y, reduction='mean')
 
         return loss, preds, y
