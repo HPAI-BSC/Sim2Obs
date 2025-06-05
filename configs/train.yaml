@@ -6,7 +6,7 @@ defaults:
   - data: galaxy_dianoga_rotation45
   #- data: combined_dataset
   #- data: galaxy_illustris300
-  - model: unet_baseline
+  - model: attunet_baseline
   - callbacks: default
   - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
