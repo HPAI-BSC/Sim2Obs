@@ -2,22 +2,17 @@ _target_: src.models.bce_module.BCELitModule
 #_target_: src.models.mse_module.MSELitModule
 
 optimizer:
-  _target_: torch.optim.SGD
+  _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.001
+  lr: 0.0005
   weight_decay: 0.0
-  momentum: 0.9
 
 scheduler:
-  _target_: torch.optim.lr_scheduler.OneCycleLR
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
   _partial_: true
-  max_lr: 0.1
-  total_steps: ${training.max_steps}  # OR set steps_per_epoch and epochs
-  pct_start: 0.3
-  anneal_strategy: linear  # or 'cos'
-  div_factor: 25.0
-  final_div_factor: 1e4
-  three_phase: false
+  mode: min
+  factor: 0.1
+  patience: 10
 
 net:
   _target_: src.models.components.UNet.UNet
