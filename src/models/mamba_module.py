@@ -10,12 +10,14 @@ import torch.nn as nn
 torch.set_float32_matmul_precision('medium')
 
 
+"""
 class RMSELoss(nn.Module):
     def __init__(self):
         super(RMSELoss, self).__init__()
 
     def forward(self, yhat, y):
         return torch.sqrt(torch.mean((yhat - y) ** 2))
+"""
 
 
 class MambaLitModule(LightningModule):
@@ -188,9 +190,9 @@ class MambaLitModule(LightningModule):
         if torch.isnan(preds).any():
             preds[torch.isnan(preds)] = 0.0
         #loss = self.criterion(preds, y)
-        #y, preds = torch.sigmoid(y), torch.sigmoid(preds)
-        #loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
-        loss = nn.functional.binary_cross_entropy_with_logits(preds, y, reduction='mean')
+        y, preds = torch.sigmoid(y), torch.sigmoid(preds)
+        loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        #loss = nn.functional.binary_cross_entropy_with_logits(preds, y, reduction='mean')
 
         return loss, preds, y
 

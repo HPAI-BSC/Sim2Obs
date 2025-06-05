@@ -196,10 +196,6 @@ class PairedTransformNumpy:
         image = TF.resize(image, self.resize_shape)
         label = TF.resize(label, self.resize_shape)
 
-        print(image.shape, label.shape)
-        print(torch.max(image).item(), torch.max(label).item())
-        print(torch.max(image[:,:,0]).item(), torch.max(label[:,:,0]).item())
-
         return image, label
 
 
