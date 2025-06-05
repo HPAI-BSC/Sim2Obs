@@ -1,0 +1,24 @@
+#_target_: src.models.bce_module.BCELitModule
+_target_: src.models.mse_module.MSELitModule
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.0005
+  weight_decay: 0.0
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 10
+
+net:
+  _target_: src.models.components.UNet.UNet
+  n_channels: 1
+  n_classes: 1
+  bilinear: False
+
+# compile model for faster training with pytorch 2.0
+compile: true
