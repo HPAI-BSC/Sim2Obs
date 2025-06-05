@@ -238,7 +238,9 @@ class BCELitModule(LightningModule):
         #loss = self.criterion(preds.view(preds.size(0), preds.size(1), -1), y.view(y.size(0), y.size(1), -1))
         #y, preds = torch.sigmoid(y), torch.sigmoid(preds)
         #loss = nn.functional.binary_cross_entropy(preds, y, reduction='mean')
+        # Compute sigmoid before RASE, rmse and mae. Train loss as BCEwlogits more stable.
         loss = nn.functional.binary_cross_entropy_with_logits(preds, y, reduction='mean')
+        y, preds = torch.sigmoid(y), torch.sigmoid(preds)
         return loss, preds, y
 
     def training_step(
@@ -267,17 +269,10 @@ class BCELitModule(LightningModule):
             self.val_mae.reset()
             self.val_rmse.reset()
 
-        # Use gradient clipping to prevent memory spikes
-        self.clip_gradients(
-            optimizer=self.trainer.optimizers[0],
-            gradient_clip_val=0.5,
-            gradient_clip_algorithm="norm"
-        )
-
         loss, preds, targets = self.model_step(batch)
 
         # update and log metrics
-        self.train_loss(loss)
+        self.train_loss(loss.detach())
         self.train_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.train_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.train_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
