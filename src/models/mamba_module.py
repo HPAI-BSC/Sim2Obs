@@ -231,7 +231,7 @@ class MambaLitModule(LightningModule):
 
         loss, preds, targets = self.model_step(batch)
 
-        if batch_idx % 1000 == 0:
+        if batch_idx % 2000 == 0:
             import matplotlib.pyplot as plt
             plt.imshow(preds[0].permute(1, 2, 0).detach().to(torch.float32).cpu().numpy())
             plt.savefig(f"/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/preds_{batch_idx}.png")
