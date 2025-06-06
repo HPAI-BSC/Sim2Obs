@@ -367,6 +367,15 @@ class BCELitModule(LightningModule):
         if self.hparams.compile and stage == "fit":
             self.net = torch.compile(self.net)
 
+    def on_load_checkpoint(self, checkpoint: dict) -> None:
+        state_dict = checkpoint["state_dict"]
+        # Remove '_orig_mod' prefix if exists
+        new_state_dict = {
+            k.replace("net._orig_mod.", "net."): v
+            for k, v in state_dict.items()
+        }
+        checkpoint["state_dict"] = new_state_dict
+
     def configure_optimizers(self) -> Dict[str, Any]:
         """Choose what optimizers and learning-rate schedulers to use in your optimization.
         Normally you'd need one. But in the case of GANs or similar you might have multiple.
