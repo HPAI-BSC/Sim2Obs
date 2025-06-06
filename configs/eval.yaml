@@ -4,7 +4,7 @@ defaults:
   - _self_
   #- data: combined_dataset
   - data: galaxy_dianoga_rotation45
-  - model: trainsunet
+  - model: transunet
   - logger:
   - trainer: default
   - paths: gpfs
