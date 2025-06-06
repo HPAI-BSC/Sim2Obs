@@ -15,11 +15,6 @@
 CURRENT_DIR=$(pwd)
 echo "Current directory: '$CURRENT_DIR'"
 
-COMMIT_HASH=$(basename "$CURRENT_DIR")
-
-# Update the commit_tag in config.yaml using sed
-sed -i "s/^commit_tag: .*/commit_tag: \"$COMMIT_HASH\"/" configs/train.yaml
-
 module load singularity
 singularity exec -B /gpfs/scratch/bsc70/hpai/storage/projects \
                  --nv /gpfs/scratch/bsc70/hpai/storage/projects/space/singularity/space_v33.sif \
