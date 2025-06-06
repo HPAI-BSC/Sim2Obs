@@ -92,6 +92,7 @@ class MSELitModule(LightningModule):
         self.val_rmse_best = MinMetric()
         self.val_mae_best = MinMetric()
 
+    """
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         state_dict = checkpoint["state_dict"]
         # Remove '_orig_mod' prefix if exists
@@ -100,6 +101,7 @@ class MSELitModule(LightningModule):
             for k, v in state_dict.items()
         }
         checkpoint["state_dict"] = new_state_dict
+    """
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
