@@ -193,8 +193,8 @@ class PairedTransformNumpy:
         """
 
         # Final resize (might be redundant after RandomResizedCrop, but keeping for consistency)
-        image = TF.resize(image, self.resize_shape)
-        label = TF.resize(label, self.resize_shape)
+        image = TF.resize(image, self.resize_shape, antialias=True)
+        label = TF.resize(label, self.resize_shape, antialias=True)
 
         return image, label
 
