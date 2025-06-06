@@ -4,7 +4,7 @@ defaults:
   - _self_
   - data: combined_dataset
   #- data: galaxy_dianoga_rotation45
-  - model: mamba_unet
+  - model: unet_baseline
   - logger:
   - trainer: default
   - paths: gpfs
@@ -72,7 +72,8 @@ ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/bb916ef4/output/checkpoints/
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d6d71cd1/output/checkpoints/d6d71cd1/epoch_004.ckpt  # 06.06.25 Combined 1
 
 
-
+# UNet Baseline
+ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/d9ead2cb/output/checkpoints/d9ead2cb/epoch_014.ckpt  # 06.06.25 Combined 0.01
 
 
 
