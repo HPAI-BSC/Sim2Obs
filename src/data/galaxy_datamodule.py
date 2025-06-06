@@ -8,6 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 from lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import transforms
+from torchvision.transforms import InterpolationMode
 
 import numpy as np
 from scipy import ndimage
@@ -160,8 +161,8 @@ class PairedTransformNumpy:
         """
         # Random rotation with same angle
         angle = random.sample([-90, 0, 0, 90],k=1)[0]
-        image = TF.rotate(image, angle)
-        label = TF.rotate(label, angle)
+        image = TF.rotate(image, angle, interpolation=InterpolationMode.NEAREST)
+        label = TF.rotate(label, angle, interpolation=InterpolationMode.NEAREST)
 
         """
         # Random resized crop with same parameters
