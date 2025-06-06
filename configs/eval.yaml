@@ -67,6 +67,7 @@ ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/76ebb99b/output/checkpoints/
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/a54fcf1d/output/checkpoints/a54fcf1d/epoch_048.ckpt  # 02.06.25 Dianoga
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/bb916ef4/output/checkpoints/bb916ef4/epoch_009.ckpt  # 05.06.25 Combined 0.1
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/095db33d/output/checkpoints/095db33d/epoch_009.ckpt  # 05.06.25 Combined 0.25
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d6d71cd1/output/checkpoints/d6d71cd1/epoch_004.ckpt  # 06.06.25 Combined 1
 
 
 
