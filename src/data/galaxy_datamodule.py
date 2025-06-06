@@ -159,10 +159,12 @@ class PairedTransformNumpy:
             label = TF.vflip(label)
 
         """
+        """
         # Random rotation with same angle
         angle = random.sample([-90, 0, 0, 90],k=1)[0]
         image = TF.rotate(image, angle, interpolation=InterpolationMode.NEAREST)
         label = TF.rotate(label, angle, interpolation=InterpolationMode.NEAREST)
+        """
 
         """
         # Random resized crop with same parameters
