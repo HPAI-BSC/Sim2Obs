@@ -27,7 +27,7 @@ save_predictions: True
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/81406481/output/checkpoints/81406481/epoch_044.ckpt  # 14.04.25 Dianoga
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/f428ea0c/output/checkpoints/f428ea0c/epoch_043.ckpt  # 13.05.25 Combined
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c3d600dc/output/checkpoints/c3d600dc/epoch_013.ckpt  # 06.06.25 Combined 1
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c07373e8/output/checkpoints/c07373e8/epoch_014.ckpt  # 07.06.25 Combined 1
 
 # -Mamba
 # ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
@@ -80,6 +80,7 @@ ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/8a02e1f8/output/checkpoints/
 
 # UNet Baseline
 #ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/d9ead2cb/output/checkpoints/d9ead2cb/epoch_014.ckpt  # 06.06.25 Combined 0.01
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e786274b/output/checkpoints/e786274b/epoch_014.ckpt  # 07.06.25 Combined 1
 
 
 
