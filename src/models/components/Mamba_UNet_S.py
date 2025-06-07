@@ -1052,8 +1052,6 @@ class FinalRegularization(nn.Module):
         self.mlp = nn.Sequential(
             nn.Conv2d(1, hidden_dim, kernel_size=1),  # (bs,1,128,128) -> (bs,64,128,128)
             nn.GELU(),
-            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),  # (bs,64,128,128) -> (bs,64,128,128)
-            nn.GELU(),
             nn.Conv2d(hidden_dim, 1, kernel_size=1),  # (bs,64,128,128) -> (bs,1,128,128)
         )
 
