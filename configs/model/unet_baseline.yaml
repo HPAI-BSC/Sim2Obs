@@ -18,6 +18,8 @@ scheduler:
   div_factor: 25.0
   final_div_factor: 1e4
   three_phase: false
+  interval: step
+  frequency: 1
 
 net:
   _target_: src.models.components.UNet.UNet
