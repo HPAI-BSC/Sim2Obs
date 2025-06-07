@@ -93,4 +93,5 @@ ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/acae03c6/output/checkpoints
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e786274b/output/checkpoints/e786274b/epoch_014.ckpt  # 07.06.25 Combined 1
 
 
-
+# Mamba Depth 2
+ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/23e7069f/output/checkpoints/23e7069f/epoch_015.ckpt  # 07.06.25 Combined 0.05
