@@ -44,7 +44,7 @@ train: True
 test: True
 
 # simply provide checkpoint path to resume training
-ckpt_path: null
+#ckpt_path: null
 ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/24842b1b/output/checkpoints/24842b1b/epoch_014.ckpt
 
 # seed for random number generators in pytorch, numpy and python.random 
