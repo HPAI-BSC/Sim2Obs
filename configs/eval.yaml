@@ -70,7 +70,7 @@ save_predictions: True
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/0164868e/output/checkpoints/0164868e/epoch_014.ckpt  # 06.06.25 Combined 0.05
 #ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/4d133c9d/output/checkpoints/4d133c9d/epoch_014.ckpt  # 06.06.25 Combined 0.1
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e22861d1/output/checkpoints/e22861d1/epoch_013.ckpt  # 07.07.25 Combined 0.25
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/24842b1b/output/checkpoints/24842b1b/epoch_014.ckpt  # 07.06.25 Combined 1 (rot fixed)
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/8a02e1f8/output/checkpoints/8a02e1f8/epoch_013.ckpt  # 07.07.25 Combined 1
 
 # - Unet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
