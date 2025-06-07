@@ -3,8 +3,8 @@
 # specify here default configuration
 # order of defaults determines the order in which configs override each other
 defaults:
-  - data: galaxy_dianoga_rotation45
-  #- data: combined_dataset
+  #- data: galaxy_dianoga_rotation45
+  - data: combined_dataset
   #- data: galaxy_illustris300
   - model: mamba_unet
   - callbacks: default
@@ -44,8 +44,8 @@ train: True
 test: True
 
 # simply provide checkpoint path to resume training
-#ckpt_path: null
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/24842b1b/output/checkpoints/24842b1b/epoch_014.ckpt
+ckpt_path: null
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/24842b1b/output/checkpoints/24842b1b/epoch_014.ckpt
 
 # seed for random number generators in pytorch, numpy and python.random 
 seed: null
