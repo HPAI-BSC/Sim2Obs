@@ -21,13 +21,13 @@ net:
     embed_dim: 2048
     depths: [2, 2, 2, 2]
     mlp_ratio:
-    drop_rate: 0.01
-    drop_path_rate: 0.01
+    drop_rate: 0.1
+    drop_path_rate: 0.1
     patch_norm: True
     use_checkpoint: False
     final_upsample: expand_first  # From [None, 'expand_first']
   num_classes: 1 # aka num out channels
-  zero_head: False
+  zero_head: True
   vis: True
 
 # compile model for faster training with pytorch 2.0
