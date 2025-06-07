@@ -1092,7 +1092,7 @@ class MambaUNetS(nn.Module):
                                 use_checkpoint=config.use_checkpoint,
                                 final_upsample=config.final_upsample)
 
-        self.final_regularization = FinalRegularization(patch_size=config.patch_size)
+        self.final_regularization = FinalRegularization()
 
     def forward(self, x):
         """
