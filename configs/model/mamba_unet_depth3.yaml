@@ -1,0 +1,34 @@
+_target_: src.models.mamba_module.MambaLitModule
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.0005
+  weight_decay: 0.0
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 10
+
+net:
+  _target_: src.models.components.Mamba_UNet.MambaUNet
+  config:
+    patch_size: 4
+    in_chains: 1
+    embed_dim: 2048
+    depths: [3, 3, 3, 3]
+    mlp_ratio:
+    drop_rate: 0.01
+    drop_path_rate: 0.01
+    patch_norm: True
+    use_checkpoint: False
+    final_upsample: expand_first  # From [None, 'expand_first']
+  num_classes: 1 # aka num out channels
+  zero_head: False
+  vis: True
+
+# compile model for faster training with pytorch 2.0
+compile: false

@@ -94,5 +94,8 @@ save_predictions: True
 
 
 # Mamba Depth 2
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/dfa59c03/output/checkpoints/dfa59c03/epoch_015.ckpt  # 07.06.25 Combined 0.01
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/dfa59c03/output/checkpoints/dfa59c03/epoch_015.ckpt  # 07.06.25 Combined 0.01
 #ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/23e7069f/output/checkpoints/23e7069f/epoch_015.ckpt  # 07.06.25 Combined 0.05
+
+# Mamba Depth 3
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d651d683/output/checkpoints/d651d683/epoch_029.ckpt  # 07.06.25 Combined 0.05
