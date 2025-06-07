@@ -1041,29 +1041,33 @@ if __name__ == "__main__":
 
 class FinalRegularization(nn.Module):
     """
-    Regularization layer to collapse 4x4 patches to single pixels by defining clear borders
+    2D MLP using 1x1 convolutions to process each pixel independently
+    Perfect for collapsing patch artifacts without changing dimensions
     """
 
-    def __init__(self, patch_size=4):
+    def __init__(self, hidden_dim=64):
         super(FinalRegularization, self).__init__()
-        self.patch_size = patch_size
 
-        # Conv layers to process patches and define borders
-        self.patch_conv = nn.Conv2d(1, 16, kernel_size=patch_size, stride=1, padding="same")
-        self.output_conv = nn.Conv2d(16, 1, kernel_size=1, stride=1, padding=0)
-
-        # Activation functions
-        self.activation = nn.GELU()
+        # 2D MLP using 1x1 convolutions (applies same MLP to each spatial location)
+        self.mlp = nn.Sequential(
+            nn.Conv2d(1, hidden_dim, kernel_size=1),  # (bs,1,128,128) -> (bs,64,128,128)
+            nn.GELU(),
+            nn.Conv2d(hidden_dim, hidden_dim, kernel_size=1),  # (bs,64,128,128) -> (bs,64,128,128)
+            nn.GELU(),
+            nn.Conv2d(hidden_dim, 1, kernel_size=1),  # (bs,64,128,128) -> (bs,1,128,128)
+        )
 
     def forward(self, x):
         # Add channel dimension if needed
         if len(x.shape) == 3:
-            x = x.unsqueeze(1)  # [B, 1, 128, 128]
+            x = x.unsqueeze(1)  # [B, 1, H, W]
 
-        # Process patches to define borders
-        patch_features = self.activation(self.patch_conv(x))
-        border_features = self.activation(self.border_conv(patch_features))
-        output = self.output_conv(border_features)
+        # Apply 2D MLP
+        output = self.mlp(x)
+
+        # Remove channel dimension if input was 3D
+        if output.shape[1] == 1:
+            output = output.squeeze(1)  # Back to [B, H, W]
 
         return output
 
