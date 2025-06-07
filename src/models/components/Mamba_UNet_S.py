@@ -1065,10 +1065,6 @@ class FinalRegularization(nn.Module):
         # Apply 2D MLP
         output = self.mlp(x)
 
-        # Remove channel dimension if input was 3D
-        if output.shape[1] == 1:
-            output = output.squeeze(1)  # Back to [B, H, W]
-
         return output
 
 
