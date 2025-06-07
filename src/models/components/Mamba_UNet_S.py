@@ -1066,10 +1066,6 @@ class FinalRegularization(nn.Module):
         border_features = self.activation(self.border_conv(patch_features))
         output = self.output_conv(border_features)
 
-        # Remove channel dimension
-        if output.shape[1] == 1:
-            output = output.squeeze(1)  # [B, 128, 128]
-
         return output
 
 
