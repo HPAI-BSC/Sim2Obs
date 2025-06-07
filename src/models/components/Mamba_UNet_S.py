@@ -1050,8 +1050,7 @@ class FinalRegularization(nn.Module):
 
         # Conv layers to process patches and define borders
         self.patch_conv = nn.Conv2d(1, 16, kernel_size=patch_size, stride=1, padding="same")
-        self.border_conv = nn.Conv2d(16, 8, kernel_size=3, stride=1, padding=1)
-        self.output_conv = nn.Conv2d(8, 1, kernel_size=1, stride=1, padding=0)
+        self.output_conv = nn.Conv2d(16, 1, kernel_size=1, stride=1, padding=0)
 
         # Activation functions
         self.activation = nn.GELU()
