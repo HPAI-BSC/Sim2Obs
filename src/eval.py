@@ -7,6 +7,7 @@ from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
 import torch
 import numpy as np
+import random
 
 import matplotlib.pyplot as plt
 
@@ -131,14 +132,24 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         log.info("Predicting...")
         predictions = trainer.predict(model=model, dataloaders=datamodule.predict_dataloader(), ckpt_path=cfg.ckpt_path)
 
+        """
+        # Plot the first 3
         pred0, pred1, pred2 = predictions[0][0], predictions[0][1], predictions[0][2]
         preds = [pred0, pred1, pred2]
 
         for imgs, labels in datamodule.test_dataloader():
             gts = [labels[0], labels[1], labels[2]]  # Get the first two in the batch
             break
-
+        """
         output_path = cfg.paths.output_dir
+        random_idxs = random.sample(list(range(len(predictions[0]))), 3)
+
+        pred0, pred1, pred2 = predictions[0][random_idxs[0]], predictions[0][random_idxs[1]], predictions[0][random_idxs[2]]
+        preds = [pred0, pred1, pred2]
+
+        for imgs, labels in datamodule.test_dataloader():
+            gts = [labels[random_idxs[0]], labels[random_idxs[1]], labels[random_idxs[2]]]  # Get the first two in the batch
+            break
         plot_predictions(preds, gts, output_path)
 
         """
