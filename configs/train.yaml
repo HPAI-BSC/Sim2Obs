@@ -6,7 +6,7 @@ defaults:
   - data: galaxy_dianoga_rotation45
   #- data: combined_dataset
   #- data: galaxy_illustris300
-  - model: attention_unet
+  - model: transunet
   - callbacks: default
   - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
@@ -48,8 +48,8 @@ test: True
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/24842b1b/output/checkpoints/24842b1b/epoch_014.ckpt  # Mamba
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/97cdd3f1/output/checkpoints/97cdd3f1/epoch_015.ckpt  # Mamba_depth 3
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e345ef6/output/checkpoints/6e345ef6/epoch_013.ckpt  # UNet
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/8a02e1f8/output/checkpoints/8a02e1f8/epoch_013.ckpt  # TransUNet
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c07373e8/output/checkpoints/c07373e8/epoch_014.ckpt  # AttUNet
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/8a02e1f8/output/checkpoints/8a02e1f8/epoch_013.ckpt  # TransUNet
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c07373e8/output/checkpoints/c07373e8/epoch_014.ckpt  # AttUNet
 
 # seed for random number generators in pytorch, numpy and python.random 
 seed: null
