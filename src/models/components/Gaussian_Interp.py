@@ -66,8 +66,10 @@ class ConditionalUNet(nn.Module):
         return d3
 
 
+
+
 # Gaussian Interpolation Flow Model
-class GaussianInterpolationFlow:
+class GaussianInterpolationFlow(nn.Module):
     def __init__(self, input_channels, device='cuda'):
         self.v_net = ConditionalUNet(input_channels).to(device)
         self.device = device
