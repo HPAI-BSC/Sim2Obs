@@ -11,12 +11,22 @@ torch.set_float32_matmul_precision('medium')
 
 
 """
-class RMSELoss(nn.Module):
-    def __init__(self):
-        super(RMSELoss, self).__init__()
+This code implements the Trainer class for the Stochastic Interpolation model.
 
-    def forward(self, yhat, y):
-        return torch.sqrt(torch.mean((yhat - y) ** 2))
+Essentially, given Dist1 (Velocity_Dispersions) and Dist2 (ICL), and a pair (x,y) \in (Dist1, Dist2),
+we learn a probability path that interpolates between x and y passing through gaussian noise. 
+
+I_t = α(t)x + β(t)y + σ(t)ε
+
+where:
+    α(t) = 1 - t
+    β(t) = t
+    σ(t) = t(1 - t)
+    
+And so: t = 0 => x and t = 1 => y.
+
+This probability path is parametrized by a UNet which predicts velocity fields. 
+Inference given inputs x is performed by solving the corresponding ODE via a classic Euler method.
 """
 
 

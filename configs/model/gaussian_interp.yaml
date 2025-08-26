@@ -16,6 +16,12 @@ scheduler:
 net:
   _target_: src.models.components.Gaussian_Interp.GaussianInterpolationFlow
   input_channels: 1
+  base_channels: 64
+  channel_mults: (1, 2, 4, 8)
+  num_res_blocks: 2
+  attention_resolutions: (8, 16)
+  norm_groups: 8
+  time_emb_dim: 128
 
 # compile model for faster training with pytorch 2.0
 compile: false

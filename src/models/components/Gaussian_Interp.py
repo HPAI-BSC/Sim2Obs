@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 
 # Define the Conditional UNet for velocity prediction
-class ConditionalUNet(nn.Module):
+class BasicConditionalUNet(nn.Module):
     def __init__(self, input_channels, hidden_channels=64):
         super().__init__()
         self.time_embed = nn.Sequential(
@@ -43,12 +43,12 @@ class ConditionalUNet(nn.Module):
             nn.GroupNorm(8, hidden_channels), nn.SiLU())
         self.dec3 = nn.Sequential(nn.Conv2d(hidden_channels, input_channels, 3, padding=1))
 
-    def forward(self, x, t, cond):
+    def forward(self, x, t, x0):
         # Embed time
         t_embed = self.time_embed(t).unsqueeze(-1).unsqueeze(-1)
 
         # Concatenate input with condition
-        x = torch.cat([x, cond], dim=1)
+        x = torch.cat([x, x0], dim=1)
 
         # Encoder
         e1 = self.enc1(x)
@@ -66,19 +66,213 @@ class ConditionalUNet(nn.Module):
         return d3
 
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class ResidualBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, time_emb_dim=None, norm_groups=8):
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(time_emb_dim, out_channels)
+        ) if time_emb_dim is not None else None
+
+        self.block1 = nn.Sequential(
+            nn.GroupNorm(norm_groups, in_channels),
+            nn.SiLU(),
+            nn.Conv2d(in_channels, out_channels, 3, padding=1)
+        )
+
+        self.block2 = nn.Sequential(
+            nn.GroupNorm(norm_groups, out_channels),
+            nn.SiLU(),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1)
+        )
+
+        self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
+
+    def forward(self, x, time_emb=None):
+        h = self.block1(x)
+
+        if self.mlp is not None and time_emb is not None:
+            time_emb = self.mlp(time_emb)
+            h = h + time_emb.unsqueeze(-1).unsqueeze(-1)
+
+        h = self.block2(h)
+        return h + self.residual_conv(x)
+
+
+class AttentionBlock(nn.Module):
+    def __init__(self, channels, num_heads=4, norm_groups=8):
+        super().__init__()
+        self.norm = nn.GroupNorm(norm_groups, channels)
+        self.attention = nn.MultiheadAttention(channels, num_heads, batch_first=True)
+
+    def forward(self, x):
+        batch, channels, height, width = x.shape
+        h = self.norm(x)
+        h = h.view(batch, channels, height * width).transpose(1, 2)
+        h, _ = self.attention(h, h, h)
+        h = h.transpose(1, 2).view(batch, channels, height, width)
+        return x + h
+
+
+class Downsample(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.conv = nn.Conv2d(channels, channels, 3, stride=2, padding=1)
+
+    def forward(self, x):
+        return self.conv(x)
+
+
+class Upsample(nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.conv = nn.Conv2d(channels, channels, 3, padding=1)
+
+    def forward(self, x):
+        x = F.interpolate(x, scale_factor=2, mode="nearest")
+        return self.conv(x)
+
+
+class ConditionalUNet(nn.Module):
+    def __init__(
+            self,
+            input_channels,
+            base_channels=64,
+            channel_mults=(1, 2, 4, 8),
+            num_res_blocks=2,
+            attention_resolutions=(8, 16),
+            norm_groups=8,
+            time_emb_dim=128
+    ):
+        super().__init__()
+        self.time_emb_dim = time_emb_dim
+
+        # Time embedding
+        self.time_embed = nn.Sequential(
+            nn.Linear(1, time_emb_dim),
+            nn.SiLU(),
+            nn.Linear(time_emb_dim, time_emb_dim)
+        )
+
+        # Initial projection (concatenates input and condition)
+        self.init_conv = nn.Conv2d(input_channels * 2, base_channels, 3, padding=1)
+
+        # Downsampling
+        self.down_blocks = nn.ModuleList()
+        self.down_samples = nn.ModuleList()
+
+        channels = [base_channels] + [base_channels * mult for mult in channel_mults]
+        in_out_channels = list(zip(channels[:-1], channels[1:]))
+
+        res = 1  # Track resolution for attention
+
+        for i, (in_ch, out_ch) in enumerate(in_out_channels):
+            for _ in range(num_res_blocks):
+                self.down_blocks.append(nn.ModuleList([
+                    ResidualBlock(in_ch, out_ch, time_emb_dim, norm_groups),
+                    AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
+                ]))
+                in_ch = out_ch
+
+            if i < len(in_out_channels) - 1:  # Don't downsample after last block
+                self.down_samples.append(Downsample(out_ch))
+                res *= 2
+
+        # Middle blocks
+        self.mid_block1 = ResidualBlock(out_ch, out_ch, time_emb_dim, norm_groups)
+        self.mid_attn = AttentionBlock(out_ch, norm_groups=norm_groups)
+        self.mid_block2 = ResidualBlock(out_ch, out_ch, time_emb_dim, norm_groups)
+
+        # Upsampling
+        self.up_blocks = nn.ModuleList()
+        self.up_samples = nn.ModuleList()
+
+        for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
+            for _ in range(num_res_blocks + 1):
+                self.up_blocks.append(nn.ModuleList([
+                    ResidualBlock(in_ch + out_ch, out_ch, time_emb_dim, norm_groups),
+                    AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
+                ]))
+                in_ch = out_ch
+
+            if i < len(in_out_channels) - 1:  # Don't upsample after last block
+                self.up_samples.append(Upsample(out_ch))
+                res //= 2
+
+        # Final layers
+        self.final_norm = nn.GroupNorm(norm_groups, base_channels)
+        self.final_conv = nn.Conv2d(base_channels, input_channels, 3, padding=1)
+
+    def forward(self, x, t, x0):
+        # Time embedding
+        t_emb = self.time_embed(t.unsqueeze(-1))
+
+        # Concatenate input with condition
+        x = torch.cat([x, x0], dim=1)
+        x = self.init_conv(x)
+
+        # Skip connections
+        skips = [x]
+
+        # Downsample
+        for sample, blocks in zip(self.down_samples, self.down_blocks.chunk(len(self.down_samples) + 1)):
+            for res_block, attn in blocks:
+                x = res_block(x, t_emb)
+                x = attn(x)
+                skips.append(x)
+
+            if sample is not None:
+                x = sample(x)
+                skips.append(x)
+
+        # Middle
+        x = self.mid_block1(x, t_emb)
+        x = self.mid_attn(x)
+        x = self.mid_block2(x, t_emb)
+
+        # Upsample
+        for sample, blocks in zip(self.up_samples, self.up_blocks.chunk(len(self.up_samples) + 1)):
+            for res_block, attn in blocks:
+                x = torch.cat([x, skips.pop()], dim=1)
+                x = res_block(x, t_emb)
+                x = attn(x)
+
+            if sample is not None:
+                x = sample(x)
+
+        # Final
+        x = self.final_norm(x)
+        x = F.siLU(x)
+        x = self.final_conv(x)
+
+        return x
+
+
 
 
 # Gaussian Interpolation Flow Model
 class GaussianInterpolationFlow(nn.Module):
-    def __init__(self, input_channels, device='cuda'):
+    def __init__(self, input_channels, base_channels, channel_mults, num_res_blocks,
+                 attention_resolutions, norm_groups, time_emb_dim, device='cuda'):
         super().__init__()
-        self.v_net = ConditionalUNet(input_channels).to(device)
+        self.v_net = ConditionalUNet(input_channels,
+                                     base_channels,
+                                     channel_mults,
+                                     num_res_blocks,
+                                     attention_resolutions,
+                                     norm_groups,
+                                     time_emb_dim).to(device)
         self.device = device
 
-    def forward(self, x, t=None, cond=None):
-        if t is None or cond is None:
-            raise NotImplementedError('t and/or cond are None.')
-        return self.v_net(x, t, cond)
+    def forward(self, x, t=None, x0=None):
+        if t is None or x0 is None:
+            raise NotImplementedError('t and/or x0 are None.')
+        return self.v_net(x, t, x0)
 
     def compute_interpolant(self, x, y, t, epsilon):
         alpha_t = (1 - t).view(-1, 1, 1, 1)
@@ -88,8 +282,7 @@ class GaussianInterpolationFlow(nn.Module):
         return alpha_t * x + beta_t * y + sigma_t * epsilon
 
     def compute_velocity(self, x, y, epsilon, t):
-        alpha_t = (1 - t).view(-1, 1, 1, 1)
-        beta_t = t.view(-1, 1, 1, 1)
+        # Here we just compute the derivative of the interp path: I_t = (1-t) x + (t) y + t(1-t) ε
         d_alpha = -1
         d_beta = 1
         d_sigma = (1 - 2 * t).view(-1, 1, 1, 1)
