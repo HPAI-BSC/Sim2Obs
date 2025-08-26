@@ -281,14 +281,13 @@ class ConditionalUNet(nn.Module):
 # Gaussian Interpolation Flow Model
 class GaussianInterpolationFlow(nn.Module):
     def __init__(self, input_channels, base_channels, channel_mults, num_res_blocks,
-                 attention_resolutions, norm_groups, time_emb_dim, device='cuda'):
+                 attention_resolutions, time_emb_dim, device='cuda'):
         super().__init__()
         self.v_net = ConditionalUNet(input_channels,
                                      base_channels,
                                      channel_mults,
                                      num_res_blocks,
                                      attention_resolutions,
-                                     norm_groups,
                                      time_emb_dim).to(device)
         self.device = device
 
