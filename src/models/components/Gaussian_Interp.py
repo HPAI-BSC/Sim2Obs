@@ -13,7 +13,7 @@ class ConditionalUNet(nn.Module):
         self.time_embed = nn.Sequential(
             nn.Linear(1, hidden_channels * 4),
             nn.SiLU(),
-            nn.Linear(hidden_channels, hidden_channels)
+            nn.Linear(hidden_channels * 4, hidden_channels)
         )
 
         # Encoder
