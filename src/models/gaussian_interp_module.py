@@ -80,15 +80,15 @@ class GaussianInterpLitModule(LightningModule):
         # metric objects for calculating and averaging accuracy across batches
         # We choose Relative Average Spectral Error (RASE)
         # and Root Mean Squared Error Using Sliding Window
-        self.train_RASE = RelativeAverageSpectralError(window_size=8)
+        #self.train_RASE = RelativeAverageSpectralError(window_size=8)
         self.val_RASE = RelativeAverageSpectralError(window_size=8)
         self.test_RASE = RelativeAverageSpectralError(window_size=8)
 
-        self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
+        #self.train_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.val_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
         self.test_rmse = RootMeanSquaredErrorUsingSlidingWindow(window_size=8)
 
-        self.train_mae = MeanAbsoluteError()
+        #self.train_mae = MeanAbsoluteError()
         self.val_mae = MeanAbsoluteError()
         self.test_mae = MeanAbsoluteError()
 
@@ -177,7 +177,7 @@ class GaussianInterpLitModule(LightningModule):
         self.val_mae_best.reset()
 
     def model_step(
-            self, batch: Tuple[torch.Tensor, torch.Tensor]
+            self, batch: Tuple[torch.Tensor, torch.Tensor], return_preds=False
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Perform a single model step on a batch of data.
 
@@ -190,7 +190,11 @@ class GaussianInterpLitModule(LightningModule):
         """
         x, y = batch
 
-        loss, preds = self.net.train_step(x, y, return_preds=True)
+        if return_preds:
+            loss, preds = self.net.train_step(x, y, return_preds=return_preds)
+        else:
+            loss = self.net.train_step(x, y, return_preds=return_preds)
+            preds = None
         """
         preds = self.forward(x)
         if torch.isnan(preds).any():
@@ -222,9 +226,9 @@ class GaussianInterpLitModule(LightningModule):
 
         if batch_idx % 1000 == 0:
             self.train_loss.reset()
-            self.train_RASE.reset()
-            self.train_rmse.reset()
-            self.train_mae.reset()
+            #self.train_RASE.reset()
+            #self.train_rmse.reset()
+            #self.train_mae.reset()
             self.val_loss.reset()
             self.val_RASE.reset()
             self.val_mae.reset()
@@ -237,7 +241,7 @@ class GaussianInterpLitModule(LightningModule):
             gradient_clip_algorithm="norm"
         )
 
-        loss, preds, targets = self.model_step(batch)
+        loss, preds, targets = self.model_step(batch, return_preds=False)
 
         if batch_idx % 2000 == 0:
             import matplotlib.pyplot as plt
@@ -250,13 +254,13 @@ class GaussianInterpLitModule(LightningModule):
 
         # update and log metrics
         self.train_loss(loss.detach())
-        self.train_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
-        self.train_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
-        self.train_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        #self.train_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        #self.train_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        #self.train_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("train/loss", self.train_loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("train/RASE", self.train_RASE, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("train/rmse", self.train_rmse, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("train/mae", self.train_mae, on_step=True, on_epoch=True, prog_bar=True)
+        #self.log("train/RASE", self.train_RASE, on_step=True, on_epoch=True, prog_bar=True)
+        #self.log("train/rmse", self.train_rmse, on_step=True, on_epoch=True, prog_bar=True)
+        #self.log("train/mae", self.train_mae, on_step=True, on_epoch=True, prog_bar=True)
 
         # return loss or backpropagation will fail
         return loss
@@ -265,9 +269,9 @@ class GaussianInterpLitModule(LightningModule):
         "Lightning hook that is called when a training epoch ends."
         torch.cuda.empty_cache()
         self.train_loss.reset()
-        self.train_RASE.reset()
-        self.train_rmse.reset()
-        self.train_mae.reset()
+        #self.train_RASE.reset()
+        #self.train_rmse.reset()
+        #self.train_mae.reset()
         self.val_loss.reset()
         self.val_RASE.reset()
         self.val_rmse.reset()
@@ -280,7 +284,7 @@ class GaussianInterpLitModule(LightningModule):
             labels.
         :param batch_idx: The index of the current batch.
         """
-        loss, preds, targets = self.model_step(batch)
+        loss, preds, targets = self.model_step(batch, return_preds=True)
 
         # update and log metrics
         self.val_loss(loss)
@@ -314,7 +318,7 @@ class GaussianInterpLitModule(LightningModule):
             labels.
         :param batch_idx: The index of the current batch.
         """
-        loss, preds, targets = self.model_step(batch)
+        loss, preds, targets = self.model_step(batch, return_preds=True)
 
         # update and log metrics
         self.test_loss(loss)

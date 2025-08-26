@@ -25,7 +25,6 @@ class ConditionalUNet(nn.Module):
                                   nn.GroupNorm(8, hidden_channels * 4), nn.SiLU())
 
         # Bottleneck
-        print('->', hidden_channels * 4, hidden_channels * 8)
         self.bottleneck = nn.Sequential(
             nn.Conv2d(hidden_channels * 4, hidden_channels * 8, 3, padding=1),
             nn.GroupNorm(8, hidden_channels * 8),
@@ -57,8 +56,6 @@ class ConditionalUNet(nn.Module):
         e3 = self.enc3(e2)
 
         # Bottleneck with time embedding
-        print(e3.shape)
-        print(t_embed.shape)
         b = self.bottleneck(e3 + t_embed)
 
         # Decoder
@@ -80,9 +77,7 @@ class GaussianInterpolationFlow(nn.Module):
 
     def forward(self, x, t=None, cond=None):
         if t is None or cond is None:
-            print(x)
-            print("t is None or cond is none")
-            return torch.tensor([0.0])
+            raise NotImplementedError('t and/or cond are None.')
         return self.v_net(x, t, cond)
 
     def compute_interpolant(self, x, y, t, epsilon):
@@ -122,7 +117,7 @@ class GaussianInterpolationFlow(nn.Module):
         loss = nn.MSELoss()(v_pred, v_true)
 
         if return_preds:
-            preds = self.sample(x, num_steps=10)
+            preds = self.sample(x, num_steps=100)
             return loss, preds
         else:
             return loss
