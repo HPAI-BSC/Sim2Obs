@@ -151,6 +151,7 @@ class ConditionalUNet(nn.Module):
     ):
         super().__init__()
         self.time_emb_dim = time_emb_dim
+        self.num_res_blocks=num_res_blocks
 
         # Time embedding
         self.time_embed = nn.Sequential(
