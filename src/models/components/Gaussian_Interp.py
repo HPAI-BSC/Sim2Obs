@@ -77,8 +77,9 @@ class GaussianInterpolationFlow(nn.Module):
 
     def forward(self, x, t=None, cond=None):
         if t is None or cond is None:
-            raise ValueError(
-                "forward() was called without t or cond. Use step_forward() in training/validation steps.")
+            print(x)
+            print("t is None or cond is none")
+            return torch.tensor([0.0])
         return self.v_net(x, t, cond)
 
     def compute_interpolant(self, x, y, t, epsilon):
