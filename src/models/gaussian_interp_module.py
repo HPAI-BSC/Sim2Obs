@@ -302,6 +302,7 @@ class GaussianInterpLitModule(LightningModule):
         self.val_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        print(f"Batch_idx: {batch_idx}, val_loss: {loss}, val_RASE: {self.val_RASE}, val_mae: {self.val_mae}")
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/RASE", self.val_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)

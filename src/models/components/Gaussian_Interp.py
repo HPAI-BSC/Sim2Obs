@@ -146,10 +146,10 @@ class ConditionalUNet(nn.Module):
             channel_mults=(1, 2, 4, 8),
             num_res_blocks=2,
             attention_resolutions=(8, 16),
-            norm_groups=8,
             time_emb_dim=128
     ):
         super().__init__()
+        norm_groups = input_channels
         self.time_emb_dim = time_emb_dim
         self.num_res_blocks=num_res_blocks
 
