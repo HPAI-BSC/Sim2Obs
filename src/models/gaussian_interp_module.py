@@ -153,13 +153,13 @@ class GaussianInterpLitModule(LightningModule):
         print(f"Backward FLOPs: {total_flops * 2.5 / 1e9:.2f} GFLOPs")
         print('_'*25)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    #def forward(self, x: torch.Tensor, t: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
 
         :param x: A tensor of images.
         :return: A tensor of logits.
         """
-        return self.net(x)
+    #    return self.net(x, t, cond)
 
     def on_train_start(self) -> None:
         """Lightning hook that is called when training begins."""
@@ -187,7 +187,7 @@ class GaussianInterpLitModule(LightningModule):
         """
         x, y = batch
 
-        loss,preds = self.net.train_step(x, y, return_preds = True)
+        loss, preds = self.net.train_step(x, y, return_preds=True)
         """
         preds = self.forward(x)
         if torch.isnan(preds).any():
