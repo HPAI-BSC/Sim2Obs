@@ -75,7 +75,10 @@ class GaussianInterpolationFlow(nn.Module):
         self.v_net = ConditionalUNet(input_channels).to(device)
         self.device = device
 
-    def forward(self, x, t, cond):
+    def forward(self, x, t=None, cond=None):
+        if t is None or cond is None:
+            raise ValueError(
+                "forward() was called without t or cond. Use step_forward() in training/validation steps.")
         return self.v_net(x, t, cond)
 
     def compute_interpolant(self, x, y, t, epsilon):
