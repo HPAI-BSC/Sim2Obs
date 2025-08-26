@@ -8,10 +8,10 @@ from tqdm import tqdm
 
 # Define the Conditional UNet for velocity prediction
 class ConditionalUNet(nn.Module):
-    def __init__(self, input_channels, hidden_channels=256):
+    def __init__(self, input_channels, hidden_channels=64):
         super().__init__()
         self.time_embed = nn.Sequential(
-            nn.Linear(1, hidden_channels),
+            nn.Linear(1, hidden_channels * 4),
             nn.SiLU(),
             nn.Linear(hidden_channels, hidden_channels)
         )
