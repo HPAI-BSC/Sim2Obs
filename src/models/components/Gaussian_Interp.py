@@ -220,30 +220,52 @@ class ConditionalUNet(nn.Module):
         skips = [x]
 
         # Downsample
-        for sample, blocks in zip(self.down_samples, self.down_blocks.chunk(len(self.down_samples) + 1)):
-            for res_block, attn in blocks:
+        down_block_idx = 0
+        for i in range(len(self.down_samples)):
+            # Process residual blocks for this resolution
+            for _ in range(self.num_res_blocks):
+                res_block, attn = self.down_blocks[down_block_idx]
                 x = res_block(x, t_emb)
                 x = attn(x)
                 skips.append(x)
+                down_block_idx += 1
 
-            if sample is not None:
-                x = sample(x)
-                skips.append(x)
+            # Downsample
+            x = self.down_samples[i](x)
+            skips.append(x)
 
-        # Middle
+        # Process the final blocks at the bottom resolution
+        for i in range(down_block_idx, len(self.down_blocks)):
+            res_block, attn = self.down_blocks[i]
+            x = res_block(x, t_emb)
+            x = attn(x)
+            skips.append(x)
+
+        # Middle blocks
         x = self.mid_block1(x, t_emb)
         x = self.mid_attn(x)
         x = self.mid_block2(x, t_emb)
 
         # Upsample
-        for sample, blocks in zip(self.up_samples, self.up_blocks.chunk(len(self.up_samples) + 1)):
-            for res_block, attn in blocks:
+        up_block_idx = 0
+        for i in range(len(self.up_samples)):
+            # Process residual blocks for this resolution
+            for _ in range(self.num_res_blocks + 1):
+                res_block, attn = self.up_blocks[up_block_idx]
                 x = torch.cat([x, skips.pop()], dim=1)
                 x = res_block(x, t_emb)
                 x = attn(x)
+                up_block_idx += 1
 
-            if sample is not None:
-                x = sample(x)
+            # Upsample
+            x = self.up_samples[i](x)
+
+        # Process the final blocks at the top resolution
+        for i in range(up_block_idx, len(self.up_blocks)):
+            res_block, attn = self.up_blocks[i]
+            x = torch.cat([x, skips.pop()], dim=1)
+            x = res_block(x, t_emb)
+            x = attn(x)
 
         # Final
         x = self.final_norm(x)
