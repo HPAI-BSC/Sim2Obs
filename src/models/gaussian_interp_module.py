@@ -131,6 +131,9 @@ class GaussianInterpLitModule(LightningModule):
 
         # Example input
         x = torch.randn(1, 1, 128, 128).cuda()
+        cond = torch.randn(1, 1, 128, 128).cuda()
+        t = torch.rand(1, 1).cuda()
+
 
         # Move model to CUDA
         model = self.net.cuda()
@@ -143,15 +146,15 @@ class GaussianInterpLitModule(LightningModule):
         ) as prof:
             with torch.no_grad():
                 with record_function("model_inference"):
-                    model(x)
+                    model(x, t, cond)
 
         # Print total FLOPs
         #print(prof.key_averages().table(sort_by="flops", row_limit=10))
-        print('_'*25)
+        print('___'*25)
         total_flops = sum([e.flops for e in prof.key_averages() if e.flops is not None])
         print(f"Total forward FLOPs: {total_flops / 1e9:.2f} GFLOPs")
         print(f"Backward FLOPs: {total_flops * 2.5 / 1e9:.2f} GFLOPs")
-        print('_'*25)
+        print('___'*25)
 
     def forward(self, x: torch.Tensor, t: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
