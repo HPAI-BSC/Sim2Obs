@@ -25,6 +25,7 @@ class ConditionalUNet(nn.Module):
                                   nn.GroupNorm(8, hidden_channels * 4), nn.SiLU())
 
         # Bottleneck
+        print('->', hidden_channels * 4, hidden_channels * 8)
         self.bottleneck = nn.Sequential(
             nn.Conv2d(hidden_channels * 4, hidden_channels * 8, 3, padding=1),
             nn.GroupNorm(8, hidden_channels * 8),
@@ -56,6 +57,8 @@ class ConditionalUNet(nn.Module):
         e3 = self.enc3(e2)
 
         # Bottleneck with time embedding
+        print(e3.shape)
+        print(t_embed.shape)
         b = self.bottleneck(e3 + t_embed)
 
         # Decoder
