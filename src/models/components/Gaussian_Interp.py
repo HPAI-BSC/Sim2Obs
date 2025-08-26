@@ -123,9 +123,9 @@ class GaussianInterpolationFlow(nn.Module):
 
         if return_preds:
             preds = self.sample(x, num_steps=10)
-            return loss.item(), preds
+            return loss, preds
         else:
-            return loss.item(),
+            return loss
 
     def sample(self, x, num_steps=100):
         self.v_net.eval()
