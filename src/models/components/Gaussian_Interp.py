@@ -349,7 +349,7 @@ class ConditionalUNet(nn.Module):
 
         # Final
         x = self.final_norm(x)
-        x = F.siLU(x)
+        x = F.silu(x)
         x = self.final_conv(x)
 
         return x
