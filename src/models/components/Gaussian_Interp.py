@@ -268,12 +268,16 @@ class ConditionalUNet(nn.Module):
             x = self.down_samples[i](x)
             skips.append(x)
 
+        print('final blocks bottom res')
+
         # Process the final blocks at the bottom resolution
         for i in range(down_block_idx, len(self.down_blocks)):
             res_block, attn = self.down_blocks[i]
             x = res_block(x, t_emb)
             x = attn(x)
             skips.append(x)
+
+        print('middle blocks')
 
         # Middle blocks
         x = self.mid_block1(x, t_emb)
@@ -296,6 +300,8 @@ class ConditionalUNet(nn.Module):
 
             # Upsample
             x = self.up_samples[i](x)
+
+        print('final blocks top res')
 
         # Process the final blocks at the top resolution
         for i in range(up_block_idx, len(self.up_blocks)):
