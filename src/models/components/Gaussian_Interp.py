@@ -288,6 +288,7 @@ class ConditionalUNet(nn.Module):
         print('skips', [item.shape for item in skips])
         # Upsample
         up_block_idx = 0
+        print('---> ', len(self.up_samples))
         for i in range(len(self.up_samples)):
             # Process residual blocks for this resolution
             for _ in range(self.num_res_blocks + 1):
