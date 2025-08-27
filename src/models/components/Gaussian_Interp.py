@@ -253,7 +253,7 @@ class ConditionalUNet(nn.Module):
                 ]))
                 count += 1
 
-            if i > len(channels) - 2:  # Don't upsample after last block
+            if i > len(channels) - 1:  # Don't upsample after last block
                 self.up_samples.append(Upsample(out_ch))
                 res //= 2
 
