@@ -170,7 +170,7 @@ class ConditionalUNet(nn.Module):
         print('channels', channels)
         in_out_channels = list(zip(channels[:-1], channels[1:]))
         print('in_out_channels', in_out_channels)
-        in_out_channels = in_out_channels.append(1024)
+        in_out_channels = in_out_channels.append((512,1024))
         print('in_out_channels', in_out_channels)
 
         res = 1  # Track resolution for attention
