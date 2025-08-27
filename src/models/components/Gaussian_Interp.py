@@ -91,6 +91,7 @@ class ResidualBlock(nn.Module):
         self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
 
     def forward(self, x, time_emb=None):
+        print('-->', x.shape)
         h = self.block1(x)
 
         if self.mlp is not None and time_emb is not None:
@@ -448,15 +449,16 @@ class ConditionalUNet(nn.Module):
             x = self.down_samples[i](x)
             skips.append(x)
 
-        print('---')
-        print([item.shape for item in skips])
-        print('---')
-
         # Process the final blocks at the bottom resolution
         for i in range(down_block_idx, len(self.down_blocks)):
             res_block, attn = self.down_blocks[i]
             x = res_block(x, t_emb)
             x = attn(x)
+            skips.append(x)
+
+        print('---')
+        print([item.shape for item in skips])
+        print('---')
 
         # Middle blocks
         x = self.mid_block1(x, t_emb)
