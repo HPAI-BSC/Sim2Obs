@@ -198,7 +198,7 @@ class ConditionalUNet(nn.Module):
             # Add residual blocks for this level
             for _ in range(num_res_blocks):
                 self.down_blocks.append(nn.ModuleList([
-                    ResidualBlock(out_ch, out_ch, time_emb_dim, norm_groups),
+                    ResidualBlock(in_ch, out_ch, time_emb_dim, norm_groups),
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
                 in_ch = out_ch  # Subsequent blocks in same level have same channels
