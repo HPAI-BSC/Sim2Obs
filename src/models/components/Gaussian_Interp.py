@@ -91,7 +91,6 @@ class ResidualBlock(nn.Module):
         self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
 
     def forward(self, x, time_emb=None):
-        print('-->', x.shape, self.in_channels)
         h = self.block1(x)
 
         if self.mlp is not None and time_emb is not None:
@@ -399,7 +398,6 @@ class ConditionalUNet(nn.Module):
             out_ch = channels[i]
             in_ch = channels[i-1]
             for j in range(num_res_blocks):
-                print('a', out_ch, in_ch)
                 if j == 0:
                     self.up_blocks.append(nn.ModuleList([
                         # skip_ch + out_ch because skip connections are just concatenated
@@ -429,23 +427,17 @@ class ConditionalUNet(nn.Module):
         # Time embedding
         t_emb = self.time_embed(t.unsqueeze(-1))
 
-        print('*0', x.shape)
         # Concatenate input with condition
         x = torch.cat([x, x0], dim=1)
-        print('*', x.shape)
         x = self.init_conv(x)
-        print('*', x.shape)
 
         # Skip connections
         skips = [x]
-
-        print('downsample')
 
         # Downsample
         down_block_idx = 0
         for i in range(len(self.down_samples)):
             # Process residual blocks for this resolution
-            print('*', x.shape)
             for _ in range(self.num_res_blocks):
                 res_block, attn = self.down_blocks[down_block_idx]
                 x = res_block(x, t_emb)
@@ -456,29 +448,17 @@ class ConditionalUNet(nn.Module):
             x = self.down_samples[i](x)
             skips.append(x)
 
-        print('last blocks')
-
         # Process the final blocks at the bottom resolution
         for i in range(down_block_idx, len(self.down_blocks)):
-            print(i, x.shape)
             res_block, attn = self.down_blocks[i]
             x = res_block(x, t_emb)
             x = attn(x)
         skips.append(x)
 
-        print('---')
-        print([item.shape for item in skips])
-        print('---')
-
-        print('middle_block')
-
         # Middle blocks
         x = self.mid_block1(x, t_emb)
         x = self.mid_attn(x)
         x = self.mid_block2(x, t_emb)
-        print(x.shape)
-
-        print('up')
 
         # Upsample
         up_block_idx = 0
@@ -488,30 +468,14 @@ class ConditionalUNet(nn.Module):
                 x = torch.cat([x, skips.pop()], dim=1)
             except:
                 print(x.shape, skips[-1].shape)
-            print('*0', x.shape)
             for _ in range(self.num_res_blocks + 1):
                 res_block, attn = self.up_blocks[up_block_idx]
                 x = res_block(x, t_emb)
                 x = attn(x)
                 up_block_idx += 1
-                print('*1', x.shape)
 
             # Upsample
             x = self.up_samples[i](x)
-            print('*2', x.shape)
-
-        """
-        print('last blocks')
-
-        # Process the final blocks at the top resolution
-        for i in range(up_block_idx, len(self.up_blocks)):
-            print(i, x.shape)
-            res_block, attn = self.up_blocks[i]
-            x = res_block(x, t_emb)
-            x = attn(x)
-        """
-
-        print('final')
 
         # Final
         x = self.final_norm(x)
@@ -519,9 +483,6 @@ class ConditionalUNet(nn.Module):
         x = self.final_conv(x)
         x = F.silu(x)
         x = self.final_conv2(x)
-
-        print('-->', x.shape)
-        print('_______' * 3)
 
         return x
 
@@ -578,9 +539,6 @@ class GaussianInterpolationFlow(nn.Module):
 
         # Predict velocity
         v_pred = self.v_net(I_t, t.unsqueeze(1), x)
-
-        print('v_true', v_true.shape)
-        print('v_pred', v_pred.shape)
         # Compute loss
         loss = nn.MSELoss()(v_pred, v_true)
 
