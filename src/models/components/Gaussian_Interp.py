@@ -91,11 +91,7 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x, time_emb=None):
         print(x.shape)
-        try:
-            h = self.block1(x)
-        except:
-            print('here failed')
-            print(x.shape)
+        h = self.block1(x)
 
         if self.mlp is not None and time_emb is not None:
             time_emb = self.mlp(time_emb)
@@ -200,7 +196,7 @@ class ConditionalUNet(nn.Module):
             # Add residual blocks for this level
             for _ in range(num_res_blocks):
                 self.down_blocks.append(nn.ModuleList([
-                    ResidualBlock(in_ch, out_ch, time_emb_dim, norm_groups),
+                    ResidualBlock(out_ch + out_ch, out_ch, time_emb_dim, norm_groups),
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
                 in_ch = out_ch  # Subsequent blocks in same level have same channels
@@ -211,6 +207,8 @@ class ConditionalUNet(nn.Module):
                 res *= 2
 
         # Middle blocks
+        print(out_ch, channels[-1])
+        out_ch = channels[-1]
         self.mid_block1 = ResidualBlock(out_ch, out_ch, time_emb_dim, norm_groups)
         self.mid_attn = AttentionBlock(out_ch, norm_groups=norm_groups)
         self.mid_block2 = ResidualBlock(out_ch, out_ch, time_emb_dim, norm_groups)
@@ -221,7 +219,6 @@ class ConditionalUNet(nn.Module):
 
         for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
             for _ in range(num_res_blocks + 1):
-                print(i, '-->', in_ch, out_ch, in_ch + out_ch)
                 self.up_blocks.append(nn.ModuleList([
                     ResidualBlock(out_ch + out_ch, out_ch, time_emb_dim, norm_groups),  # in_ch + out_ch
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
@@ -248,8 +245,10 @@ class ConditionalUNet(nn.Module):
         skips = [x]
 
         # Downsample
+        print('downsample', self.down_blocks)
         down_block_idx = 0
         for i in range(len(self.down_samples)):
+            print(i)
             # Process residual blocks for this resolution
             for _ in range(self.num_res_blocks):
                 res_block, attn = self.down_blocks[down_block_idx]
@@ -274,9 +273,11 @@ class ConditionalUNet(nn.Module):
         x = self.mid_attn(x)
         x = self.mid_block2(x, t_emb)
 
+        print('up', self.up_blocks)
         # Upsample
         up_block_idx = 0
         for i in range(len(self.up_samples)):
+            print(i)
             # Process residual blocks for this resolution
             for _ in range(self.num_res_blocks + 1):
                 res_block, attn = self.up_blocks[up_block_idx]
