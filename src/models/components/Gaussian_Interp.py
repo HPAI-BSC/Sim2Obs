@@ -499,6 +499,7 @@ class ConditionalUNet(nn.Module):
             x = self.up_samples[i](x)
             print('*2', x.shape)
 
+        """
         print('last blocks')
 
         # Process the final blocks at the top resolution
@@ -507,6 +508,7 @@ class ConditionalUNet(nn.Module):
             res_block, attn = self.up_blocks[i]
             x = res_block(x, t_emb)
             x = attn(x)
+        """
 
         print('final')
 
