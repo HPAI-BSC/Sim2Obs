@@ -226,7 +226,7 @@ class ConditionalUNet(nn.Module):
             in_ch = channels[i-1]
             out_ch = channels[i]
             for j in range(num_res_blocks + 1):  # +1 because of skip connections
-                print(i, in_ch, out_ch, skip_ch)
+                print(i, j, in_ch, out_ch, skip_ch)
                 self.up_blocks.append(nn.ModuleList([
                     # skip_ch + out_ch because skip connections are just concatenated
                     ResidualBlock(skip_ch + out_ch, out_ch, time_emb_dim, norm_groups),
@@ -235,6 +235,8 @@ class ConditionalUNet(nn.Module):
                 if j > 0:
                     skip_ch = in_ch
                     #in_ch = out_ch
+                if j > 0 and i > 0:
+                    skip_ch = out_ch
 
             if count < len(channels) - 2:  # Don't upsample after last block
                 self.up_samples.append(Upsample(out_ch))
