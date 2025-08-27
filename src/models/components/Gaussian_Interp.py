@@ -222,7 +222,7 @@ class ConditionalUNet(nn.Module):
         for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
             for _ in range(num_res_blocks + 1):
                 self.up_blocks.append(nn.ModuleList([
-                    ResidualBlock(in_ch + out_ch, out_ch, time_emb_dim, norm_groups),  # in_ch + out_ch
+                    ResidualBlock(in_ch, out_ch, time_emb_dim, norm_groups),  # in_ch + out_ch
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
                 in_ch = out_ch
