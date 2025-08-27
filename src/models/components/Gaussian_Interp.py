@@ -343,8 +343,7 @@ class ConditionalUNet(nn.Module):
             try:
                 x = torch.cat([x, skips.pop()], dim=1)
             except:
-                print(x.shape)
-                print(skips[-1].shape)
+                pass
             x = res_block(x, t_emb)
             x = attn(x)
 
