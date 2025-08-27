@@ -222,6 +222,7 @@ class ConditionalUNet(nn.Module):
         skip_ch = channels[-1]
         #for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
         # ToDo: This is hardcoded, implement logic
+        """
         skips_channels = list(reversed([64, 64, 128, 128, 128, 256, 256, 256, 512, 512]))
         count = 0
         for i in range(len(channels) -1, -1, -1):
@@ -236,6 +237,24 @@ class ConditionalUNet(nn.Module):
                 self.up_blocks.append(nn.ModuleList([
                     # skip_ch + out_ch because skip connections are just concatenated
                     ResidualBlock(skip_ch + out_ch, out_ch, time_emb_dim, norm_groups),
+                    AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
+                ]))
+                count += 1
+        """
+        skips_channels = list(reversed([64, 64, 128, 128, 128, 256, 256, 256, 512, 512]))
+        skips_n_outs_channels = [1024, 1024, 768, 768]
+        count = 0
+        for i in range(len(channels) - 1, -1, -1):
+            out_ch = channels[i]
+            for j in range(num_res_blocks + 1):  # +1 because of skip connections
+                try:
+                    skip_n_outs_ch = skips_n_outs_channels[count]
+                except:
+                    skip_n_outs_ch = 0
+                print(i, j, '-', skip_n_outs_ch)
+                self.up_blocks.append(nn.ModuleList([
+                    # skip_ch + out_ch because skip connections are just concatenated
+                    ResidualBlock(skip_n_outs_ch, out_ch, time_emb_dim, norm_groups),
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
                 count += 1
