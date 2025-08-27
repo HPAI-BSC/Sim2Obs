@@ -397,19 +397,15 @@ class ConditionalUNet(nn.Module):
         # ToDo: This is hardcoded, implement logic
         # skips_n_outs_channels = [1024, 1024, 768, 768, 512, 384, 256, 128, 128, 128, 64, 64, 64]
         skips_n_outs_channels = [256, 256, 256, 128, 128, 128, 64, 64, 64]
+        print(channels)
         count = 0
         for i in range(len(channels) - 1, -1, -1):
             out_ch = channels[i]
             in_ch = channels[i-1]
             for j in range(num_res_blocks + 1):  # +1 because of skip connections
-                try:
-                    skip_n_outs_ch = skips_n_outs_channels[count]
-                except:
-                    skip_n_outs_ch = 0
-                print('a',in_ch, out_ch, skip_n_outs_ch)
                 self.up_blocks.append(nn.ModuleList([
                     # skip_ch + out_ch because skip connections are just concatenated
-                    ResidualBlock(skip_n_outs_ch, out_ch, time_emb_dim, norm_groups),
+                    ResidualBlock(out_ch, out_ch, time_emb_dim, norm_groups),
                     AttentionBlock(out_ch,
                                    norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
@@ -457,7 +453,7 @@ class ConditionalUNet(nn.Module):
             res_block, attn = self.down_blocks[i]
             x = res_block(x, t_emb)
             x = attn(x)
-            skips.append(x)
+        skips.append(x)
 
         print('---')
         print([item.shape for item in skips])
