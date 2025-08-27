@@ -393,16 +393,12 @@ class ConditionalUNet(nn.Module):
         self.up_blocks = nn.ModuleList()
         self.up_samples = nn.ModuleList()
 
-
-        # ToDo: This is hardcoded, implement logic
-        # skips_n_outs_channels = [1024, 1024, 768, 768, 512, 384, 256, 128, 128, 128, 64, 64, 64]
-        skips_n_outs_channels = [256, 256, 256, 128, 128, 128, 64, 64, 64]
-        print(channels)
         count = 0
         for i in range(len(channels) - 1, -1, -1):
             out_ch = channels[i]
             in_ch = channels[i-1]
             for j in range(num_res_blocks + 1):  # +1 because of skip connections
+                print(out_ch, in_ch)
                 self.up_blocks.append(nn.ModuleList([
                     # skip_ch + out_ch because skip connections are just concatenated
                     ResidualBlock(out_ch, out_ch, time_emb_dim, norm_groups),
@@ -412,7 +408,7 @@ class ConditionalUNet(nn.Module):
                 count += 1
 
             if i > len(channels) - 1:  # Don't upsample after last block
-                self.up_samples.append(Upsample(out_ch))
+                self.up_samples.append(Upsample(in_ch))
                 res //= 2
 
         # Final layers
