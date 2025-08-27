@@ -242,7 +242,7 @@ class ConditionalUNet(nn.Module):
                 count += 1
         """
         # ToDo: This is hardcoded, implement logic
-        skips_n_outs_channels = [1024, 1024, 768, 768, 512, 384, 256, 128, 128, 128, 64]
+        skips_n_outs_channels = [1024, 1024, 768, 768, 512, 384, 256, 128, 128, 128, 64, 64, 64]
         count = 0
         for i in range(len(channels) - 1, -1, -1):
             out_ch = channels[i]
