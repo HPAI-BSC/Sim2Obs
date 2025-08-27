@@ -221,8 +221,8 @@ class ConditionalUNet(nn.Module):
 
         skip_ch = channels[-1]
         for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
-            print(in_ch, out_ch)
-            for _ in range(num_res_blocks + 1):
+            print(in_ch, out_ch, skip_ch)
+            for _ in range(num_res_blocks):  #  + 1
                 self.up_blocks.append(nn.ModuleList([
                     # out_ch + out_ch because skip connections are just concatenated
                     ResidualBlock(skip_ch + out_ch, out_ch, time_emb_dim, norm_groups),
