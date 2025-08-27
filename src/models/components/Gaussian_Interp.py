@@ -242,16 +242,17 @@ class ConditionalUNet(nn.Module):
                 count += 1
         """
         # ToDo: This is hardcoded, implement logic
-        skips_n_outs_channels = [1024, 1024, 768, 768, 512, 512]
+        skips_n_outs_channels = [1024, 1024, 768, 768, 512, 384]
         count = 0
         for i in range(len(channels) - 1, -1, -1):
             out_ch = channels[i]
+            in_ch = channels[i]
             for j in range(num_res_blocks + 1):  # +1 because of skip connections
                 try:
                     skip_n_outs_ch = skips_n_outs_channels[count]
                 except:
                     skip_n_outs_ch = 0
-                print(i, j, '-', skip_n_outs_ch)
+                print(i, j, in_ch, out_ch, '-', skip_n_outs_ch)
                 self.up_blocks.append(nn.ModuleList([
                     # skip_ch + out_ch because skip connections are just concatenated
                     ResidualBlock(skip_n_outs_ch, out_ch, time_emb_dim, norm_groups),
