@@ -93,6 +93,7 @@ class ResidualBlock(nn.Module):
     def forward(self, x, time_emb=None):
         print(x.shape)
         print(self.norm_groups, self.in_channels)
+        print('----'*5)
         h = self.block1(x)
 
         if self.mlp is not None and time_emb is not None:
@@ -219,10 +220,13 @@ class ConditionalUNet(nn.Module):
         self.up_blocks = nn.ModuleList()
         self.up_samples = nn.ModuleList()
 
+        print(num_res_blocks)
+
         for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
             for _ in range(num_res_blocks + 1):
                 self.up_blocks.append(nn.ModuleList([
-                    ResidualBlock(out_ch + out_ch, out_ch, time_emb_dim, norm_groups),  # in_ch + out_ch
+                    # out_ch + out_ch because skip connections are just concatenated
+                    ResidualBlock(out_ch + out_ch, out_ch, time_emb_dim, norm_groups),
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
                 in_ch = out_ch
@@ -276,6 +280,7 @@ class ConditionalUNet(nn.Module):
         x = self.mid_block2(x, t_emb)
 
         print('up')
+        print('skips', [item.shape for item in skips])
         # Upsample
         up_block_idx = 0
         for i in range(len(self.up_samples)):
