@@ -91,7 +91,7 @@ class ResidualBlock(nn.Module):
         self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
 
     def forward(self, x, time_emb=None):
-        print('-->', x.shape)
+        print('-->', x.shape, self.in_channels)
         h = self.block1(x)
 
         if self.mlp is not None and time_emb is not None:
