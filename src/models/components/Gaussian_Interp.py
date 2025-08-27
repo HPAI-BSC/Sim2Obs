@@ -450,7 +450,7 @@ class ConditionalUNet(nn.Module):
 
         # Process the final blocks at the bottom resolution
         for i in range(down_block_idx, len(self.down_blocks)):
-            print(i, x.sahpe)
+            print(i, x.shape)
             res_block, attn = self.down_blocks[i]
             x = res_block(x, t_emb)
             x = attn(x)
