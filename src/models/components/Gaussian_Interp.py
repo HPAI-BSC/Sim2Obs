@@ -429,6 +429,8 @@ class ConditionalUNet(nn.Module):
         # Skip connections
         skips = [x]
 
+        print('downsample')
+
         # Downsample
         down_block_idx = 0
         for i in range(len(self.down_samples)):
@@ -444,8 +446,11 @@ class ConditionalUNet(nn.Module):
             x = self.down_samples[i](x)
             skips.append(x)
 
+        print('last blocks')
+
         # Process the final blocks at the bottom resolution
         for i in range(down_block_idx, len(self.down_blocks)):
+            print(i, x.sahpe)
             res_block, attn = self.down_blocks[i]
             x = res_block(x, t_emb)
             x = attn(x)
@@ -455,10 +460,15 @@ class ConditionalUNet(nn.Module):
         print([item.shape for item in skips])
         print('---')
 
+        print('middle_block')
+
         # Middle blocks
         x = self.mid_block1(x, t_emb)
         x = self.mid_attn(x)
         x = self.mid_block2(x, t_emb)
+        print(x.shape)
+
+        print('up')
 
         # Upsample
         up_block_idx = 0
@@ -475,18 +485,23 @@ class ConditionalUNet(nn.Module):
             # Upsample
             x = self.up_samples[i](x)
 
+        print('last blocks')
+
         # Process the final blocks at the top resolution
         for i in range(up_block_idx, len(self.up_blocks)):
+            print(i, x.shape)
             res_block, attn = self.up_blocks[i]
             x = res_block(x, t_emb)
             x = attn(x)
+
+        print('final')
 
         # Final
         x = self.final_norm(x)
         x = F.silu(x)
         x = self.final_conv(x)
 
-        print(x.shape)
+        print('-->', x.shape)
         print('_______' * 3)
 
         return x
