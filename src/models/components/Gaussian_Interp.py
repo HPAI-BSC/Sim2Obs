@@ -306,7 +306,11 @@ class ConditionalUNet(nn.Module):
         # Process the final blocks at the top resolution
         for i in range(up_block_idx, len(self.up_blocks)):
             res_block, attn = self.up_blocks[i]
-            x = torch.cat([x, skips.pop()], dim=1)
+            try:
+                x = torch.cat([x, skips.pop()], dim=1)
+            except:
+                print(x.shape)
+                print(skips)
             x = res_block(x, t_emb)
             x = attn(x)
 
