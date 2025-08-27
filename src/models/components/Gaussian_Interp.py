@@ -427,9 +427,9 @@ class ConditionalUNet(nn.Module):
 
         # Concatenate input with condition
         x = torch.cat([x, x0], dim=1)
-        print(x)
+        print(x.shape)
         x = self.init_conv(x)
-        print(x)
+        print(x.shape)
 
         # Skip connections
         skips = [x]
@@ -448,7 +448,9 @@ class ConditionalUNet(nn.Module):
             x = self.down_samples[i](x)
             skips.append(x)
 
+        print('---')
         print([item.shape for item in skips])
+        print('---')
 
         # Process the final blocks at the bottom resolution
         for i in range(down_block_idx, len(self.down_blocks)):
