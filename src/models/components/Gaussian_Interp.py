@@ -221,15 +221,16 @@ class ConditionalUNet(nn.Module):
 
         skip_ch = channels[-1]
         for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
-            print(in_ch, out_ch, skip_ch)
-            for _ in range(num_res_blocks):  #  + 1
+            for i in range(num_res_blocks + 1):
+                print(in_ch, out_ch, skip_ch)
                 self.up_blocks.append(nn.ModuleList([
                     # out_ch + out_ch because skip connections are just concatenated
                     ResidualBlock(skip_ch + out_ch, out_ch, time_emb_dim, norm_groups),
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
-            skip_ch = in_ch
-                #in_ch = out_ch
+                if i > 1:
+                    skip_ch = in_ch
+                    #in_ch = out_ch
 
             if i < len(in_out_channels) - 1:  # Don't upsample after last block
                 self.up_samples.append(Upsample(out_ch))
@@ -254,9 +255,9 @@ class ConditionalUNet(nn.Module):
         print('downsample')
         down_block_idx = 0
         for i in range(len(self.down_samples)):
-            print(i)
             # Process residual blocks for this resolution
             for _ in range(self.num_res_blocks):
+                print(i, down_block_idx)
                 res_block, attn = self.down_blocks[down_block_idx]
                 x = res_block(x, t_emb)
                 x = attn(x)
@@ -284,9 +285,9 @@ class ConditionalUNet(nn.Module):
         # Upsample
         up_block_idx = 0
         for i in range(len(self.up_samples)):
-            print(i)
             # Process residual blocks for this resolution
             for _ in range(self.num_res_blocks + 1):
+                print(i, up_block_idx)
                 res_block, attn = self.up_blocks[up_block_idx]
                 x = torch.cat([x, skips.pop()], dim=1)
                 x = res_block(x, t_emb)
