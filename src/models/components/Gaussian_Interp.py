@@ -166,12 +166,10 @@ class ConditionalUNet(nn.Module):
         self.down_blocks = nn.ModuleList()
         self.down_samples = nn.ModuleList()
 
-        #channels = [base_channels] + [base_channels * mult for mult in channel_mults]
-        channels = [base_channels * mult for mult in channel_mults]
+        channels = [base_channels] + [base_channels * mult for mult in channel_mults]
         print('channels', channels)
         in_out_channels = list(zip(channels[:-1], channels[1:]))
         print('in_out_channels', in_out_channels)
-        in_out_channels = in_out_channels + [(512,1024)]
         print('in_out_channels', in_out_channels)
 
         res = 1  # Track resolution for attention
@@ -228,16 +226,21 @@ class ConditionalUNet(nn.Module):
         # Downsample
         down_block_idx = 0
         for i in range(len(self.down_samples)):
+            print('-->', i)
             # Process residual blocks for this resolution
             for _ in range(self.num_res_blocks):
+                print('a')
                 res_block, attn = self.down_blocks[down_block_idx]
                 x = res_block(x, t_emb)
                 x = attn(x)
                 skips.append(x)
                 down_block_idx += 1
+                print('b')
 
+            print('-->', 'downsample', x.shape)
             # Downsample
             x = self.down_samples[i](x)
+            print('-->', 'downsample_after', x.shape)
             skips.append(x)
 
         # Process the final blocks at the bottom resolution
