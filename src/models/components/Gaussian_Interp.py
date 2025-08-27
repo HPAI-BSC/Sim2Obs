@@ -137,7 +137,7 @@ class Upsample(nn.Module):
         return self.conv(x)
 
 
-class ConditionalUNet(nn.Module):
+class ConditionalUNetOld(nn.Module):
     def __init__(
             self,
             input_channels,
@@ -328,6 +328,166 @@ class ConditionalUNet(nn.Module):
         x = self.final_norm(x)
         x = F.silu(x)
         x = self.final_conv(x)
+
+        return
+
+class ConditionalUNet(nn.Module):
+    def __init__(
+            self,
+            input_channels,
+            base_channels=64,
+            channel_mults=(1, 2, 4, 8),
+            num_res_blocks=2,
+            attention_resolutions=(8, 16),
+            norm_groups=8,
+            time_emb_dim=128
+    ):
+        super().__init__()
+        # norm_groups = input_channels
+        self.time_emb_dim = time_emb_dim
+        self.num_res_blocks = num_res_blocks
+
+        # Time embedding
+        self.time_embed = nn.Sequential(
+            nn.Linear(1, time_emb_dim),
+            nn.SiLU(),
+            nn.Linear(time_emb_dim, time_emb_dim)
+        )
+
+        # Initial projection (concatenates input and condition)
+        self.init_conv = nn.Conv2d(input_channels * 2, base_channels, 3, padding=1)
+
+        # Downsampling
+        self.down_blocks = nn.ModuleList()
+        self.down_samples = nn.ModuleList()
+
+        channels = [base_channels * mult for mult in channel_mults]  # [base_channels] +
+
+        res = 1  # Track resolution for attention
+        for i in range(len(channels) - 1):
+            in_ch = channels[i]
+            out_ch = channels[i + 1]
+
+            # Add residual blocks for this level
+            for _ in range(num_res_blocks):
+                self.down_blocks.append(nn.ModuleList([
+                    ResidualBlock(in_ch, out_ch, time_emb_dim, norm_groups),
+                    AttentionBlock(out_ch,
+                                   norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
+                ]))
+                in_ch = out_ch  # Subsequent blocks in same level have same channels
+
+            # Add downsampling (except after last level)
+            if i < len(channels) - 2:
+                self.down_samples.append(Downsample(out_ch))
+                res *= 2
+
+        # Middle blocks
+        out_ch = channels[-1]
+        self.mid_block1 = ResidualBlock(out_ch, out_ch, time_emb_dim, norm_groups)
+        self.mid_attn = AttentionBlock(out_ch, norm_groups=norm_groups)
+        self.mid_block2 = ResidualBlock(out_ch, out_ch, time_emb_dim, norm_groups)
+
+        # Upsampling
+        self.up_blocks = nn.ModuleList()
+        self.up_samples = nn.ModuleList()
+
+
+        # ToDo: This is hardcoded, implement logic
+        # skips_n_outs_channels = [1024, 1024, 768, 768, 512, 384, 256, 128, 128, 128, 64, 64, 64]
+        skips_n_outs_channels = [1024, 1024, 768, 512, 256, 256, 256, 128, 128, 128, 64, 64, 64]
+        count = 0
+        for i in range(len(channels) - 1, -1, -1):
+            out_ch = channels[i]
+            in_ch = channels[i]
+            for j in range(num_res_blocks + 1):  # +1 because of skip connections
+                try:
+                    skip_n_outs_ch = skips_n_outs_channels[count]
+                except:
+                    skip_n_outs_ch = 0
+                self.up_blocks.append(nn.ModuleList([
+                    # skip_ch + out_ch because skip connections are just concatenated
+                    ResidualBlock(skip_n_outs_ch, out_ch, time_emb_dim, norm_groups),
+                    AttentionBlock(out_ch,
+                                   norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
+                ]))
+                count += 1
+
+            if i > len(channels) - 1:  # Don't upsample after last block
+                self.up_samples.append(Upsample(out_ch))
+                res //= 2
+
+        # Final layers
+        self.final_norm = nn.GroupNorm(norm_groups, base_channels)
+        self.final_conv = nn.Conv2d(base_channels, input_channels, 3, padding=1)
+
+    def forward(self, x, t, x0):
+        # Time embedding
+        t_emb = self.time_embed(t.unsqueeze(-1))
+
+        # Concatenate input with condition
+        x = torch.cat([x, x0], dim=1)
+        print(x)
+        x = self.init_conv(x)
+        print(x)
+
+        # Skip connections
+        skips = [x]
+
+        # Downsample
+        down_block_idx = 0
+        for i in range(len(self.down_samples)):
+            # Process residual blocks for this resolution
+            for _ in range(self.num_res_blocks):
+                res_block, attn = self.down_blocks[down_block_idx]
+                x = res_block(x, t_emb)
+                x = attn(x)
+                down_block_idx += 1
+
+            # Downsample
+            x = self.down_samples[i](x)
+            skips.append(x)
+
+        print([item.shape for item in skips])
+
+        # Process the final blocks at the bottom resolution
+        for i in range(down_block_idx, len(self.down_blocks)):
+            res_block, attn = self.down_blocks[i]
+            x = res_block(x, t_emb)
+            x = attn(x)
+
+        # Middle blocks
+        x = self.mid_block1(x, t_emb)
+        x = self.mid_attn(x)
+        x = self.mid_block2(x, t_emb)
+
+        # Upsample
+        up_block_idx = 0
+        for i in range(len(self.up_samples)):
+            # Process residual blocks for this resolution
+            x = torch.cat([x, skips.pop()], dim=1)
+            for _ in range(self.num_res_blocks + 1):
+                res_block, attn = self.up_blocks[up_block_idx]
+                x = res_block(x, t_emb)
+                x = attn(x)
+                up_block_idx += 1
+
+            # Upsample
+            x = self.up_samples[i](x)
+
+        # Process the final blocks at the top resolution
+        for i in range(up_block_idx, len(self.up_blocks)):
+            res_block, attn = self.up_blocks[i]
+            x = res_block(x, t_emb)
+            x = attn(x)
+
+        # Final
+        x = self.final_norm(x)
+        x = F.silu(x)
+        x = self.final_conv(x)
+
+        print(x.shape)
+        print('_______' * 3)
 
         return x
 
