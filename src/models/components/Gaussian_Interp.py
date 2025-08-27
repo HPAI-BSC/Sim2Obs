@@ -407,13 +407,6 @@ class ConditionalUNet(nn.Module):
                         AttentionBlock(out_ch,
                                        norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                     ]))
-                elif j == num_res_blocks - 1:
-                    self.up_blocks.append(nn.ModuleList([
-                        # skip_ch + out_ch because skip connections are just concatenated
-                        ResidualBlock(out_ch, in_ch, time_emb_dim, norm_groups),
-                        AttentionBlock(out_ch,
-                                       norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
-                    ]))
                 else:
                     self.up_blocks.append(nn.ModuleList([
                         # skip_ch + out_ch because skip connections are just concatenated
@@ -428,8 +421,9 @@ class ConditionalUNet(nn.Module):
                 res //= 2
 
         # Final layers
-        self.final_norm = nn.GroupNorm(norm_groups, base_channels)
-        self.final_conv = nn.Conv2d(base_channels, input_channels, 3, padding=1)
+        self.final_norm = nn.GroupNorm(norm_groups, base_channels * 2)
+        self.final_conv = nn.Conv2d(base_channels * 2, base_channels, 3, padding=1)
+        self.final_conv2 = nn.Conv2d(base_channels, input_channels, 3, padding=1)
 
     def forward(self, x, t, x0):
         # Time embedding
@@ -523,6 +517,8 @@ class ConditionalUNet(nn.Module):
         x = self.final_norm(x)
         x = F.silu(x)
         x = self.final_conv(x)
+        x = F.silu(x)
+        x = self.final_conv2(x)
 
         print('-->', x.shape)
         print('_______' * 3)
