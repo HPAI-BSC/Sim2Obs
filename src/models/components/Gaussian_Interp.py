@@ -69,6 +69,7 @@ import torch.nn.functional as F
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels, out_channels, time_emb_dim=None, norm_groups=8):
         super().__init__()
+        self.norm_groups = norm_groups
         self.mlp = nn.Sequential(
             nn.SiLU(),
             nn.Linear(time_emb_dim, out_channels)
@@ -89,8 +90,13 @@ class ResidualBlock(nn.Module):
         self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
 
     def forward(self, x, time_emb=None):
-        print(x.shape)
-        h = self.block1(x)
+        print(self.norm_groups)
+        try:
+            h = self.block1(x)
+        except:
+            print(x.shape)
+            print(self.norm_groups)
+            h = self.block2(x)
 
         if self.mlp is not None and time_emb is not None:
             time_emb = self.mlp(time_emb)
