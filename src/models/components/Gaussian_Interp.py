@@ -407,6 +407,13 @@ class ConditionalUNet(nn.Module):
                         AttentionBlock(out_ch,
                                        norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                     ]))
+                elif j == num_res_blocks - 1:
+                    self.up_blocks.append(nn.ModuleList([
+                        # skip_ch + out_ch because skip connections are just concatenated
+                        ResidualBlock(out_ch, in_ch, time_emb_dim, norm_groups),
+                        AttentionBlock(out_ch,
+                                       norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
+                    ]))
                 else:
                     self.up_blocks.append(nn.ModuleList([
                         # skip_ch + out_ch because skip connections are just concatenated
