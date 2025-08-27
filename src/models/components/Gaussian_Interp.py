@@ -483,7 +483,10 @@ class ConditionalUNet(nn.Module):
         up_block_idx = 0
         for i in range(len(self.up_samples)):
             # Process residual blocks for this resolution
-            x = torch.cat([x, skips.pop()], dim=1)
+            try:
+                x = torch.cat([x, skips.pop()], dim=1)
+            except:
+                print(x.shape, skips[-1].shape)
             print('*0', x.shape)
             for _ in range(self.num_res_blocks + 1):
                 res_block, attn = self.up_blocks[up_block_idx]
