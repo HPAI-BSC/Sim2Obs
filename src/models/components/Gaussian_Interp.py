@@ -97,7 +97,7 @@ class ResidualBlock(nn.Module):
             time_emb = self.mlp(time_emb)
             print('time_emb', time_emb.shape)
             print('h', h.shape)
-            h = h + time_emb.unsqueeze(-1).unsqueeze(-1)
+            h = h + time_emb.unsqueeze(-1)
             print('->h', h.shape)
 
         print('h after self.mlp', h.shape)
