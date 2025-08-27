@@ -232,7 +232,8 @@ class ConditionalUNet(nn.Module):
                     skip_ch = in_ch
                     #in_ch = out_ch
 
-            if i < len(in_out_channels) - 1:  # Don't upsample after last block
+            if i < len(channels) - 2:  # Don't upsample after last block
+                print('aaa')
                 self.up_samples.append(Upsample(out_ch))
                 res //= 2
 
