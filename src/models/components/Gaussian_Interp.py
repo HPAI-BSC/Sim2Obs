@@ -95,7 +95,10 @@ class ResidualBlock(nn.Module):
 
         if self.mlp is not None and time_emb is not None:
             time_emb = self.mlp(time_emb)
+            print('time_emb', time_emb.shape)
+            print('h', h.shape)
             h = h + time_emb.unsqueeze(-1).unsqueeze(-1)
+            print('->h', h.shape)
 
         print('h after self.mlp', h.shape)
         h = self.block2(h)
