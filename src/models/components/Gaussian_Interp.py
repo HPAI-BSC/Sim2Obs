@@ -220,7 +220,11 @@ class ConditionalUNet(nn.Module):
         self.up_samples = nn.ModuleList()
 
         skip_ch = channels[-1]
-        for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
+        #for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
+        count = 0
+        for i in range(len(channels) - 2, -1, -1):
+            in_ch = channels[i-1]
+            out_ch = channels[i]
             for i in range(num_res_blocks + 1):  # +1 because of skip connections
                 print(i, in_ch, out_ch, skip_ch)
                 self.up_blocks.append(nn.ModuleList([
@@ -232,10 +236,11 @@ class ConditionalUNet(nn.Module):
                     skip_ch = in_ch
                     #in_ch = out_ch
 
-            if i < len(channels) - 2:  # Don't upsample after last block
+            if count < len(channels) - 2:  # Don't upsample after last block
                 print('aaa')
                 self.up_samples.append(Upsample(out_ch))
                 res //= 2
+            count += 1
 
         # Final layers
         self.final_norm = nn.GroupNorm(norm_groups, base_channels)
