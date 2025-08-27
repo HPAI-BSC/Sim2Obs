@@ -196,7 +196,7 @@ class ConditionalUNet(nn.Module):
             # Add residual blocks for this level
             for _ in range(num_res_blocks):
                 self.down_blocks.append(nn.ModuleList([
-                    ResidualBlock(out_ch + out_ch, out_ch, time_emb_dim, norm_groups),
+                    ResidualBlock(in_ch + out_ch, out_ch, time_emb_dim, norm_groups),
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
                 in_ch = out_ch  # Subsequent blocks in same level have same channels
@@ -220,7 +220,7 @@ class ConditionalUNet(nn.Module):
         for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
             for _ in range(num_res_blocks + 1):
                 self.up_blocks.append(nn.ModuleList([
-                    ResidualBlock(out_ch + out_ch, out_ch, time_emb_dim, norm_groups),  # in_ch + out_ch
+                    ResidualBlock(in_ch + out_ch, out_ch, time_emb_dim, norm_groups),  # in_ch + out_ch
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
                 in_ch = out_ch
@@ -245,7 +245,7 @@ class ConditionalUNet(nn.Module):
         skips = [x]
 
         # Downsample
-        print('downsample', self.down_blocks)
+        print('downsample')
         down_block_idx = 0
         for i in range(len(self.down_samples)):
             print(i)
@@ -273,7 +273,7 @@ class ConditionalUNet(nn.Module):
         x = self.mid_attn(x)
         x = self.mid_block2(x, t_emb)
 
-        print('up', self.up_blocks)
+        print('up')
         # Upsample
         up_block_idx = 0
         for i in range(len(self.up_samples)):
