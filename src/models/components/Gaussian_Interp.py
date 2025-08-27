@@ -174,6 +174,7 @@ class ConditionalUNet(nn.Module):
 
         res = 1  # Track resolution for attention
 
+        """
         for i, (in_ch, out_ch) in enumerate(in_out_channels):
             for _ in range(num_res_blocks):
                 print('--->',in_ch,out_ch)
@@ -184,6 +185,23 @@ class ConditionalUNet(nn.Module):
                 in_ch = out_ch
 
             if i < len(in_out_channels) - 1:  # Don't downsample after last block
+                self.down_samples.append(Downsample(out_ch))
+                res *= 2
+        """
+        for i in range(len(channels) - 1):
+            in_ch = channels[i]
+            out_ch = channels[i + 1]
+
+            # Add residual blocks for this level
+            for _ in range(num_res_blocks):
+                self.down_blocks.append(nn.ModuleList([
+                    ResidualBlock(in_ch, out_ch, time_emb_dim, norm_groups),
+                    AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
+                ]))
+                in_ch = out_ch  # Subsequent blocks in same level have same channels
+
+            # Add downsampling (except after last level)
+            if i < len(channels) - 2:
                 self.down_samples.append(Downsample(out_ch))
                 res *= 2
 
@@ -226,21 +244,16 @@ class ConditionalUNet(nn.Module):
         # Downsample
         down_block_idx = 0
         for i in range(len(self.down_samples)):
-            print('-->', i)
             # Process residual blocks for this resolution
             for _ in range(self.num_res_blocks):
-                print('a')
                 res_block, attn = self.down_blocks[down_block_idx]
                 x = res_block(x, t_emb)
                 x = attn(x)
                 skips.append(x)
                 down_block_idx += 1
-                print('b')
 
-            print('-->', 'downsample', x.shape)
             # Downsample
             x = self.down_samples[i](x)
-            print('-->', 'downsample_after', x.shape)
             skips.append(x)
 
         # Process the final blocks at the bottom resolution
