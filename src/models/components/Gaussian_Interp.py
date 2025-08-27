@@ -284,8 +284,11 @@ class ConditionalUNet(nn.Module):
         x = self.mid_attn(x)
         x = self.mid_block2(x, t_emb)
 
-        print('up')
+        print('________' * 3)
         print('skips', [item.shape for item in skips])
+        print('________' * 3)
+
+        print('up')
         # Upsample
         up_block_idx = 0
         print('---> ', len(self.up_samples))
@@ -301,6 +304,8 @@ class ConditionalUNet(nn.Module):
 
             # Upsample
             x = self.up_samples[i](x)
+        print('________' * 3)
+        print('________' * 3)
 
         print('final blocks top res')
 
@@ -311,7 +316,7 @@ class ConditionalUNet(nn.Module):
                 x = torch.cat([x, skips.pop()], dim=1)
             except:
                 print(x.shape)
-                print(skips)
+                print(skips[-1].shape)
             x = res_block(x, t_emb)
             x = attn(x)
 
