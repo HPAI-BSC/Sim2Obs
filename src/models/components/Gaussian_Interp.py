@@ -169,7 +169,7 @@ class ConditionalUNet(nn.Module):
         self.down_blocks = nn.ModuleList()
         self.down_samples = nn.ModuleList()
 
-        channels = [base_channels] + [base_channels * mult for mult in channel_mults]
+        channels = [base_channels * mult for mult in channel_mults]  # [base_channels] +
         print('channels', channels)
         in_out_channels = list(zip(channels[:-1], channels[1:]))
         print('in_out_channels', in_out_channels)
