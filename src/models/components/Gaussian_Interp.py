@@ -222,7 +222,7 @@ class ConditionalUNet(nn.Module):
         skip_ch = channels[-1]
         #for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
         # ToDo: This is hardcoded, implement logic
-        skips_channels = list(reversed([64, 128, 128, 128, 256, 256, 256, 512, 512]))
+        skips_channels = list(reversed([64, 64, 128, 128, 128, 256, 256, 256, 512, 512]))
         count = 0
         for i in range(len(channels) -1, -1, -1):
             in_ch = channels[i-1]
