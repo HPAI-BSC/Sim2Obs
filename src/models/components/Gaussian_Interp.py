@@ -1,9 +1,4 @@
-import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
-import numpy as np
-from tqdm import tqdm
 
 
 # Define the Conditional UNet for velocity prediction
@@ -94,13 +89,17 @@ class ResidualBlock(nn.Module):
         self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
 
     def forward(self, x, time_emb=None):
+        print('x', x.shape)
         h = self.block1(x)
+        print('h', h.shape)
 
         if self.mlp is not None and time_emb is not None:
             time_emb = self.mlp(time_emb)
             h = h + time_emb.unsqueeze(-1).unsqueeze(-1)
 
+        print('h after self.mlp', h.shape)
         h = self.block2(h)
+        print('h after self.block2', h.shape)
         return h + self.residual_conv(x)
 
 
