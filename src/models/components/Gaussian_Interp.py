@@ -222,7 +222,7 @@ class ConditionalUNet(nn.Module):
         skip_ch = channels[-1]
         #for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
         # ToDo: This is hardcoded, implement logic
-        skips_channels = reversed([64, 128, 128, 128, 256, 256, 256, 512, 512])
+        skips_channels = list(reversed([64, 128, 128, 128, 256, 256, 256, 512, 512]))
         count = 0
         for i in range(len(channels) -1, -1, -1):
             in_ch = channels[i-1]
@@ -235,11 +235,11 @@ class ConditionalUNet(nn.Module):
                     ResidualBlock(skip_ch + out_ch, out_ch, time_emb_dim, norm_groups),
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
+                count += 1
 
-            if count < len(channels) - 2:  # Don't upsample after last block
+            if i > len(channels) - 2:  # Don't upsample after last block
                 self.up_samples.append(Upsample(out_ch))
                 res //= 2
-            count += 1
 
         # Final layers
         self.final_norm = nn.GroupNorm(norm_groups, base_channels)
