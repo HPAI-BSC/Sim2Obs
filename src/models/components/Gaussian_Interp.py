@@ -427,11 +427,12 @@ class ConditionalUNet(nn.Module):
         # Time embedding
         t_emb = self.time_embed(t.unsqueeze(-1))
 
+        print('*0', x.shape)
         # Concatenate input with condition
         x = torch.cat([x, x0], dim=1)
-        print(x.shape)
+        print('*', x.shape)
         x = self.init_conv(x)
-        print(x.shape)
+        print('*', x.shape)
 
         # Skip connections
         skips = [x]
@@ -440,6 +441,7 @@ class ConditionalUNet(nn.Module):
         down_block_idx = 0
         for i in range(len(self.down_samples)):
             # Process residual blocks for this resolution
+            print('*', x.shape)
             for _ in range(self.num_res_blocks):
                 res_block, attn = self.down_blocks[down_block_idx]
                 x = res_block(x, t_emb)
@@ -471,6 +473,7 @@ class ConditionalUNet(nn.Module):
         for i in range(len(self.up_samples)):
             # Process residual blocks for this resolution
             x = torch.cat([x, skips.pop()], dim=1)
+            print('*', x.shape)
             for _ in range(self.num_res_blocks + 1):
                 res_block, attn = self.up_blocks[up_block_idx]
                 x = res_block(x, t_emb)
