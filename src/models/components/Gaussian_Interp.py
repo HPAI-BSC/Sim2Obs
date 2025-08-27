@@ -90,13 +90,7 @@ class ResidualBlock(nn.Module):
         self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
 
     def forward(self, x, time_emb=None):
-        print(self.norm_groups)
-        try:
-            h = self.block1(x)
-        except:
-            print(x.shape)
-            print(self.norm_groups)
-            h = self.block2(x)
+        h = self.block1(x)
 
         if self.mlp is not None and time_emb is not None:
             time_emb = self.mlp(time_emb)
@@ -150,10 +144,11 @@ class ConditionalUNet(nn.Module):
             channel_mults=(1, 2, 4, 8),
             num_res_blocks=2,
             attention_resolutions=(8, 16),
+            norm_groups=8,
             time_emb_dim=128
     ):
         super().__init__()
-        norm_groups = input_channels
+        #norm_groups = input_channels
         self.time_emb_dim = time_emb_dim
         self.num_res_blocks=num_res_blocks
 
@@ -172,7 +167,11 @@ class ConditionalUNet(nn.Module):
         self.down_samples = nn.ModuleList()
 
         channels = [base_channels] + [base_channels * mult for mult in channel_mults]
+        print('channels', channels)
         in_out_channels = list(zip(channels[:-1], channels[1:]))
+        print('in_out_channels', in_out_channels)
+        in_out_channels = in_out_channels.append(1024)
+        print('in_out_channels', in_out_channels)
 
         res = 1  # Track resolution for attention
 
@@ -286,13 +285,14 @@ class ConditionalUNet(nn.Module):
 # Gaussian Interpolation Flow Model
 class GaussianInterpolationFlow(nn.Module):
     def __init__(self, input_channels, base_channels, channel_mults, num_res_blocks,
-                 attention_resolutions, time_emb_dim, device='cuda'):
+                 attention_resolutions, norm_groups, time_emb_dim, device='cuda'):
         super().__init__()
         self.v_net = ConditionalUNet(input_channels,
                                      base_channels,
                                      channel_mults,
                                      num_res_blocks,
                                      attention_resolutions,
+                                     norm_groups,
                                      time_emb_dim).to(device)
         self.device = device
 
