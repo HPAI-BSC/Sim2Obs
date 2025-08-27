@@ -89,20 +89,16 @@ class ResidualBlock(nn.Module):
         self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
 
     def forward(self, x, time_emb=None):
-        print('x', x.shape)
+        print(x.shape)
         h = self.block1(x)
-        print('h', h.shape)
 
         if self.mlp is not None and time_emb is not None:
             time_emb = self.mlp(time_emb)
-            print('time_emb', time_emb.shape)
-            print('h', h.shape)
-            h = h + time_emb.squeeze(1).unsqueeze(-1).unsqueeze(-1)
-            print('->h', h.shape)
+            if time_emb.ndim == 3:
+                time_emb = time_emb.squeeze(1)  # Should be # [1,64]
+            h = h + time_emb.unsqueeze(-1).unsqueeze(-1)
 
-        print('h after self.mlp', h.shape)
         h = self.block2(h)
-        print('h after self.block2', h.shape)
         return h + self.residual_conv(x)
 
 
