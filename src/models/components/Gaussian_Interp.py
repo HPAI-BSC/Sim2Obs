@@ -394,6 +394,7 @@ class ConditionalUNet(nn.Module):
         self.up_samples = nn.ModuleList()
 
         count = 0
+        skip_list = [512, 256, 128, 64]
         for i in range(len(channels) - 1, -1, -1):
             out_ch = channels[i]
             in_ch = channels[i-1]
@@ -475,12 +476,13 @@ class ConditionalUNet(nn.Module):
         for i in range(len(self.up_samples)):
             # Process residual blocks for this resolution
             x = torch.cat([x, skips.pop()], dim=1)
-            print('*', x.shape)
+            print('*0', x.shape)
             for _ in range(self.num_res_blocks + 1):
                 res_block, attn = self.up_blocks[up_block_idx]
                 x = res_block(x, t_emb)
                 x = attn(x)
                 up_block_idx += 1
+                print('*1', x.shape)
 
             # Upsample
             x = self.up_samples[i](x)
