@@ -210,7 +210,6 @@ class ConditionalUNet(nn.Module):
                 res *= 2
 
         # Middle blocks
-        print(out_ch, channels[-1])
         out_ch = channels[-1]
         self.mid_block1 = ResidualBlock(out_ch, out_ch, time_emb_dim, norm_groups)
         self.mid_attn = AttentionBlock(out_ch, norm_groups=norm_groups)
@@ -220,16 +219,16 @@ class ConditionalUNet(nn.Module):
         self.up_blocks = nn.ModuleList()
         self.up_samples = nn.ModuleList()
 
-        print(num_res_blocks)
-
+        skip_ch = channels[-1]
         for i, (in_ch, out_ch) in enumerate(reversed(in_out_channels)):
             print(in_ch, out_ch)
             for _ in range(num_res_blocks + 1):
                 self.up_blocks.append(nn.ModuleList([
                     # out_ch + out_ch because skip connections are just concatenated
-                    ResidualBlock(in_ch + out_ch, out_ch, time_emb_dim, norm_groups),
+                    ResidualBlock(skip_ch + out_ch, out_ch, time_emb_dim, norm_groups),
                     AttentionBlock(out_ch, norm_groups=norm_groups) if res in attention_resolutions else nn.Identity()
                 ]))
+            skip_ch = in_ch
                 #in_ch = out_ch
 
             if i < len(in_out_channels) - 1:  # Don't upsample after last block
