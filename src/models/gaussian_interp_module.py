@@ -254,7 +254,6 @@ class GaussianInterpLitModule(LightningModule):
         loss, preds, targets = self.model_step(batch, return_preds=False)
 
         if batch_idx > 0 & batch_idx % 2000 == 0:
-            print(f"batch idx: {batch_idx}")
             loss, preds, targets = self.model_step(batch, return_preds=True)
             import matplotlib.pyplot as plt
             plt.imshow(preds[0].permute(1, 2, 0).detach().to(torch.float32).cpu().numpy())
