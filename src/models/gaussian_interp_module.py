@@ -254,6 +254,7 @@ class GaussianInterpLitModule(LightningModule):
         loss, preds, targets = self.model_step(batch, return_preds=False)
 
         if batch_idx > 0 & batch_idx % 2000 == 0:
+            print(f"batch idx: {batch_idx}")
             loss, preds, targets = self.model_step(batch, return_preds=True)
             import matplotlib.pyplot as plt
             plt.imshow(preds[0].permute(1, 2, 0).detach().to(torch.float32).cpu().numpy())
@@ -302,7 +303,6 @@ class GaussianInterpLitModule(LightningModule):
         self.val_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
-        print(f"Batch_idx: {batch_idx}, val_loss: {loss}, val_RASE: {self.val_RASE}, val_mae: {self.val_mae}")
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/RASE", self.val_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
@@ -322,6 +322,7 @@ class GaussianInterpLitModule(LightningModule):
         self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/rmse_best", self.val_rmse_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/mae_best", self.val_mae_best.compute(), sync_dist=True, prog_bar=True)
+        print(f"-> val_RASE: {self.rase}, val_mae: {self.mae},  val_rmse: {self.rmse}")
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set.

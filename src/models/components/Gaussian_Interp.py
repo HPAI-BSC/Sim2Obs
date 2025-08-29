@@ -530,6 +530,12 @@ class GaussianInterpolationFlow(nn.Module):
         """
         self.v_net.train()
 
+        x_min = x.amin(dim=(2, 3), keepdim=True)
+        x_max = x.amax(dim=(2, 3), keepdim=True)
+
+        # Normalize each image to [0,1]
+        x = (x - x_min) / (x_max - x_min + 1e-8)
+
         # Sample random time and noise
         t = torch.rand(x.shape[0], device=self.device)
         epsilon = torch.randn_like(x)
