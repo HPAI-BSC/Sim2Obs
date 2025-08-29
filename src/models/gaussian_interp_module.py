@@ -322,7 +322,7 @@ class GaussianInterpLitModule(LightningModule):
         self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/rmse_best", self.val_rmse_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/mae_best", self.val_mae_best.compute(), sync_dist=True, prog_bar=True)
-        print(f"-> val_RASE: {self.rase}, val_mae: {self.mae},  val_rmse: {self.rmse}")
+        print(f"-> val_RASE: {rase}, val_mae: {mae},  val_rmse: {rmse}")
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set.
