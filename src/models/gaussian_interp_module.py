@@ -253,10 +253,11 @@ class GaussianInterpLitModule(LightningModule):
 
         loss, preds, targets = self.model_step(batch, return_preds=False)
 
-        if batch_idx > 0 & batch_idx % 2000 == 0:
+        if (self.global_step > 0) & (self.global_step % 17 == 0):
             loss, preds, targets = self.model_step(batch, return_preds=True)
             import matplotlib.pyplot as plt
-            print(batch_idx)
+            print('batch_idx', batch_idx)
+            print('global_step', self.global_step)
             plt.imshow(preds[0].permute(1, 2, 0).detach().to(torch.float32).cpu().numpy())
             plt.colorbar()
             plt.savefig(f"/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/stoch_interp/preds_{batch_idx}.png")
