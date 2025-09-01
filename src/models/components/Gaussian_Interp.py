@@ -393,7 +393,6 @@ class ConditionalUNet(nn.Module):
         self.up_samples = nn.ModuleList()
 
         count = 0
-        skip_list = [512, 256, 128, 64]
         for i in range(len(channels) - 1, -1, -1):
             out_ch = channels[i]
             in_ch = channels[i-1]
