@@ -45,6 +45,7 @@ test: True
 
 # simply provide checkpoint path to resume training
 ckpt_path: null
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e4acd8d0/output/checkpoints/e4acd8d0/last.ckpt  # Gaussian interpolation, 5 epochs
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/24842b1b/output/checkpoints/24842b1b/epoch_014.ckpt  # Mamba
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/97cdd3f1/output/checkpoints/97cdd3f1/epoch_015.ckpt  # Mamba_depth 3
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e345ef6/output/checkpoints/6e345ef6/epoch_013.ckpt  # UNet
