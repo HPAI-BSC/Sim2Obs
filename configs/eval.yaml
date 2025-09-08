@@ -27,7 +27,7 @@ save_predictions: True
 
 # -AttentionUNet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
-ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/81406481/output/checkpoints/81406481/epoch_044.ckpt  # 14.04.25 Dianoga
+#ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/81406481/output/checkpoints/81406481/epoch_044.ckpt  # 14.04.25 Dianoga
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/f428ea0c/output/checkpoints/f428ea0c/epoch_043.ckpt  # 13.05.25 Combined
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/a2dfe98b/output/checkpoints/a2dfe98b/epoch_014.ckpt  # 07.06.25 Combined 0.01
 #ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/f435e6e7/output/checkpoints/f435e6e7/epoch_014.ckpt # 07.06.25 Combined 0.05
@@ -82,12 +82,12 @@ ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/81406481/output/checkpoints/
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/a9e9b7ee/output/checkpoints/a9e9b7ee/epoch_036.ckpt  # 13.05.25 Combined 0.25
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/47f75496/output/checkpoints/47f75496/epoch_034.ckpt  # 13.05.25 Combined 0.05
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d0a5bd44/output/checkpoints/d0a5bd44/epoch_036.ckpt  # 13.05.25 Combined 0.1
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/a54fcf1d/output/checkpoints/a54fcf1d/epoch_048.ckpt  # 02.06.25 Dianoga
+ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/a54fcf1d/output/checkpoints/a54fcf1d/epoch_048.ckpt  # 02.06.25 Dianoga
 #ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/51aaea5f/output/checkpoints/51aaea5f/epoch_013.ckpt  # 07.06.25 Combined 0.01
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d4bc91cc/output/checkpoints/d4bc91cc/epoch_014.ckpt  # 07.06.25 Combined 0.05
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e02f1466/output/checkpoints/e02f1466/epoch_012.ckpt  # 07.06.25 Combined 0.1
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/eaa58be5/output/checkpoints/eaa58be5/epoch_013.ckpt  # 07.06.25 Combined 0.25
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e345ef6/output/checkpoints/6e345ef6/epoch_013.ckpt  # 07.06.25 Combined 1
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e345ef6/output/checkpoints/6e345ef6/epoch_013.ckpt  # 07.06.25 Combined 1
 
 
 # UNet Baseline

@@ -162,6 +162,12 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         plt.imshow(diff)
         plt.savefig(f"{output_path}/icl_diff_sample.png")
 
+        plt.figure(figsize=(8, 6))
+        im = plt.imshow((pred0-gts0), cmap="bwr", vmin=-np.max(np.abs(diff)), vmax=np.max(np.abs(diff)))
+        plt.colorbar(im, label="ICL frac difference")
+        plt.axis("off")
+        plt.savefig(f"{output_path}/icl_diff_sample2.png")
+
 
         """
         log.info("Saving predictions...")
