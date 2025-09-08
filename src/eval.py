@@ -152,6 +152,17 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
             break
         plot_predictions(preds, gts, output_path)
 
+        print('plotting ICL frac difference')
+        gts0 = gts[0]
+        print(gts0.shape)
+        print(torch.max(gts0), torch.min(gts0))
+        diff = torch.abs(pred0 - gts0)
+        diff = diff.permute(1, 2, 0).detach().cpu()
+        diff = np.array(diff.tolist())
+        plt.imshow(diff)
+        plt.savefig(f"{output_path}/icl_diff_sample.png")
+
+
         """
         log.info("Saving predictions...")
         output_path = cfg.paths.output_dir
