@@ -165,6 +165,18 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
             plt.axis("off")
             plt.savefig(f"{output_path}/icl_diff_sample_{i}.png")
 
+            plt.figure(figsize=(8, 6))
+            im = plt.imshow(pred_i)
+            plt.colorbar(im, label="ICL frac")
+            plt.axis("off")
+            plt.savefig(f"{output_path}/icl_pred_sample_{i}.png")
+
+            plt.figure(figsize=(8, 6))
+            im = plt.imshow(gts_i)
+            plt.colorbar(im, label="ICL frac")
+            plt.axis("off")
+            plt.savefig(f"{output_path}/icl_gt_sample_{i}.png")
+
         """
         print('plotting ICL frac difference')
         gts0 = gts[0]
