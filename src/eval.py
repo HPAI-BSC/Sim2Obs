@@ -166,13 +166,13 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
             plt.savefig(f"{output_path}/icl_diff_sample_{i}.png")
 
             plt.figure(figsize=(8, 6))
-            im = plt.imshow(pred_i)
+            im = plt.imshow(np.array(pred_i.permute(1, 2, 0).detach().cpu().tolist()))
             plt.colorbar(im, label="ICL frac")
             plt.axis("off")
             plt.savefig(f"{output_path}/icl_pred_sample_{i}.png")
 
             plt.figure(figsize=(8, 6))
-            im = plt.imshow(gts_i)
+            im = plt.imshow(np.array(gts_i.permute(1, 2, 0).detach().cpu().tolist()))
             plt.colorbar(im, label="ICL frac")
             plt.axis("off")
             plt.savefig(f"{output_path}/icl_gt_sample_{i}.png")
