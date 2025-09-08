@@ -152,6 +152,20 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
             break
         plot_predictions(preds, gts, output_path)
 
+        for i in range(len(gts)):
+            pred_i,gts_i = preds[i], gts[i]
+
+            plt.figure(figsize=(8, 6))
+            diff = pred_i - gts_i
+            diff = diff.permute(1, 2, 0).detach().cpu()
+            diff = np.array(diff.tolist())
+            print(f'sample {i}: {torch.mean(torch.abs(diff))}')
+            im = plt.imshow(diff, cmap="bwr", vmin=-np.max(np.abs(diff)), vmax=np.max(np.abs(diff)))
+            plt.colorbar(im, label="ICL frac difference")
+            plt.axis("off")
+            plt.savefig(f"{output_path}/icl_diff_sample_{i}.png")
+
+        """
         print('plotting ICL frac difference')
         gts0 = gts[0]
         print(gts0.shape)
@@ -170,6 +184,7 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         plt.colorbar(im, label="ICL frac difference")
         plt.axis("off")
         plt.savefig(f"{output_path}/icl_diff_sample2.png")
+        """
 
 
         """
