@@ -156,14 +156,17 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         gts0 = gts[0]
         print(gts0.shape)
         print(torch.max(gts0), torch.min(gts0))
-        diff = torch.abs(pred0 - gts0)
-        diff = diff.permute(1, 2, 0).detach().cpu()
-        diff = np.array(diff.tolist())
-        plt.imshow(diff)
+        diff_abs = torch.abs(pred0 - gts0)
+        diff_abs = diff_abs.permute(1, 2, 0).detach().cpu()
+        diff_abs = np.array(diff_abs.tolist())
+        plt.imshow(diff_abs)
         plt.savefig(f"{output_path}/icl_diff_sample.png")
 
         plt.figure(figsize=(8, 6))
-        im = plt.imshow((pred0-gts0), cmap="bwr", vmin=-np.max(np.abs(diff)), vmax=np.max(np.abs(diff)))
+        diff = pred0-gts0
+        diff = diff.permute(1, 2, 0).detach().cpu()
+        diff = np.array(diff.tolist())
+        im = plt.imshow(diff, cmap="bwr", vmin=-np.max(np.abs(diff)), vmax=np.max(np.abs(diff)))
         plt.colorbar(im, label="ICL frac difference")
         plt.axis("off")
         plt.savefig(f"{output_path}/icl_diff_sample2.png")
