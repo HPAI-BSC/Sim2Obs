@@ -158,8 +158,8 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
             plt.figure(figsize=(8, 6))
             diff = pred_i - gts_i
             diff = diff.permute(1, 2, 0).detach().cpu()
-            diff = np.array(diff.tolist())
             print(f'sample {i}: {torch.mean(torch.abs(diff))}')
+            diff = np.array(diff.tolist())
             im = plt.imshow(diff, cmap="bwr", vmin=-np.max(np.abs(diff)), vmax=np.max(np.abs(diff)))
             plt.colorbar(im, label="ICL frac difference")
             plt.axis("off")
