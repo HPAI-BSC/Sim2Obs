@@ -327,12 +327,12 @@ class GaussianInterpLitModule(LightningModule):
         self.val_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
-        self.val_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        val_masked_mae = self.val_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/RASE", self.val_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/mae", self.val_mae, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/masked_mae", self.val_masked_mae, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/masked_mae", val_masked_mae, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_validation_epoch_end(self) -> None:
         torch.cuda.empty_cache()
@@ -340,18 +340,15 @@ class GaussianInterpLitModule(LightningModule):
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
         mae = self.val_mae.compute()
-        masked_mae = self.val_masked_mae.compute()
         self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
         self.val_mae_best(mae)
-        self.val_masked_mae_best(masked_mae)
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/rmse_best", self.val_rmse_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/mae_best", self.val_mae_best.compute(), sync_dist=True, prog_bar=True)
-        self.log("val/masked_mae_best", self.val_masked_mae.compute(), sync_dist=True, prog_bar=True)
-        print(f"-> val_RASE: {rase}, val_mae: {mae},  val_rmse: {rmse}, val_masked_mae: {masked_mae}")
+        print(f"-> val_RASE: {rase}, val_mae: {mae},  val_rmse: {rmse}")
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set.
@@ -367,12 +364,12 @@ class GaussianInterpLitModule(LightningModule):
         self.test_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.test_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.test_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
-        self.test_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        test_masked_mae = self.test_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/RASE", self.test_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/rmse", self.test_rmse, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/mae", self.test_mae, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("test/masked_mae", self.test_masked_mae, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("test/masked_mae", test_masked_mae, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
