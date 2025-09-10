@@ -264,7 +264,6 @@ class GaussianInterpLitModule(LightningModule):
             self.val_RASE.reset()
             self.val_mae.reset()
             self.val_rmse.reset()
-            self.val_masked_mae.reset()
 
         # Use gradient clipping to prevent memory spikes
         self.clip_gradients(
@@ -311,7 +310,6 @@ class GaussianInterpLitModule(LightningModule):
         self.val_RASE.reset()
         self.val_rmse.reset()
         self.val_mae.reset()
-        self.val_masked_mae.reset()
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single validation step on a batch of data from the validation set.
