@@ -328,7 +328,7 @@ class GaussianInterpLitModule(LightningModule):
         self.val_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         val_masked_mae = self.val_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
-        self.val_masked_mae_epch.append(val_masked_mae)
+        self.val_masked_mae_epch.append(val_masked_mae.item())
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/RASE", self.val_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
@@ -341,7 +341,7 @@ class GaussianInterpLitModule(LightningModule):
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
         mae = self.val_mae.compute()
-        val_masked_mae = torch.mean(self.val_masked_mae_epch)
+        val_masked_mae = torch.mean(torch.tensor(self.val_masked_mae_epch))
         self.val_masked_mae_epch = []
         self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
