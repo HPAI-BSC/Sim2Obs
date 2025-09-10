@@ -133,6 +133,8 @@ class GaussianInterpLitModule(LightningModule):
         self.val_rmse_best = MinMetric()
         self.val_mae_best = MinMetric()
 
+        self.val_masked_mae_epch = []
+
         self._estimate_flops()
 
 
@@ -326,6 +328,7 @@ class GaussianInterpLitModule(LightningModule):
         self.val_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         val_masked_mae = self.val_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.val_masked_mae_epch.append(val_masked_mae)
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/RASE", self.val_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
@@ -338,6 +341,8 @@ class GaussianInterpLitModule(LightningModule):
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
         mae = self.val_mae.compute()
+        val_masked_mae = torch.mean(self.val_masked_mae_epch)
+        self.val_masked_mae_epch = []
         self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
         self.val_mae_best(mae)
@@ -346,7 +351,7 @@ class GaussianInterpLitModule(LightningModule):
         self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/rmse_best", self.val_rmse_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/mae_best", self.val_mae_best.compute(), sync_dist=True, prog_bar=True)
-        print(f"-> val_RASE: {rase}, val_mae: {mae},  val_rmse: {rmse}")
+        print(f"-> val_RASE: {rase}, val_mae: {mae},  val_rmse: {rmse}, val_masked_mae: {val_masked_mae}")
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set.
