@@ -537,7 +537,8 @@ class GaussianInterpolationFlow(nn.Module):
 
         # Sample random time and noise
         t = torch.rand(x.shape[0], device=self.device)
-        epsilon = torch.randn_like(x)
+        #epsilon = torch.randn_like(x)
+        epsilon = torch.zeros_like(x)  # Try following straight paths
 
         # Compute interpolant and ground truth velocity
         I_t = self.compute_interpolant(x, y, t, epsilon)

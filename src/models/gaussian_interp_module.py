@@ -30,6 +30,24 @@ Inference given inputs x is performed by solving the corresponding ODE via a cla
 """
 
 
+class MaskedMAE(nn.Module):
+    """
+    Differentiable mean absolute error between x and y,
+    ignoring positions where the difference is exactly zero.
+    """
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        diff = torch.abs(x - y)            # keeps gradients
+        mask = (diff != 0).float()         # 1 where nonzero, 0 where zero
+        masked_sum = (diff * mask).sum()   # only nonzero positions contribute
+        count = mask.sum()
+        if count == 0:                     # avoid division by zero
+            return torch.tensor(0.0, device=x.device, requires_grad=True)
+        return masked_sum / count
+
+
 class GaussianInterpLitModule(LightningModule):
     """
     A `LightningModule` implements 8 key methods:
@@ -101,6 +119,9 @@ class GaussianInterpLitModule(LightningModule):
         #self.train_mae = MeanAbsoluteError()
         self.val_mae = MeanAbsoluteError()
         self.test_mae = MeanAbsoluteError()
+
+        self.val_masked_mae = MaskedMAE()
+        self.test_masked_mae = MaskedMAE()
 
         # for averaging loss across batches
         self.train_loss = MeanMetric()
@@ -243,6 +264,7 @@ class GaussianInterpLitModule(LightningModule):
             self.val_RASE.reset()
             self.val_mae.reset()
             self.val_rmse.reset()
+            self.val_masked_mae.reset()
 
         # Use gradient clipping to prevent memory spikes
         self.clip_gradients(
@@ -289,6 +311,7 @@ class GaussianInterpLitModule(LightningModule):
         self.val_RASE.reset()
         self.val_rmse.reset()
         self.val_mae.reset()
+        self.val_masked_mae.reset()
 
     def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single validation step on a batch of data from the validation set.
@@ -304,10 +327,12 @@ class GaussianInterpLitModule(LightningModule):
         self.val_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.val_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/RASE", self.val_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/mae", self.val_mae, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/masked_mae", self.val_masked_mae, on_step=False, on_epohc=True, prog_bar=True)
 
     def on_validation_epoch_end(self) -> None:
         torch.cuda.empty_cache()
@@ -315,15 +340,18 @@ class GaussianInterpLitModule(LightningModule):
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
         mae = self.val_mae.compute()
+        masked_mae = self.val_masked_mae.compute()
         self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
         self.val_mae_best(mae)
+        self.val_masked_mae_best(masked_mae)
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/rmse_best", self.val_rmse_best.compute(), sync_dist=True, prog_bar=True)
         self.log("val/mae_best", self.val_mae_best.compute(), sync_dist=True, prog_bar=True)
-        print(f"-> val_RASE: {rase}, val_mae: {mae},  val_rmse: {rmse}")
+        self.log("val/masked_mae_best", self.val_masked_mae.compute(), sync_dist=True, prog_bar=True)
+        print(f"-> val_RASE: {rase}, val_mae: {mae},  val_rmse: {rmse}, val_masked_mae: {masked_mae}")
 
     def test_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set.
@@ -339,10 +367,12 @@ class GaussianInterpLitModule(LightningModule):
         self.test_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.test_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.test_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.test_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/RASE", self.test_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/rmse", self.test_rmse, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/mae", self.test_mae, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("test/masked_mae", self.test_masked_mae, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
