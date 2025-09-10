@@ -332,7 +332,7 @@ class GaussianInterpLitModule(LightningModule):
         self.log("val/RASE", self.val_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/mae", self.val_mae, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/masked_mae", self.val_masked_mae, on_step=False, on_epohc=True, prog_bar=True)
+        self.log("val/masked_mae", self.val_masked_mae, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_validation_epoch_end(self) -> None:
         torch.cuda.empty_cache()
