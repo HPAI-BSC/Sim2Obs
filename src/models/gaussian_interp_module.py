@@ -1,10 +1,13 @@
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Optional
 
 import torch
 from lightning import LightningModule
 from torchmetrics import MinMetric, MeanMetric, MeanAbsoluteError
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
+import torch
+from torch.profiler import profile, record_function, ProfilerActivity
+
 #from ptflops import get_model_complexity_info
 
 torch.set_float32_matmul_precision('medium')
@@ -159,9 +162,6 @@ class GaussianInterpLitModule(LightningModule):
         print(f"Number of parameters: {params}")
         print('_' * 25)
         """
-        import torch
-        from torch.profiler import profile, record_function, ProfilerActivity
-
         # Example input
         x = torch.randn(1, 1, 128, 128).cuda()
         cond = torch.randn(1, 1, 128, 128).cuda()
@@ -377,6 +377,16 @@ class GaussianInterpLitModule(LightningModule):
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
         pass
+
+    def predict_step(self, batch: Optional[torch.Tensor], batch_idx: int, dataloader_idx: int = 0):
+        """Sampling method employed -- Euler sampling"""
+        # ToDo: If we are using gaussian interpolation, we need to sample noise as well
+        print(batch.shape)
+        x, y = batch
+
+        _, preds = self.net.train_step(x, y, return_preds=True)
+
+        return preds
 
     def setup(self, stage: str) -> None:
         """Lightning hook that is called at the beginning of fit (train + validate), validate,
