@@ -1752,8 +1752,6 @@ class FlamingoFetcher(DataFetcher):
             self.column_map['soap.host_halo_index'] = 'parent_id_satellite'
             OmegaConf.set_struct(self.catalog, True)
 
-        # TODO add fof as main subhalos
-
         if isinstance(self.fof_subhalos, SWIFTDataset):
 
             if 'soap.host_halo_index' not in self.halo_fields:
@@ -1804,7 +1802,6 @@ class FlamingoFetcher(DataFetcher):
             ]
             processed_subhalos = run_pipeline(subhalos, steps)
             subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
-
 
             logger.debug(f"Subhalo data fetched successfully: {len(subhalo_context.data)} subhalos.")
             return subhalo_context

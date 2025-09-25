@@ -1,3 +1,4 @@
+import pickle
 from typing import Any
 
 
@@ -18,7 +19,16 @@ def get_generator(data_loader, n=None, starting_idx=None):
 
     # Clean subhalo context to remove subhalos that belong to halos that do not exist
     subhalo_context.remove_subhalos_belonging_unvalid_halos(halo_context)
+    print(f'Number of subhalos after removing unvalid fofs: {len(subhalo_context)}.')
+
+    # Store overlapping matrix
     overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
+    sim_code = data_loader.cfg.path.split('/')[:-1]
+    name = data_loader.cfg.name
+    path = data_loader.cfg.paths.datasets_dir + f'overlapping_matrix_{name}_{sim_code}.pkl'
+    with open(path, 'wb') as f:
+        pickle.dump(overlapping_matrix, f)
+
     halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
 
     if starting_idx is not None:

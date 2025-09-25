@@ -334,6 +334,17 @@ class SubhaloContext:
         """
         return self.data["subhalo_id"].tolist()
 
+    def __len__(self):
+        """
+        Return the length of the DataFrame.
+
+        Returns:
+        --------
+        int
+            Length of the dataframe data.
+        """
+        return len(self.data)
+
 
 class SubhaloParticles:
     """

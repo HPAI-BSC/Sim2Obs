@@ -26,7 +26,7 @@ class LastStep:
         with open(path, 'wb') as f:
             joblib.dump(results, f)
 
-        transition_radius_analysis = True
+        transition_radius_analysis = False
 
         # Collect statistics and errors
         data = {'halo_id': [], 'r200': [], 'transition_radius': [], 'normalized_transition_radius': []}
