@@ -2,7 +2,7 @@ from typing import Any, List
 import hydra
 # from dotenv import load_dotenv, find_dotenv
 from omegaconf import DictConfig
-from rootutils import rootutils
+# from rootutils import rootutils
 
 from src.data_generation.src.utils import setup_logger
 
