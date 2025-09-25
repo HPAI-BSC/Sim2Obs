@@ -19,7 +19,7 @@ class MapStep(PipelineStep):
     def __init__(self, cfg: DictConfig):
         self.map_configuration = self._build_map_configuration(cfg)
 
-        self.transition_radius = cfg.catalog.transition_radius
+        self.transition_radius = cfg.catalog.get('transition_radius', None)
         self.cfg = cfg
 
         # Compute bins and radius
