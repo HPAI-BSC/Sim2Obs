@@ -25,7 +25,7 @@ def get_generator(data_loader, n=None, starting_idx=None):
     overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
     sim_code = data_loader.cfg.path.split('/')[:-1]
     name = data_loader.cfg.name
-    path = data_loader.cfg.paths.datasets_dir + f'overlapping_matrix_{name}_{sim_code}.pkl'
+    path = data_loader.cfg.path.datasets_dir + f'overlapping_matrix_{name}_{sim_code}.pkl'
     with open(path, 'wb') as f:
         pickle.dump(overlapping_matrix, f)
 
