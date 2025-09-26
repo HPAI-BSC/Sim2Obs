@@ -54,9 +54,7 @@ def main(cfg: DictConfig) -> Any:
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
     starting_idx = None
-    # Retrieve first 5 halos
-    n = 5
-    _ = pipeline.run(n, starting_idx)
+    _ = pipeline.run(starting_idx)
 
 
 if __name__ == "__main__":
