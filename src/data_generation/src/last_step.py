@@ -25,12 +25,12 @@ class LastStep:
         dataset_dir = self.cfg.paths.datasets_dir
         name = self.cfg.catalog.path.replace(dataset_dir, '')
         name = name.replace('/', '_')
-        errors_df = pd.DataFrame(errors)
-        path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.csv'
-        logger.info(f'Storing errors df at: {path}')
-        errors_df.to_csv(path, index=False)
-        print(len(errors_df))
-        print(errors_df.head())
+        path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.txt'
+        logger.info(f'Storing errors at: {path}')
+
+        with open(path, 'w') as f:
+            for item in errors:
+                f.write(f"{item}\n")
 
 
 
