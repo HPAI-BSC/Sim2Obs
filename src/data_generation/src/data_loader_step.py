@@ -46,6 +46,7 @@ class DataLoader(PipelineStep):
         attr_list = self._build_data_loader_configuration(cfg)
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
         self.cfg = cfg
+        self.errors = []
 
     @classmethod
     def _build_data_loader_configuration(cls, cfg: DictConfig) -> dict:
@@ -102,7 +103,6 @@ class DataLoader(PipelineStep):
         lbox = self.cfg.catalog.get('Lbox', None)
         halo_context = kwargs.pop('halo_context', None)
         models = kwargs.pop('models', None)
-        errors = []
 
         # Note that subhalos here contains overlapping subhalos
         for halo, subhalo_ctx, cosmos_data in g:
@@ -116,27 +116,22 @@ class DataLoader(PipelineStep):
                 attach_models_to_features([input_feature, output_feature], models)
 
                 # Load particles for all the subhalos in that halo
-                print('Load particles for all the subhalos in that halo')
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
 
                 # Preprocessed all particles for current halo
-                print('Preprocessed all particles for current halo')
                 halo_particles_no_overlapping.preprocess(halo, lbox)
 
                 # Load preprocessed particles for overlapping halos
-                print('Load preprocessed particles for overlapping halos')
                 overlapping_subhalo_particles, subhalos_with_errors = \
                     self._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
 
                 # Group all the particles together
-                print('Group all the particles together')
                 if overlapping_subhalo_particles is not None:
                     halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
                 else:
                     halo_particles_overlapping = halo_particles_no_overlapping
 
                 # Compute features with preprocessed and non-overlapping particles
-                logger.info(f"Computing features ...")
                 input_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
                 output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
 
@@ -144,7 +139,7 @@ class DataLoader(PipelineStep):
                 subhalo_ctx.preprocess(halo, lbox)
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
-                errors.append((halo, str(e), self.name))
+                self.errors.append((halo, str(e), self.name))
                 continue
 
             # Update cosmos instance
@@ -160,10 +155,9 @@ class DataLoader(PipelineStep):
                 yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
 
             logger.info(f"Finished processing halo {halo.halo_id}")
-        yield errors
+        yield self.errors
 
-    @staticmethod
-    def load_halo_subhalo_data(subhalo_context: SubhaloContext, halo_context: HaloContext,
+    def load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
                                overlapping_matrix: dict) -> List[Tuple]:
         """
         Loads halo data and associated subhalo data, including overlapping subhalos from other halos.
@@ -197,7 +191,7 @@ class DataLoader(PipelineStep):
         """
         logger.debug('Add subhalo data of overlapping halos to each subhalo context ...')
         result = []
-
+        halo = None
         for id_halo in halo_context.halo_id:
             try:
                 halo = halo_context.get_halo_by_id(id_halo)
@@ -217,7 +211,8 @@ class DataLoader(PipelineStep):
                     overlapping_subhalo_ctx = SubhaloContext.from_dataframe(overlapping_subhalos_df)
                     subhalo_ctx += overlapping_subhalo_ctx
             except Exception as e:
-                logger.error(e)
+                logger.error(f"Error with {id_halo}: {e}")
+                self.errors.append((halo, str(e), self.name))
                 continue
             result.append((halo, subhalo_ctx, cosmos_data))
         return result
