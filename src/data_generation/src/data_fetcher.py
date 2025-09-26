@@ -1960,7 +1960,7 @@ class FlamingoFetcher(DataFetcher):
         ]
 
         processed_particles = run_pipeline(data, steps)
-        logger.debug("Halo data fetched successfully.")
+        logger.debug("Halo particles data fetched successfully.")
 
         # SubhaloParticles is expecting a dict with part_types - df
         d = {}
