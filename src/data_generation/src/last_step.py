@@ -30,7 +30,11 @@ class LastStep:
 
         with open(path, 'w') as f:
             for item in errors:
-                f.write(f"{item}\n")
+                if isinstance(item, list):
+                    for error in item:
+                        f.write(f"{error}\n")
+                else:
+                    f.write(f"{item}\n")
 
 
 
