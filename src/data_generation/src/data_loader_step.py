@@ -155,6 +155,8 @@ class DataLoader(PipelineStep):
                 yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
 
             logger.info(f"Finished processing halo {halo.halo_id}")
+
+        print(self.errors)
         yield self.errors
 
     def load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
