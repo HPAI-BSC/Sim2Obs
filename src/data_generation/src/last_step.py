@@ -29,6 +29,8 @@ class LastStep:
         path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.csv'
         logger.info(f'Storing errors df at: {path}')
         errors_df.to_csv(path, index=False)
+        print(len(errors_df))
+        print(errors_df.head())
 
 
 
