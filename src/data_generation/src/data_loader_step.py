@@ -46,7 +46,7 @@ class DataLoader(PipelineStep):
         attr_list = self._build_data_loader_configuration(cfg)
         self.fetcher = DataFetcherFactory.get_data_fetcher(cfg.catalog, **attr_list)
         self.cfg = cfg
-        self.errors = []
+        self.errors = {'halo': [], 'errors': [], 'class': []}
 
     @classmethod
     def _build_data_loader_configuration(cls, cfg: DictConfig) -> dict:
@@ -139,7 +139,7 @@ class DataLoader(PipelineStep):
                 subhalo_ctx.preprocess(halo, lbox)
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
-                self.errors.append((halo, str(e), self.name))
+                self.errors.update({'halo': halo.halo_id, 'error': str(e), 'class': self.name})
                 continue
 
             # Update cosmos instance
@@ -191,7 +191,6 @@ class DataLoader(PipelineStep):
         """
         logger.debug('Add subhalo data of overlapping halos to each subhalo context ...')
         result = []
-        halo = None
         for id_halo in halo_context.halo_id:
             try:
                 halo = halo_context.get_halo_by_id(id_halo)
@@ -212,7 +211,7 @@ class DataLoader(PipelineStep):
                     subhalo_ctx += overlapping_subhalo_ctx
             except Exception as e:
                 logger.error(f"Error with {id_halo}: {e}")
-                self.errors.append((halo, str(e), self.name))
+                self.errors.update({'halo': id_halo, 'error': str(e), 'class': self.name})
                 continue
             result.append((halo, subhalo_ctx, cosmos_data))
         return result
