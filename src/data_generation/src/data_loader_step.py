@@ -139,7 +139,9 @@ class DataLoader(PipelineStep):
                 subhalo_ctx.preprocess(halo, lbox)
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
-                self.errors.update({'halo': halo.halo_id, 'error': str(e), 'class': self.name})
+                self.errors['halo'].append(halo.halo_id)
+                self.errors['errors'].append(str(e))
+                self.errors['class'].append(self.name)
                 continue
 
             # Update cosmos instance
@@ -213,7 +215,9 @@ class DataLoader(PipelineStep):
                     subhalo_ctx += overlapping_subhalo_ctx
             except Exception as e:
                 logger.error(f"Error with {id_halo}: {e}")
-                self.errors.update({'halo': id_halo, 'error': str(e), 'class': self.name})
+                self.errors['halo'].append(id_halo)
+                self.errors['errors'].append(str(e))
+                self.errors['class'].append(self.name)
                 continue
             result.append((halo, subhalo_ctx, cosmos_data))
         return result
