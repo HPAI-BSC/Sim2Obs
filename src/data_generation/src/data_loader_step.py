@@ -156,7 +156,6 @@ class DataLoader(PipelineStep):
 
             logger.info(f"Finished processing halo {halo.halo_id}")
 
-        print(self.errors)
         yield self.errors
 
     def load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,

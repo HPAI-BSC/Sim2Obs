@@ -21,7 +21,6 @@ class LastStep:
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
-        print(errors)
         dataset_dir = self.cfg.paths.datasets_dir
         name = self.cfg.catalog.path.replace(dataset_dir, '')
         name = name.replace('/', '_')
