@@ -381,8 +381,9 @@ class GaussianInterpLitModule(LightningModule):
     def predict_step(self, batch: Optional[torch.Tensor], batch_idx: int, dataloader_idx: int = 0):
         """Sampling method employed -- Euler sampling"""
         # ToDo: If we are using gaussian interpolation, we need to sample noise as well
-        print(batch)
-        x, y = batch
+        print(batch.shape)
+        x = batch
+        x, y = x[0], x[1]
 
         _, preds = self.net.train_step(x, y, return_preds=True)
 
