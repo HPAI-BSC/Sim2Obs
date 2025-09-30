@@ -384,6 +384,7 @@ class GaussianInterpLitModule(LightningModule):
         print(batch.shape)
         x = batch
         x, y = x[0], x[1]
+        print(x.shape, y.shape)
 
         _, preds = self.net.train_step(x, y, return_preds=True)
 
