@@ -278,7 +278,10 @@ class GaussianInterpLitModule(LightningModule):
         #self.train_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         #self.train_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("train/loss", self.train_loss, on_step=True, on_epoch=True, prog_bar=True)
-        masked_mae = self.train_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        try:
+            masked_mae = self.train_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        except:
+            masked_mae = 100.0
         self.log("train/masked_mae", masked_mae, on_step=True, on_epoch=True, prog_bar=True)
         #self.log("train/RASE", self.train_RASE, on_step=True, on_epoch=True, prog_bar=True)
         #self.log("train/rmse", self.train_rmse, on_step=True, on_epoch=True, prog_bar=True)
