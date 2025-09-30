@@ -547,7 +547,15 @@ class GaussianInterpolationFlow(nn.Module):
         # Predict velocity
         v_pred = self.v_net(I_t, t.unsqueeze(1), x)
         # Compute loss
-        loss = nn.MSELoss()(v_pred, v_true)
+
+        lambda_reg = 0.01
+        loss_mse = nn.MSELoss()(v_pred, v_true)
+
+        # Add penalty for predictions deviating from 0 where true value is 0
+        zero_mask = (v_true == 0).float()  # mask of true zeros
+        penalty = (v_pred * zero_mask).pow(2).mean()  # squared predictions at zeros
+
+        loss = loss_mse + lambda_reg * penalty
 
         if return_preds:
             preds = self.sample(x, num_steps=100)
