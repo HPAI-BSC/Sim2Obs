@@ -6,6 +6,7 @@ from lightning import LightningModule
 from torchmetrics import MinMetric, MeanMetric, MeanAbsoluteError
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
+from utils import MaskedMAE
 
 
 torch.set_float32_matmul_precision('medium')
@@ -83,6 +84,11 @@ class BCELitModule(LightningModule):
         self.val_mae = MeanAbsoluteError()
         self.test_mae = MeanAbsoluteError()
 
+        # We introduce MaskedMAE to homogenize evals across datasets with different ICL/BCG levels
+        self.train_masked_mae = MaskedMAE()
+        self.val_masked_mae = MaskedMAE()
+        self.test_masked_mae = MaskedMAE()
+
         # for averaging loss across batches
         self.train_loss = MeanMetric()
         self.val_loss = MeanMetric()
@@ -92,6 +98,8 @@ class BCELitModule(LightningModule):
         self.val_rase_best = MinMetric()
         self.val_rmse_best = MinMetric()
         self.val_mae_best = MinMetric()
+
+        self.val_masked_mae_epch = []
 
         # Estimate forward flops
         self._estimate_flops()
@@ -285,10 +293,12 @@ class BCELitModule(LightningModule):
         self.train_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.train_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.train_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        masked_mae = self.train_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("train/loss", self.train_loss, on_step=True, on_epoch=True, prog_bar=True)
         self.log("train/RASE", self.train_RASE, on_step=True, on_epoch=True, prog_bar=True)
         self.log("train/rmse", self.train_rmse, on_step=True, on_epoch=True, prog_bar=True)
         self.log("train/mae", self.train_mae, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/masked_mae", masked_mae, on_step=True, on_epoch=True, prog_bar=True)
 
         # return loss or backpropagation will fail
         return loss
@@ -321,10 +331,16 @@ class BCELitModule(LightningModule):
         self.val_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.val_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+
+        val_masked_mae = self.val_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.val_masked_mae_epch.append(val_masked_mae.item())
+        self.log("val/masked_mae", val_masked_mae, on_step=False, on_epoch=True, prog_bar=True)
+
         self.log("val/loss", self.val_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/RASE", self.val_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/rmse", self.val_rmse, on_step=False, on_epoch=True, prog_bar=True)
         self.log("val/mae", self.val_mae, on_step=False, on_epoch=True, prog_bar=True)
+
 
     def on_validation_epoch_end(self) -> None:
         torch.cuda.empty_cache()
@@ -335,6 +351,12 @@ class BCELitModule(LightningModule):
         self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
         self.val_mae_best(mae)
+
+        val_masked_mae = torch.mean(torch.tensor(self.val_masked_mae_epch))
+        best_val_masked_mae = torch.min(torch.tensor(self.val_masked_mae_epch))
+        self.val_masked_mae_epch = []
+        self.log("val/masked_mae_best", best_val_masked_mae, sync_dist=True, prog_bar=True)
+
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
@@ -355,6 +377,9 @@ class BCELitModule(LightningModule):
         self.test_RASE(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.test_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.test_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.test_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        test_masked_mae = self.test_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.log("test/masked_mae", test_masked_mae, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/RASE", self.test_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/rmse", self.test_rmse, on_step=False, on_epoch=True, prog_bar=True)

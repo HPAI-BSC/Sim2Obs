@@ -4,9 +4,9 @@ import torch
 from lightning import LightningModule
 from torchmetrics import MinMetric, MeanMetric, MeanAbsoluteError
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
-import torch.nn as nn
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
+from utils import MaskedMAE
 
 #from ptflops import get_model_complexity_info
 
@@ -31,24 +31,6 @@ And so: t = 0 => x and t = 1 => y.
 This probability path is parametrized by a UNet which predicts velocity fields. 
 Inference given inputs x is performed by solving the corresponding ODE via a classic Euler method.
 """
-
-
-class MaskedMAE(nn.Module):
-    """
-    Differentiable mean absolute error between x and y,
-    ignoring positions where the difference is exactly zero.
-    """
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        diff = torch.abs(x - y)            # keeps gradients
-        mask = (diff != 0).float()         # 1 where nonzero, 0 where zero
-        masked_sum = (diff * mask).sum()   # only nonzero positions contribute
-        count = mask.sum()
-        if count == 0:                     # avoid division by zero
-            return torch.tensor(0.0, device=x.device, requires_grad=True)
-        return masked_sum / count
 
 
 class GaussianInterpLitModule(LightningModule):
@@ -123,6 +105,8 @@ class GaussianInterpLitModule(LightningModule):
         self.val_mae = MeanAbsoluteError()
         self.test_mae = MeanAbsoluteError()
 
+        # We introduce MaskedMAE to homogenize evals across datasets with different ICL/BCG levels
+        self.train_masked_mae = MaskedMAE()
         self.val_masked_mae = MaskedMAE()
         self.test_masked_mae = MaskedMAE()
 
@@ -294,6 +278,8 @@ class GaussianInterpLitModule(LightningModule):
         #self.train_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         #self.train_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.log("train/loss", self.train_loss, on_step=True, on_epoch=True, prog_bar=True)
+        masked_mae = self.train_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.log("train/masked_mae", masked_mae, on_step=True, on_epoch=True, prog_bar=True)
         #self.log("train/RASE", self.train_RASE, on_step=True, on_epoch=True, prog_bar=True)
         #self.log("train/rmse", self.train_rmse, on_step=True, on_epoch=True, prog_bar=True)
         #self.log("train/mae", self.train_mae, on_step=True, on_epoch=True, prog_bar=True)
@@ -341,11 +327,15 @@ class GaussianInterpLitModule(LightningModule):
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
         mae = self.val_mae.compute()
-        val_masked_mae = torch.mean(torch.tensor(self.val_masked_mae_epch))
-        self.val_masked_mae_epch = []
         self.val_rase_best(rase)  # update best so far val rase
         self.val_rmse_best(rmse)
         self.val_mae_best(mae)
+
+        val_masked_mae = torch.mean(torch.tensor(self.val_masked_mae_epch))
+        best_val_masked_mae = torch.min(torch.tensor(self.val_masked_mae_epch))
+        self.val_masked_mae_epch = []
+        self.log("val/masked_mae_best", best_val_masked_mae, sync_dist=True, prog_bar=True)
+
         # log `val_acc_best` as a value through `.compute()` method, instead of as a metric object
         # otherwise metric would be reset by lightning after each epoch
         self.log("val/rase_best", self.val_rase_best.compute(), sync_dist=True, prog_bar=True)
@@ -368,11 +358,11 @@ class GaussianInterpLitModule(LightningModule):
         self.test_rmse(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         self.test_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
         test_masked_mae = self.test_masked_mae(preds.detach().to(torch.float32), targets.detach().to(torch.float32))
+        self.log("test/masked_mae", test_masked_mae, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/RASE", self.test_RASE, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/rmse", self.test_rmse, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/mae", self.test_mae, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("test/masked_mae", test_masked_mae, on_step=False, on_epoch=True, prog_bar=True)
 
     def on_test_epoch_end(self) -> None:
         """Lightning hook that is called when a test epoch ends."""
@@ -381,11 +371,10 @@ class GaussianInterpLitModule(LightningModule):
     def predict_step(self, batch: Optional[torch.Tensor], batch_idx: int, dataloader_idx: int = 0):
         """Sampling method employed -- Euler sampling"""
         # ToDo: If we are using gaussian interpolation, we need to sample noise as well
-        print(batch.shape)
         x = batch
-        x, y = x[0], x[1]
-        print(x.shape, y.shape)
+        y = torch.zeros_like(x)
 
+        # This performs euler sampling on x. See models.Gaussian_Interp
         _, preds = self.net.train_step(x, y, return_preds=True)
 
         return preds
