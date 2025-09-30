@@ -6,7 +6,7 @@ from lightning import LightningModule
 from torchmetrics import MinMetric, MeanMetric, MeanAbsoluteError
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch.nn as nn
-from utils import MaskedMAE
+from src.models.utils import MaskedMAE
 
 
 torch.set_float32_matmul_precision('medium')

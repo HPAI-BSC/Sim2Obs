@@ -6,7 +6,7 @@ from torchmetrics import MinMetric, MeanMetric, MeanAbsoluteError
 from torchmetrics.image import RelativeAverageSpectralError, RootMeanSquaredErrorUsingSlidingWindow
 import torch
 from torch.profiler import profile, record_function, ProfilerActivity
-from utils import MaskedMAE
+from src.models.utils import MaskedMAE
 
 #from ptflops import get_model_complexity_info
 
