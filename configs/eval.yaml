@@ -42,6 +42,7 @@ save_all_predictions: False
 
 # -Mamba
 # ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/276f98f3/output/checkpoints/276f98f3/epoch_044.ckpt
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/4e897f5c/output/checkpoints/4e897f5c/last.ckpt  # 14.04.25 Dianoga
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/6e8b2ef3/last.ckpt  # 13.05.25 Combined
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/6e8b2ef3/epoch_035.ckpt  # 13.05.25 Combined
@@ -49,7 +50,7 @@ save_all_predictions: False
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e5d676db/output/checkpoints/e5d676db/epoch_031.ckpt  # 13.05.25 Combined 0.05
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/58c2e555/output/checkpoints/58c2e555/epoch_047.ckpt  # 13.05.25 Combined 0.1
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e5d676db/output/checkpoints/e5d676db/last.ckpt  # 13.05.25 Combined 0.25
-ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/4ae18b9d/output/checkpoints/4ae18b9d/epoch_049.ckpt  # 02.06.25 Dianoga
+#ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/4ae18b9d/output/checkpoints/4ae18b9d/epoch_049.ckpt  # 02.06.25 Dianoga
 
 # Mamba ps 4
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6b3045df/output/checkpoints/6b3045df/last.ckpt  # 13.05.25 Combined 1
