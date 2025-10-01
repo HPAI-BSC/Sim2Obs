@@ -6,7 +6,7 @@ min_epochs: 1 # prevents early stopping
 max_epochs: 50
 #max_steps: 1000  # For Stochastic Interpolation Models
 
-gradient_clip_val: 1.0
+gradient_clip_val: 0.5
 
 accelerator: gpu
 devices: 1
