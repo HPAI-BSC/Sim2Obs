@@ -6,7 +6,8 @@ defaults:
   - data: galaxy_dianoga_rotation45
   #- data: combined_dataset
   #- data: galaxy_illustris300
-  - model: gaussian_interp
+  #- model: gaussian_interp
+  - model: unet
   - callbacks: default
   - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
@@ -44,8 +45,8 @@ train: True
 test: True
 
 # simply provide checkpoint path to resume training
-#ckpt_path: null
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/82d5f80a/output/checkpoints/82d5f80a/epoch_095.ckpt # Direct interpolation
+ckpt_path: null
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/82d5f80a/output/checkpoints/82d5f80a/epoch_095.ckpt # Direct interpolation
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/b2c465c6/output/checkpoints/b2c465c6/epoch_086.ckpt  # Gaussian interpolation, 86 epochs
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/82d5f80a/output/checkpoints/82d5f80a/epoch_095.ckpt # Direct interpolation
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/24842b1b/output/checkpoints/24842b1b/epoch_014.ckpt  # Mamba
