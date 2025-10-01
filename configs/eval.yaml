@@ -26,7 +26,8 @@ save_predictions: False
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d400da3c/output/checkpoints/d400da3c/epoch_041.ckpt  # 14.04.25 Dianoga
 
 # INTERPOLATION MODELS
-ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/82d5f80a/output/checkpoints/82d5f80a/epoch_095.ckpt # Direct interpolation
+#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/82d5f80a/output/checkpoints/82d5f80a/epoch_095.ckpt # Direct interpolation
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/de05dbb0/output/checkpoints/de05dbb0/epoch_160.ckpt  # Direct interpolation with regularization
 
 # -AttentionUNet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
