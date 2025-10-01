@@ -1,5 +1,6 @@
 import logging
 import os
+import pickle
 import re
 import traceback
 from pathlib import Path
@@ -385,6 +386,7 @@ def get_transform_matrix(n: np.ndarray, axis: np.ndarray) -> np.ndarray:
         [2 * (q1 * q3 - q0 * q2), 2 * (q0 * q1 + q2 * q3), 1 - 2 * (q1 ** 2 + q2 ** 2)]
     ])
     return Q
+
 
 def rotate_3dvec(Q: np.ndarray, vec: np.ndarray) -> np.ndarray:
     """
@@ -801,5 +803,26 @@ def store_overlapping_matrix_as_df(cfg, overlapping_matrix):
 
     path = cfg.paths.datasets_dir + f'/../logs/overlapping_halos_{name}.csv'
     df.to_csv(path, index=False)
+
+
+def store_obj(cfg, halo, subhalo_ctx, cosmos_data):
+    sim_code = cfg.catalog.path.split('/')[-1]
+    datasets_dir = cfg.paths.datasets_dir
+    name = cfg.catalog.name
+    path = datasets_dir + f'/../logs/halo_{name}_{sim_code}_{halo.halo_id}.pkl'
+    print(path)
+    with open(path, 'wb') as f:
+        pickle.dump(halo, f)
+
+    path = datasets_dir + f'/../logs/subhalo_ctx_{name}_{sim_code}_{halo.halo_id}.pkl'
+    print(path)
+    with open(path, 'wb') as f:
+        pickle.dump(subhalo_ctx, f)
+
+    path = datasets_dir + f'/../logs/cosmos_{name}_{sim_code}_{halo.halo_id}.pkl'
+    print(path)
+    with open(path, 'wb') as f:
+        pickle.dump(cosmos_data, f)
+
 
 

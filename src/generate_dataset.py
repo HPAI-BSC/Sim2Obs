@@ -53,6 +53,9 @@ def main(cfg: DictConfig) -> Any:
     steps = get_pipeline_steps(cfg)
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
+    # For debugging purposes
+    debug_halo_ids = [1080849, 1500213]
+
     starting_idx = None
     _ = pipeline.run(starting_idx)
 

@@ -13,24 +13,21 @@ from src.data_generation.src.utils import setup_logger
 logger = setup_logger("Pipeline")
 
 
-def get_generator(data_loader, n=None, starting_idx=None):
+def get_generator(data_loader, n=None, starting_idx=None, debug_halo_ids=[]):
     halo_context = data_loader.fetcher.get_halos()
     subhalo_context = data_loader.fetcher.get_subhalos()
+
+    # Just for debug purposes
+    if len(debug_halo_ids) > 0:
+        print(f'Filtering halo context by the following halo ids: {debug_halo_ids}')
+        halo_context = halo_context.filter_by_ids(debug_halo_ids)
+        print(f'Halo context size: {len(halo_context)}')
 
     # Clean subhalo context to remove subhalos that belong to halos that do not exist
     subhalo_context.remove_subhalos_belonging_unvalid_halos(halo_context)
     print(f'Number of subhalos after removing unvalid fofs: {len(subhalo_context)}.')
 
-    # Store overlapping matrix
     overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
-    sim_code = data_loader.cfg.catalog.path.split('/')[-1]
-    datasets_dir = data_loader.cfg.paths.datasets_dir
-    name = data_loader.cfg.catalog.name
-    path = datasets_dir + f'/../logs/overlapping_matrix_{name}_{sim_code}.pkl'
-    print(f'Store overlapping in {path}')
-    with open(path, 'wb') as f:
-        pickle.dump(overlapping_matrix, f)
-
     halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
 
     if starting_idx is not None:
@@ -91,7 +88,7 @@ class Pipeline:
 
         return pipeline
 
-    def run(self, n=None, starting_idx=None) -> Any:
+    def run(self, n=None, starting_idx=None, debug_halo_ids=[]) -> Any:
         if not self.steps:
             logger.error("Error, please provide a non-empty pipeline, steps cannot be an empty list.")
             return None
@@ -110,11 +107,9 @@ class Pipeline:
         halo_context = data_loader.fetcher.get_halos()
         models = load_models(self.cfg.feature_names)
 
-        store_subhalo_ids = [1500213]
-
         # Run the pipeline function
         result = list(pipeline_fn(input_gen, first_step_kwargs={'halo_context': halo_context, 'models': models,
-                                                                'ids': store_subhalo_ids}))
+                                                                'debug_halo_ids': debug_halo_ids}))
 
         final_step = LastStep(self.cfg)
         final_step.process(result)

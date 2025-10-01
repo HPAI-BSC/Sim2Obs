@@ -13,7 +13,7 @@ from src.data_generation.src.feature import FeatureProcessorFactory, attach_mode
 from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
-from src.data_generation.src.utils import setup_logger
+from src.data_generation.src.utils import setup_logger, store_obj
 
 logger = setup_logger("DataLoader")
 
@@ -103,6 +103,7 @@ class DataLoader(PipelineStep):
         lbox = self.cfg.catalog.get('Lbox', None)
         halo_context = kwargs.pop('halo_context', None)
         models = kwargs.pop('models', None)
+        debug_halo_ids = kwargs.pop('debug_halo_ids', None)
 
         # Note that subhalos here contains overlapping subhalos
         for halo, subhalo_ctx, cosmos_data in g:
@@ -147,6 +148,10 @@ class DataLoader(PipelineStep):
             cosmos_data.subhalo_particles = halo_particles_overlapping
             cosmos_data.input_feature = input_feature
             cosmos_data.output_feature = output_feature
+
+            # Analyze objects with errors offline
+            if debug_halo_ids is not None:
+                store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
 
             # Got to the next step
             if next_step is not None:

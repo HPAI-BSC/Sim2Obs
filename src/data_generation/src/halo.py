@@ -175,3 +175,21 @@ class HaloContext:
             A Series containing the halo_id values.
         """
         return self.data["halo_id"].tolist()
+
+    def filter_by_ids(self, halo_ids: list) -> "HaloContext":
+        """
+        Return a new HaloContext containing only halos with IDs in `halo_ids`.
+
+        Parameters
+        ----------
+        halo_ids : list
+            A list of halo IDs to keep.
+
+        Returns
+        -------
+        HaloContext
+            A new HaloContext instance with the filtered halos.
+        """
+        filtered_df = self.data[self.data["halo_id"].isin(halo_ids)]
+        return HaloContext.from_dataframe(filtered_df)
+
