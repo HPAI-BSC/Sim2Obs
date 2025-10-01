@@ -129,6 +129,10 @@ class MAELitModule(LightningModule):
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         print(self.net)
+        if hasattr(self.net, "_orig_mod"):
+            print('---->')
+        else:
+            print('b', self.net)
         state_dict = checkpoint["state_dict"]
         # Remove '_orig_mod' prefix if exists
         """
