@@ -18,24 +18,10 @@ def get_generator(data_loader, n=None, starting_idx=None, debug_halo_ids=[]):
     halo_context = data_loader.fetcher.get_halos()
     subhalo_context = data_loader.fetcher.get_subhalos()
 
-    # Just for debug purposes
-    sim_code = data_loader.cfg.catalog.path.split('/')[-1]
-    datasets_dir = data_loader.cfg.paths.datasets_dir
-    name = data_loader.cfg.catalog.name
-    path = datasets_dir + f'/../logs/haloContext_{name}_{sim_code}.pkl'
-    print(path)
-    with open(path, 'wb') as f:
-        pickle.dump(halo_context, f)
-
-    path = datasets_dir + f'/../logs/SubhaloContext_{name}_{sim_code}.pkl'
-    print(path)
-    with open(path, 'wb') as f:
-        pickle.dump(subhalo_context, f)
-
     if len(debug_halo_ids) > 0:
         print(f'Filtering halo context by the following halo ids: {debug_halo_ids}')
         halo_context = halo_context.filter_by_ids(debug_halo_ids)
-        print(f'Halo context size: {len(halo_context)}')
+        print(f'Halo context size: {len(halo_context.data)}')
 
     # Clean subhalo context to remove subhalos that belong to halos that do not exist
     subhalo_context.remove_subhalos_belonging_unvalid_halos(halo_context)
@@ -107,6 +93,8 @@ class Pipeline:
             logger.error("Error, please provide a non-empty pipeline, steps cannot be an empty list.")
             return None
 
+        print(f'debug_halo_ids={debug_halo_ids}')
+
         pipeline_fn = self.build_pipeline(self.steps)
 
         # get dataloader step
@@ -114,7 +102,7 @@ class Pipeline:
 
         if len(step_list) > 0:
             data_loader = step_list[0]
-            input_gen = get_generator(data_loader, n, starting_idx)
+            input_gen = get_generator(data_loader, n, starting_idx, debug_halo_ids)
         else:
             raise Exception()
 
