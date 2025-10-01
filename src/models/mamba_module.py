@@ -231,12 +231,14 @@ class MambaLitModule(LightningModule):
             self.val_mae.reset()
             self.val_rmse.reset()
 
+        """
         # Use gradient clipping to prevent memory spikes
         self.clip_gradients(
             optimizer=self.trainer.optimizers[0],
             gradient_clip_val=0.5,
             gradient_clip_algorithm="norm"
         )
+        """
 
         loss, preds, targets = self.model_step(batch)
 
