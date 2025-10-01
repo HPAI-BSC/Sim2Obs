@@ -49,7 +49,7 @@ save_all_predictions: False
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e5d676db/output/checkpoints/e5d676db/epoch_031.ckpt  # 13.05.25 Combined 0.05
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/58c2e555/output/checkpoints/58c2e555/epoch_047.ckpt  # 13.05.25 Combined 0.1
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e5d676db/output/checkpoints/e5d676db/last.ckpt  # 13.05.25 Combined 0.25
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/4ae18b9d/output/checkpoints/4ae18b9d/epoch_049.ckpt  # 02.06.25 Dianoga
+ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/4ae18b9d/output/checkpoints/4ae18b9d/epoch_049.ckpt  # 02.06.25 Dianoga
 
 # Mamba ps 4
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6b3045df/output/checkpoints/6b3045df/last.ckpt  # 13.05.25 Combined 1
