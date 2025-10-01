@@ -54,10 +54,10 @@ def main(cfg: DictConfig) -> Any:
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
     # For debugging purposes
-    debug_halo_ids = [1080849, 1500213]
+    debug_halo_ids = [724423, 1080849, 1500213]
 
     starting_idx = None
-    _ = pipeline.run(starting_idx)
+    _ = pipeline.run(starting_idx, debug_halo_ids)
 
 
 if __name__ == "__main__":

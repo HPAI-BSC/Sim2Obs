@@ -18,6 +18,19 @@ def get_generator(data_loader, n=None, starting_idx=None, debug_halo_ids=[]):
     subhalo_context = data_loader.fetcher.get_subhalos()
 
     # Just for debug purposes
+    sim_code = data_loader.cfg.catalog.path.split('/')[-1]
+    datasets_dir = data_loader.cfg.paths.datasets_dir
+    name = data_loader.cfg.catalog.name
+    path = datasets_dir + f'/../logs/haloContext_{name}_{sim_code}.pkl'
+    print(path)
+    with open(path, 'wb') as f:
+        pickle.dump(halo_context, f)
+
+    path = datasets_dir + f'/../logs/SubhaloContext_{name}_{sim_code}.pkl'
+    print(path)
+    with open(path, 'wb') as f:
+        pickle.dump(subhalo_context, f)
+
     if len(debug_halo_ids) > 0:
         print(f'Filtering halo context by the following halo ids: {debug_halo_ids}')
         halo_context = halo_context.filter_by_ids(debug_halo_ids)
