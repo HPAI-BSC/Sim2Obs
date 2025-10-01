@@ -129,19 +129,17 @@ class MAELitModule(LightningModule):
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         print(self.net)
-        if hasattr(self.net, "_orig_mod"):
-            print('---->')
-        else:
-            print('b', self.net)
         state_dict = checkpoint["state_dict"]
-        # Remove '_orig_mod' prefix if exists
-        """
-        new_state_dict = {
-            k.replace("net._orig_mod.", "net."): v
-            for k, v in state_dict.items()
-        }
-        checkpoint["state_dict"] = new_state_dict
-        """
+        if hasattr(self.net, "_orig_mod"):
+            pass
+        else:
+            # Remove '_orig_mod' prefix if exists
+            new_state_dict = {
+                k.replace("net._orig_mod.", "net."): v
+                for k, v in state_dict.items()
+            }
+            checkpoint["state_dict"] = new_state_dict
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Perform a forward pass through the model `self.net`.
