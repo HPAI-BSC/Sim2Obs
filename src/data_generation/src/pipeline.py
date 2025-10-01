@@ -14,6 +14,7 @@ logger = setup_logger("Pipeline")
 
 
 def get_generator(data_loader, n=None, starting_idx=None, debug_halo_ids=[]):
+    print(f'debug_halo_ids={debug_halo_ids}')
     halo_context = data_loader.fetcher.get_halos()
     subhalo_context = data_loader.fetcher.get_subhalos()
 
