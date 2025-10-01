@@ -150,7 +150,7 @@ class DataLoader(PipelineStep):
             cosmos_data.output_feature = output_feature
 
             # Analyze objects with errors offline
-            if debug_halo_ids is not None:
+            if debug_halo_ids is not None and halo.halo_id in debug_halo_ids:
                 store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
 
             # Got to the next step
