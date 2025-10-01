@@ -128,7 +128,6 @@ class MAELitModule(LightningModule):
             print("CUDA is not available")
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
-        print(self.net)
         state_dict = checkpoint["state_dict"]
         if hasattr(self.net, "_orig_mod"):
             pass
