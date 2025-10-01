@@ -198,16 +198,15 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         plt.savefig(f"{output_path}/icl_diff_sample2.png")
         """
 
+        if cfg.save_all_predictions:
+            log.info("Saving predictions...")
+            output_path = cfg.paths.output_dir
+            for batch_idx, batch in enumerate(predictions):
+                for i, pred in enumerate(batch):
+                    global_idx = batch_idx * len(batch) + i
+                    plot_single_pred(pred, global_idx, output_path)
 
-        log.info("Saving predictions...")
-        output_path = cfg.paths.output_dir
-        for batch_idx, batch in enumerate(predictions):
-            for i, pred in enumerate(batch):
-                global_idx = batch_idx * len(batch) + i
-                plot_single_pred(pred, global_idx, output_path)
-
-        log.info(f"Predictions saved to {output_path}")
-
+            log.info(f"Predictions saved to {output_path}")
 
 
     metric_dict = trainer.callback_metrics

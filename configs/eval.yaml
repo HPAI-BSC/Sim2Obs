@@ -17,7 +17,8 @@ tags: ["dev"]
 
 commit_tag: "commit_hash"
 
-save_predictions: False
+save_predictions: True
+save_all_predictions: False
 
 # ckpts path changed to: /gpfs/projects/bsc70/space-coe/pipelines/
 
