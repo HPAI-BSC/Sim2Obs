@@ -928,8 +928,8 @@ class VSSM(nn.Module):
             self.up = lambda x: x
 
         self.apply(self._init_weights)
-        gflops = self.flops(shape=(1,128,128))
-        print(f"VSSM GFLOPS: {gflops}")
+        flops = self.flops(shape=(1,128,128))
+        print(f"VSSM FLOPS: {flops}, GFLOPS: {flops * 1e-9:.4f}")
 
     def _init_weights(self, m: nn.Module):
         """
