@@ -233,6 +233,36 @@ def flops_selective_scan_ref(B=1, L=256, D=768, N=16, with_D=True, with_Z=False,
 
 
 def selective_scan_flop_jit(inputs, outputs):
+    # Inputs are expected in the order: [x, dt, A, B, C, D, dt_bias]
+    # Use tensor sizes and positions instead of debug names
+    x = inputs[0]  # Should be the main input tensor (B, D, L)
+    A = inputs[2]  # Should be the A parameter (D, N)
+    B = inputs[3]  # Should be the B parameter (with_Group=True if 4D)
+
+    # Extract dimensions from tensor sizes
+    x_sizes = x.type().sizes()
+    A_sizes = A.type().sizes()
+    B_sizes = B.type().sizes()
+
+    B_dim, D, L = x_sizes  # Batch, Dimension, Sequence length
+    N = A_sizes[1]  # State dimension from A matrix
+
+    # Determine model configuration based on tensor dimensions
+    with_Group = len(B_sizes) == 4  # Check if B is 4-dimensional
+
+    # Check for D and z parameters based on input count and position
+    with_D = len(inputs) > 5 and inputs[5].type().sizes() is not None
+    if with_D:
+        with_z = len(inputs) > 6
+    else:
+        with_z = len(inputs) > 5
+
+    # Calculate FLOPs
+    flops = flops_selective_scan_ref(B=B_dim, L=L, D=D, N=N, with_D=with_D, with_Z=with_z, with_Group=with_Group)
+    return flops
+
+
+def selective_scan_flop_jit_og(inputs, outputs):
     # xs, dts, As, Bs, Cs, Ds (skip), z (skip), dt_projs_bias (skip)
     print(inputs)
     assert inputs[0].debugName().startswith("xs")  # (B, D, L)
