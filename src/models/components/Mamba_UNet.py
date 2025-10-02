@@ -234,6 +234,7 @@ def flops_selective_scan_ref(B=1, L=256, D=768, N=16, with_D=True, with_Z=False,
 
 def selective_scan_flop_jit(inputs, outputs):
     # xs, dts, As, Bs, Cs, Ds (skip), z (skip), dt_projs_bias (skip)
+    print(inputs)
     assert inputs[0].debugName().startswith("xs")  # (B, D, L)
     assert inputs[2].debugName().startswith("As")  # (D, N)
     assert inputs[3].debugName().startswith("Bs")  # (D, N)
