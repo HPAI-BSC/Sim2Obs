@@ -2,8 +2,8 @@
 
 defaults:
   - _self_
-  #- data: combined_dataset
-  - data: galaxy_dianoga_rotation45
+  - data: combined_dataset
+  #- data: galaxy_dianoga_rotation45
   - model: unet
   - logger:
   - trainer: default
@@ -83,12 +83,13 @@ save_all_predictions: False
 # - Unet
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
 #ckpt_path: ${oc.env:PROJECT_ROOT}/local/ckpt/19b3ea5f/last.ckpt #Unet local
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/522dfd58/output/checkpoints/522dfd58/epoch_045.ckpt  # 02.10.25 DIANOGA
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/5c014fc5/output/checkpoints/5c014fc5/epoch_043.ckpt  # 14.04.25 Dianoga
 #clpt_path: /gpfs/projects/bsc70/pipelines/space-coe/499ff89d/output/checkpoints/499ff89d/epoch_047.ckpt  # 13.05.25 Combined
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/a9e9b7ee/output/checkpoints/a9e9b7ee/epoch_036.ckpt  # 13.05.25 Combined 0.25
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/47f75496/output/checkpoints/47f75496/epoch_034.ckpt  # 13.05.25 Combined 0.05
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d0a5bd44/output/checkpoints/d0a5bd44/epoch_036.ckpt  # 13.05.25 Combined 0.1
-ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/a54fcf1d/output/checkpoints/a54fcf1d/epoch_048.ckpt  # 02.06.25 Dianoga
+#ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/a54fcf1d/output/checkpoints/a54fcf1d/epoch_048.ckpt  # 02.06.25 Dianoga
 #ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/51aaea5f/output/checkpoints/51aaea5f/epoch_013.ckpt  # 07.06.25 Combined 0.01
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d4bc91cc/output/checkpoints/d4bc91cc/epoch_014.ckpt  # 07.06.25 Combined 0.05
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e02f1466/output/checkpoints/e02f1466/epoch_012.ckpt  # 07.06.25 Combined 0.1
