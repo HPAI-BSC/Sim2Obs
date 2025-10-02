@@ -42,7 +42,7 @@ save_all_predictions: False
 
 # -Mamba
 # ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/2888f740/output/checkpoints/2888f740/epoch_39.ckpt  # 02.10.25 Dianoga ps 1 depth [2,1,1,1]
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/2888f740/output/checkpoints/2888f740/epoch_039.ckpt  # 02.10.25 Dianoga ps 1 depth [2,1,1,1]
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/4e897f5c/output/checkpoints/4e897f5c/last.ckpt  # 14.04.25 Dianoga
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/6e8b2ef3/last.ckpt  # 13.05.25 Combined
 #ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/6e8b2ef3/epoch_035.ckpt  # 13.05.25 Combined
