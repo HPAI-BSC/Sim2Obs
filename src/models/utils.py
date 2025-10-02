@@ -11,10 +11,11 @@ class MaskedMAE(nn.Module):
     """
     def __init__(self):
         super().__init__()
+        self.alpha = 0.005
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         diff = torch.abs(x - y)            # keeps gradients
-        mask = (diff != 0.0).float()         # 1 where nonzero, 0 where zero
+        mask = (diff >= self.alpha).float()         # 1 where nonzero, 0 where almost zero
         masked_sum = (diff * mask).sum()   # only nonzero positions contribute
         count = mask.sum()
         if count == 0:                     # avoid division by zero
