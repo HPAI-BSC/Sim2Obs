@@ -125,10 +125,14 @@ class DataLoader(PipelineStep):
                 # Load preprocessed particles for overlapping halos
                 overlapping_subhalo_particles, subhalos_with_errors = \
                     self._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
+                print(len(overlapping_subhalo_particles))
+                print(subhalos_with_errors)
 
                 # Group all the particles together
                 if overlapping_subhalo_particles is not None:
+                    print('sum')
                     halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
+                    print(halo_particles_overlapping)
                 else:
                     halo_particles_overlapping = halo_particles_no_overlapping
 

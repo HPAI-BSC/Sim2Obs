@@ -56,8 +56,11 @@ def main(cfg: DictConfig) -> Any:
     # For debugging purposes
     debug_halo_ids = [724423, 1080849, 1500213]
 
+    # TODO add end idx for batching processing
+
     starting_idx = None
-    _ = pipeline.run(starting_idx=starting_idx, debug_halo_ids=debug_halo_ids)
+    ending_idx = None
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=debug_halo_ids)
 
 
 if __name__ == "__main__":

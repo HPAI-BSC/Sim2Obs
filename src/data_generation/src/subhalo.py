@@ -281,11 +281,12 @@ class SubhaloContext:
         Exception:
             If no subhalos are found for the given `halo_id`.
         """
-        try:
-            df = self.data.loc[halo_id]
-            return SubhaloContext.from_dataframe(df)
-        except KeyError:
-            raise Exception(f"No subhalos found for halo_id={halo_id}.")
+        if halo_id not in self.data['id_parents']:
+            logger.warning(f'No subhalos found for: {halo_id}')
+            return pd.DataFrame()
+
+        df = self.data.loc[halo_id]
+        return SubhaloContext.from_dataframe(df)
 
     def remove_subhalos_belonging_unvalid_halos(self, halo_context: HaloContext):
         halo_ids = halo_context.data['halo_id'].unique()
