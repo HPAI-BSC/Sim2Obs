@@ -1973,6 +1973,7 @@ class FlamingoFetcher(DataFetcher):
             d[part_type] = tmp
 
         particle_data = SubhaloParticles(d, self.catalog.fields.particles)
+        logger.debug(f'Stellar particle size: {len(particle_data.star_p)}')
         return particle_data
 
 
