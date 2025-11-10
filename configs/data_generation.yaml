@@ -11,7 +11,7 @@ task_name: "data_generation"
 feature_names:
   - name: VelocityDispersion
   - name: IntraClusterLight
-    transition_radius_compute: false
+    transition_radius_compute: true
 
 # [angle, z axis, [rotation_axis]]
 rotation_45: [ 45, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]

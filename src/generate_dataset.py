@@ -54,8 +54,9 @@ def main(cfg: DictConfig) -> Any:
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
     # For debugging purposes
-    starting_idx = None
-    ending_idx = None
+    # TODO
+    starting_idx = 1
+    ending_idx = 5
     _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[])
 
 
