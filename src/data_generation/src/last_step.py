@@ -18,15 +18,15 @@ class LastStep:
         self.cfg = cfg
 
     def process(self, input):
-        n = 4
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
-        tmp = input[n]
-        df = pd.DataFrame(tmp[1])
+        tmp = input[:-1]
+        errors = tmp[0]
+        df = pd.DataFrame(tmp[1], columns=['halo_id', 'R200', 'transition_radius'])
+        df['transition_radius/R200'] = df['transition_radius'] / df['R200']
         print(df.describe())
 
-        '''
         dataset_dir = self.cfg.paths.datasets_dir
         name = self.cfg.catalog.path.replace(dataset_dir, '')
         name = name.replace('/', '_')
@@ -40,9 +40,6 @@ class LastStep:
                         f.write(f"{error}\n")
                 else:
                     f.write(f"{item}\n")
-
-        print(statistics)
-        '''
 
 
 
