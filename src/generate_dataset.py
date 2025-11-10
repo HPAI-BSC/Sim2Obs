@@ -7,6 +7,7 @@ from omegaconf import DictConfig
 from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("GenerateDataset")
+print(f"Logger {logger.name} has {len(logger.handlers)} handlers")
 
 from data_generation.src.data_loader_step import DataLoader
 from data_generation.src.map_step import MapStep
@@ -55,8 +56,8 @@ def main(cfg: DictConfig) -> Any:
 
     # For debugging purposes
     # TODO
-    starting_idx = None
-    ending_idx = None
+    starting_idx = 1
+    ending_idx = 5
     _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[])
 
 
