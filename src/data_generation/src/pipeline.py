@@ -9,8 +9,9 @@ from src.data_generation.src.data_loader_step import DataLoader
 from src.data_generation.src.feature import load_models
 from src.data_generation.src.last_step import LastStep
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.utils import setup_logger
+from src.data_generation.src.utils import setup_logger, setup_logging
 
+setup_logging()
 logger = logging.getLogger(__name__)  # use __name__ inside modules
 
 

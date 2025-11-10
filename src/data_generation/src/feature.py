@@ -13,8 +13,9 @@ from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
-from src.data_generation.src.utils import setup_logger, rotate
+from src.data_generation.src.utils import setup_logger, rotate, setup_logging
 
+setup_logging()
 logger = logging.getLogger(__name__)  # use __name__ inside modules
 
 # Uncomment for local testing, internet connection required
@@ -369,7 +370,7 @@ class ICLProcessor(FeatureProcessor):
         float or None
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
-        logger.info(f'Computing transition radius for: {halo.halo_id}')
+        logger.debug(f'Computing transition radius for: {halo.halo_id}')
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
         distance = np.sqrt((particle_position ** 2).sum(axis=1))
@@ -403,10 +404,10 @@ class ICLProcessor(FeatureProcessor):
                         max_diff = diff
                         max_pos = i
 
-            logger.info(f'Index for the transition radius: {transition_index[max_pos]}')
+            logger.debug(f'Index for the transition radius: {transition_index[max_pos]}')
             transition_radius = sorted_distances[transition_index[max_pos]]
             normalized_transition_radius = transition_radius / halo.r200
-            logger.info(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
+            logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
                          f'({round(normalized_transition_radius, 2)} % r200), r200: {halo.r200}')
         else:
             logger.warning("No transition radius found; ICL never dominates.")
@@ -442,9 +443,7 @@ class ICLProcessor(FeatureProcessor):
         self.value = icl_mask
 
         if hasattr(self, 'transition_radius_compute'):
-            print('Computing transition radius (1)...')
             if self.transition_radius_compute:
-                print('Computing transition radius (2)...')
                 self._compute_transition_radius(halo, subhalo_particles, icl_mask)
             elif self.cfg.catalog.get('transition_radius', None) is None:
                 logger.warning('Warning, you must define a transition radius for generating the maps')

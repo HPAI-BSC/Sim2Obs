@@ -58,6 +58,27 @@ def setup_logger(name: str) -> logging.Logger:
     return logger
 
 
+def setup_logging():
+    """
+    Configure logging to print all messages (DEBUG and above)
+    to the console, for all modules.
+    """
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)  # Capture all levels
+
+    # Check if root logger already has handlers
+    if not root_logger.handlers:
+        # Console handler
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)  # Handler also prints DEBUG
+        formatter = logging.Formatter(
+            '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+        )
+        ch.setFormatter(formatter)
+        root_logger.addHandler(ch)
+
+
 logger = setup_logger("Utils")
 
 

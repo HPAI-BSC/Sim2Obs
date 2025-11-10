@@ -6,9 +6,9 @@ import pandas as pd
 from omegaconf import DictConfig
 
 from src.data_generation.src.halo import Halo, HaloContext
-from src.data_generation.src.utils import rotate, dict_depth, setup_logger
+from src.data_generation.src.utils import rotate, dict_depth, setup_logger, setup_logging
 
-
+setup_logging()
 logger = logging.getLogger(__name__)  # use __name__ inside modules
 
 
