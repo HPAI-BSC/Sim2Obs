@@ -4,9 +4,10 @@ import pandas as pd
 import illustris_python as il
 from hydra import initialize, compose
 
-print(os.path.abspath('.'))
-
-with initialize(config_path="./configs"):
+path = os.path.join(os.path.abspath('.'), 'configs')
+print(path)
+print(os.path.exists(path))
+with initialize(config_path=path, version_base=None):
     cfg_tngcluster = compose(config_name="data_generation.yaml")
 
 path = cfg_tngcluster.catalog.path
