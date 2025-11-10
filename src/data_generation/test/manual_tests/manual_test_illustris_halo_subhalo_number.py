@@ -36,4 +36,3 @@ mass_filter_units = 1e10 * h # Msun / h
 filtered_subhalos = subhalos_df[subhalos_df['SubhaloMassType'] > mass_filter_units]
 print(len(filtered_subhalos))
 
-# TODO particles ?

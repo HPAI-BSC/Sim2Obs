@@ -1827,6 +1827,7 @@ class FlamingoFetcher(DataFetcher):
         #logger.debug(f"Fetching particle data for subhalo: {subhalo_id}")
 
         # Get the position for the subhalo
+        # TODO
         subhalo_position = np.where(self.fof_subhalos.input_halos.halo_catalogue_index == subhalo_id)[0]
 
         if len(subhalo_position) > 0:
