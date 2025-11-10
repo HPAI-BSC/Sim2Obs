@@ -110,11 +110,11 @@ class Pipeline:
         models = load_models(self.cfg.feature_names)
 
         # Run the pipeline function
-        result = list(pipeline_fn(input_gen, first_step_kwargs={'halo_context': halo_context, 'models': models,
+        result, statistics = list(pipeline_fn(input_gen, first_step_kwargs={'halo_context': halo_context, 'models': models,
                                                                 'debug_halo_ids': debug_halo_ids}))
 
         final_step = LastStep(self.cfg)
-        final_step.process(result)
+        final_step.process(result, statistics)
 
         logger.info("Pipeline processing completed.")
         return result
