@@ -21,10 +21,11 @@ class LastStep:
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
-        tmp = input[:-1]
+        tmp = input[-1]
         errors = tmp[0]
         df = pd.DataFrame(tmp[1], columns=['halo_id', 'R200', 'transition_radius'])
         df['transition_radius/R200'] = df['transition_radius'] / df['R200']
+        print(f'n = {len(df)}')
         print(df.describe())
 
         dataset_dir = self.cfg.paths.datasets_dir
