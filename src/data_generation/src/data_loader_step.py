@@ -268,7 +268,9 @@ class DataLoader(PipelineStep):
             particle fetching or preprocessing.
         """
         logger.debug('Loading particles for overlapping subhalos ...')
+        print(f'lbox: {lbox}')
         overlapping_subhalos = subhalo_context.data[subhalo_context.data['id_parents'] != halo.halo_id]
+        print(f'Overlapping subhalos: {len(overlapping_subhalos)}')
         subhalo_particles = None
         subhalos_with_errors = []
         if not overlapping_subhalos.empty:
