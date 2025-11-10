@@ -369,7 +369,7 @@ class ICLProcessor(FeatureProcessor):
         float or None
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
-        logger.debug(f'Computing transition radius for: {halo.halo_id}')
+        logger.info(f'Computing transition radius for: {halo.halo_id}')
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
         distance = np.sqrt((particle_position ** 2).sum(axis=1))
@@ -403,10 +403,10 @@ class ICLProcessor(FeatureProcessor):
                         max_diff = diff
                         max_pos = i
 
-            logger.debug(f'Index for the transition radius: {transition_index[max_pos]}')
+            logger.info(f'Index for the transition radius: {transition_index[max_pos]}')
             transition_radius = sorted_distances[transition_index[max_pos]]
             normalized_transition_radius = transition_radius / halo.r200
-            logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
+            logger.info(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
                          f'({round(normalized_transition_radius, 2)} % r200), r200: {halo.r200}')
         else:
             logger.warning("No transition radius found; ICL never dominates.")
