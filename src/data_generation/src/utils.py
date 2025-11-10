@@ -51,10 +51,6 @@ def setup_logger(name: str) -> logging.Logger:
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
-
-    # Stop propagation to avoid duplicate logs from root
-    logger.propagate = False
-
     return logger
 
 
