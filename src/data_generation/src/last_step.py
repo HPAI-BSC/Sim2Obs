@@ -21,12 +21,11 @@ class LastStep:
         objects = input[0]
         errors_tr = input[1]
         errors, statistics = errors_tr[0], errors_tr[1]
-        print(statistics)
-
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
-        print(input)
+        print(statistics)
+
         '''
         dataset_dir = self.cfg.paths.datasets_dir
         name = self.cfg.catalog.path.replace(dataset_dir, '')
