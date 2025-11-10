@@ -365,8 +365,8 @@ class DataLoader(PipelineStep):
                 if valid_subhalo_idxs:
                     overlapping_matrix[halo_id] = list(
                         zip(id_parents[valid_subhalo_idxs], subhalo_ids[valid_subhalo_idxs]))
-                    logger.debug(f'Halo {halo_id} has {len(valid_subhalo_idxs)} overlapping subhalos:')
-                    logger.debug(f'------> {overlapping_matrix[halo_id]}')
+                    #logger.debug(f'Halo {halo_id} has {len(valid_subhalo_idxs)} overlapping subhalos:')
+                    #logger.debug(f'------> {overlapping_matrix[halo_id]}')
                 else:
                     overlapping_matrix[halo_id] = []
             else:
