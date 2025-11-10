@@ -6,7 +6,7 @@ from hydra import initialize, compose
 
 print(os.path.abspath('.'))
 
-with initialize(config_path="../../../../../../configs"):
+with initialize(config_path="../../../../../configs"):
     cfg_tngcluster = compose(config_name="data_generation.yaml")
 
 path = cfg_tngcluster.catalog.path
