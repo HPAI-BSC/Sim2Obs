@@ -440,6 +440,7 @@ class ICLProcessor(FeatureProcessor):
         # Non overlapping particles
         icl_mask = self._compute_icl_mask(halo, subhalo_particles)
         self.value = icl_mask
+        print(self.transition_radius_compute)
 
         if hasattr(self, 'transition_radius_compute'):
             if self.transition_radius_compute:
