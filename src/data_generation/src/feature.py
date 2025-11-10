@@ -440,15 +440,14 @@ class ICLProcessor(FeatureProcessor):
         # Non overlapping particles
         icl_mask = self._compute_icl_mask(halo, subhalo_particles)
         self.value = icl_mask
-        print(self.transition_radius_compute)
 
         if hasattr(self, 'transition_radius_compute'):
+            print('Computing transition radius (1)...')
             if self.transition_radius_compute:
+                print('Computing transition radius (2)...')
                 self._compute_transition_radius(halo, subhalo_particles, icl_mask)
             elif self.cfg.catalog.get('transition_radius', None) is None:
                 logger.warning('Warning, you must define a transition radius for generating the maps')
-        else:
-            print(hasattr(self, 'transition_radius_compute'))
 
     def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
