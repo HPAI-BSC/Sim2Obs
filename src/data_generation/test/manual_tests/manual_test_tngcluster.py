@@ -2,7 +2,7 @@ import pandas as pd
 import illustris_python as il
 from hydra import initialize, compose
 
-with initialize(config_path="'../../../../../configs"):
+with initialize(config_path="'../../../../configs"):
     cfg_tngcluster = compose(config_name="data_generation.yaml")
 
 path = cfg_tngcluster.catalog.path
