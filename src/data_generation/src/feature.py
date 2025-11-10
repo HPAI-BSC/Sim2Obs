@@ -13,7 +13,7 @@ from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
-from src.data_generation.src.utils import setup_logger, rotate
+from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles
 
 logger = setup_logger("FeatureProcessor")
 
@@ -421,6 +421,10 @@ class ICLProcessor(FeatureProcessor):
 
         # Store values within the feature
         self.transition_radius = transition_radius
+
+        # Build cumsum profiles
+        plot_icl_bcg_profiles(icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
+
         if transition_radius in (0, None):
             raise Exception(f'Ignoring halo: {halo.halo_id}, ICL never dominates')
 
