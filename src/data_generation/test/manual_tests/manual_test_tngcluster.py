@@ -7,7 +7,7 @@ from hydra import initialize, compose
 path = os.path.join(os.path.abspath('.'), 'configs')
 print(path)
 print(os.path.exists(path))
-with initialize(config_path=path, version_base=None):
+with initialize(config_path='configs', version_base=None):
     cfg_tngcluster = compose(config_name="data_generation.yaml")
 
 path = cfg_tngcluster.catalog.path
