@@ -1,3 +1,4 @@
+import logging
 import os
 import warnings
 from abc import ABC, abstractmethod
@@ -14,7 +15,7 @@ from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import setup_logger, rotate
 
-logger = setup_logger("FeatureProcessor")
+logger = logging.getLogger(__name__)  # use __name__ inside modules
 
 # Uncomment for local testing, internet connection required
 # dotenv_path = find_dotenv('../.env')

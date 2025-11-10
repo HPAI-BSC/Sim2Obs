@@ -1,3 +1,4 @@
+import logging
 import traceback
 from typing import Tuple, List, Optional, Callable, Any
 import os
@@ -15,7 +16,7 @@ from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import setup_logger, store_obj
 
-logger = setup_logger("DataLoader")
+logger = logging.getLogger(__name__)  # use __name__ inside modules
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 
@@ -128,9 +129,7 @@ class DataLoader(PipelineStep):
 
                 # Group all the particles together
                 if overlapping_subhalo_particles is not None:
-                    print('sum')
                     halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
-                    print(halo_particles_overlapping)
                 else:
                     halo_particles_overlapping = halo_particles_no_overlapping
 
@@ -265,9 +264,8 @@ class DataLoader(PipelineStep):
             particle fetching or preprocessing.
         """
         logger.debug('Loading particles for overlapping subhalos ...')
-        print(f'lbox: {lbox}')
         overlapping_subhalos = subhalo_context.data[subhalo_context.data['id_parents'] != halo.halo_id]
-        print(f'Overlapping subhalos: {len(overlapping_subhalos)}')
+        print(f'Overlapping subhalos for {halo.halo_id}: {len(overlapping_subhalos)}')
         subhalo_particles = None
         subhalos_with_errors = []
         if not overlapping_subhalos.empty:

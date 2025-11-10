@@ -1,3 +1,4 @@
+import logging
 from collections import Counter
 
 import numpy as np
@@ -8,7 +9,7 @@ from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.utils import rotate, dict_depth, setup_logger
 
 
-logger = setup_logger("SubhaloContext - SubhaloParticles")
+logger = logging.getLogger(__name__)  # use __name__ inside modules
 
 
 class SubHalo:

@@ -1,3 +1,4 @@
+import logging
 from typing import Any, List
 import hydra
 # from dotenv import load_dotenv, find_dotenv
@@ -5,8 +6,7 @@ from omegaconf import DictConfig
 # from rootutils import rootutils
 
 from src.data_generation.src.utils import setup_logger
-
-logger = setup_logger("GenerateDataset")
+logger = logging.getLogger(__name__)  # use __name__ inside modules
 
 from data_generation.src.data_loader_step import DataLoader
 from data_generation.src.map_step import MapStep

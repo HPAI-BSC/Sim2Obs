@@ -1,3 +1,4 @@
+import logging
 import pickle
 from typing import Any
 
@@ -10,7 +11,7 @@ from src.data_generation.src.last_step import LastStep
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.utils import setup_logger
 
-logger = setup_logger("Pipeline")
+logger = logging.getLogger(__name__)  # use __name__ inside modules
 
 
 def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[]):

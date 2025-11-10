@@ -1,4 +1,5 @@
 import copy
+import logging
 import operator
 import os.path
 from abc import ABC, abstractmethod
@@ -18,7 +19,7 @@ from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion, \
     dict_depth, to_list_in_batches
 
-logger = setup_logger("DataFetcher")
+logger = logging.getLogger(__name__)  # use __name__ inside modules
 
 operators = {
     '>': operator.gt,
