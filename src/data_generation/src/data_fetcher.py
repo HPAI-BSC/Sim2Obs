@@ -17,9 +17,9 @@ from swiftsimio import SWIFTDataset
 from src.data_generation.src.halo import HaloContext, Halo
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion, \
-    dict_depth, to_list_in_batches, setup_logging
+    dict_depth, to_list_in_batches
 
-setup_logging()
+logger = setup_logger("DataFetcher")
 logger = logging.getLogger(__name__)  # use __name__ inside modules
 
 operators = {

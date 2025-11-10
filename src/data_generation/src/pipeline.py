@@ -9,10 +9,9 @@ from src.data_generation.src.data_loader_step import DataLoader
 from src.data_generation.src.feature import load_models
 from src.data_generation.src.last_step import LastStep
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.utils import setup_logger, setup_logging
+from src.data_generation.src.utils import setup_logger
 
-setup_logging()
-logger = logging.getLogger(__name__)  # use __name__ inside modules
+logger = setup_logger("Pipeline")
 
 
 def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[]):

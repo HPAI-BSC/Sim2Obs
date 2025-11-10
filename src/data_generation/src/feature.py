@@ -13,10 +13,9 @@ from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
-from src.data_generation.src.utils import setup_logger, rotate, setup_logging
+from src.data_generation.src.utils import setup_logger, rotate
 
-setup_logging()
-logger = logging.getLogger(__name__)  # use __name__ inside modules
+logger = setup_logger("FeatureProcessor")
 
 # Uncomment for local testing, internet connection required
 # dotenv_path = find_dotenv('../.env')

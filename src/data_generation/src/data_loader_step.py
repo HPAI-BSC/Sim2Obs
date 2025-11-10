@@ -14,10 +14,9 @@ from src.data_generation.src.feature import FeatureProcessorFactory, attach_mode
 from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
-from src.data_generation.src.utils import setup_logger, store_obj, setup_logging
+from src.data_generation.src.utils import setup_logger, store_obj
 
-setup_logging()
-logger = logging.getLogger(__name__)  # use __name__ inside modules
+logger = setup_logger("Pipeline")
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 

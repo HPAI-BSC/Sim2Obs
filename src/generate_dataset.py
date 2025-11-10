@@ -5,10 +5,10 @@ import hydra
 from omegaconf import DictConfig
 # from rootutils import rootutils
 
-from src.data_generation.src.utils import setup_logger, setup_logging
+from src.data_generation.src.utils import setup_logger
 
-setup_logging()
-logger = logging.getLogger(__name__)  # use __name__ inside modules
+logger = setup_logger("Generate-dataset")
+
 
 from data_generation.src.data_loader_step import DataLoader
 from data_generation.src.map_step import MapStep
