@@ -7,7 +7,7 @@ from omegaconf import DictConfig
 from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("GenerateDataset")
-print(f"Logger {logger.name} has {len(logger.handlers)} handlers")
+logger.propagate = False
 
 from data_generation.src.data_loader_step import DataLoader
 from data_generation.src.map_step import MapStep

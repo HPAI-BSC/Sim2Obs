@@ -11,7 +11,7 @@ from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("Pipeline")
-print(f"Logger {logger.name} has {len(logger.handlers)} handlers")
+logger.propagate = False
 
 
 def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[]):

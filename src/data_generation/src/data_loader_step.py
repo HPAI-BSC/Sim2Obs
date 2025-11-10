@@ -16,7 +16,7 @@ from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import setup_logger, store_obj
 
 logger = setup_logger("DataLoader")
-print(f"Logger {logger.name} has {len(logger.handlers)} handlers")
+logger.propagate = False
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 
