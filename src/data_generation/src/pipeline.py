@@ -114,9 +114,7 @@ class Pipeline:
                                                                 'debug_halo_ids': debug_halo_ids}))
 
         final_step = LastStep(self.cfg)
-        errors, statistics = result
-        print(statistics)
-        final_step.process(errors, statistics)
+        final_step.process(result)
 
         logger.info("Pipeline processing completed.")
         return result

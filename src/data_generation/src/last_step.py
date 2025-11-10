@@ -17,10 +17,12 @@ class LastStep:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
 
-    def process(self, errors, statistics):
+    def process(self, input):
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
+        print(input)
+        '''
         dataset_dir = self.cfg.paths.datasets_dir
         name = self.cfg.catalog.path.replace(dataset_dir, '')
         name = name.replace('/', '_')
@@ -36,6 +38,7 @@ class LastStep:
                     f.write(f"{item}\n")
 
         print(statistics)
+        '''
 
 
 
