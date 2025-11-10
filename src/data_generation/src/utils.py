@@ -45,19 +45,15 @@ def setup_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
 
-    # Ensure no previous handlers are attached
-    if logger.hasHandlers():
-        logger.handlers.clear()
+    # Only add a handler if none exists
+    if not logger.hasHandlers():
+        console_handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
 
-    # Prevent log propagation to avoid duplicate logs
-    # logger.propagate = False
-
-    console_handler = logging.StreamHandler()
-
-    # Updated format string to ensure line number is not included
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+    # Stop propagation to avoid duplicate logs from root
+    logger.propagate = False
 
     return logger
 

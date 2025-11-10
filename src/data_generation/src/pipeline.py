@@ -11,7 +11,6 @@ from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.utils import setup_logger
 
 logger = setup_logger("Pipeline")
-logger.propagate = False
 
 
 def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[]):

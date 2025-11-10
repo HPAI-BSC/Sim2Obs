@@ -16,7 +16,6 @@ from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import setup_logger, store_obj
 
 logger = setup_logger("DataLoader")
-logger.propagate = False
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 

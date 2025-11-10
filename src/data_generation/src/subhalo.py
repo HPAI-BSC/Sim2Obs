@@ -9,7 +9,7 @@ from src.data_generation.src.utils import rotate, dict_depth, setup_logger
 
 
 logger = setup_logger("SubhaloContext - SubhaloParticles")
-logger.propagate = False
+
 
 class SubHalo:
     """

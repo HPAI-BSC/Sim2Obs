@@ -15,7 +15,6 @@ from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import setup_logger, rotate
 
 logger = setup_logger("FeatureProcessor")
-logger.propagate = False
 
 # Uncomment for local testing, internet connection required
 # dotenv_path = find_dotenv('../.env')
