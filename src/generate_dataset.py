@@ -1,3 +1,4 @@
+import os
 from typing import Any, List
 import hydra
 import pandas as pd
@@ -68,8 +69,8 @@ if __name__ == "__main__":
     with initialize(config_path="../configs"):
         cfg_tngcluster = compose(config_name="data_generation.yaml")
 
-    path = cfg_tngcluster.catalog.path
-    print(path)
+    path = os.path.join(cfg_tngcluster.catalog.path, 'output')
+    print(path, os.path.exists(path))
     halo_fields = ['Group_M_Crit200', 'Group_R_Crit200', 'GroupFirstSub']
     halos = il.groupcat.loadHalos(path, 84, fields=halo_fields)
     df = pd.DataFrame(halos)
