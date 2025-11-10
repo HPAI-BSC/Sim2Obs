@@ -140,7 +140,7 @@ class DataLoader(PipelineStep):
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 subhalo_ctx.preprocess(halo, lbox)
-                statistics.append((halo.halo_id, halo.r200, feature_output_name.transition_radius))
+                statistics.append((halo.halo_id, halo.r200, output_feature.transition_radius))
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
                 self.errors.append(f'Error with {halo.halo_id}: {e} in class {self.name}')
