@@ -1,7 +1,7 @@
 defaults:
   - _self_
   - paths: gpfs
-  - catalog: flamingo
+  - catalog: tngcluster
   - extras: default
   - hydra: default
 

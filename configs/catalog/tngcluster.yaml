@@ -1,0 +1,84 @@
+name: tngcluster
+#subhalo_error_id: 4294967295
+snapnum: 84       # redshift 0.2
+a: 0.8333     # redshift 0.2
+H: 0.6774
+# https://www.tng-project.org/data/docs/background/
+#Lbox: 205000 # box size in kpc/h
+#transition_radius: 637.031 # kpc
+#spatial_resolution: 1.480 # kpc
+# bin_size = spatial_resolution * 1 ->
+# ensure that bins use a proper resolution,
+#bin_size > spatial resolution *1.5-2 times
+#bin_spatial_resolution_scale: 1.5
+
+path: ${paths.datasets_dir}/tngcluster
+
+
+fields:
+  halo:
+    Group_M_Crit200:
+      input: "10^10 Msun/h"
+      output: "Msun/h"
+      scaling: "x * 1e10"
+      name: "m200"
+      # Final units 1e13M⊙ to 6.77*1e12 M⊙/h
+      filter: ["> 1e13 * 0.6774"]
+    Group_R_Crit200:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      name: "r200"
+    GroupPos:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      name: "gpos"
+    GroupFirstSub:
+      input: null
+      output: null
+      scaling: null
+      name: "fsub"
+  subhalo:
+    SubhaloPos:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      name: "spos"
+    SubhaloHalfmassRadType:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      index: 4 # Select the 5th column (stars)
+      name: "shmr"
+    SubhaloMassType:
+      input: "10^10 Msun/h"
+      output: "Msun"
+      scaling: "x * 1e10 / h"
+      index: 4
+      name: "mstr"
+      # Mass > 1e10 M⊙
+      filter: "> 1e10 "
+    SubhaloGrNr:
+      input: null
+      output: null
+      scaling: null
+      name: "id_parents"
+  particles:
+    star:
+      # <part_type>_<name>
+      Coordinates:
+        input: "ckpc/h"
+        output: "pkpc/h"
+        scaling: "x * a"
+        name: "p"
+      Velocities:
+        input: "kma/s^-1"
+        output: "km/s^-1"
+        scaling: "x * math.sqrt(a)"
+        name: "v"
+      Masses:
+        input: "10^10 Msun/h"
+        output: "Msun/h"
+        scaling: "x * 1e10"
+        name: "m"
