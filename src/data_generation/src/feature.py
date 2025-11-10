@@ -446,6 +446,8 @@ class ICLProcessor(FeatureProcessor):
                 self._compute_transition_radius(halo, subhalo_particles, icl_mask)
             elif self.cfg.catalog.get('transition_radius', None) is None:
                 logger.warning('Warning, you must define a transition radius for generating the maps')
+        else:
+            print(hasattr(self, 'transition_radius_compute'))
 
     def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
