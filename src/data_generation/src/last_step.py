@@ -23,8 +23,9 @@ class LastStep:
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
         tmp = input[n]
-        print(tmp[0])
-        print(tmp[1])
+        df = pd.DataFrame(tmp[1])
+        print(df.describe())
+
         '''
         dataset_dir = self.cfg.paths.datasets_dir
         name = self.cfg.catalog.path.replace(dataset_dir, '')
