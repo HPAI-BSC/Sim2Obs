@@ -18,11 +18,15 @@ class LastStep:
         self.cfg = cfg
 
     def process(self, input):
-        errors, statistics = input[0], input[1]
+        objects = input[0]
+        errors_tr = input[1]
+        errors, statistics = errors_tr[0], errors_tr[1]
+        print(statistics)
+
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
-        print(statistics)
+        print(input)
         '''
         dataset_dir = self.cfg.paths.datasets_dir
         name = self.cfg.catalog.path.replace(dataset_dir, '')
