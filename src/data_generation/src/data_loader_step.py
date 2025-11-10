@@ -107,6 +107,7 @@ class DataLoader(PipelineStep):
         debug_halo_ids = kwargs.pop('debug_halo_ids', None)
 
         # Note that subhalos here contains overlapping subhalos
+        statistics = []
         for halo, subhalo_ctx, cosmos_data in g:
             logger.info('-------------------------------------------------------------------------------------')
             logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
@@ -139,6 +140,7 @@ class DataLoader(PipelineStep):
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 subhalo_ctx.preprocess(halo, lbox)
+                statistics.append((halo.halo_id, halo.r200, feature_output_name.transition_radius))
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
                 self.errors.append(f'Error with {halo.halo_id}: {e} in class {self.name}')
@@ -162,7 +164,7 @@ class DataLoader(PipelineStep):
 
             logger.info(f"Finished processing halo {halo.halo_id}")
 
-        yield self.errors
+        yield self.errors, statistics
 
     def load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
                                overlapping_matrix: dict) -> List[Tuple]:

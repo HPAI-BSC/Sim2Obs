@@ -17,7 +17,7 @@ class LastStep:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
 
-    def process(self, errors):
+    def process(self, errors, statistics):
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
@@ -34,6 +34,8 @@ class LastStep:
                         f.write(f"{error}\n")
                 else:
                     f.write(f"{item}\n")
+
+        print(statistics)
 
 
 
