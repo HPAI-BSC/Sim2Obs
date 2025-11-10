@@ -704,6 +704,8 @@ class Illustris300Fetcher(DataFetcher):
         group_attr = ''
         if 'illustris300' in self.catalog.path:
             group_attr = 'SubhaloGrNr'
+        elif 'tng_cluster' in self.catalog.path:
+            group_attr = 'SubhaloGrNr'
         elif 'millenium' in self.catalog.path:
             group_attr = 'SubhaloGroupNr'
         else:
