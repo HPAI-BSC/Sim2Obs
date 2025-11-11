@@ -1,3 +1,4 @@
+import json
 import logging
 import traceback
 from typing import Tuple, List, Optional, Callable, Any
@@ -140,7 +141,17 @@ class DataLoader(PipelineStep):
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 subhalo_ctx.preprocess(halo, lbox)
-                statistics.append((halo.halo_id, halo.r200, output_feature.transition_radius))
+
+                # Store info for log purposes
+                halo_dict = {'halo_id': halo.halo_id, 'R200': halo.r200,
+                             'transition_radius': output_feature.transition_radius}
+                dataset_dir = self.cfg.paths.datasets_dir
+                name = self.cfg.catalog.path.replace(dataset_dir, '')
+                name = name.replace('/', '_')
+                path = dataset_dir + f'/../logs/transition_radius/{name}_transition_radius_info_{halo.halo_id}.json'
+                with open(path, "w") as f:
+                    json.dump(halo_dict, f, indent=4)
+
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
                 self.errors.append(f'Error with {halo.halo_id}: {e} in class {self.name}')
@@ -164,7 +175,7 @@ class DataLoader(PipelineStep):
 
             logger.info(f"Finished processing halo {halo.halo_id}")
 
-        yield self.errors, statistics
+        yield self.errors
 
     def load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
                                overlapping_matrix: dict) -> List[Tuple]:

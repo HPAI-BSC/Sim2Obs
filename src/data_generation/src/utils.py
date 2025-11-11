@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import pickle
@@ -817,4 +818,53 @@ def store_obj(cfg, halo, subhalo_ctx, cosmos_data):
         pickle.dump(cosmos_data, f)
 
 
+def merge_json_files_to_csv(input_dir, output_file, chunk_size=1000, length=None):
+    """
+    Efficiently merges many JSON files from a directory into one CSV.
 
+    Args:
+        input_dir (str): Path containing JSON files.
+        output_file (str): Path to the output CSV file.
+        chunk_size (int): Number of JSONs to load per chunk before writing to disk.
+    """
+    json_files = [f for f in os.listdir(input_dir) if f.endswith('.json')]
+
+    if length is not None:
+        json_files = json_files[:length]
+
+    total = len(json_files)
+    if total == 0:
+        print("No JSON files found.")
+        return
+
+    print(f"Found {total} JSON files. Merging in chunks of {chunk_size}...")
+
+    first_write = True
+    buffer = []
+
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+    for i, filename in enumerate(json_files, start=1):
+        file_path = os.path.join(input_dir, filename)
+        try:
+            with open(file_path, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    buffer.append(data)
+                else:
+                    print(f"Skipping {filename} (not a dict)")
+        except Exception as e:
+            print(f"Error reading {filename}: {e}")
+            continue
+
+        # Write to CSV in chunks to save memory
+        if len(buffer) >= chunk_size or i == total:
+            df = pd.DataFrame(buffer)
+            df.to_csv(output_file, index=False, mode="a", header=first_write)
+            first_write = False
+            buffer.clear()
+
+            print(f"Processed {i}/{total} files ({(i/total)*100:.1f}%)")
+
+    print(f"Merge complete. Output saved to {output_file}")
