@@ -22,25 +22,20 @@ class LastStep:
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
-        tmp = input[-1]
-        errors = tmp[0]
 
+        # Transition radius analysis
         dataset_dir = self.cfg.paths.datasets_dir
-        name = self.cfg.catalog.path.replace(dataset_dir, '')
-        name = name.replace('/', '_')
         path = dataset_dir + f'/../logs/transition_radius'
         output_file = dataset_dir + f'/../logs/transition_radius/merged.csv'
         merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None)
 
         df = pd.read_csv(output_file)
-        print(df.columns)
-        #df = pd.DataFrame(tmp[1], columns=['halo_id', 'R200', 'transition_radius'])
-        #df['transition_radius/R200'] = df['transition_radius'] / df['R200']
-        #print(f'n = {len(df)}')
+        df['transition_radius/R200'] = df['transition_radius'] / df['R200']
+        print(f'n = {len(df)}')
         print(df.describe())
 
         # Errors
-        dataset_dir = self.cfg.paths.datasets_dir
+        errors = input[-1]
         name = self.cfg.catalog.path.replace(dataset_dir, '')
         name = name.replace('/', '_')
         path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.txt'
