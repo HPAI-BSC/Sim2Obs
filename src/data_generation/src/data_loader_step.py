@@ -119,7 +119,7 @@ class DataLoader(PipelineStep):
             path = dataset_dir + f'/../logs/transition_radius/{name}_transition_radius_info_{halo.halo_id}.json'
 
             # Do the transition radius analysis iff the halo has not been processed before
-            if not os.path.exists(path):
+            if True: #not os.path.exists(path):
                 try:
                     feature_input_name, feature_output_name = self.cfg.feature_names
                     input_feature = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg)
@@ -170,11 +170,12 @@ class DataLoader(PipelineStep):
                     store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
 
                 # Got to the next step
+                '''
                 if next_step is not None:
                     yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
                 else:
                     yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
-
+                '''
                 logger.info(f"Finished processing halo {halo.halo_id}")
             else:
                 logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')

@@ -35,7 +35,8 @@ class LastStep:
         print(df.describe())
 
         # Errors
-        errors = input[-1]
+        # TODO check if it works
+        errors = input
         name = self.cfg.catalog.path.replace(dataset_dir, '')
         name = name.replace('/', '_')
         path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.txt'
