@@ -155,8 +155,11 @@ class DataLoader(PipelineStep):
                     with open(path, "w") as f:
                         json.dump(halo_dict, f, indent=4)
                 except Exception as e:
+                    path = dataset_dir + f'/../logs/errors/{name}_error_{halo.halo_id}.json'
                     logger.error(f"Error with {halo.halo_id}: {e}")
-                    self.errors.append(f'Error with {halo.halo_id}: {e} in class {self.name}')
+                    halo_dict = {'halo_id': halo.halo_id, 'error': str(e)}
+                    with open(path, "w") as f:
+                        json.dump(halo_dict, f, indent=4)
                     continue
 
                 # Update cosmos instance
