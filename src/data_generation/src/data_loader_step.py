@@ -112,13 +112,15 @@ class DataLoader(PipelineStep):
             logger.info('-------------------------------------------------------------------------------------')
             logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
             logger.info('-------------------------------------------------------------------------------------')
-            try:
-                dataset_dir = self.cfg.paths.datasets_dir
-                name = self.cfg.catalog.path.replace(dataset_dir, '')
-                name = name.replace('/', '_')
-                path = dataset_dir + f'/../logs/transition_radius/{name}_transition_radius_info_{halo.halo_id}.json'
-                # Do the transition radius analysis iff the halo has not been processed before
-                if not os.path.exists(path):
+
+            dataset_dir = self.cfg.paths.datasets_dir
+            name = self.cfg.catalog.path.replace(dataset_dir, '')
+            name = name.replace('/', '_')
+            path = dataset_dir + f'/../logs/transition_radius/{name}_transition_radius_info_{halo.halo_id}.json'
+
+            # Do the transition radius analysis iff the halo has not been processed before
+            if not os.path.exists(path):
+                try:
                     feature_input_name, feature_output_name = self.cfg.feature_names
                     input_feature = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg)
                     output_feature = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg)
@@ -152,30 +154,30 @@ class DataLoader(PipelineStep):
                                  'transition_radius': output_feature.transition_radius}
                     with open(path, "w") as f:
                         json.dump(halo_dict, f, indent=4)
+                except Exception as e:
+                    logger.error(f"Error with {halo.halo_id}: {e}")
+                    self.errors.append(f'Error with {halo.halo_id}: {e} in class {self.name}')
+                    continue
+
+                # Update cosmos instance
+                cosmos_data.subhalos = subhalo_ctx
+                cosmos_data.subhalo_particles = halo_particles_overlapping
+                cosmos_data.input_feature = input_feature
+                cosmos_data.output_feature = output_feature
+
+                # Analyze objects with errors offline
+                if debug_halo_ids is not None and halo.halo_id in debug_halo_ids:
+                    store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
+
+                # Got to the next step
+                if next_step is not None:
+                    yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
                 else:
-                    logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')
-            except Exception as e:
-                logger.error(f"Error with {halo.halo_id}: {e}")
-                self.errors.append(f'Error with {halo.halo_id}: {e} in class {self.name}')
-                continue
+                    yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
 
-            # Update cosmos instance
-            cosmos_data.subhalos = subhalo_ctx
-            cosmos_data.subhalo_particles = halo_particles_overlapping
-            cosmos_data.input_feature = input_feature
-            cosmos_data.output_feature = output_feature
-
-            # Analyze objects with errors offline
-            if debug_halo_ids is not None and halo.halo_id in debug_halo_ids:
-                store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
-
-            # Got to the next step
-            if next_step is not None:
-                yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
+                logger.info(f"Finished processing halo {halo.halo_id}")
             else:
-                yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
-
-            logger.info(f"Finished processing halo {halo.halo_id}")
+                logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')
 
         yield self.errors
 
