@@ -17,7 +17,7 @@ from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import setup_logger, store_obj
 
-logger = setup_logger("Pipeline")
+logger = setup_logger("DataLoader-step")
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 

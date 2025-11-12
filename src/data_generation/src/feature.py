@@ -409,8 +409,8 @@ class ICLProcessor(FeatureProcessor):
             logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
                          f'({round(normalized_transition_radius, 2)} % r200), r200: {halo.r200}')
         else:
-            logger.error("No transition radius found; ICL never dominates.")
-            transition_radius = None
+            logger.error('No transition radius found; ICL never dominates.')
+            raise Exception('No transition radius found; ICL never dominates.')
 
         # To analyze cumsum profiles
         r_by_r200 = sorted_distances #/ halo.r200
@@ -425,8 +425,6 @@ class ICLProcessor(FeatureProcessor):
         # Build cumsum profiles
         plot_icl_bcg_profiles(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
 
-        if transition_radius in (0, None):
-            raise Exception(f'Ignoring halo: {halo.halo_id}, ICL never dominates')
 
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):
         """
