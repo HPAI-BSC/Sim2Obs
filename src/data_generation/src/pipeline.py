@@ -33,19 +33,6 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
 
     halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
 
-    # Debug ----
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets'
-    path = dataset_dir + f'/../logs/transition_radius/merged.csv'
-    error_path = dataset_dir + f'/../logs/errors/errors_merged.csv'
-
-    halos_tr = pd.read_csv(path)['halo_id']
-    halos_errors = pd.read_csv(error_path)['halo_id']
-    halo_id_list = halo_context.halo_id
-    diff = set(halo_id_list) - (set(halos_tr) | set(halos_errors))
-    print(len(diff))
-    print(diff)
-    # ---------
-
     if n is not None:
         halo_subhalo_list = halo_subhalo_list[:n]
 
