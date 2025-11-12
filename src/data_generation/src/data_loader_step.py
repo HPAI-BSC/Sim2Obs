@@ -86,7 +86,7 @@ class DataLoader(PipelineStep):
                 raise ValueError(f"Error, missing required configuration key: {key}")
         return data_loader_dict
 
-    def process(self, g: List[Tuple], next_step: Optional[Callable[[List[Tuple]], Any]], **kwargs):
+    def compute_transition_radius(self, g: List[Tuple], **kwargs):
         """
         Processes the input and output features, updating the cosmos data for each halo and subhalo in the graph.
 
@@ -94,13 +94,6 @@ class DataLoader(PipelineStep):
         -----------
         g : List[Tuple]
             A list of tuples where each tuple contains halo data and its associated subhalo data.
-        next_step : Optional[Callable[[List[Tuple]], Any]]
-            A callable that represents the next step in the pipeline. It should accept the graph `g` and return the next value.
-
-        Yields:
-        -------
-        Tuple
-            A tuple containing the input feature, output feature, and cosmos data after processing.
         """
         lbox = self.cfg.catalog.get('Lbox', None)
         halo_context = kwargs.pop('halo_context', None)
@@ -172,18 +165,114 @@ class DataLoader(PipelineStep):
                 if debug_halo_ids is not None and halo.halo_id in debug_halo_ids:
                     store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
 
-                # Got to the next step
-                '''
-                if next_step is not None:
-                    yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
-                else:
-                    yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
-                '''
                 logger.info(f"Finished processing halo {halo.halo_id}")
             else:
                 logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')
 
+    def execute_process(self, g: List[Tuple], next_step: Optional[Callable[[List[Tuple]], Any]], **kwargs):
+        """
+        Processes the input and output features, updating the cosmos data for each halo and subhalo in the graph.
+
+        Parameters:
+        -----------
+        g : List[Tuple]
+            A list of tuples where each tuple contains halo data and its associated subhalo data.
+        next_step : Optional[Callable[[List[Tuple]], Any]]
+            A callable that represents the next step in the pipeline. It should accept the graph `g` and return the next value.
+
+        Yields:
+        -------
+        Tuple
+            A tuple containing the input feature, output feature, and cosmos data after processing.
+        """
+        lbox = self.cfg.catalog.get('Lbox', None)
+        halo_context = kwargs.pop('halo_context', None)
+        models = kwargs.pop('models', None)
+        debug_halo_ids = kwargs.pop('debug_halo_ids', None)
+
+        # Note that subhalos here contains overlapping subhalos
+        for halo, subhalo_ctx, cosmos_data in g:
+            logger.info('-------------------------------------------------------------------------------------')
+            logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
+            logger.info('-------------------------------------------------------------------------------------')
+
+            try:
+                feature_input_name, feature_output_name = self.cfg.feature_names
+                input_feature = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg)
+                output_feature = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg)
+                attach_models_to_features([input_feature, output_feature], models)
+
+                # Load particles for all the subhalos in that halo
+                halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
+
+                # Preprocessed all particles for current halo
+                halo_particles_no_overlapping.preprocess(halo, lbox)
+
+                # Load preprocessed particles for overlapping halos
+                overlapping_subhalo_particles, subhalos_with_errors = \
+                    self._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
+
+                # Group all the particles together
+                if overlapping_subhalo_particles is not None:
+                    halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
+                else:
+                    halo_particles_overlapping = halo_particles_no_overlapping
+
+                # Compute features with preprocessed and non-overlapping particles
+                input_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
+                output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
+
+                # Center subhalos positions respect to current halo, including overlapping subhalos
+                subhalo_ctx.preprocess(halo, lbox)
+            except Exception as e:
+                logger.error(f"Error with {halo.halo_id}: {e}")
+                halo_dict = {'halo_id': halo.halo_id, 'error': str(e)}
+                self.errors.append(halo_dict)
+                continue
+
+            # Update cosmos instance
+            cosmos_data.subhalos = subhalo_ctx
+            cosmos_data.subhalo_particles = halo_particles_overlapping
+            cosmos_data.input_feature = input_feature
+            cosmos_data.output_feature = output_feature
+
+            # Analyze objects with errors offline
+            if debug_halo_ids is not None and halo.halo_id in debug_halo_ids:
+                store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
+
+            # Got to the next step
+            if next_step is not None:
+                yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
+            else:
+                yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
+
+            logger.info(f"Finished processing halo {halo.halo_id}")
+        else:
+            logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')
         yield self.errors
+
+    def process(self, g: List[Tuple], next_step: Optional[Callable[[List[Tuple]], Any]], **kwargs):
+        """
+        Processes the input and output features, updating the cosmos data for each halo and subhalo in the graph.
+
+        Parameters:
+        -----------
+        g : List[Tuple]
+            A list of tuples where each tuple contains halo data and its associated subhalo data.
+        next_step : Optional[Callable[[List[Tuple]], Any]]
+            A callable that represents the next step in the pipeline. It should accept the graph `g` and return the next value.
+
+        Yields:
+        -------
+        Tuple
+            A tuple containing the input feature, output feature, and cosmos data after processing.
+        """
+        transition_radius_compute = self.cfg.feature_names[1].get("transition_radius_compute", False)
+
+        if transition_radius_compute:
+            yield from self.compute_transition_radius(g)
+        else:
+            yield from self.execute_process(g, next_step, **kwargs)
 
     def load_halo_subhalo_data(self, subhalo_context: SubhaloContext, halo_context: HaloContext,
                                overlapping_matrix: dict) -> List[Tuple]:
