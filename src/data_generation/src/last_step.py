@@ -18,7 +18,7 @@ class LastStep:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
 
-    def process(self, input):
+    def process(self, errors):
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
@@ -45,5 +45,21 @@ class LastStep:
             df = pd.read_csv(output_file)
             print(f'n = {len(df)}')
             print(df['error'].value_counts())
+        else:
+            dataset_dir = self.cfg.paths.datasets_dir
+            name = self.cfg.catalog.path.replace(dataset_dir, '')
+            name = name.replace('/', '_')
+            path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.txt'
+            logger.info(f'Storing errors at: {path}')
+
+            with open(path, 'w') as f:
+                for item in errors:
+                    if isinstance(item, list):
+                        for error in item:
+                            f.write(f"{error}\n")
+                    else:
+                        f.write(f"{item}\n")
+
+
 
 
