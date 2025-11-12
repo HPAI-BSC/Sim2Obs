@@ -144,12 +144,15 @@ class DataLoader(PipelineStep):
                     attach_models_to_features([input_feature, output_feature], models)
 
                     # Load particles for all the subhalos in that halo
+                    print('Load particles for all the subhalos in that halo')
                     halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
 
                     # Preprocessed all particles for current halo
+                    print('Preprocessed all particles for current halo')
                     halo_particles_no_overlapping.preprocess(halo, lbox)
 
                     # Load preprocessed particles for overlapping halos
+                    print('Load preprocessed particles for overlapping halos')
                     overlapping_subhalo_particles, subhalos_with_errors = \
                         self._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
 
@@ -160,10 +163,12 @@ class DataLoader(PipelineStep):
                         halo_particles_overlapping = halo_particles_no_overlapping
 
                     # Compute features with preprocessed and non-overlapping particles
+                    print('Compute features with preprocessed and non-overlapping particles')
                     input_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
                     output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
 
                     # Center subhalos positions respect to current halo, including overlapping subhalos
+                    print('Center subhalos positions respect to current halo, including overlapping subhalos')
                     subhalo_ctx.preprocess(halo, lbox)
 
                     # Store info for log purposes
