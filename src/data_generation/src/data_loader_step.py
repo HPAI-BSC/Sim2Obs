@@ -134,10 +134,11 @@ class DataLoader(PipelineStep):
             name = name.replace('/', '_')
             path = dataset_dir + f'/../logs/transition_radius/{name}_transition_radius_info_{halo.halo_id}.json'
             error_path = dataset_dir + f'/../logs/errors/{name}_error_{halo.halo_id}.json'
-
+            logger.debug(f'{path}')
             # Do the transition radius analysis iff the halo has not been processed before
             if not os.path.exists(path):
                 try:
+                    logger.debug('Instantiating feature processors')
                     feature_input_name, feature_output_name = self.cfg.feature_names
                     input_feature = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg)
                     output_feature = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg)
