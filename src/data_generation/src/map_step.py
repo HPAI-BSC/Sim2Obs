@@ -1,4 +1,5 @@
 import os
+import re
 from typing import List, Generator, Callable
 
 import numpy as np
@@ -335,6 +336,26 @@ class MapStep(PipelineStep):
         self._create_n_zooms(projection, rotation_axis, rotation_iteration, cosmos_data, input_feature, output_feature,
                              interlopers_mask)
 
+    def _is_halo_already_processed(self, feature, halo, cosmos_data):
+        feature_name = feature.name
+        file = f'halo_{halo.halo_id}_subhalo_{cosmos_data.subhalo_id}'
+
+        if self.map_configuration['rotation_angle'] is not None:
+            path = os.path.join(self.map_configuration['root_path'],
+                                f'rotation_{self.map_configuration["rotation_angle"]}_s{self.map_configuration["bin_spatial_resolution_scale"]}',
+                                feature_name)
+        else:
+            path = os.path.join(self.map_configuration['root_path'],
+                                f'no_rotation_s{self.map_configuration["bin_spatial_resolution_scale"]}',
+                                feature_name)
+
+        pattern = re.compile(re.escape(file) + ".*")  # escape special chars in string
+        print(pattern, path)
+        for filename in os.listdir(path):
+            if pattern.match(filename):  # match at the start of the filename
+                return True
+        return False
+
     def process(self, g: Generator, next_step: Callable[[Generator], Generator], **kwargs):
         """
         Main method to process projections for the given cosmos data, generating maps and processing them.
@@ -367,35 +388,39 @@ class MapStep(PipelineStep):
             logger.debug(f'Halo: {halo.halo_id}, {cosmos_data.halo.halo_id}')
             try:
                 if halo not in self.cfg.catalog.ignore_halos:
-                    # Compute number of bins and store it in the metadata
-                    fov = self.transition_radius * 2
-                    bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
+                    # Check if this halo has been processed already
+                    if not self._is_halo_already_processed(input_feature, halo, cosmos_data):
+                        # Compute number of bins and store it in the metadata
+                        fov = self.transition_radius * 2
+                        bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
 
-                    # Store num_bins
-                    cosmos_data.metadata['map']['bins'] = bins
-                    input_feature = cosmos_data.input_feature
-                    output_feature = cosmos_data.output_feature
-                    logger.debug(f'Number of bins: {bins}')
+                        # Store num_bins
+                        cosmos_data.metadata['map']['bins'] = bins
+                        input_feature = cosmos_data.input_feature
+                        output_feature = cosmos_data.output_feature
+                        logger.debug(f'Number of bins: {bins}')
 
-                    interlopers_id = self._get_interlopers_id(cosmos_data)
-                    io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
+                        interlopers_id = self._get_interlopers_id(cosmos_data)
+                        io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
 
-                    if self.dim == 2:
-                        projections = ["xy", "yz", "xz"]
-                        for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
-                            projection_name = projections[j]
-                            input_feature.map = map_f_i
-                            output_feature.map = map_f_o
-                            self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, rotation_axis,
-                                                     rotation_iteration, cosmos_data, input_feature, output_feature)
-                    elif self.dim == 3:
-                        pass
+                        if self.dim == 2:
+                            projections = ["xy", "yz", "xz"]
+                            for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
+                                projection_name = projections[j]
+                                input_feature.map = map_f_i
+                                output_feature.map = map_f_o
+                                self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, rotation_axis,
+                                                         rotation_iteration, cosmos_data, input_feature, output_feature)
+                        elif self.dim == 3:
+                            pass
 
-                    # Got to the next step
-                    if next_step is not None:
-                        yield from next_step([(halo, _, cosmos_data)], **kwargs)
+                        # Got to the next step
+                        if next_step is not None:
+                            yield from next_step([(halo, _, cosmos_data)], **kwargs)
+                        else:
+                            yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
                     else:
-                        yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
+                        logger.debug(f'Halo already processed: {cosmos_data.halo.halo_id}, skipping it.')
                 else:
                     logger.debug(f'Ignoring halo: {cosmos_data.halo.halo_id}')
             except Exception as e:
