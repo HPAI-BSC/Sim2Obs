@@ -144,6 +144,7 @@ class DataLoader(PipelineStep):
                     output_feature = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg)
                     print(input_feature, output_feature)
                     logger.debug('attach_models_to_features')
+                    print(models)
                     attach_models_to_features([input_feature, output_feature], models)
 
                     # Load particles for all the subhalos in that halo
