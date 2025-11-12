@@ -39,5 +39,8 @@ class LastStep:
         output_file = dataset_dir + f'/../logs/errors/errors_merged.csv'
         merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None)
         logger.info(f'Storing errors at: {output_file}')
+        df = pd.read_csv(output_file)
+        print(f'n = {len(df)}')
+        print(df['error'].value_counts())
 
 
