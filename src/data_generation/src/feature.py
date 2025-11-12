@@ -45,11 +45,9 @@ def load_model(path):
 
 
 def load_models(features):
-    print('load_models')
     models = {}
     for feature in features:
         feature_name = feature['name']
-        print(feature)
         if feature_name in MODELS:
             model_path = MODELS[feature_name]
             model = load_model(model_path)

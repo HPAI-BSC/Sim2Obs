@@ -301,7 +301,7 @@ class DataLoader(PipelineStep):
         transition_radius_compute = self.cfg.feature_names[1].get("transition_radius_compute", False)
 
         if transition_radius_compute:
-            yield from self.compute_transition_radius(g)
+            yield from self.compute_transition_radius(g, **kwargs)
         else:
             yield from self.execute_process(g, next_step, **kwargs)
 

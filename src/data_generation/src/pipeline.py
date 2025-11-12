@@ -108,7 +108,6 @@ class Pipeline:
 
         halo_context = data_loader.fetcher.get_halos()
         models = load_models(self.cfg.feature_names)
-        print(models)
 
         # Run the pipeline function
         result = list(pipeline_fn(input_gen, first_step_kwargs={'halo_context': halo_context, 'models': models,
