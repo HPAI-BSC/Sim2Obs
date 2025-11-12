@@ -409,7 +409,7 @@ class ICLProcessor(FeatureProcessor):
             logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
                          f'({round(normalized_transition_radius, 2)} % r200), r200: {halo.r200}')
         else:
-            logger.warning("No transition radius found; ICL never dominates.")
+            logger.error("No transition radius found; ICL never dominates.")
             transition_radius = None
 
         # To analyze cumsum profiles
