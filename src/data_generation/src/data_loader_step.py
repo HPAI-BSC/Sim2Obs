@@ -168,6 +168,9 @@ class DataLoader(PipelineStep):
                 logger.info(f"Finished processing halo {halo.halo_id}")
             else:
                 logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')
+        yield self.errors
+
+    # TODO add outliers removal
 
     def execute_process(self, g: List[Tuple], next_step: Optional[Callable[[List[Tuple]], Any]], **kwargs):
         """
