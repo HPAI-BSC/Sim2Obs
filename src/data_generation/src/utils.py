@@ -818,6 +818,25 @@ def store_obj(cfg, halo, subhalo_ctx, cosmos_data):
         pickle.dump(cosmos_data, f)
 
 
+def store_tr_obj(cfg, halo, subhalo_particles, icl_mask):
+    print(f'Storing oject for transition radius debugging for: {halo.halo_id}')
+    sim_code = cfg.catalog.path.split('/')[-1]
+    datasets_dir = cfg.paths.datasets_dir
+    name = cfg.catalog.name
+    path = datasets_dir + f'/../logs/halo_{name}_{sim_code}_{halo.halo_id}.pkl'
+    print(path)
+    with open(path, 'wb') as f:
+        pickle.dump(halo, f)
+
+    path = datasets_dir + f'/../logs/subhalo_particles_{name}_{sim_code}_{halo.halo_id}.pkl'
+    print(path)
+    with open(path, 'wb') as f:
+        pickle.dump(subhalo_particles, f)
+
+    path = datasets_dir + f'/../logs/icl_mask_{name}_{sim_code}_{halo.halo_id}.npy'
+    np.save(path, icl_mask)
+
+
 def merge_json_files_to_csv(input_dir, output_file, chunk_size=1000, length=None):
     """
     Efficiently merges many JSON files from a directory into one CSV.

@@ -58,7 +58,8 @@ def main(cfg: DictConfig) -> Any:
     starting_idx = None
     ending_idx = None
 
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[])
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[15075791, 7869072, 12698568,
+                                                                                       3423689])
 
 
 if __name__ == "__main__":

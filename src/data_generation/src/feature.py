@@ -13,7 +13,7 @@ from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
-from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles
+from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles, store_tr_obj
 
 logger = setup_logger("FeatureProcessor")
 
@@ -341,6 +341,7 @@ class ICLProcessor(FeatureProcessor):
             icl_mask[ids] = 1
         else:
             logger.warning('No particles predicted as ICL.')
+            store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
             raise ValueError("icl_mask is empty; no masking applied.")
 
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
@@ -370,6 +371,7 @@ class ICLProcessor(FeatureProcessor):
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
         logger.debug(f'Computing transition radius for: {halo.halo_id}')
+        store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
         distance = np.sqrt((particle_position ** 2).sum(axis=1))
@@ -424,7 +426,6 @@ class ICLProcessor(FeatureProcessor):
 
         # Build cumsum profiles
         plot_icl_bcg_profiles(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
-
 
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):
         """
