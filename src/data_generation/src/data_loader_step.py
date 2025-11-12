@@ -117,6 +117,7 @@ class DataLoader(PipelineStep):
             name = self.cfg.catalog.path.replace(dataset_dir, '')
             name = name.replace('/', '_')
             path = dataset_dir + f'/../logs/transition_radius/{name}_transition_radius_info_{halo.halo_id}.json'
+            error_path = dataset_dir + f'/../logs/errors/{name}_error_{halo.halo_id}.json'
 
             # Do the transition radius analysis iff the halo has not been processed before
             if not os.path.exists(path):
@@ -155,10 +156,9 @@ class DataLoader(PipelineStep):
                     with open(path, "w") as f:
                         json.dump(halo_dict, f, indent=4)
                 except Exception as e:
-                    path = dataset_dir + f'/../logs/errors/{name}_error_{halo.halo_id}.json'
                     logger.error(f"Error with {halo.halo_id}: {e}")
                     halo_dict = {'halo_id': halo.halo_id, 'error': str(e)}
-                    with open(path, "w") as f:
+                    with open(error_path, "w") as f:
                         json.dump(halo_dict, f, indent=4)
                     continue
 

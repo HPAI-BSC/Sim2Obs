@@ -35,21 +35,9 @@ class LastStep:
         print(df.describe())
 
         # Errors
-        # TODO check if it works
-        errors = input
-        name = self.cfg.catalog.path.replace(dataset_dir, '')
-        name = name.replace('/', '_')
-        path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.txt'
-        logger.info(f'Storing errors at: {path}')
-
-        with open(path, 'w') as f:
-            for item in errors:
-                if isinstance(item, list):
-                    for error in item:
-                        f.write(f"{error}\n")
-                else:
-                    f.write(f"{item}\n")
-
-
+        path = dataset_dir + f'/../logs/errors'
+        output_file = dataset_dir + f'/../logs/errors/errors_merged.csv'
+        merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None)
+        logger.info(f'Storing errors at: {output_file}')
 
 
