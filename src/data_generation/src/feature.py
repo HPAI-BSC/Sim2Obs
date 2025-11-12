@@ -32,20 +32,24 @@ MODELS = {
 
 
 def load_model(path):
+    print(path)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=ConvergenceWarning)
         warnings.simplefilter("ignore", category=DataConversionWarning)
         warnings.simplefilter("ignore", category=UserWarning)
 
         project_root = os.getenv('PROJECT_ROOT')
+        print('model_path', os.path.join(project_root, path))
         model = joblib.load(os.path.join(project_root, path))
     return model
 
 
 def load_models(features):
+    print('load_models')
     models = {}
     for feature in features:
         feature_name = feature['name']
+        print(feature)
         if feature_name in MODELS:
             model_path = MODELS[feature_name]
             model = load_model(model_path)
