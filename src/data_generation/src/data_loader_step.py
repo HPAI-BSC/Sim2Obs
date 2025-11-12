@@ -1,7 +1,6 @@
 import json
 import logging
 import traceback
-import seaborn as sns
 from typing import Tuple, List, Optional, Callable, Any
 import os
 
@@ -41,7 +40,7 @@ def filter_outliers_transition_radius(transition_radius_path):
         ignored_halos = set(df['halo_id']) - set(filtered_df['halo_id'])
         # print(ignored_halos)
 
-        sns.histplot(filtered_df["transition_radius"] / filtered_df['R200'], bins=100, kde=True)
+        plt.hist(filtered_df["transition_radius"] / filtered_df['R200'], bins=100)
         plt.title(f"Transition radius/R200 distribution, percentile: {percentile}")
         plt.show()
 
