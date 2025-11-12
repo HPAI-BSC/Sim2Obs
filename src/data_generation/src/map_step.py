@@ -389,7 +389,7 @@ class MapStep(PipelineStep):
             try:
                 if halo not in self.cfg.catalog.ignore_halos:
                     # Check if this halo has been processed already
-                    if not self._is_halo_already_processed(input_feature, halo, cosmos_data):
+                    if not self._is_halo_already_processed(cosmos_data.input_feature, halo, cosmos_data):
                         # Compute number of bins and store it in the metadata
                         fov = self.transition_radius * 2
                         bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
