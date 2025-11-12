@@ -1,10 +1,13 @@
 import json
 import logging
 import traceback
+import seaborn as sns
 from typing import Tuple, List, Optional, Callable, Any
 import os
 
 import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
 from scipy.spatial import cKDTree
 
 from src.data_generation.src.cosmos import CosmosData
@@ -20,6 +23,27 @@ from src.data_generation.src.utils import setup_logger, store_obj
 logger = setup_logger("DataLoader-step")
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+
+def filter_outliers_transition_radius(transition_radius_path):
+    df = pd.read_csv(transition_radius_path)
+    transition_radius = df['transition_radius']
+    print(transition_radius.describe())
+
+    percentiles = [99, 98, 97, 96, 95]
+
+    for percentile in percentiles:
+        upper_bound = np.percentile(transition_radius, percentile)
+        lower_bound = 100 - upper_bound
+        filtered_df = df[(transition_radius >= lower_bound) & (transition_radius <= upper_bound)]
+        print(
+            f'Percentile: {percentile}, transition radius [kpc]: {upper_bound}, final size: {len(filtered_df)}, Ignored halos: {len(df) - len(filtered_df)}')
+        ignored_halos = set(df['halo_id']) - set(filtered_df['halo_id'])
+        # print(ignored_halos)
+
+        sns.histplot(filtered_df["transition_radius"] / filtered_df['R200'], bins=100, kde=True)
+        plt.title(f"Transition radius/R200 distribution, percentile: {percentile}")
+        plt.show()
 
 
 class DataLoader(PipelineStep):
@@ -169,8 +193,6 @@ class DataLoader(PipelineStep):
             else:
                 logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')
         yield self.errors
-
-    # TODO add outliers removal
 
     def execute_process(self, g: List[Tuple], next_step: Optional[Callable[[List[Tuple]], Any]], **kwargs):
         """

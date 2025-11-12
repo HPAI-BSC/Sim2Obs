@@ -23,24 +23,27 @@ class LastStep:
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
 
-        # Transition radius analysis
-        dataset_dir = self.cfg.paths.datasets_dir
-        path = dataset_dir + f'/../logs/transition_radius'
-        output_file = dataset_dir + f'/../logs/transition_radius/merged.csv'
-        merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None)
+        transition_radius_compute = self.cfg.feature_names[1].get("transition_radius_compute", False)
 
-        df = pd.read_csv(output_file)
-        df['transition_radius/R200'] = df['transition_radius'] / df['R200']
-        print(f'n = {len(df)}')
-        print(df.describe())
+        if transition_radius_compute:
+            # Transition radius analysis
+            dataset_dir = self.cfg.paths.datasets_dir
+            path = dataset_dir + f'/../logs/transition_radius'
+            output_file = dataset_dir + f'/../logs/transition_radius/merged.csv'
+            merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None)
 
-        # Errors
-        path = dataset_dir + f'/../logs/errors'
-        output_file = dataset_dir + f'/../logs/errors/errors_merged.csv'
-        merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None)
-        logger.info(f'Storing errors at: {output_file}')
-        df = pd.read_csv(output_file)
-        print(f'n = {len(df)}')
-        print(df['error'].value_counts())
+            df = pd.read_csv(output_file)
+            df['transition_radius/R200'] = df['transition_radius'] / df['R200']
+            print(f'n = {len(df)}')
+            print(df.describe())
+
+            # Errors
+            path = dataset_dir + f'/../logs/errors'
+            output_file = dataset_dir + f'/../logs/errors/errors_merged.csv'
+            merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None)
+            logger.info(f'Storing errors at: {output_file}')
+            df = pd.read_csv(output_file)
+            print(f'n = {len(df)}')
+            print(df['error'].value_counts())
 
 
