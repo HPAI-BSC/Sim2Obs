@@ -41,6 +41,7 @@ class TestFeature(unittest.TestCase):
             self.cfg_eagle = compose(config_name="data_generation.yaml")
             self.cfg_millenium = compose(config_name="data_generation.yaml")
             self.cfg_flamingo = compose(config_name="data_generation.yaml")
+            self.cfg_tng_cluster = compose(config_name="data_generation.yaml")
 
             # Load the local config for paths and assign them
             local_config = compose(config_name="paths/local.yaml")
@@ -48,6 +49,7 @@ class TestFeature(unittest.TestCase):
             self.cfg_eagle.paths = local_config.paths
             self.cfg_millenium.paths = local_config.paths
             self.cfg_flamingo.paths = local_config.paths
+            self.cfg_tng_cluster.paths = local_config.paths
 
             # Dynamic catalog loading for both Illustris and Eagle
             self.cfg_illustris.catalog = compose("catalog/illustris300.yaml")['catalog']
@@ -63,6 +65,9 @@ class TestFeature(unittest.TestCase):
             self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
             self.cfg_flamingo.catalog.path = '../../../local/data/datasets/flamingo/L1000N0900'
 
+            self.cfg_tng_cluster.catalog = compose("catalog/tngcluster.yaml")['catalog']
+            self.cfg_tng_cluster.catalog.path = '../../../local/data/datasets/' # not used
+
         os.environ['PROJECT_ROOT'] = '../../..'
         required_keys = ['G']
         data_loader_dict = next((step for step in self.cfg_eagle.pipeline if step.name == 'data_loader'), None)
@@ -71,6 +76,7 @@ class TestFeature(unittest.TestCase):
         self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
         self.fetcher_millenium = DataFetcherFactory.get_data_fetcher(self.cfg_millenium.catalog, **attr_dict)
         self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
+        self.fetcher_tng_cluster = DataFetcherFactory.get_data_fetcher(self.cfg_tng_cluster.catalog, **attr_dict)
 
         model_path = 'src/data_generation/model/Best_Model-Random-3par.pkl'
         project_root = os.getenv('PROJECT_ROOT')
@@ -86,6 +92,10 @@ class TestFeature(unittest.TestCase):
         self.input_feature_millenium = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg_millenium)
         self.output_feature_millenium = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg_millenium)
         self.output_feature_millenium.model = joblib.load(os.path.join(project_root, model_path))
+
+        self.input_feature_tng_cluster = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg_tng_cluster)
+        self.output_feature_tng_cluster = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg_tng_cluster)
+        self.output_feature_tng_cluster.model = joblib.load(os.path.join(project_root, model_path))
 
     @patch('src.data_generation.src.halo.Halo')
     @patch('src.data_generation.src.subhalo.SubhaloParticles')
@@ -249,6 +259,68 @@ class TestFeature(unittest.TestCase):
         z = subhalo_particles.star_p[:, 2]
 
         plot_particles(x, y, z, halo_center=[0, 0, 0])
+
+    def test_icl_never_dominates(self):
+        def plot_particles(x, y, z, halo_center):
+            # Create a 3D scatter plot
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+
+            # Plot all the particles
+            ax.scatter(x, y, z, c='r', marker='o')  # Particles in red
+
+            # Plot the halo center with a different color (e.g., blue) and a larger marker
+            ax.scatter(halo_center[0], halo_center[1], halo_center[2], c='b', marker='*',
+                       s=100)  # Halo center in blue, larger marker
+
+            # Add labels for clarity
+            ax.set_xlabel('X Label')
+            ax.set_ylabel('Y Label')
+            ax.set_zlabel('Z Label')
+            plt.show()
+
+        halo_id = 7869072
+        path = f'data/tng_cluster/halo_illustris-300_tng_cluster_{halo_id}.pkl'
+        # Load the pickle file
+        with open(path, "rb") as f:
+            halo = pickle.load(f)
+
+        path = f'data/tng_cluster/subhalo_particles_illustris-300_tng_cluster_{halo_id}.pkl'
+        with open(path, "rb") as f:
+            subhalo_particles = pickle.load(f)
+
+        path = f'data/tng_cluster/icl_mask_illustris-300_tng_cluster_{halo_id}.npy'
+        icl_mask = np.load(path)
+
+        try:
+            self.output_feature_tng_cluster._compute_transition_radius(halo, subhalo_particles, icl_mask)
+            print(self.output_feature_tng_cluster.transition_radius)
+        except Exception as e:
+            print(e)
+
+        # Extract x, y, z coordinates
+        x = subhalo_particles.star_p[:, 0]
+        y = subhalo_particles.star_p[:, 1]
+        z = subhalo_particles.star_p[:, 2]
+
+        plot_particles(x, y, z, halo_center=[0, 0, 0])
+
+    def test_icl_mask_empty(self):
+        halo_id = 3423689
+        path = f'data/tng_cluster/halo_illustris-300_tng_cluster_{halo_id}.pkl'
+        # Load the pickle file
+        with open(path, "rb") as f:
+            halo = pickle.load(f)
+
+        path = f'data/tng_cluster/subhalo_particles_illustris-300_tng_cluster_{halo_id}.pkl'
+        with open(path, "rb") as f:
+            subhalo_particles = pickle.load(f)
+
+        path = f'data/tng_cluster/icl_mask_illustris-300_tng_cluster_{halo_id}.npy'
+        icl_mask = np.load(path)
+
+        self.output_feature_tng_cluster.process(halo, subhalo_particles)
+        _ = self.output_feature_illustris.value
 
     def test_generate_maps_halo_0(self):
         halo_id = 0

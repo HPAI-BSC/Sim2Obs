@@ -13,7 +13,8 @@ from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
-from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles, store_tr_obj
+from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles, store_tr_obj, \
+    plot_icl_bcg_profiles_conflictive
 
 logger = setup_logger("FeatureProcessor")
 
@@ -397,6 +398,10 @@ class ICLProcessor(FeatureProcessor):
         # Identify transition radius where ICL surpasses BCG
         transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
 
+        # To analyze cumsum profiles
+        r_by_r200 = sorted_distances #/ halo.r200
+        self.log_r = np.log10(r_by_r200)
+
         max_pos = -1
         if len(transition_index) > 0:
             max_diff = -1
@@ -413,12 +418,10 @@ class ICLProcessor(FeatureProcessor):
             logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
                          f'({round(normalized_transition_radius, 2)} % r200), r200: {halo.r200}')
         else:
+            plot_icl_bcg_profiles_conflictive(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, halo.halo_id)
             logger.error('No transition radius found; ICL never dominates.')
             raise Exception('No transition radius found; ICL never dominates.')
 
-        # To analyze cumsum profiles
-        r_by_r200 = sorted_distances #/ halo.r200
-        self.log_r = np.log10(r_by_r200)
         self.icl_cumulative = icl_cumulative
         self.bcg_cumulative = bcg_cumulative
         self.tr_index = transition_index[max_pos]

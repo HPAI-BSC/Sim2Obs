@@ -577,6 +577,52 @@ def plot_icl_bcg_profiles(cfg, icl_cumulative, bcg_cumulative, r_by_r200, t_idx,
     #plt.show()
 
 
+def plot_icl_bcg_profiles_conflictive(cfg, icl_cumulative, bcg_cumulative, r_by_r200, halo_id):
+    """
+    Plots and saves the cumulative mass profiles of ICL and BCG components for a given halo.
+
+    Parameters:
+    ----------
+    cfg : object
+        Configuration object containing the path information, particularly:
+        - cfg.paths.datasets_dir : str, base directory path to datasets.
+
+    icl_cumulative : array-like
+        Cumulative mass profile of the intracluster light (ICL) component.
+
+    bcg_cumulative : array-like
+        Cumulative mass profile of the brightest cluster galaxy (BCG) component.
+
+    r_by_r200 : array-like
+        Radii normalized by r200, corresponding to the mass profiles.
+
+    halo_id : int or str
+        Identifier of the halo being analyzed (used in the plot title and filename).
+
+    Returns:
+    -------
+    None
+        The function saves the plot as a PNG file in the logs directory and displays it.
+    """
+    dataset_dir = cfg.paths.datasets_dir
+
+    # Plotting
+    plt.figure(figsize=(8, 5))
+    plt.plot(r_by_r200, icl_cumulative, label='ICL Cumulative Mass', color='orange')
+    plt.plot(r_by_r200, bcg_cumulative, label='BCG Cumulative Mass', color='blue')
+    plt.xlabel('r / r200')
+    plt.ylabel('Cumulative Mass (M☉)')
+    plt.title(f'Cumulative Mass Profiles for Halo {halo_id}')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    name = cfg.catalog.path.replace(dataset_dir, '').replace('/', '_')
+    path = dataset_dir + f'/../logs/{name}_cumsum_{halo_id}_error.png'
+    plt.savefig(path, dpi=300)
+    plt.show()
+
+
 def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spatial_resolution_scale: float,
                              input_feature_name: str, output_feature_name: str):
     """
