@@ -555,8 +555,7 @@ def plot_hist(df, attribute, title, bins, log=False):
     plt.tight_layout()
     #plt.show()
 
-    name = cfg.catalog.path.replace(dataset_dir, '')
-    name = name.replace('/', '_')
+    name = 'tng_cluster'
     path = dataset_dir + f'/../logs/{name}_{attribute}_histogram.png'
     plt.savefig(path, dpi=300)
 
