@@ -1,4 +1,6 @@
+import os.path
 import pickle
+import shutil
 
 import joblib
 import numpy as np
@@ -51,6 +53,9 @@ class LastStep:
             name = name.replace('/', '_')
             path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.txt'
             logger.info(f'Storing errors at: {path}')
+
+            if os.path.exists(path):
+                shutil.rmtree(path)
 
             with open(path, 'w') as f:
                 for item in errors:
