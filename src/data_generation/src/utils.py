@@ -522,6 +522,45 @@ def plot_transition_radius(cfg, transition_radius_list, log_normalization=True):
     plt.savefig(path, dpi=300)
 
 
+def plot_hist(df, attribute, title, bins, log=False):
+    """
+       Plots a histogram of the 'm200' column from a DataFrame.
+
+       Parameters
+       ----------
+       df : pandas.DataFrame
+           DataFrame containing the halos attributes.
+       bins : int or sequence, optional
+           Number of bins or specific bin edges (default: 30).
+       log : bool, optional
+           If True, use a logarithmic scale on the x-axis (default: False).
+       title : str, optional
+           Title of the plot.
+       """
+    if attribute not in df:
+        raise Exception()
+
+    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets'
+    # Plotting
+    plt.figure(figsize=(8, 5))
+    plt.hist(df[attribute].dropna(), bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+
+    if log:
+        plt.xscale('log')
+
+    plt.xlabel(attribute)
+    plt.ylabel("Count")
+    plt.title(title)
+    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.tight_layout()
+    #plt.show()
+
+    name = cfg.catalog.path.replace(dataset_dir, '')
+    name = name.replace('/', '_')
+    path = dataset_dir + f'/../logs/{name}_{attribute}_histogram.png'
+    plt.savefig(path, dpi=300)
+
+
 def plot_icl_bcg_profiles(cfg, icl_cumulative, bcg_cumulative, r_by_r200, t_idx, halo_id):
     """
     Plots and saves the cumulative mass profiles of ICL and BCG components for a given halo.

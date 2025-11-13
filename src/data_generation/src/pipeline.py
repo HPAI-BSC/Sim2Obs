@@ -9,7 +9,7 @@ from src.data_generation.src.data_loader_step import DataLoader
 from src.data_generation.src.feature import load_models
 from src.data_generation.src.last_step import LastStep
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.utils import setup_logger
+from src.data_generation.src.utils import setup_logger, plot_hist
 
 logger = setup_logger("Pipeline")
 
@@ -32,6 +32,10 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
 
     halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
+
+    # DEBUG
+    plot_hist(df=halo_context.data, attribute='m200', title='TNG-Cluster M200 distribution', bins=100)
+    #----
 
     if n is not None:
         halo_subhalo_list = halo_subhalo_list[:n]

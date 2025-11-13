@@ -219,6 +219,8 @@ class DataLoader(PipelineStep):
             logger.info('-------------------------------------------------------------------------------------')
             logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
             logger.info('-------------------------------------------------------------------------------------')
+            # TODO this is apparently not filtering
+            break
             if halo not in self.cfg.catalog.ignore_halos:
                 try:
                     feature_input_name, feature_output_name = self.cfg.feature_names
