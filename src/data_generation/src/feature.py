@@ -96,7 +96,7 @@ class FeatureProcessor(ABC):
 
     # TODO update
     @abstractmethod
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple, muse_filter: bool) -> tuple:
         """
         Generate a 2D map for the feature based on particle positions.
 
@@ -132,6 +132,9 @@ class FeatureProcessor(ABC):
         Returns:
             np.ndarray: An empty or default value for the feature.
         """
+        pass
+
+    def _apply_muse_filter(self):
         pass
 
 
@@ -455,7 +458,7 @@ class ICLProcessor(FeatureProcessor):
             elif self.cfg.catalog.get('transition_radius', None) is None:
                 logger.warning('Warning, you must define a transition radius for generating the maps')
 
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple, muse_filter: bool) -> tuple:
         """
         Generate a 2D map of particle feature data using binned statistics.
 
@@ -508,6 +511,8 @@ class ICLProcessor(FeatureProcessor):
             print(f"Number of bins with data: {non_nan_bins}")
 
             output_ij[np.isnan(output_ij)] = 0
+
+            # TODO call filter
             return output_ij, binx, biny
         else:
             # TODO

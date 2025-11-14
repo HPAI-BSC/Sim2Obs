@@ -21,6 +21,8 @@ class MapStep(PipelineStep):
         self.map_configuration = self._build_map_configuration(cfg)
 
         self.transition_radius = cfg.catalog.get('transition_radius', None)
+        # TODO review
+        self.simulate_muse = cfg.feature_names[1].get('simulate_muse', None)
         self.cfg = cfg
 
         # Compute bins and radius
