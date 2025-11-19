@@ -235,23 +235,39 @@ class FeatureProcessor(ABC):
         xedges = np.linspace(xrange[0], xrange[1], nx+1)
         yedges = np.linspace(yrange[0], yrange[1], ny+1)
 
+        print('zzz')
+
         # Initialize 2D array of lists
         bin_features = np.empty((ny, nx), dtype=object)
         for i in range(ny):
             for j in range(nx):
                 bin_features[i,j] = []
 
+        print('zzzz')
+
         # Digitize particle positions
         ix = np.digitize(pos_x, xedges) - 1
         iy = np.digitize(pos_y, yedges) - 1
+
+        print('zzzzz')
 
         # Mask particles outside the range
         mask = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
         ix = ix[mask]; iy = iy[mask]; f = feature[mask]
 
+        """
         # Assign features to bins
         for x_idx, y_idx, val in zip(ix, iy, f):
             bin_features[y_idx, x_idx].append(val)
+        """
+        print('yy')
+        indices = np.column_stack([iy, ix])
+        unique_bins, inverse = np.unique(indices, axis=0, return_inverse=True)
+
+        for bin_idx, (y_idx, x_idx) in enumerate(unique_bins):
+            if bin_idx % 500000 == 0:
+                print(f"Processed {bin_idx}/{len(ix)} particles")
+            bin_features[y_idx, x_idx] = f[inverse == bin_idx].tolist()
 
         print(bin_features.shape, xedges, yedges)
         return (bin_features, xedges, yedges)
