@@ -291,7 +291,12 @@ class DataLoader(PipelineStep):
         Tuple
             A tuple containing the input feature, output feature, and cosmos data after processing.
         """
-        transition_radius_compute = self.cfg.feature_names[1].get("transition_radius_compute", False)
+        if len(self.cfg.feature_names) > 1:
+            transition_radius_compute = self.cfg.feature_names[1].get(
+                "transition_radius_compute", False
+            )
+        else:
+            transition_radius_compute = False
 
         if transition_radius_compute:
             yield from self.compute_transition_radius(g, **kwargs)
