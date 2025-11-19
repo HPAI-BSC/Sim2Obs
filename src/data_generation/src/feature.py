@@ -193,6 +193,59 @@ class FeatureProcessor(ABC):
 
         return output_ij, binx, biny
 
+    def _bin_particles_2d(self, pos_x, pos_y, feature, bins, xrange, yrange):
+        """
+        Bin particle data in 2D **without collapsing statistics**.
+
+        Parameters
+        ----------
+        pos_x, pos_y : array-like, shape (N,)
+            Particle positions in two axes.
+        feature : array-like, shape (N,)
+            Particle values to store (e.g., LOS velocities)
+        bins : int or tuple
+            Number of bins in x and y (int or (nx, ny))
+        xrange, yrange : 2-element lists
+            Min/max of each axis
+
+        Returns
+        -------
+        bin_features : 2D array of lists, shape (ny, nx)
+            Each entry is a list of particle feature values in that bin.
+        xedges, yedges : bin edges
+        """
+        pos_x = np.asarray(pos_x)
+        pos_y = np.asarray(pos_y)
+        feature = np.asarray(feature)
+
+        if isinstance(bins, int):
+            nx = ny = bins
+        else:
+            nx, ny = bins
+
+        xedges = np.linspace(xrange[0], xrange[1], nx+1)
+        yedges = np.linspace(yrange[0], yrange[1], ny+1)
+
+        # Initialize 2D array of lists
+        bin_features = np.empty((ny, nx), dtype=object)
+        for i in range(ny):
+            for j in range(nx):
+                bin_features[i,j] = []
+
+        # Digitize particle positions
+        ix = np.digitize(pos_x, xedges) - 1
+        iy = np.digitize(pos_y, yedges) - 1
+
+        # Mask particles outside the range
+        mask = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
+        ix = ix[mask]; iy = iy[mask]; f = feature[mask]
+
+        # Assign features to bins
+        for x_idx, y_idx, val in zip(ix, iy, f):
+            bin_features[y_idx, x_idx].append(val)
+
+        return bin_features, xedges, yedges
+
 
 class VelocityDispersionProcessor(FeatureProcessor):
     """
@@ -236,7 +289,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
         logger.info(f'Computed velocity dispersion for {len(subhalo_particles.star_v)} particles.')
         self.value = subhalo_particles.star_v
 
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple, muse_filter: bool) -> tuple:
         """
         Generate a 2D map of processed particle features using binned statistics.
 
@@ -280,15 +333,28 @@ class VelocityDispersionProcessor(FeatureProcessor):
             missing_component = components - set(axis)
             k = next(iter(missing_component))
 
-            input_ij, binx, biny, _ = stats.binned_statistic_2d(
-                pos_rot[:, i], pos_rot[:, j],
-                (feature[:, k]) ** 2,  # Access the relevant feature
-                statistic="mean", bins=bins, range=ranging
-            )
-            input_ij = np.sqrt(input_ij / 3)
-            input_ij[np.isnan(input_ij)] = 0
-            logger.debug(f"Shapes: input_ij={input_ij.shape}, binx={binx.shape}, biny={biny.shape}")
-            return input_ij, binx, biny
+            if muse_filter:
+                input_ij, binx, biny = self._apply_muse_filter(
+                    pos_rot[:, i], pos_rot[:, j],
+                    feature=(feature[:, k]) ** 2,  # Access the relevant feature,
+                    bins=bins,
+                    range=ranging
+                )
+                input_ij = np.sqrt(input_ij / 3)
+                input_ij[np.isnan(input_ij)] = 0
+                logger.debug(f"MUSE -- Shapes: input_ij={input_ij.shape}, binx={binx.shape}, biny={biny.shape}")
+                return input_ij, binx, biny
+
+            else:
+                input_ij, binx, biny, _ = stats.binned_statistic_2d(
+                    pos_rot[:, i], pos_rot[:, j],
+                    (feature[:, k]) ** 2,  # Access the relevant feature
+                    statistic="mean", bins=bins, range=ranging
+                )
+                input_ij = np.sqrt(input_ij / 3)
+                input_ij[np.isnan(input_ij)] = 0
+                logger.debug(f"Shapes: input_ij={input_ij.shape}, binx={binx.shape}, biny={biny.shape}")
+                return input_ij, binx, biny
         else:
             # 3D
             pass
@@ -514,7 +580,7 @@ class ICLProcessor(FeatureProcessor):
             elif self.cfg.catalog.get('transition_radius', None) is None:
                 logger.warning('Warning, you must define a transition radius for generating the maps')
 
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple, muse_filter: bool) -> tuple:
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
         Generate a 2D map of particle feature data using binned statistics.
 
@@ -559,29 +625,15 @@ class ICLProcessor(FeatureProcessor):
             print("Range of pos_rot[:, i]:", np.min(pos_rot[:, i]), np.max(pos_rot[:, i]))
             print("Range of pos_rot[:, j]:", np.min(pos_rot[:, j]), np.max(pos_rot[:, j]))
 
-            if muse_filter:
-                output_ij, binx, biny = self._apply_muse_filter(
-                    pos_rot[:, i], pos_rot[:, j],
-                    feature=feature,
-                    bins=bins,
-                    range=ranging
-                )
-                return output_ij, binx, biny
-
-            else:
-                output_ij, binx, biny, _ = stats.binned_statistic_2d(
-                    pos_rot[:, i], pos_rot[:, j],
-                    feature,  # Access the ICL feature data
-                    statistic="mean", bins=bins, range=ranging
-                )
+            output_ij, binx, biny, _ = stats.binned_statistic_2d(
+                pos_rot[:, i], pos_rot[:, j],
+                feature,  # Access the ICL feature data
+                statistic="mean", bins=bins, range=ranging
+            )
             non_nan_bins = np.count_nonzero(~np.isnan(output_ij))
             print(f"Number of bins with data: {non_nan_bins}")
 
             output_ij[np.isnan(output_ij)] = 0
-
-            # ToDO: finish filter
-            if muse_filter:
-                output_ij = self._apply_muse_filter(output_ij)
 
             return output_ij, binx, biny
         else:
@@ -591,59 +643,6 @@ class ICLProcessor(FeatureProcessor):
                                                                              bins=bins, range=ranging)
             statistic_ijk[np.isnan(statistic_ijk)] = 0
             return statistic_ijk, bin_edges, bin_number
-
-    def _bin_particles_2d(self, pos_x, pos_y, feature, bins, xrange, yrange):
-        """
-        Bin particle data in 2D **without collapsing statistics**.
-
-        Parameters
-        ----------
-        pos_x, pos_y : array-like, shape (N,)
-            Particle positions in two axes.
-        feature : array-like, shape (N,)
-            Particle values to store (e.g., LOS velocities)
-        bins : int or tuple
-            Number of bins in x and y (int or (nx, ny))
-        xrange, yrange : 2-element lists
-            Min/max of each axis
-
-        Returns
-        -------
-        bin_features : 2D array of lists, shape (ny, nx)
-            Each entry is a list of particle feature values in that bin.
-        xedges, yedges : bin edges
-        """
-        pos_x = np.asarray(pos_x)
-        pos_y = np.asarray(pos_y)
-        feature = np.asarray(feature)
-
-        if isinstance(bins, int):
-            nx = ny = bins
-        else:
-            nx, ny = bins
-
-        xedges = np.linspace(xrange[0], xrange[1], nx+1)
-        yedges = np.linspace(yrange[0], yrange[1], ny+1)
-
-        # Initialize 2D array of lists
-        bin_features = np.empty((ny, nx), dtype=object)
-        for i in range(ny):
-            for j in range(nx):
-                bin_features[i,j] = []
-
-        # Digitize particle positions
-        ix = np.digitize(pos_x, xedges) - 1
-        iy = np.digitize(pos_y, yedges) - 1
-
-        # Mask particles outside the range
-        mask = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
-        ix = ix[mask]; iy = iy[mask]; f = feature[mask]
-
-        # Assign features to bins
-        for x_idx, y_idx, val in zip(ix, iy, f):
-            bin_features[y_idx, x_idx].append(val)
-
-        return bin_features, xedges, yedges
 
     @classmethod
     def get_empty(cls) -> np.ndarray:
