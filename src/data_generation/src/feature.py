@@ -235,6 +235,19 @@ class FeatureProcessor(ABC):
         xedges = np.linspace(xrange[0], xrange[1], nx+1)
         yedges = np.linspace(yrange[0], yrange[1], ny+1)
 
+        print(f"xrange[0] type: {type(xrange[0])}, value: {xrange[0]}")
+        print(f"xrange[1] type: {type(xrange[1])}, value: {xrange[1]}")
+        print(f"xedges shape: {xedges.shape}, ndim: {xedges.ndim}")
+        print(f"xedges: {xedges}")
+
+        x_min = np.asarray(xrange[0]).item()
+        x_max = np.asarray(xrange[1]).item()
+        xedges = np.linspace(x_min, x_max, nx + 1)
+
+        # xedges should be 1D
+        if xedges.ndim != 1:
+            print(f"ERROR: xedges is {xedges.ndim}D instead of 1D!")
+
         print('zzz')
 
         # Initialize 2D array of lists
@@ -244,6 +257,13 @@ class FeatureProcessor(ABC):
                 bin_features[i,j] = []
 
         print('zzzz')
+
+        print(f"pos_x dtype: {pos_x.dtype}, shape: {pos_x.shape}")
+        print(f"pos_y dtype: {pos_y.dtype}, shape: {pos_y.shape}")
+        print(f"xedges dtype: {xedges.dtype}, shape: {xedges.shape}, values: {xedges}")
+        print(f"yedges dtype: {yedges.dtype}, shape: {yedges.shape}, values: {yedges}")
+        print(f"xrange: {xrange}, yrange: {yrange}")
+        print(f"bins: {bins}, nx: {nx}, ny: {ny}")
 
         # Digitize particle positions
         ix = np.digitize(pos_x, xedges) - 1
