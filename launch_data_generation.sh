@@ -7,7 +7,7 @@
 #SBATCH -e slurm_output/err.txt       # Name of stderr output file(%j expands to jobId)
 #SBATCH -n 1
 #SBATCH -c 32               # Cores per task requested
-#SBATCH -t 24:00:00         # Run time (hh:mm:ss)
+#SBATCH -t 00:05:00         # Run time (hh:mm:ss)
 #SBATCH --account bsc70
 #SBATCH --qos=gp_bsccs
 

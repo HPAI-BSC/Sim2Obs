@@ -14,7 +14,7 @@ from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles, store_tr_obj, \
-    plot_icl_bcg_profiles_conflictive
+    plot_icl_bcg_profiles_conflictive, convolve_and_pixelize_from_bins_1d
 
 logger = setup_logger("FeatureProcessor")
 
@@ -134,8 +134,64 @@ class FeatureProcessor(ABC):
         """
         pass
 
-    def _apply_muse_filter(self):
-        pass
+    def _apply_muse_filter(self, pos_rot_i, pos_rot_j, feature, bins, range, final_aggr='std', sigma=0.0):
+        """
+        This simulates alterations in telescope imaging to produce realistic maps.
+
+        - Create the maps, similarly to what we have done so far, but at higher resolution. This means that we should
+        probably refine the binning, maybe that we have a bin of side x2 the softening length (done in generate_map).
+        - Apply a Gaussian Kernel to each bin to mimic an instrument effect called Line Spread Function. What this does
+        is to increase the size of the distribution in the bin. The kernel size has an approximated sigma that I can pass
+        to you.
+        - Apply pixelization: meaning decrease the number of bins with the number of bins measured by the instrument.
+        This would mean, reapplying the binning to what we are already doing.
+        - Fit a Gaussian to each bin to get the velocity dispersion (i.e. the standard deviation) as we are already doing.
+        """
+        # We need higher resolution to apply muse filter
+        bins = 2 * bins
+
+        # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
+        bin_features, binx, biny = self._bin_particles_2d(
+            pos_rot_i, pos_rot_j,  # positions
+            feature,  # Velocity
+            bins=bins,
+            xrange=range,
+            yrange=range
+        )
+
+        print(bin_features.shape)
+
+        output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
+
+        # Now we apply per-bin 1d gaussian kernel (Line Spread Function)
+        for i in range(bin_features.shape[0]):
+            for j in range(bin_features.shape[1]):
+                velocities = bin_features[i, j]
+                if len(velocities) == 0:
+                    # No particles in bin
+                    #map_mean[i, j] = 0
+                    #map_std[i, j] = 0
+                    #map_pix[i, j] = 0
+                    output_ij[i, j] = 0
+                    continue
+
+                # Apply your 1D convolution / pixelization function
+                F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
+                    np.array(velocities),
+                    stat_mode="std",  # Std since we are handling velocities
+                    FWHM=2.5,  # ToDo: Adjust to MUSE
+                    ksize=None,  # kernel size, or let function compute
+                    bin_factor=2,  # rebin spectral dimension if desired
+                    agg_pixel="mean"  # aggregation method for rebin
+                )
+
+                print(F_intr.shape, F_conv.shape, F_pix.shape)
+                if final_aggr == "std":
+                    output_ij[i, j] = np.std(F_pix)
+                else:
+                    output_ij[i, j] = np.mean(F_pix)
+
+        return output_ij, binx, biny
 
 
 class VelocityDispersionProcessor(FeatureProcessor):
@@ -474,6 +530,7 @@ class ICLProcessor(FeatureProcessor):
                 e.g., ((xmin, xmax), (ymin, ymax)).
             axis (tuple): A tuple of two integers indicating which axes to use for the 2D grid
                 (e.g., (0, 1) for x and y).
+            muse_filter (bool): Whether to apply muse filter for realistic maps. If true, number of bins duplicated
 
         Returns:
             tuple: A tuple containing:
@@ -502,17 +559,30 @@ class ICLProcessor(FeatureProcessor):
             print("Range of pos_rot[:, i]:", np.min(pos_rot[:, i]), np.max(pos_rot[:, i]))
             print("Range of pos_rot[:, j]:", np.min(pos_rot[:, j]), np.max(pos_rot[:, j]))
 
-            output_ij, binx, biny, _ = stats.binned_statistic_2d(
-                pos_rot[:, i], pos_rot[:, j],
-                feature,  # Access the ICL feature data
-                statistic="mean", bins=bins, range=ranging
-            )
+            if muse_filter:
+                output_ij, binx, biny = self._apply_muse_filter(
+                    pos_rot[:, i], pos_rot[:, j],
+                    feature=feature,
+                    bins=bins,
+                    range=ranging
+                )
+                return output_ij, binx, biny
+
+            else:
+                output_ij, binx, biny, _ = stats.binned_statistic_2d(
+                    pos_rot[:, i], pos_rot[:, j],
+                    feature,  # Access the ICL feature data
+                    statistic="mean", bins=bins, range=ranging
+                )
             non_nan_bins = np.count_nonzero(~np.isnan(output_ij))
             print(f"Number of bins with data: {non_nan_bins}")
 
             output_ij[np.isnan(output_ij)] = 0
 
-            # TODO call filter
+            # ToDO: finish filter
+            if muse_filter:
+                output_ij = self._apply_muse_filter(output_ij)
+
             return output_ij, binx, biny
         else:
             # TODO
@@ -521,6 +591,59 @@ class ICLProcessor(FeatureProcessor):
                                                                              bins=bins, range=ranging)
             statistic_ijk[np.isnan(statistic_ijk)] = 0
             return statistic_ijk, bin_edges, bin_number
+
+    def _bin_particles_2d(self, pos_x, pos_y, feature, bins, xrange, yrange):
+        """
+        Bin particle data in 2D **without collapsing statistics**.
+
+        Parameters
+        ----------
+        pos_x, pos_y : array-like, shape (N,)
+            Particle positions in two axes.
+        feature : array-like, shape (N,)
+            Particle values to store (e.g., LOS velocities)
+        bins : int or tuple
+            Number of bins in x and y (int or (nx, ny))
+        xrange, yrange : 2-element lists
+            Min/max of each axis
+
+        Returns
+        -------
+        bin_features : 2D array of lists, shape (ny, nx)
+            Each entry is a list of particle feature values in that bin.
+        xedges, yedges : bin edges
+        """
+        pos_x = np.asarray(pos_x)
+        pos_y = np.asarray(pos_y)
+        feature = np.asarray(feature)
+
+        if isinstance(bins, int):
+            nx = ny = bins
+        else:
+            nx, ny = bins
+
+        xedges = np.linspace(xrange[0], xrange[1], nx+1)
+        yedges = np.linspace(yrange[0], yrange[1], ny+1)
+
+        # Initialize 2D array of lists
+        bin_features = np.empty((ny, nx), dtype=object)
+        for i in range(ny):
+            for j in range(nx):
+                bin_features[i,j] = []
+
+        # Digitize particle positions
+        ix = np.digitize(pos_x, xedges) - 1
+        iy = np.digitize(pos_y, yedges) - 1
+
+        # Mask particles outside the range
+        mask = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
+        ix = ix[mask]; iy = iy[mask]; f = feature[mask]
+
+        # Assign features to bins
+        for x_idx, y_idx, val in zip(ix, iy, f):
+            bin_features[y_idx, x_idx].append(val)
+
+        return bin_features, xedges, yedges
 
     @classmethod
     def get_empty(cls) -> np.ndarray:

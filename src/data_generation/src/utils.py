@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 # from dotenv import load_dotenv, find_dotenv
 from omegaconf import DictConfig
 from scipy.spatial.distance import cosine
+from scipy.signal import fftconvolve
 
 # This will search for the .env file and load it if found
 # Uncomment to connect to eagle db for local test,
@@ -971,3 +972,59 @@ def merge_json_files_to_csv(input_dir, output_file, chunk_size=1000, length=None
             print(f"Processed {i}/{total} files ({(i/total)*100:.1f}%)")
 
     print(f"Merge complete. Output saved to {output_file}")
+
+
+def gaussian_kernel_1d(ksize, sigma, normalize=True):
+    x = np.arange(ksize) - ksize//2
+    K = np.exp(-(x**2)/(2*sigma**2))
+    if normalize:
+        K /= K.sum()
+    return K
+
+def rebin_1d(arr, factor, agg="mean"):
+    """
+    Rebin a 1D array by integer factor.
+    """
+    n = len(arr)
+    m = n // factor
+    arr = arr[:m*factor].reshape(m, factor)
+    if agg == "mean":
+        return arr.mean(axis=1)
+    elif agg == "sum":
+        return arr.sum(axis=1)
+    else:
+        raise ValueError("agg must be 'mean' or 'sum'")
+
+
+def convolve_and_pixelize_from_bins_1d(
+    F_intr,
+    stat_mode="std",
+    FWHM=2.5,
+    ksize=None,
+    bin_factor=1,
+    agg_pixel="mean"
+):
+    n = F_intr.shape[0]
+
+    # FWHM → sigma
+    sigma = FWHM / (2 * np.sqrt(2 * np.log(2)))
+
+    # Gaussian kernel length
+    if ksize is None:
+        ksize = int(np.ceil(6 * sigma))
+        if ksize % 2 == 0:
+            ksize += 1
+
+    # Build kernel
+    K = gaussian_kernel_1d(ksize, sigma, normalize=True)
+
+    # Convolution
+    F_conv = fftconvolve(F_intr, K, mode="same")
+
+    # Pixelization
+    if bin_factor == 1:
+        F_pix = F_conv.copy()
+    else:
+        F_pix = rebin_1d(F_conv, bin_factor, agg=agg_pixel)
+
+    return F_intr, F_conv, F_pix
