@@ -224,7 +224,6 @@ class FeatureProcessor(ABC):
             Each entry is a list of particle feature values in that bin.
         xedges, yedges : bin edges
         """
-        print('zz')
         pos_x = np.asarray(pos_x)
         pos_y = np.asarray(pos_y)
         feature = np.asarray(feature)
@@ -234,14 +233,6 @@ class FeatureProcessor(ABC):
         else:
             nx, ny = bins
 
-        xedges = np.linspace(xrange[0], xrange[1], nx+1)
-        yedges = np.linspace(yrange[0], yrange[1], ny+1)
-
-        print(f"xrange[0] type: {type(xrange[0])}, value: {xrange[0]}")
-        print(f"xrange[1] type: {type(xrange[1])}, value: {xrange[1]}")
-        print(f"xedges shape: {xedges.shape}, ndim: {xedges.ndim}")
-        print(f"xedges: {xedges}")
-
         x_min = np.asarray(xrange[0]).item()
         x_max = np.asarray(xrange[1]).item()
         xedges = np.linspace(x_min, x_max, nx + 1)
@@ -249,32 +240,15 @@ class FeatureProcessor(ABC):
         y_max = np.asarray(yrange[1]).item()
         yedges = np.linspace(y_min, y_max, ny + 1)
 
-        # xedges should be 1D
-        if xedges.ndim != 1:
-            print(f"ERROR: xedges is {xedges.ndim} D instead of 1D!")
-
-        print('zzz')
-
         # Initialize 2D array of lists
         bin_features = np.empty((ny, nx), dtype=object)
         for i in range(ny):
             for j in range(nx):
-                bin_features[i,j] = []
-
-        print('zzzz')
-
-        print(f"pos_x dtype: {pos_x.dtype}, shape: {pos_x.shape}")
-        print(f"pos_y dtype: {pos_y.dtype}, shape: {pos_y.shape}")
-        print(f"xedges dtype: {xedges.dtype}, shape: {xedges.shape}, values: {xedges}")
-        print(f"yedges dtype: {yedges.dtype}, shape: {yedges.shape}, values: {yedges}")
-        print(f"xrange: {xrange}, yrange: {yrange}")
-        print(f"bins: {bins}, nx: {nx}, ny: {ny}")
+                bin_features[i, j] = []
 
         # Digitize particle positions
         ix = np.digitize(pos_x, xedges) - 1
         iy = np.digitize(pos_y, yedges) - 1
-
-        print('zzzzz')
 
         # Mask particles outside the range
         mask = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
@@ -285,7 +259,7 @@ class FeatureProcessor(ABC):
         for x_idx, y_idx, val in zip(ix, iy, f):
             bin_features[y_idx, x_idx].append(val)
         """
-        print('yy')
+        """
         indices = np.column_stack([iy, ix])
         unique_bins, inverse = np.unique(indices, axis=0, return_inverse=True)
 
@@ -293,9 +267,16 @@ class FeatureProcessor(ABC):
             if bin_idx % 500000 == 0:
                 print(f"Processed {bin_idx}/{len(ix)} particles")
             bin_features[y_idx, x_idx] = f[inverse == bin_idx].tolist()
+        """
+        # Assign features to bins
+        for x_idx, y_idx, val in zip(ix, iy, f):
+            bin_features[y_idx, x_idx].append(val)
 
-        print(bin_features.shape, xedges, yedges)
-        return (bin_features, xedges, yedges)
+        print(bin_features.shape)
+        print(bin_features[0,0])
+        print(bin_features[0,0].shape)
+
+        return bin_features, xedges, yedges
 
 
 class VelocityDispersionProcessor(FeatureProcessor):
