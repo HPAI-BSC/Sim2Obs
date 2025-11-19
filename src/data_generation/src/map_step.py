@@ -22,7 +22,7 @@ class MapStep(PipelineStep):
 
         self.transition_radius = cfg.catalog.get('transition_radius', None)
         # TODO review
-        self.simulate_muse = cfg.feature_names[1].get('simulate_muse', None)
+        self.simulate_muse = cfg.feature_names.get('simulate_muse', None)
         self.cfg = cfg
 
         # Compute bins and radius
