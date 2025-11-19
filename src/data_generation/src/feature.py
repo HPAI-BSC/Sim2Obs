@@ -148,6 +148,7 @@ class FeatureProcessor(ABC):
         This would mean, reapplying the binning to what we are already doing.
         - Fit a Gaussian to each bin to get the velocity dispersion (i.e. the standard deviation) as we are already doing.
         """
+        print('aa')
         # We need higher resolution to apply muse filter
         bins = 2 * bins
 
@@ -161,6 +162,8 @@ class FeatureProcessor(ABC):
             xrange=range,
             yrange=range
         )
+
+        print('bb')
 
         logger.debug(f"MUSE filter bin_features: ", bin_features.shape, binx, biny)
 
@@ -219,6 +222,7 @@ class FeatureProcessor(ABC):
             Each entry is a list of particle feature values in that bin.
         xedges, yedges : bin edges
         """
+        print('zz')
         pos_x = np.asarray(pos_x)
         pos_y = np.asarray(pos_y)
         feature = np.asarray(feature)
@@ -322,7 +326,6 @@ class VelocityDispersionProcessor(FeatureProcessor):
             Exception: If the `self.value` attribute is empty, indicating that the `process`
                 method needs to be called before generating the map.
         """
-        print('aa')
         pos_rot = subhalo_particles.star_p
         feature = self.value
 
@@ -341,6 +344,11 @@ class VelocityDispersionProcessor(FeatureProcessor):
 
             if muse_filter:
                 logger.debug(f"Applying MUSE filter...")
+
+                print(pos_rot[:,i].shape)
+                print(pos_rot[:,j].shape)
+                print((feature[:, k]) ** 2)
+
                 input_ij, binx, biny = self._apply_muse_filter(
                     pos_rot[:, i], pos_rot[:, j],
                     feature=(feature[:, k]) ** 2,  # Access the relevant feature,
