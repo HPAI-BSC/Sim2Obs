@@ -151,6 +151,8 @@ class FeatureProcessor(ABC):
         # We need higher resolution to apply muse filter
         bins = 2 * bins
 
+        logger.debug(f"MUSE filter n bins: ", bins)
+
         # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
         bin_features, binx, biny = self._bin_particles_2d(
             pos_rot_i, pos_rot_j,  # positions
@@ -159,6 +161,8 @@ class FeatureProcessor(ABC):
             xrange=range,
             yrange=range
         )
+
+        logger.debug(f"MUSE filter bin_features: ", bin_features.shape, binx, biny)
 
         print(bin_features.shape)
 
