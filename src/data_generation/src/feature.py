@@ -154,13 +154,15 @@ class FeatureProcessor(ABC):
 
         logger.debug(f"MUSE filter n bins: ", bins)
 
+        print(range)
+
         # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
         bin_features, binx, biny = self._bin_particles_2d(
             pos_rot_i, pos_rot_j,  # positions
             feature,  # Velocity
             bins=bins,
-            xrange=range,
-            yrange=range
+            xrange=range[0],
+            yrange=range[1]
         )
 
         print('bb')
@@ -243,10 +245,13 @@ class FeatureProcessor(ABC):
         x_min = np.asarray(xrange[0]).item()
         x_max = np.asarray(xrange[1]).item()
         xedges = np.linspace(x_min, x_max, nx + 1)
+        y_min = np.asarray(yrange[0]).item()
+        y_max = np.asarray(yrange[1]).item()
+        yedges = np.linspace(y_min, y_max, ny + 1)
 
         # xedges should be 1D
         if xedges.ndim != 1:
-            print(f"ERROR: xedges is {xedges.ndim}D instead of 1D!")
+            print(f"ERROR: xedges is {xedges.ndim} D instead of 1D!")
 
         print('zzz')
 
