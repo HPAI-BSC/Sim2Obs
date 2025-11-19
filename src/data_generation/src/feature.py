@@ -250,6 +250,7 @@ class FeatureProcessor(ABC):
         ix = np.digitize(pos_x, xedges) - 1
         iy = np.digitize(pos_y, yedges) - 1
 
+
         # Mask particles outside the range
         mask = (ix >= 0) & (ix < nx) & (iy >= 0) & (iy < ny)
         ix = ix[mask]; iy = iy[mask]; f = feature[mask]
@@ -273,8 +274,7 @@ class FeatureProcessor(ABC):
             bin_features[y_idx, x_idx].append(val)
 
         print(bin_features.shape)
-        print(bin_features[0,0])
-        print(bin_features[0,0].shape)
+        print(bin_features[300,300])
 
         return bin_features, xedges, yedges
 
