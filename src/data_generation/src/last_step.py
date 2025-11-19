@@ -25,7 +25,12 @@ class LastStep:
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
 
-        transition_radius_compute = self.cfg.feature_names[1].get("transition_radius_compute", False)
+        if len(self.cfg.feature_names) > 1:
+            transition_radius_compute = self.cfg.feature_names[1].get(
+                "transition_radius_compute", False
+            )
+        else:
+            transition_radius_compute = False
 
         if transition_radius_compute:
             # Transition radius analysis
