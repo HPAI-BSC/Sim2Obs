@@ -318,6 +318,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
             Exception: If the `self.value` attribute is empty, indicating that the `process`
                 method needs to be called before generating the map.
         """
+        print('aa')
         pos_rot = subhalo_particles.star_p
         feature = self.value
 
