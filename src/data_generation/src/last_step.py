@@ -59,8 +59,10 @@ class LastStep:
             path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.txt'
             logger.info(f'Storing errors at: {path}')
 
-            if os.path.exists(path):
+            if os.path.isdir(path):
                 shutil.rmtree(path)
+            elif os.path.isfile(path):
+                os.remove(path)
 
             with open(path, 'w') as f:
                 for item in errors:
