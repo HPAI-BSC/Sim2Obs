@@ -253,7 +253,8 @@ class FeatureProcessor(ABC):
         for x_idx, y_idx, val in zip(ix, iy, f):
             bin_features[y_idx, x_idx].append(val)
 
-        return bin_features, xedges, yedges
+        print(bin_features.shape, xedges, yedges)
+        return (bin_features, xedges, yedges)
 
 
 class VelocityDispersionProcessor(FeatureProcessor):
