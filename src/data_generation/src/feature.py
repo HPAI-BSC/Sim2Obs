@@ -105,6 +105,7 @@ class FeatureProcessor(ABC):
             bins (int): Number of bins for the map.
             ranging (tuple): Range for the 2D map.
             axis (tuple): Axes to project (e.g., (0, 1) for x-y plane).
+            muse_filter (bool): Whether to apply muse filter for realistic maps. If true, number of bins duplicated
 
         Returns:
             tuple: A tuple containing the map and additional data like bin edges.
@@ -289,7 +290,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
         logger.info(f'Computed velocity dispersion for {len(subhalo_particles.star_v)} particles.')
         self.value = subhalo_particles.star_v
 
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple, muse_filter: bool) -> tuple:
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple, muse_filter: bool = True) -> tuple:
         """
         Generate a 2D map of processed particle features using binned statistics.
 
@@ -334,6 +335,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
             k = next(iter(missing_component))
 
             if muse_filter:
+                logger.debug(f"Applying MUSE filter...")
                 input_ij, binx, biny = self._apply_muse_filter(
                     pos_rot[:, i], pos_rot[:, j],
                     feature=(feature[:, k]) ** 2,  # Access the relevant feature,
@@ -342,7 +344,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
                 )
                 input_ij = np.sqrt(input_ij / 3)
                 input_ij[np.isnan(input_ij)] = 0
-                logger.debug(f"MUSE -- Shapes: input_ij={input_ij.shape}, binx={binx.shape}, biny={biny.shape}")
+                logger.debug(f"MUSE filter successfully applied -- Shapes: input_ij={input_ij.shape}, binx={binx.shape}, biny={biny.shape}")
                 return input_ij, binx, biny
 
             else:
@@ -596,7 +598,6 @@ class ICLProcessor(FeatureProcessor):
                 e.g., ((xmin, xmax), (ymin, ymax)).
             axis (tuple): A tuple of two integers indicating which axes to use for the 2D grid
                 (e.g., (0, 1) for x and y).
-            muse_filter (bool): Whether to apply muse filter for realistic maps. If true, number of bins duplicated
 
         Returns:
             tuple: A tuple containing:
