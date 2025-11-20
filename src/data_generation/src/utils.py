@@ -1004,10 +1004,13 @@ def convolve_and_pixelize_from_bins_1d(
     bin_factor=1,
     agg_pixel="mean"
 ):
+    print('aa')
     n = F_intr.shape[0]
 
     # FWHM → sigma
     sigma = FWHM / (2 * np.sqrt(2 * np.log(2)))
+
+    print('sigma', sigma)
 
     # Gaussian kernel length
     if ksize is None:
