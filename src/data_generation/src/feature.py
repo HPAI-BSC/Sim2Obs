@@ -169,8 +169,8 @@ class FeatureProcessor(ABC):
         print('-')
 
         # Now we apply per-bin 1d gaussian kernel (Line Spread Function)
-        for i in range(bin_features.shape[0]):
-            for j in range(bin_features.shape[1]):
+        for i in range(bins):
+            for j in range(bins):
                 print('--')
                 velocities = bin_features[i, j]
                 print(velocities)
