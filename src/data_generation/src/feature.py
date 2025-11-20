@@ -148,13 +148,10 @@ class FeatureProcessor(ABC):
         This would mean, reapplying the binning to what we are already doing.
         - Fit a Gaussian to each bin to get the velocity dispersion (i.e. the standard deviation) as we are already doing.
         """
-        print('aa')
         # We need higher resolution to apply muse filter
         bins = 2 * bins
 
         logger.debug(f"MUSE filter n bins: ", bins)
-
-        print(range)
 
         # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
         bin_features, binx, biny = self._bin_particles_2d(
@@ -167,12 +164,14 @@ class FeatureProcessor(ABC):
 
         logger.debug(f"MUSE filter bin_features: {bin_features.shape}, {binx[:3]}, {biny[:3]}")
 
-        output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
+        output_ij = np.zeros((bins, bins))
+
+        print('-')
 
         # Now we apply per-bin 1d gaussian kernel (Line Spread Function)
         for i in range(bin_features.shape[0]):
             for j in range(bin_features.shape[1]):
-                print('-')
+                print('--')
                 velocities = bin_features[i, j]
                 print(velocities)
                 if len(velocities) == 0:
