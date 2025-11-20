@@ -165,17 +165,7 @@ class FeatureProcessor(ABC):
             yrange=range[1]
         )
 
-        print('bb')
-
-        print(bin_features)
-
-        print(bin_features.shape)
-
-        print('cc')
-
-        logger.debug(f"MUSE filter bin_features: ", bin_features.shape, binx, biny)
-
-        print(bin_features.shape)
+        logger.debug(f"MUSE filter bin_features: {bin_features.shape}, {binx}, {biny}")
 
         output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
 
@@ -277,11 +267,10 @@ class FeatureProcessor(ABC):
         """
         # Assign features to bins
         for x_idx, y_idx, val in zip(ix, iy, f):
-            print(y_idx, x_idx, val)
             bin_features[y_idx, x_idx].append(val)
 
         print(bin_features.shape)
-        print(bin_features[300,300])
+        print(bin_features[634, 518])
 
         return bin_features, xedges, yedges
 
