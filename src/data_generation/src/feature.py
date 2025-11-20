@@ -153,6 +153,13 @@ class FeatureProcessor(ABC):
 
         logger.debug(f"MUSE filter n bins: {bins}")
 
+        print(len(feature))
+        vmin = feature.min()
+        vmax = feature.max()
+        print(vmin, vmax)
+        velocity_grid = (vmin, vmax, (vmax-vmin)//1000)
+
+
         # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
         bin_features, binx, biny = self._bin_particles_2d(
             pos_rot_i, pos_rot_j,  # positions
@@ -166,16 +173,10 @@ class FeatureProcessor(ABC):
 
         output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
 
-        print(output_ij.shape)
-
-        print('-')
-
         # Now we apply per-bin 1d gaussian kernel (Line Spread Function)
         for i in range(bin_features.shape[0]):
             for j in range(bin_features.shape[1]):
-                print('--')
                 velocities = bin_features[i, j]
-                print(velocities)
                 if len(velocities) == 0:
                     # No particles in bin
                     #map_mean[i, j] = 0
@@ -184,9 +185,12 @@ class FeatureProcessor(ABC):
                     output_ij[i, j] = 0
                     continue
 
+                # To simulate LSF we need to apply the conv on a velocity distribution
+                hist, edges = np.histogram(np.array(velocities), bins=velocity_grid)
+
                 # Apply your 1D convolution / pixelization function
                 F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
-                    np.array(velocities),
+                    hist,
                     stat_mode="std",  # Std since we are handling velocities
                     FWHM=2.5,  # ToDo: Adjust to MUSE
                     ksize=None,  # kernel size, or let function compute
@@ -199,6 +203,11 @@ class FeatureProcessor(ABC):
                     output_ij[i, j] = np.std(F_pix)
                 else:
                     output_ij[i, j] = np.mean(F_pix)
+
+        output_ij = avg_pool_2x2(output_ij)
+        print(output_ij.shape)
+        print(type(binx))
+        print(binx)
 
         return output_ij, binx, biny
 

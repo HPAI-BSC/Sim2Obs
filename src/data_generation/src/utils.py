@@ -996,6 +996,19 @@ def rebin_1d(arr, factor, agg="mean"):
         raise ValueError("agg must be 'mean' or 'sum'")
 
 
+def avg_pool_2x2(arr):
+    # truncate to even shape to make divisible by 2
+    rows, cols = arr.shape
+    arr = arr[:rows - rows % 2, :cols - cols % 2]  # truncate if needed
+
+    # reshape into blocks of 2x2
+    arr_reshaped = arr.reshape(rows // 2, 2, cols // 2, 2)
+
+    # take mean over the 2x2 blocks
+    pooled = arr_reshaped.mean(axis=(1, 3))
+    return pooled
+
+
 def convolve_and_pixelize_from_bins_1d(
     F_intr,
     stat_mode="std",
