@@ -372,7 +372,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
                     pos_rot[:, i], pos_rot[:, j],
                     feature=(feature[:, k]) ** 2,  # Access the relevant feature,
                     bins=bins,
-                    range=ranging
+                    ranging=ranging
                 )
                 input_ij = np.sqrt(input_ij / 3)
                 input_ij[np.isnan(input_ij)] = 0
