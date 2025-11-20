@@ -167,6 +167,12 @@ class FeatureProcessor(ABC):
 
         print('bb')
 
+        print(bin_features)
+
+        print(bin_features.shape)
+
+        print('cc')
+
         logger.debug(f"MUSE filter bin_features: ", bin_features.shape, binx, biny)
 
         print(bin_features.shape)
@@ -271,6 +277,7 @@ class FeatureProcessor(ABC):
         """
         # Assign features to bins
         for x_idx, y_idx, val in zip(ix, iy, f):
+            print(y_idx, x_idx, val)
             bin_features[y_idx, x_idx].append(val)
 
         print(bin_features.shape)
