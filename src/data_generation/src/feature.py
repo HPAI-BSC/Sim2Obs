@@ -151,7 +151,7 @@ class FeatureProcessor(ABC):
         # We need higher resolution to apply muse filter
         bins = 2 * bins
 
-        logger.debug(f"MUSE filter n bins: ", bins)
+        logger.debug(f"MUSE filter n bins: {bins}")
 
         # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
         bin_features, binx, biny = self._bin_particles_2d(
@@ -164,13 +164,15 @@ class FeatureProcessor(ABC):
 
         logger.debug(f"MUSE filter bin_features: {bin_features.shape}, {binx[:3]}, {biny[:3]}")
 
-        output_ij = np.zeros((bins, bins))
+        output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
+
+        print(output_ij.shape)
 
         print('-')
 
         # Now we apply per-bin 1d gaussian kernel (Line Spread Function)
-        for i in range(bins):
-            for j in range(bins):
+        for i in range(1137):
+            for j in range(1137):
                 print('--')
                 velocities = bin_features[i, j]
                 print(velocities)
