@@ -135,7 +135,7 @@ class FeatureProcessor(ABC):
         """
         pass
 
-    def _apply_muse_filter(self, pos_rot_i, pos_rot_j, feature, bins, range, final_aggr='std', sigma=0.0):
+    def _apply_muse_filter(self, pos_rot_i, pos_rot_j, feature, bins, ranging, final_aggr='std', sigma=0.0):
         """
         This simulates alterations in telescope imaging to produce realistic maps.
 
@@ -158,8 +158,8 @@ class FeatureProcessor(ABC):
             pos_rot_i, pos_rot_j,  # positions
             feature,  # Velocity
             bins=bins,
-            xrange=range[0],
-            yrange=range[1]
+            xrange=ranging[0],
+            yrange=ranging[1]
         )
 
         logger.debug(f"MUSE filter bin_features: {bin_features.shape}, {binx[:3]}, {biny[:3]}")
@@ -171,8 +171,8 @@ class FeatureProcessor(ABC):
         print('-')
 
         # Now we apply per-bin 1d gaussian kernel (Line Spread Function)
-        for i in range(1137):
-            for j in range(1137):
+        for i in range(bin_features.shape[0]):
+            for j in range(bin_features.shape[1]):
                 print('--')
                 velocities = bin_features[i, j]
                 print(velocities)
