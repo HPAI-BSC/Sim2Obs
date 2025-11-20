@@ -165,9 +165,13 @@ class FeatureProcessor(ABC):
             yrange=range[1]
         )
 
-        logger.debug(f"MUSE filter bin_features: {bin_features.shape}, {binx}, {biny}")
+        logger.debug(f"MUSE filter bin_features: {bin_features.shape}, {binx[:3]}, {biny[:3]}")
 
-        output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
+        output_ij = np.zeros((bins, bins))
+
+        print('cc')
+        print(bin_features.shape[0], bin_features.shape[1])
+        print('dd')
 
         # Now we apply per-bin 1d gaussian kernel (Line Spread Function)
         for i in range(bin_features.shape[0]):
@@ -268,9 +272,6 @@ class FeatureProcessor(ABC):
         # Assign features to bins
         for x_idx, y_idx, val in zip(ix, iy, f):
             bin_features[y_idx, x_idx].append(val)
-
-        print(bin_features.shape)
-        print(bin_features[634, 518])
 
         return bin_features, xedges, yedges
 
