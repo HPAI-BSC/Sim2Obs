@@ -14,7 +14,7 @@ from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles, store_tr_obj, \
-    plot_icl_bcg_profiles_conflictive, convolve_and_pixelize_from_bins_1d
+    plot_icl_bcg_profiles_conflictive, convolve_and_pixelize_from_bins_1d, avg_pool_2x2
 
 logger = setup_logger("FeatureProcessor")
 
