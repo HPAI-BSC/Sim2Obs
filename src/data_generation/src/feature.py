@@ -157,7 +157,7 @@ class FeatureProcessor(ABC):
         vmin = feature.min()
         vmax = feature.max()
         print(vmin, vmax)
-        velocity_grid = (vmin, vmax, (vmax-vmin)//1000)
+        velocity_grid = (vmin, vmax, 1001)
 
 
         # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
@@ -186,7 +186,12 @@ class FeatureProcessor(ABC):
                     continue
 
                 # To simulate LSF we need to apply the conv on a velocity distribution
-                hist, edges = np.histogram(np.array(velocities), bins=velocity_grid)
+                try:
+                    hist, edges = np.histogram(np.array(velocities), bins=velocity_grid)
+                except Exception as e:
+                    print(e)
+                    print(velocity_grid)
+
 
                 # Apply your 1D convolution / pixelization function
                 F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
