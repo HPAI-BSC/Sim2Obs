@@ -186,16 +186,13 @@ class FeatureProcessor(ABC):
                     continue
 
                 # To simulate LSF we need to apply the conv on a velocity distribution
-                try:
-                    hist, edges = np.histogram(np.array(velocities), bins=velocity_grid)
-                except Exception as e:
-                    print(e)
-                    print(velocity_grid)
+                hist, edges = np.histogram(np.array(velocities), bins=velocity_grid)
 
 
                 # Apply your 1D convolution / pixelization function
                 F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
                     hist,
+                    edges,
                     stat_mode="std",  # Std since we are handling velocities
                     FWHM=2.5,  # ToDo: Adjust to MUSE
                     ksize=None,  # kernel size, or let function compute

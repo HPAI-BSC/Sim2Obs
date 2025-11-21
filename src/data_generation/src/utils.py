@@ -1011,6 +1011,7 @@ def avg_pool_2x2(arr):
 
 def convolve_and_pixelize_from_bins_1d(
     F_intr,
+    edges,
     stat_mode="std",
     FWHM=2.5,
     ksize=None,
@@ -1022,6 +1023,8 @@ def convolve_and_pixelize_from_bins_1d(
 
     # FWHM → sigma
     sigma = FWHM / (2 * np.sqrt(2 * np.log(2)))
+    bin_width = edges[1] - edges[0]
+    sigma_bins = sigma_vel / bin_width
 
     print('sigma', sigma)
 
@@ -1031,8 +1034,8 @@ def convolve_and_pixelize_from_bins_1d(
         if ksize % 2 == 0:
             ksize += 1
 
-    # Build kernel
-    K = gaussian_kernel_1d(ksize, sigma, normalize=True)
+    # Build kernel -- apply it in bin units
+    K = gaussian_kernel_1d(ksize, sigma_bins, normalize=True)
 
     # Convolution
     F_conv = fftconvolve(F_intr, K, mode="same")
