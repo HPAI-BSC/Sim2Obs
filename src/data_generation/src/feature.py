@@ -201,7 +201,8 @@ class FeatureProcessor(ABC):
                     agg_pixel="mean"  # aggregation method for rebin
                 )
                 """
-                F_pix = lsf_blur_via_sum_of_gaussians(np.array(velocities))
+                _, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
+                F_pix = spectrum
 
                 print(F_pix.shape)
                 if final_aggr == "std":
