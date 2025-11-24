@@ -203,7 +203,7 @@ class FeatureProcessor(ABC):
                 """
                 F_pix = lsf_blur_via_sum_of_gaussians(np.array(velocities))
 
-                print(F_intr.shape, F_conv.shape, F_pix.shape)
+                print(F_pix.shape)
                 if final_aggr == "std":
                     output_ij[i, j] = np.std(F_pix)
                 else:
