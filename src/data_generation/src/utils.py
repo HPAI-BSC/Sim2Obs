@@ -1009,6 +1009,101 @@ def avg_pool_2x2(arr):
     return pooled
 
 
+import numpy as np
+
+# MUSE specifications
+WAVELENGTH_MIN = 4800  # Angstroms
+WAVELENGTH_MAX = 9300  # Angstroms
+WAVELENGTH_SAMPLING = 1.25  # Angstroms per pixel
+N_SPECTRAL_PIXELS = int((WAVELENGTH_MAX - WAVELENGTH_MIN) / WAVELENGTH_SAMPLING)  # ~3600
+
+
+# Convert to velocity space for a specific emission line
+# Example: H-alpha at 6562.8 Angstroms
+def wavelength_to_velocity(wavelength_array, line_center_angstroms):
+    """
+    Convert wavelength to velocity using Doppler formula.
+
+    Parameters:
+    -----------
+    wavelength_array : array
+        Wavelengths in Angstroms
+    line_center_angstroms : float
+        Rest wavelength of the line in Angstroms
+
+    Returns:
+    --------
+    velocity : array
+        Velocities in km/s
+    """
+    c = 299792.458  # km/s
+    velocity = c * (wavelength_array - line_center_angstroms) / line_center_angstroms
+    return velocity
+
+
+def get_muse_velocity_axis(line_center_angstroms=6562.8):
+    """
+    Get MUSE velocity axis for a specific emission line.
+
+    Parameters:
+    -----------
+    line_center_angstroms : float
+        Rest wavelength of the emission line (default: H-alpha)
+
+    Returns:
+    --------
+    v_axis : ndarray
+        Velocity axis in km/s
+    wavelength_axis : ndarray
+        Wavelength axis in Angstroms
+    """
+    # MUSE specifications -- https://www.aanda.org/articles/aa/full_html/2020/09/aa37855-20/aa37855-20.html
+    WAVELENGTH_MIN = 4800  # Angstroms
+    WAVELENGTH_MAX = 9300  # Angstroms
+    WAVELENGTH_SAMPLING = 1.25  # Angstroms per pixel
+    N_SPECTRAL_PIXELS = int((WAVELENGTH_MAX - WAVELENGTH_MIN) / WAVELENGTH_SAMPLING)  # ~3600
+
+    # MUSE wavelength axis
+    wavelength_axis = np.linspace(WAVELENGTH_MIN, WAVELENGTH_MAX, N_SPECTRAL_PIXELS)
+
+    # Convert to velocity
+    v_axis = wavelength_to_velocity(wavelength_axis, line_center_angstroms)
+
+    return v_axis, wavelength_axis
+
+
+def lsf_blur_via_sum_of_gaussians(
+    velocities,
+    FWHM=2.5,
+):
+    """
+    Create an observed spectrum from particle velocities by applying LSF.
+    Parameters:
+        FWHM: float - Full Width at Half Maximum
+    """
+    print('aa')
+    v_axis = get_muse_velocity_axis()
+    print('vv')
+
+    # FWHM → sigma
+    sigma = FWHM / (2 * np.sqrt(2 * np.log(2)))
+
+    # Initialize spectrum
+    spectrum = np.zeros(n_pixels)
+
+    # Add each particle's contribution (Gaussian centered at its velocity)
+    for v_i in velocities:
+        # Add Gaussian centered at v_i with width sigma_lsf
+        spectrum += np.exp(-(v_axis - v_i) ** 2 / (2 * sigma ** 2))
+
+    # Normalize by sqrt(2*pi*sigma^2) to make each Gaussian integrate to 1
+    # (optional - depends on whether you care about absolute flux units)
+    spectrum /= (sigma_lsf * np.sqrt(2 * np.pi))
+
+    return v_axis, spectrum
+
+
+
 def convolve_and_pixelize_from_bins_1d(
     F_intr,
     edges,

@@ -14,7 +14,7 @@ from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles, store_tr_obj, \
-    plot_icl_bcg_profiles_conflictive, convolve_and_pixelize_from_bins_1d, avg_pool_2x2
+    plot_icl_bcg_profiles_conflictive, convolve_and_pixelize_from_bins_1d, lsf_blur_via_sum_of_gaussians, avg_pool_2x2
 
 logger = setup_logger("FeatureProcessor")
 
@@ -185,10 +185,11 @@ class FeatureProcessor(ABC):
                     output_ij[i, j] = 0
                     continue
 
+                """
                 # To simulate LSF we need to apply the conv on a velocity distribution
                 hist, edges = np.histogram(np.array(velocities), bins=velocity_grid)
 
-
+                
                 # Apply your 1D convolution / pixelization function
                 F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
                     hist,
@@ -199,6 +200,8 @@ class FeatureProcessor(ABC):
                     bin_factor=2,  # rebin spectral dimension if desired
                     agg_pixel="mean"  # aggregation method for rebin
                 )
+                """
+                F_pix = lsf_blur_via_sum_of_gaussians(np.array(velocities))
 
                 print(F_intr.shape, F_conv.shape, F_pix.shape)
                 if final_aggr == "std":
