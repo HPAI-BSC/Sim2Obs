@@ -1082,7 +1082,7 @@ def lsf_blur_via_sum_of_gaussians(
         FWHM: float - Full Width at Half Maximum
     """
     print('aa')
-    v_axis = get_muse_velocity_axis()
+    v_axis, _ = get_muse_velocity_axis()
     print(v_axis.shape)
 
     # FWHM → sigma
