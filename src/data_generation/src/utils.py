@@ -1075,15 +1075,17 @@ def get_muse_velocity_axis(line_center_angstroms=6562.8):
 def lsf_blur_via_sum_of_gaussians(
     velocities,
     FWHM=2.5,
+    line_center_angstroms=6562.8,
+    normalize=True,
 ):
     """
     Create an observed spectrum from particle velocities by applying LSF.
     Parameters:
-        FWHM: float - Full Width at Half Maximum
+        Velocities : array - Particle velocities in that bin (in Km/s?)
+        FWHM : float - Full Width at Half Maximum (in Angstroms?)
+        line_center_angstroms : float - Of the instrument we're using
     """
-    print('aa')
-    v_axis, _ = get_muse_velocity_axis()
-    print(v_axis.shape)
+    v_axis, _ = get_muse_velocity_axis(line_center_angstroms)
 
     # FWHM → sigma
     sigma = FWHM / (2 * np.sqrt(2 * np.log(2)))
@@ -1096,9 +1098,9 @@ def lsf_blur_via_sum_of_gaussians(
         # Add Gaussian centered at v_i with width sigma_lsf
         spectrum += np.exp(-(v_axis - v_i) ** 2 / (2 * sigma ** 2))
 
-    # Normalize by sqrt(2*pi*sigma^2) to make each Gaussian integrate to 1
-    # (optional - depends on whether you care about absolute flux units)
-    spectrum /= (sigma_lsf * np.sqrt(2 * np.pi))
+    # (Optional) Normalize by sqrt(2*pi*sigma^2) to make each Gaussian integrate to 1
+    if normalize:
+        spectrum /= (sigma * np.sqrt(2 * np.pi))
 
     return v_axis, spectrum
 
