@@ -1083,13 +1083,13 @@ def lsf_blur_via_sum_of_gaussians(
     """
     print('aa')
     v_axis = get_muse_velocity_axis()
-    print('vv')
+    print(v_axis.shape)
 
     # FWHM → sigma
     sigma = FWHM / (2 * np.sqrt(2 * np.log(2)))
 
     # Initialize spectrum
-    spectrum = np.zeros(n_pixels)
+    spectrum = np.zeros(v_axis.shape[0])
 
     # Add each particle's contribution (Gaussian centered at its velocity)
     for v_i in velocities:
