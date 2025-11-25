@@ -97,14 +97,14 @@ class MapStep(PipelineStep):
             # in each region, and return the resulting grid of values.
 
             # Map for the input feature
-            input_xy, _, biny_xy = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 1))
-            input_yz, _, biny_yz = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(1, 2))
-            input_xz, _, biny_xz = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 2))
+            input_xy, _, biny_xy = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 1), muse_filter=self.simulate_muse)
+            input_yz, _, biny_yz = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(1, 2), muse_filter=self.simulate_muse)
+            input_xz, _, biny_xz = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 2), muse_filter=self.simulate_muse)
 
             # Map for the output feature
-            output_xy, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 1))
-            output_yz, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(1, 2))
-            output_xz, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 2))
+            output_xy, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 1), muse_filter=self.simulate_muse)
+            output_yz, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(1, 2), muse_filter=self.simulate_muse)
+            output_xz, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 2), muse_filter=self.simulate_muse)
 
             maps = [
                 (input_xy, output_xy, biny_xy),

@@ -204,14 +204,13 @@ class FeatureProcessor(ABC):
                 _, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
                 F_pix = spectrum
 
-                print(F_pix.shape)
                 if final_aggr == "std":
                     output_ij[i, j] = np.std(F_pix)
                 else:
                     output_ij[i, j] = np.mean(F_pix)
 
         output_ij = avg_pool_2x2(output_ij)
-        print(output_ij.shape)
+        print('after avg pool', output_ij.shape)
         print(type(binx))
         print(binx)
 
@@ -332,7 +331,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
         logger.info(f'Computed velocity dispersion for {len(subhalo_particles.star_v)} particles.')
         self.value = subhalo_particles.star_v
 
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple, muse_filter: bool = True) -> tuple:
+    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple, muse_filter: bool = False) -> tuple:
         """
         Generate a 2D map of processed particle features using binned statistics.
 
