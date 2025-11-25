@@ -102,9 +102,9 @@ class MapStep(PipelineStep):
             input_xz, _, biny_xz = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 2), muse_filter=self.simulate_muse)
 
             # Map for the output feature
-            output_xy, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 1), muse_filter=self.simulate_muse)
-            output_yz, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(1, 2), muse_filter=self.simulate_muse)
-            output_xz, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 2), muse_filter=self.simulate_muse)
+            output_xy, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 1))
+            output_yz, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(1, 2))
+            output_xz, _, _ = output_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 2))
 
             maps = [
                 (input_xy, output_xy, biny_xy),
