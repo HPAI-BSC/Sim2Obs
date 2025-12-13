@@ -34,7 +34,10 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
 
     # DEBUG
-    plot_hist(df=halo_context.data, attribute='m200', name='Illustris', title='Illustris M200 distribution', bins=100)
+    # plot_hist(df=halo_context.data, attribute='m200', name='Illustris', title='Illustris M200 distribution', bins=100)
+    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets'
+    path = dataset_dir + f'/../logs/illustris_halo_context.csv'
+    halo_context.data.to_csv(path, index=False)
     return
     #----
 
