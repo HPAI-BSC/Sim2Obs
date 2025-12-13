@@ -523,7 +523,7 @@ def plot_transition_radius(cfg, transition_radius_list, log_normalization=True):
     plt.savefig(path, dpi=300)
 
 
-def plot_hist(df, attribute, title, bins, log=False):
+def plot_hist(df, attribute, title, bins, name, log=False):
     """
        Plots a histogram of the 'm200' column from a DataFrame.
 
@@ -556,7 +556,6 @@ def plot_hist(df, attribute, title, bins, log=False):
     plt.tight_layout()
     #plt.show()
 
-    name = 'tng_cluster'
     path = dataset_dir + f'/../logs/{name}_{attribute}_histogram.png'
     plt.savefig(path, dpi=300)
 
