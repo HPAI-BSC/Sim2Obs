@@ -151,6 +151,8 @@ class FeatureProcessor(ABC):
         # We need higher resolution to apply muse filter
         bins = 2 * bins
 
+        print('Apply muse filter')
+
         logger.debug(f"MUSE filter n bins: {bins}")
 
         print(len(feature))
@@ -373,8 +375,10 @@ class VelocityDispersionProcessor(FeatureProcessor):
             components = {0, 1, 2}
             missing_component = components - set(axis)
             k = next(iter(missing_component))
+            print('muse-filter',muse_filter)
 
             if muse_filter:
+                print(f"Applying muse filter...")
                 logger.debug(f"Applying MUSE filter...")
 
                 print(pos_rot[:,i].shape)
