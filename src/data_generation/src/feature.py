@@ -157,7 +157,6 @@ class FeatureProcessor(ABC):
         vmin = feature.min()
         vmax = feature.max()
         print(vmin, vmax)
-        velocity_grid = np.linspace(vmin, vmax, 1001)
 
 
         # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
