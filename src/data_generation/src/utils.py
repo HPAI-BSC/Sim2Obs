@@ -1114,7 +1114,7 @@ def convolve_and_pixelize_from_bins_1d(
     bin_factor=1,
     agg_pixel="mean"
 ):
-    print('aa')
+    print('convolve and pixelize from bins aa')
     n = F_intr.shape[0]
 
     # FWHM → sigma
