@@ -55,9 +55,8 @@ def main(cfg: DictConfig) -> Any:
     steps = get_pipeline_steps(cfg)
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
-    # TESTING
     starting_idx = 1
-    ending_idx = 6
+    ending_idx = 4
 
     _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[])
 
