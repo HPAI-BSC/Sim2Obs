@@ -135,7 +135,7 @@ class FeatureProcessor(ABC):
         """
         pass
 
-    def _apply_muse_filter(self, pos_rot_i, pos_rot_j, feature, bins, ranging, final_aggr='std', sigma=0.0):
+    def _apply_muse_filter(self, pos_rot_i, pos_rot_j, feature, bins, ranging, final_aggr='mean', n_particles_threshold=10):
         """
         This simulates alterations in telescope imaging to produce realistic maps.
 
@@ -180,30 +180,29 @@ class FeatureProcessor(ABC):
                     #map_pix[i, j] = 0
                     output_ij[i, j] = 0
                     continue
+                if len(velocities) > n_particles_threshold:
+                    # To simulate LSF we need to apply the conv on a velocity distribution
+                    hist, edges = np.histogram(np.array(velocities), bins=velocity_grid)
 
-                """
-                # To simulate LSF we need to apply the conv on a velocity distribution
-                hist, edges = np.histogram(np.array(velocities), bins=velocity_grid)
+                    # Apply your 1D convolution / pixelization function
+                    F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
+                        hist,
+                        edges,
+                        stat_mode="std",  # Std since we are handling velocities
+                        FWHM=2.5,  # ToDo: Adjust to MUSE
+                        ksize=None,  # kernel size, or let function compute
+                        bin_factor=2,  # rebin spectral dimension if desired
+                        agg_pixel="mean"  # aggregation method for rebin
+                    )
+                    #_, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
+                    #F_pix = spectrum
 
-                
-                # Apply your 1D convolution / pixelization function
-                F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
-                    hist,
-                    edges,
-                    stat_mode="std",  # Std since we are handling velocities
-                    FWHM=2.5,  # ToDo: Adjust to MUSE
-                    ksize=None,  # kernel size, or let function compute
-                    bin_factor=2,  # rebin spectral dimension if desired
-                    agg_pixel="mean"  # aggregation method for rebin
-                )
-                """
-                _, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
-                F_pix = spectrum
-
-                if final_aggr == "std":
-                    output_ij[i, j] = np.std(F_pix)
+                    if final_aggr == "std":
+                        output_ij[i, j] = np.std(F_pix)
+                    else:
+                        output_ij[i, j] = np.mean(F_pix)
                 else:
-                    output_ij[i, j] = np.mean(F_pix)
+                    output_ij[i, j] = 0
 
         output_ij = avg_pool_2x2(output_ij)
 
@@ -382,7 +381,8 @@ class VelocityDispersionProcessor(FeatureProcessor):
                     feature=(feature[:, k]) ** 2,  # Access the relevant feature,
                     bins=bins,
                     ranging=ranging,
-                    final_aggr="mean"
+                    final_aggr="mean",
+                    n_particles_threshold=10
                 )
                 input_ij = np.sqrt(input_ij / 3)
                 input_ij[np.isnan(input_ij)] = 0
