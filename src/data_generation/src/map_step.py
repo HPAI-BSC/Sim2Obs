@@ -90,9 +90,6 @@ class MapStep(PipelineStep):
         bins = cosmos_data.metadata['map']['bins']
         logger.debug(f'Generating maps for r={r}, bins={bins} and num particles={len(subhalo_particles.star_p)}')
 
-        print(self.simulate_muse)
-        print('self-dim', self.dim)
-        self.dim = 2
         if self.dim == 2:
             ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
 
@@ -102,8 +99,6 @@ class MapStep(PipelineStep):
 
             # Map for the input feature
             input_xy, _, biny_xy = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 1), muse_filter=self.simulate_muse)
-
-            a = b
             input_yz, _, biny_yz = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(1, 2), muse_filter=self.simulate_muse)
             input_xz, _, biny_xz = input_feature.generate_map(subhalo_particles, bins, ranging, axis=(0, 2), muse_filter=self.simulate_muse)
 

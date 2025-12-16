@@ -151,14 +151,9 @@ class FeatureProcessor(ABC):
         # We need higher resolution to apply muse filter
         bins = 2 * bins
 
-        print('Apply muse filter')
-
         logger.debug(f"MUSE filter n bins: {bins}")
-
-        print(len(feature))
-        vmin = feature.min()
-        vmax = feature.max()
-        print(vmin, vmax)
+        #vmin = feature.min()
+        #vmax = feature.max()
 
 
         # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
@@ -211,9 +206,6 @@ class FeatureProcessor(ABC):
                     output_ij[i, j] = np.mean(F_pix)
 
         output_ij = avg_pool_2x2(output_ij)
-        print('after avg pool', output_ij.shape)
-        print(type(binx))
-        print(binx)
 
         return output_ij, binx, biny
 
@@ -389,7 +381,8 @@ class VelocityDispersionProcessor(FeatureProcessor):
                     pos_rot[:, i], pos_rot[:, j],
                     feature=(feature[:, k]) ** 2,  # Access the relevant feature,
                     bins=bins,
-                    ranging=ranging
+                    ranging=ranging,
+                    final_aggr="mean"
                 )
                 input_ij = np.sqrt(input_ij / 3)
                 input_ij[np.isnan(input_ij)] = 0
