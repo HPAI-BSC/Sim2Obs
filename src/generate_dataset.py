@@ -55,8 +55,8 @@ def main(cfg: DictConfig) -> Any:
     steps = get_pipeline_steps(cfg)
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
-    starting_idx = 1
-    ending_idx = 4
+    starting_idx = None
+    ending_idx = None
 
     """
     # ---------------

@@ -135,6 +135,7 @@ class FeatureProcessor(ABC):
         """
         pass
 
+    @staticmethod
     def _neighbors(self, i, j, shape):
         for di in (-1, 0, 1):
             for dj in (-1, 0, 1):
@@ -463,6 +464,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
             components = {0, 1, 2}
             missing_component = components - set(axis)
             k = next(iter(missing_component))
+
 
             if muse_filter:
                 logger.debug(f"Applying MUSE filter...")
