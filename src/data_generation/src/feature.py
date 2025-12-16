@@ -152,9 +152,6 @@ class FeatureProcessor(ABC):
         bins = 2 * bins
 
         logger.debug(f"MUSE filter n bins: {bins}")
-        #vmin = feature.min()
-        #vmax = feature.max()
-
 
         # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
         bin_features, binx, biny = self._bin_particles_2d(
@@ -181,8 +178,9 @@ class FeatureProcessor(ABC):
                     output_ij[i, j] = 0
                     continue
                 if len(velocities) > n_particles_threshold:
+                    print('velocities', len(velocities))
                     # To simulate LSF we need to apply the conv on a velocity distribution
-                    hist, edges = np.histogram(np.array(velocities), bins=velocity_grid)
+                    hist, edges = np.histogram(np.array(velocities), bins=int(np.ceil(np.sqrt(len(velocities)))))
 
                     # Apply your 1D convolution / pixelization function
                     F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
@@ -366,10 +364,8 @@ class VelocityDispersionProcessor(FeatureProcessor):
             components = {0, 1, 2}
             missing_component = components - set(axis)
             k = next(iter(missing_component))
-            print('muse-filter',muse_filter)
 
             if muse_filter:
-                print(f"Applying muse filter...")
                 logger.debug(f"Applying MUSE filter...")
 
                 print(pos_rot[:,i].shape)
