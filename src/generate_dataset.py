@@ -58,6 +58,7 @@ def main(cfg: DictConfig) -> Any:
     starting_idx = 1
     ending_idx = 4
 
+    """
     # ---------------
     import glob
     import h5py
@@ -78,6 +79,7 @@ def main(cfg: DictConfig) -> Any:
     print(f"\nTotal corrupted files: {len(corrupted)}")
 
     # ---------------
+    """
 
     _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[9])
 
