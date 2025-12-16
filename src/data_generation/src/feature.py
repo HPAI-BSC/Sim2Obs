@@ -135,6 +135,15 @@ class FeatureProcessor(ABC):
         """
         pass
 
+    def _neighbors(self, i, j, shape):
+        for di in (-1, 0, 1):
+            for dj in (-1, 0, 1):
+                if di == 0 and dj == 0:
+                    continue
+                ni, nj = i + di, j + dj
+                if 0 <= ni < shape[0] and 0 <= nj < shape[1]:
+                    yield ni, nj
+
     def _apply_muse_filter(self, pos_rot_i, pos_rot_j, feature, bins, ranging, final_aggr='mean', n_particles_threshold=10):
         """
         This simulates alterations in telescope imaging to produce realistic maps.
@@ -151,7 +160,7 @@ class FeatureProcessor(ABC):
         # We need higher resolution to apply muse filter
         bins = 2 * bins
 
-        logger.debug(f"MUSE filter n bins: {bins}")
+        logger.debug(f"MUSE filter with n bins: {bins}")
 
         # This outputs per-bin-distributions, without collapsing them (mean/std) as stats.binned_statistic_2d does
         bin_features, binx, biny = self._bin_particles_2d(
@@ -164,8 +173,10 @@ class FeatureProcessor(ABC):
 
         logger.debug(f"MUSE filter bin_features: {bin_features.shape}, {binx[:3]}, {biny[:3]}")
 
+        visited = np.zeros(bin_features.shape[:2], dtype=bool)
         output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
 
+        """
         # Now we apply per-bin 1d gaussian kernel (Line Spread Function)
         for i in range(bin_features.shape[0]):
             for j in range(bin_features.shape[1]):
@@ -200,6 +211,95 @@ class FeatureProcessor(ABC):
                         output_ij[i, j] = np.mean(F_pix)
                 else:
                     output_ij[i, j] = 0
+            """
+
+        for i in range(bin_features.shape[0]):
+            for j in range(bin_features.shape[1]):
+
+                if visited[i, j]:
+                    continue
+
+                velocities = bin_features[i, j]
+
+                # ------------------------
+                # CASE 1: empty cell
+                # ------------------------
+                if len(velocities) == 0:
+                    output_ij[i, j] = 0
+                    visited[i, j] = True
+                    continue
+
+                # ------------------------
+                # CASE 2: enough particles → normal processing
+                # ------------------------
+                if len(velocities) >= n_particles_threshold:
+                    hist, edges = np.histogram(
+                        np.array(velocities),
+                        bins=int(np.ceil(np.sqrt(len(velocities))))
+                    )
+
+                    F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
+                        hist,
+                        edges,
+                        stat_mode="std",
+                        FWHM=2.5,
+                        ksize=None,
+                        bin_factor=2,
+                        agg_pixel="mean"
+                    )
+
+                    output_ij[i, j] = np.std(F_pix) if final_aggr == "std" else np.mean(F_pix)
+                    visited[i, j] = True
+                    continue
+
+                # ------------------------
+                # CASE 3: not enough particles → grow region
+                # ------------------------
+                region = []
+                merged_velocities = []
+                queue = [(i, j)]
+
+                visited[i, j] = True
+
+                while queue and len(merged_velocities) < n_particles_threshold:
+                    x, y = queue.pop(0)
+
+                    region.append((x, y))
+                    merged_velocities.extend(bin_features[x, y])
+
+                    for nx, ny in self._neighbors(x, y, bin_features.shape[:2]):
+                        if not visited[nx, ny]:
+                            visited[nx, ny] = True
+                            queue.append((nx, ny))
+
+                # ------------------------
+                # Apply SAME operation on merged region
+                # ------------------------
+                if len(merged_velocities) == 0:
+                    value = 0
+                else:
+                    hist, edges = np.histogram(
+                        np.array(merged_velocities),
+                        bins=int(np.ceil(np.sqrt(len(merged_velocities))))
+                    )
+
+                    F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
+                        hist,
+                        edges,
+                        stat_mode="std",
+                        FWHM=2.5,
+                        ksize=None,
+                        bin_factor=2,
+                        agg_pixel="mean"
+                    )
+
+                    value = np.std(F_pix) if final_aggr == "std" else np.mean(F_pix)
+
+                # ------------------------
+                # Copy result to all merged cells
+                # ------------------------
+                for x, y in region:
+                    output_ij[x, y] = value
 
         output_ij = avg_pool_2x2(output_ij)
 
