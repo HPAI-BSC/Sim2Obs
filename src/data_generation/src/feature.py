@@ -145,7 +145,7 @@ class FeatureProcessor(ABC):
                 if 0 <= ni < shape[0] and 0 <= nj < shape[1]:
                     yield ni, nj
 
-    def _apply_muse_filter(self, pos_rot_i, pos_rot_j, feature, bins, ranging, final_aggr='mean', n_particles_threshold=10):
+    def _apply_muse_filter(self, pos_rot_i, pos_rot_j, feature, bins, ranging, final_aggr='mean', n_particles_threshold=100):
         """
         This simulates alterations in telescope imaging to produce realistic maps.
 
