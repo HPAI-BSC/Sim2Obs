@@ -178,7 +178,6 @@ class FeatureProcessor(ABC):
                     output_ij[i, j] = 0
                     continue
                 if len(velocities) > n_particles_threshold:
-                    print('velocities', len(velocities))
                     # To simulate LSF we need to apply the conv on a velocity distribution
                     hist, edges = np.histogram(np.array(velocities), bins=int(np.ceil(np.sqrt(len(velocities)))))
 

@@ -1008,15 +1008,6 @@ def avg_pool_2x2(arr):
     return pooled
 
 
-import numpy as np
-
-# MUSE specifications
-WAVELENGTH_MIN = 4800  # Angstroms
-WAVELENGTH_MAX = 9300  # Angstroms
-WAVELENGTH_SAMPLING = 1.25  # Angstroms per pixel
-N_SPECTRAL_PIXELS = int((WAVELENGTH_MAX - WAVELENGTH_MIN) / WAVELENGTH_SAMPLING)  # ~3600
-
-
 # Convert to velocity space for a specific emission line
 # Example: H-alpha at 6562.8 Angstroms
 def wavelength_to_velocity(wavelength_array, line_center_angstroms):
@@ -1114,13 +1105,10 @@ def convolve_and_pixelize_from_bins_1d(
     bin_factor=1,
     agg_pixel="mean"
 ):
-    print('convolve and pixelize from bins aa')
     n = F_intr.shape[0]
 
     # FWHM → sigma
     sigma = FWHM / (2 * np.sqrt(2 * np.log(2)))
-
-    print('sigma', sigma)
 
     # Gaussian kernel length
     if ksize is None:
