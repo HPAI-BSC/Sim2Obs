@@ -136,7 +136,7 @@ class FeatureProcessor(ABC):
         pass
 
     @staticmethod
-    def _neighbors(self, i, j, shape):
+    def _neighbors(i, j, shape):
         for di in (-1, 0, 1):
             for dj in (-1, 0, 1):
                 if di == 0 and dj == 0:
