@@ -479,7 +479,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
                     bins=bins,
                     ranging=ranging,
                     final_aggr="mean",
-                    n_particles_threshold=10
+                    n_particles_threshold=100
                 )
                 input_ij = np.sqrt(input_ij / 3)
                 input_ij[np.isnan(input_ij)] = 0
