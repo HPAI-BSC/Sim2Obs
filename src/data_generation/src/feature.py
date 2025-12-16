@@ -176,10 +176,9 @@ class FeatureProcessor(ABC):
 
         logger.debug(f"MUSE filter bin_features: {bin_features.shape}, {binx[:3]}, {biny[:3]}")
 
-        visited = np.zeros(bin_features.shape[:2], dtype=bool)
+        #visited = np.zeros(bin_features.shape[:2], dtype=bool)
         output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
 
-        """
         # Now we apply per-bin 1d gaussian kernel (Line Spread Function)
         for i in range(bin_features.shape[0]):
             for j in range(bin_features.shape[1]):
@@ -214,8 +213,8 @@ class FeatureProcessor(ABC):
                         output_ij[i, j] = np.mean(F_pix)
                 else:
                     output_ij[i, j] = 0
-            """
 
+        """
         for i in range(bin_features.shape[0]):
             for j in range(bin_features.shape[1]):
 
@@ -303,10 +302,7 @@ class FeatureProcessor(ABC):
                 # ------------------------
                 for x, y in region:
                     output_ij[x, y] = value
-
-        # Smooth the output
-        sigma = 1.0  # in pixels
-        output_ij = gaussian_filter(output_ij, sigma=sigma)
+        """
 
         output_ij = avg_pool_2x2(output_ij)
 
@@ -485,7 +481,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
                     bins=bins,
                     ranging=ranging,
                     final_aggr="mean",
-                    n_particles_threshold=100
+                    n_particles_threshold=5
                 )
                 input_ij = np.sqrt(input_ij / 3)
                 input_ij[np.isnan(input_ij)] = 0
