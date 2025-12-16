@@ -9,7 +9,9 @@ import pandas as pd
 import joblib
 from omegaconf import DictConfig, OmegaConf
 from scipy import stats
+from scipy.ndimage import gaussian_filter
 from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
+
 
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
@@ -301,6 +303,10 @@ class FeatureProcessor(ABC):
                 # ------------------------
                 for x, y in region:
                     output_ij[x, y] = value
+
+        # Smooth the output
+        sigma = 1.0  # in pixels
+        output_ij = gaussian_filter(output_ij, sigma=sigma)
 
         output_ij = avg_pool_2x2(output_ij)
 
