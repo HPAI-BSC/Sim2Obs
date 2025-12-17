@@ -264,9 +264,14 @@ class FeatureProcessor(ABC):
                     #_, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
                     #F_pix = spectrum
 
-                    print(F_pix)
+                    print(F_pix.shape, hist.shape, edges.shape)
 
-                    mean, std = self.gaussian_moments_from_hist(F_pix, edges)
+                    try:
+                        mean, std = self.gaussian_moments_from_hist(F_pix, edges)
+                    except Exception as e:
+                        print(F_pix.shape)
+                        print(F_pix)
+                        print(e)
 
                     print(mean)
 
