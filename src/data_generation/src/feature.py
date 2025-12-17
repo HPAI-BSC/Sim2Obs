@@ -148,9 +148,6 @@ class FeatureProcessor(ABC):
                     yield ni, nj
 
     @staticmethod
-
-    import numpy as np
-
     def _muse_pixelization(output_ij, muse_n_bins=300):
         """
         Reduce a high-resolution 2D spatial map to the MUSE spatial resolution.
