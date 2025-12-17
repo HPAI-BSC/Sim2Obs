@@ -480,7 +480,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
                     feature=(feature[:, k]) ** 2,  # Access the relevant feature,
                     bins=bins,
                     ranging=ranging,
-                    final_aggr="mean",
+                    final_aggr="std",
                     n_particles_threshold=5
                 )
                 input_ij = np.sqrt(input_ij / 3)
