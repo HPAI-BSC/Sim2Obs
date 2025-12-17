@@ -147,6 +147,62 @@ class FeatureProcessor(ABC):
                 if 0 <= ni < shape[0] and 0 <= nj < shape[1]:
                     yield ni, nj
 
+    @staticmethod
+
+    import numpy as np
+
+    def _muse_pixelization(output_ij, muse_n_bins=300):
+        """
+        Reduce a high-resolution 2D spatial map to the MUSE spatial resolution.
+
+        Parameters
+        ----------
+        output_ij : 2D array-like of lists
+            High-resolution spatial map, where each pixel contains a list
+            (e.g. a velocity distribution).
+        muse_n_bins : int
+            Number of spatial bins per axis for MUSE (default = 300).
+
+        Returns
+        -------
+        rebinned : 2D array (muse_n_bins x muse_n_bins)
+            Each pixel contains the concatenated lists of the corresponding
+            high-resolution pixels.
+        """
+        output_ij = np.asarray(output_ij, dtype=object)
+        nx, ny = output_ij.shape
+
+        # Bin sizes
+        bx = nx // muse_n_bins
+        by = ny // muse_n_bins
+
+        rebinned = np.empty((muse_n_bins, muse_n_bins), dtype=object)
+
+        for i in range(muse_n_bins):
+            for j in range(muse_n_bins):
+                block = output_ij[
+                    i * bx: (i + 1) * bx,
+                    j * by: (j + 1) * by
+                ]
+
+                # Concatenate lists inside the block
+                rebinned[i, j] = [
+                    v for cell in block.flatten() for v in cell
+                ]
+
+        return rebinned
+
+
+    @staticmethod
+    def gaussian_moments_from_hist(counts, vel_centers):
+        w = counts
+        v = vel_centers
+
+        mean = np.sum(w * v) / np.sum(w)
+        var = np.sum(w * (v - mean) ** 2) / np.sum(w)
+
+        return mean, np.sqrt(var)
+
     def _apply_muse_filter(self, pos_rot_i, pos_rot_j, feature, bins, ranging, final_aggr='mean', n_particles_threshold=100):
         """
         This simulates alterations in telescope imaging to produce realistic maps.
@@ -176,6 +232,8 @@ class FeatureProcessor(ABC):
 
         logger.debug(f"MUSE filter bin_features: {bin_features.shape}, {binx[:3]}, {biny[:3]}")
 
+        bin_features = self._muse_pixelization(bin_features)
+
         #visited = np.zeros(bin_features.shape[:2], dtype=bool)
         output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
 
@@ -193,7 +251,7 @@ class FeatureProcessor(ABC):
                 if len(velocities) > n_particles_threshold:
                     # To simulate LSF we need to apply the conv on a velocity distribution
                     #hist, edges = np.histogram(np.array(velocities), bins=int(np.ceil(np.sqrt(len(velocities)))))
-                    hist, edges = np.histogram(np.array(velocities), bins=100)
+                    hist, edges = np.histogram(np.array(velocities), bins=1000)
 
                     # Apply your 1D convolution / pixelization function
                     F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
@@ -208,10 +266,10 @@ class FeatureProcessor(ABC):
                     #_, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
                     #F_pix = spectrum
 
-                    if final_aggr == "std":
-                        output_ij[i, j] = np.std(F_pix)
-                    else:
-                        output_ij[i, j] = np.mean(F_conv)
+                    mean, std = self.gaussian_moments_from_hist(F_pix, edges)
+
+                    output_ij[i, j] = std if final_aggr == "std" else np.mean(F_pix)
+
                 else:
                     output_ij[i, j] = 0
 
@@ -305,7 +363,12 @@ class FeatureProcessor(ABC):
                     output_ij[x, y] = value
         """
 
-        output_ij = avg_pool_2x2(output_ij)
+        print(output_ij.shape)
+        # Apply pixelization (merging bins to get the desired shape)
+        print(output_ij.shape)
+
+        # Reduce by 2 to og size
+        #output_ij = avg_pool_2x2(output_ij)
 
         return output_ij, binx, biny
 
