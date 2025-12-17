@@ -208,12 +208,10 @@ class FeatureProcessor(ABC):
                     #_, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
                     #F_pix = spectrum
 
-                    print(final_aggr)
-
                     if final_aggr == "std":
                         output_ij[i, j] = np.std(F_pix)
                     else:
-                        output_ij[i, j] = np.mean(F_intr)
+                        output_ij[i, j] = np.mean(F_conv)
                 else:
                     output_ij[i, j] = 0
 
