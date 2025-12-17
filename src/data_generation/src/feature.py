@@ -210,7 +210,7 @@ class FeatureProcessor(ABC):
                     if final_aggr == "std":
                         output_ij[i, j] = np.std(F_pix)
                     else:
-                        output_ij[i, j] = np.mean(F_pix)
+                        output_ij[i, j] = np.mean(F_intr)
                 else:
                     output_ij[i, j] = 0
 
@@ -480,7 +480,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
                     feature=(feature[:, k]) ** 2,  # Access the relevant feature,
                     bins=bins,
                     ranging=ranging,
-                    final_aggr="std",
+                    final_aggr="mean",
                     n_particles_threshold=5
                 )
                 input_ij = np.sqrt(input_ij / 3)
