@@ -1098,8 +1098,6 @@ def lsf_blur_via_sum_of_gaussians(
 
 def convolve_and_pixelize_from_bins_1d(
     F_intr,
-    edges,
-    stat_mode="std",
     FWHM=2.5,
     ksize=None,
     bin_factor=1,

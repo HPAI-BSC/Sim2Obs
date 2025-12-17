@@ -166,6 +166,7 @@ class FeatureProcessor(ABC):
             Each pixel contains the concatenated lists of the corresponding
             high-resolution pixels.
         """
+        print('aa')
         output_ij = np.asarray(output_ij, dtype=object)
         nx, ny = output_ij.shape
 
@@ -231,6 +232,8 @@ class FeatureProcessor(ABC):
 
         bin_features = self._muse_pixelization(bin_features)
 
+        print(bin_features.shape)
+
         #visited = np.zeros(bin_features.shape[:2], dtype=bool)
         output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
 
@@ -253,8 +256,6 @@ class FeatureProcessor(ABC):
                     # Apply your 1D convolution / pixelization function
                     F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
                         hist,
-                        edges,
-                        stat_mode="std",  # Std since we are handling velocities
                         FWHM=2.5,  # ToDo: Adjust to MUSE
                         ksize=None,  # kernel size, or let function compute
                         bin_factor=2,  # rebin spectral dimension if desired
@@ -263,7 +264,11 @@ class FeatureProcessor(ABC):
                     #_, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
                     #F_pix = spectrum
 
+                    print(F_pix)
+
                     mean, std = self.gaussian_moments_from_hist(F_pix, edges)
+
+                    print(mean)
 
                     output_ij[i, j] = std if final_aggr == "std" else np.mean(F_pix)
 
@@ -359,10 +364,6 @@ class FeatureProcessor(ABC):
                 for x, y in region:
                     output_ij[x, y] = value
         """
-
-        print(output_ij.shape)
-        # Apply pixelization (merging bins to get the desired shape)
-        print(output_ij.shape)
 
         # Reduce by 2 to og size
         #output_ij = avg_pool_2x2(output_ij)
