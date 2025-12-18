@@ -258,13 +258,13 @@ class FeatureProcessor(ABC):
                         hist,
                         FWHM=2.5,  # ToDo: Adjust to MUSE
                         ksize=None,  # kernel size, or let function compute
-                        bin_factor=2,  # rebin spectral dimension if desired
+                        bin_factor=1,  # rebin spectral dimension if desired
                         agg_pixel="mean"  # aggregation method for rebin
                     )
                     #_, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
                     #F_pix = spectrum
 
-                    print(F_pix.shape, hist.shape, edges.shape)
+                    print(F_conv, F_pix.shape, hist.shape, edges.shape)
 
                     try:
                         mean, std = self.gaussian_moments_from_hist(F_pix, edges)
