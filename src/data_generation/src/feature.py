@@ -232,8 +232,6 @@ class FeatureProcessor(ABC):
 
         bin_features = self._muse_pixelization(bin_features)
 
-        print(bin_features.shape)
-
         #visited = np.zeros(bin_features.shape[:2], dtype=bool)
         output_ij = np.zeros((bin_features.shape[0], bin_features.shape[1]))
 
@@ -264,16 +262,7 @@ class FeatureProcessor(ABC):
                     #_, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
                     #F_pix = spectrum
 
-                    print(F_conv.shape, F_pix.shape, hist.shape, edges.shape)
-
-                    try:
-                        mean, std = self.gaussian_moments_from_hist(F_pix, edges)
-                    except Exception as e:
-                        print(F_pix.shape)
-                        print(F_pix)
-                        print(e)
-
-                    print('->', mean)
+                    mean, std = self.gaussian_moments_from_hist(F_pix, edges)
 
                     output_ij[i, j] = std if final_aggr == "std" else np.mean(F_pix)
 
@@ -534,7 +523,6 @@ class VelocityDispersionProcessor(FeatureProcessor):
             missing_component = components - set(axis)
             k = next(iter(missing_component))
 
-
             if muse_filter:
                 logger.debug(f"Applying MUSE filter...")
 
@@ -556,6 +544,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
                 return input_ij, binx, biny
 
             else:
+                logger.debug(f"We do not apply MUSE filter.")
                 input_ij, binx, biny, _ = stats.binned_statistic_2d(
                     pos_rot[:, i], pos_rot[:, j],
                     (feature[:, k]) ** 2,  # Access the relevant feature
