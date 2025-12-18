@@ -215,7 +215,7 @@ class FeatureProcessor(ABC):
         - Fit a Gaussian to each bin to get the velocity dispersion (i.e. the standard deviation) as we are already doing.
         """
         # We need higher resolution to apply muse filter
-        bins = 2 * bins
+        #bins = 2 * bins
 
         logger.debug(f"MUSE filter with n bins: {bins}")
 
