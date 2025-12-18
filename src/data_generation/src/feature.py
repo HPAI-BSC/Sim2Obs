@@ -263,11 +263,14 @@ class FeatureProcessor(ABC):
 
                     output_ij[i, j] = std if final_aggr == "std" else np.mean(F_pix)
                 elif len(velocities) < n_particles_threshold:
-                    output_ij[i, j] = np.mean(bin_features[i, j])
+                    print(len(velocities))
+                    output_ij[i, j] = velocities[0]
+                """
                 else:
                     # Todo: If very few particles, then just record the mean as we were doing before
                     #output_ij[i, j] = np.std(velocities) if final_aggr == "std" else np.mean(velocities)
                     output_ij[i, j] = 0
+                """
 
         """
         for i in range(bin_features.shape[0]):
