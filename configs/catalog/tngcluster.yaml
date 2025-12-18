@@ -7,7 +7,6 @@ H: 0.6774
 Lbox: 680000 # box size in kpc/h
 transition_radius: 711.387 # kpc
 
-# TODO double checked
 spatial_resolution: 1.5 # kpc
 # bin_size = spatial_resolution * 1 ->
 # ensure that bins use a proper resolution,
@@ -85,7 +84,7 @@ fields:
         scaling: "x * 1e10"
         name: "m"
 
-# 3858
+# 3858 TODO
 # removed
 
 # 3664

@@ -921,6 +921,27 @@ def store_tr_obj(cfg, halo, subhalo_particles, icl_mask):
     np.save(path, icl_mask)
 
 
+def check_corrupted_files(hdf5_folder):
+    import glob
+    import h5py
+
+    # example: hdf5_folder = ".../snapdir_084/snap_084.*.hdf5"
+    files = glob.glob(hdf5_folder)
+
+    corrupted = []
+
+    for f in files:
+        try:
+            with h5py.File(f, "r"):
+                pass  # opening is enough to validate the file structure
+        except Exception as e:
+            print(f"CORRUPTED: {f}")
+            print(f"  -> {e}")
+            corrupted.append(f)
+
+    print(f"\nTotal corrupted files: {len(corrupted)}")
+
+
 def merge_json_files_to_csv(input_dir, output_file, chunk_size=1000, length=None):
     """
     Efficiently merges many JSON files from a directory into one CSV.
