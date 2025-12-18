@@ -241,9 +241,6 @@ class FeatureProcessor(ABC):
                 velocities = bin_features[i, j]
                 if len(velocities) == 0:
                     # No particles in bin
-                    #map_mean[i, j] = 0
-                    #map_std[i, j] = 0
-                    #map_pix[i, j] = 0
                     output_ij[i, j] = 0
                     continue
                 if len(velocities) > n_particles_threshold:
@@ -267,7 +264,8 @@ class FeatureProcessor(ABC):
                     output_ij[i, j] = std if final_aggr == "std" else np.mean(F_pix)
 
                 else:
-                    output_ij[i, j] = 0
+                    # Todo: If very few particles, then just record the mean as we were doing before
+                    output_ij[i, j] = np.std(velocities) if final_aggr == "std" else np.mean(velocities)
 
         """
         for i in range(bin_features.shape[0]):
