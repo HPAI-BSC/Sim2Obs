@@ -229,6 +229,8 @@ class FeatureProcessor(ABC):
             yrange=ranging[1]
         )
 
+        print(binx)
+
         logger.debug(f"MUSE filter bin_features: {bin_features.shape}, {binx[:3]}, {biny[:3]}")
 
         bin_features = self._muse_pixelization(bin_features)
@@ -264,8 +266,12 @@ class FeatureProcessor(ABC):
 
                     output_ij[i, j] = std if final_aggr == "std" else np.mean(F_pix)
                 elif len(velocities) < n_particles_threshold:
+                    output_ij[i, j] = 1000
+                """
+                elif len(velocities) < n_particles_threshold:
                     print(len(velocities))
                     output_ij[i, j] = velocities[0]
+                """
                 """
                 else:
                     # Todo: If very few particles, then just record the mean as we were doing before
