@@ -5,7 +5,7 @@ a: 0.8333     # redshift 0.2
 H: 0.6774
 # https://www.tng-project.org/cluster/
 Lbox: 680000 # box size in kpc/h
-transition_radius: 711.387 # kpc
+#transition_radius: 711.387 # kpc
 
 spatial_resolution: 1.5 # kpc
 # bin_size = spatial_resolution * 1 ->
