@@ -11,7 +11,7 @@ from scipy.spatial import cKDTree
 
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_fetcher import DataFetcherFactory
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from src.data_generation.src.feature import FeatureProcessorFactory, attach_models_to_features
 from src.data_generation.src.halo import Halo, HaloContext
@@ -221,7 +221,8 @@ class DataLoader(PipelineStep):
             logger.info('-------------------------------------------------------------------------------------')
             # TODO this is apparently not filtering
 
-            if halo not in self.cfg.catalog.ignore_halos:
+            ignore_halos = OmegaConf.select(self.cfg, "catalog.ignore_halos", default=[])
+            if halo not in ignore_halos:
                 try:
                     feature_input_name, feature_output_name = self.cfg.feature_names
                     input_feature = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg)
