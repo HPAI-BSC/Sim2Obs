@@ -262,6 +262,8 @@ class FeatureProcessor(ABC):
                     mean, std = self.gaussian_moments_from_hist(F_pix, edges)
 
                     output_ij[i, j] = std if final_aggr == "std" else np.mean(F_pix)
+                elif len(velocities) < n_particles_threshold:
+                    output_ij[i, j] = np.mean(bin_features[i, j])
                 else:
                     # Todo: If very few particles, then just record the mean as we were doing before
                     #output_ij[i, j] = np.std(velocities) if final_aggr == "std" else np.mean(velocities)
