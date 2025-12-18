@@ -192,9 +192,9 @@ class FeatureProcessor(ABC):
 
 
     @staticmethod
-    def gaussian_moments_from_hist(counts, vel_centers):
+    def gaussian_moments_from_hist(counts, vel_edges):
+        v = 0.5 * (vel_edges[:-1] + vel_edges[1:])
         w = counts
-        v = vel_centers
 
         mean = np.sum(w * v) / np.sum(w)
         var = np.sum(w * (v - mean) ** 2) / np.sum(w)
@@ -251,7 +251,7 @@ class FeatureProcessor(ABC):
                 if len(velocities) > n_particles_threshold:
                     # To simulate LSF we need to apply the conv on a velocity distribution
                     #hist, edges = np.histogram(np.array(velocities), bins=int(np.ceil(np.sqrt(len(velocities)))))
-                    hist, edges = np.histogram(np.array(velocities), bins=999)
+                    hist, edges = np.histogram(np.array(velocities), bins=1000)
 
                     # Apply your 1D convolution / pixelization function
                     F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
@@ -264,7 +264,7 @@ class FeatureProcessor(ABC):
                     #_, spectrum = lsf_blur_via_sum_of_gaussians(np.array(velocities))
                     #F_pix = spectrum
 
-                    print(F_conv, F_pix.shape, hist.shape, edges.shape)
+                    print(F_conv.shape, F_pix.shape, hist.shape, edges.shape)
 
                     try:
                         mean, std = self.gaussian_moments_from_hist(F_pix, edges)
@@ -273,7 +273,7 @@ class FeatureProcessor(ABC):
                         print(F_pix)
                         print(e)
 
-                    print(mean)
+                    print('->', mean)
 
                     output_ij[i, j] = std if final_aggr == "std" else np.mean(F_pix)
 
