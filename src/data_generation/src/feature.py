@@ -248,8 +248,8 @@ class FeatureProcessor(ABC):
                     continue
                 if len(velocities) > n_particles_threshold:
                     # To simulate LSF we need to apply the conv on a velocity distribution
-                    #hist, edges = np.histogram(np.array(velocities), bins=int(np.ceil(np.sqrt(len(velocities)))))
-                    hist, edges = np.histogram(np.array(velocities), bins=1000)
+                    hist, edges = np.histogram(np.array(velocities), bins=int(np.ceil(np.sqrt(len(velocities)))))
+                    #hist, edges = np.histogram(np.array(velocities), bins=1000)
 
                     # Apply your 1D convolution / pixelization function
                     F_intr, F_conv, F_pix = convolve_and_pixelize_from_bins_1d(
