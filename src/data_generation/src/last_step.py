@@ -26,13 +26,12 @@ class LastStep:
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(errors)
+        commit_hash = os.getenv("COMMIT_HASH", "unknown")
+        logger.info("Commit hash:", commit_hash)
 
-        if len(self.cfg.feature_names) > 1:
-            transition_radius_compute = self.cfg.feature_names[1].get(
-                "transition_radius_compute", False
-            )
-        else:
-            transition_radius_compute = False
+        transition_radius_compute = False
+        for feature in self.cfg.feature_names:
+            transition_radius_compute = feature.get("transition_radius_compute", False)
 
         if transition_radius_compute:
             # Transition radius analysis
