@@ -539,17 +539,20 @@ def plot_hist(df, attribute, title, bins, name, log=False):
            Title of the plot.
        """
     if attribute not in df:
-        raise Exception()
+        raise Exception(f'Error, {attribute} not present in the dataframe with columns: {df.columns}')
 
     dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets'
+
     # Plotting
     plt.figure(figsize=(8, 5))
-    plt.hist(df[attribute].dropna(), bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+    plt.hist(np.log(df[attribute].dropna()), bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
 
     if log:
-        plt.xscale('log')
+        plt.xscale(f'log {attribute}')
+    else:
+        plt.hist(df[attribute].dropna(), bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+        plt.xlabel(attribute)
 
-    plt.xlabel(attribute)
     plt.ylabel("Count")
     plt.title(title)
     plt.grid(True, linestyle='--', alpha=0.5)
