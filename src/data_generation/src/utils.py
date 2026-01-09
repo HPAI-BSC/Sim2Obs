@@ -545,9 +545,10 @@ def plot_hist(df, attribute, title, bins, name, log=False):
 
     # Plotting
     plt.figure(figsize=(8, 5))
-    plt.hist(np.log(df[attribute].dropna()), bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
 
     if log:
+        print('--------------- log --------------- ')
+        plt.hist(np.log(df[attribute].dropna()), bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
         plt.xscale(f'log {attribute}')
     else:
         plt.hist(df[attribute].dropna(), bins=bins, color='skyblue', edgecolor='black', alpha=0.7)

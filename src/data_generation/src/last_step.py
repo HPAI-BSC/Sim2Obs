@@ -27,12 +27,13 @@ class LastStep:
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(errors)
         commit_hash = os.getenv("COMMIT_HASH", "unknown")
-        logger.info("Commit hash:", commit_hash)
+        logger.info(f"Commit hash:{commit_hash}")
 
         transition_radius_compute = False
         for feature in self.cfg.feature_names:
             transition_radius_compute = feature.get("transition_radius_compute", False)
 
+        '''
         if transition_radius_compute:
             # Transition radius analysis
             dataset_dir = self.cfg.paths.datasets_dir
@@ -72,6 +73,7 @@ class LastStep:
                             f.write(f"{error}\n")
                     else:
                         f.write(f"{item}\n")
+        '''
 
 
 
