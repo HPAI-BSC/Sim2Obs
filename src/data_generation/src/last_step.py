@@ -21,9 +21,11 @@ class LastStep:
         self.cfg = cfg
 
     def process(self, errors):
+        # todo make errors pipeline or catalog dependent
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
+        logger.info(errors)
 
         if len(self.cfg.feature_names) > 1:
             transition_radius_compute = self.cfg.feature_names[1].get(
