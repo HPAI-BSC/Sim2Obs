@@ -546,10 +546,14 @@ def plot_hist(df, attribute, title, bins, name, log=False):
     # Plotting
     plt.figure(figsize=(8, 5))
 
+    plt.hist(df[attribute].dropna(), bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+
     if log:
-        print('--------------- log --------------- ')
-        plt.hist(np.log(df[attribute].dropna()), bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
-        plt.xscale(f'log({attribute})')
+        data = df[attribute].dropna()
+        data = data[data > 0]
+        plt.hist(data, bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+        plt.xscale('log')
+        plt.xlabel(f'log({attribute})')
     else:
         plt.hist(df[attribute].dropna(), bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
         plt.xlabel(attribute)
@@ -558,8 +562,6 @@ def plot_hist(df, attribute, title, bins, name, log=False):
     plt.title(title)
     plt.grid(True, linestyle='--', alpha=0.5)
     plt.tight_layout()
-    #plt.show()
-
     path = dataset_dir + f'/../logs/{name}_{attribute}_histogram.png'
     plt.savefig(path, dpi=300)
 
