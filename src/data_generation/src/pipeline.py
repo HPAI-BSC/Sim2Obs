@@ -36,7 +36,7 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     catalog = 'Tng-cluster'
     #catalog = 'Illustris'
     plot_hist(df=halo_context.data, attribute='m200', name=catalog, title=f'{catalog} M200 distribution', bins=100,
-              log=True)
+              log=False)
     return
 
     if n is not None:
