@@ -32,13 +32,6 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
     halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
 
-    # DEBUG
-    #catalog = 'Tng-cluster'
-    catalog = 'Illustris'
-    plot_hist(df=halo_context.data, attribute='m200', name=catalog, title=f'{catalog} M200 distribution', bins=100,
-              log=False)
-    return
-
     if n is not None:
         halo_subhalo_list = halo_subhalo_list[:n]
 
