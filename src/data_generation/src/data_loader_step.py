@@ -170,12 +170,14 @@ class DataLoader(PipelineStep):
                     halo_dict = {'halo_id': halo.halo_id, 'R200': halo.r200,
                                  'transition_radius': output_feature.transition_radius}
                     with open(path, "w") as f:
-                        json.dump(halo_dict, f, indent=4)
+                        pass
+                        #json.dump(halo_dict, f, indent=4)
                 except Exception as e:
                     logger.error(f"Error with {halo.halo_id}: {e}")
                     halo_dict = {'halo_id': halo.halo_id, 'error': str(e)}
                     with open(error_path, "w") as f:
-                        json.dump(halo_dict, f, indent=4)
+                        pass
+                        #json.dump(halo_dict, f, indent=4)
                     continue
 
                 # Update cosmos instance
