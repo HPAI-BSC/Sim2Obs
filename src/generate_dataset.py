@@ -55,9 +55,31 @@ def main(cfg: DictConfig) -> Any:
     steps = get_pipeline_steps(cfg)
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
-    starting_idx = None
-    ending_idx = None
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[15075791, 7869072])
+    starting_idx = 1
+    ending_idx = 4
+
+    # ---------------
+    import glob
+    import h5py
+
+    files = glob.glob("/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/illustris300/output/snapdir_084/snap_084.*.hdf5")
+
+    corrupted = []
+
+    for f in files:
+        try:
+            with h5py.File(f, "r"):
+                pass  # opening is enough to validate the file structure
+        except Exception as e:
+            print(f"CORRUPTED: {f}")
+            print(f"  -> {e}")
+            corrupted.append(f)
+
+    print(f"\nTotal corrupted files: {len(corrupted)}")
+
+    # ---------------
+
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[])
 
 
 if __name__ == "__main__":
