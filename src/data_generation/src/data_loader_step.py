@@ -186,7 +186,8 @@ class DataLoader(PipelineStep):
 
                 # Analyze objects with errors offline
                 if debug_halo_ids is not None and halo.halo_id in debug_halo_ids:
-                    store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
+                    pass
+                    #store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
 
                 logger.info(f"Finished processing halo {halo.halo_id}")
             else:
@@ -267,7 +268,8 @@ class DataLoader(PipelineStep):
                 # ToDO (Pablo) - Try added due to permission denied errors. Remove when permission in '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/../logs/' granted.
                 try:
                     if debug_halo_ids is not None and halo.halo_id in debug_halo_ids:
-                        store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
+                        pass
+                        #store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
                 except Exception as e:
                     logger.error(f"Error with {halo.halo_id}: {e}")
 
