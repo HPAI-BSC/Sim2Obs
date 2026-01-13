@@ -33,8 +33,8 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
 
     # DEBUG
-    catalog = 'Tng-cluster'
-    #catalog = 'Illustris'
+    #catalog = 'Tng-cluster'
+    catalog = 'Illustris'
     plot_hist(df=halo_context.data, attribute='m200', name=catalog, title=f'{catalog} M200 distribution', bins=100,
               log=False)
     return
