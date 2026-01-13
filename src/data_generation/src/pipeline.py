@@ -32,10 +32,10 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
     halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
 
-    path = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/tng_cluster_halos.csv'
+    path = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/illustris_halos.csv'
     halo_context.data.to_csv(path, index=False)
 
-    path = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/tng_cluster_subhalos.csv'
+    path = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/illustris_subhalos.csv'
     subhalo_context.data.to_csv(path, index=False)
 
     if n is not None:
