@@ -55,12 +55,10 @@ def main(cfg: DictConfig) -> Any:
     steps = get_pipeline_steps(cfg)
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
-    starting_idx = None
-    ending_idx = None
+    starting_idx = 1
+    ending_idx = 4
 
-    check_corrupted_files(hdf5_folder='/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/illustris300/output/snapdir_084/.*.hdf5')
-
-    #_ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[])
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[])
 
 
 if __name__ == "__main__":
