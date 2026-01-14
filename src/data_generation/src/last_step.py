@@ -33,10 +33,12 @@ class LastStep:
             error_list = errors[0]
             for e in error_list:
                 if (isinstance(e, list) or isinstance(e, tuple)) and len(e) > 0:
-                    error_item = e[0]
-                    row = {'halo_id': error_item[0], 'error': error_item[1], 'step': error_item[2]}
-                    print(f'Halo id: {error_item[0]}, error: {error_item[1]} in step: {error_item[2]}')
-                    errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
+                    print(e)
+                    print('------')
+                    #error_item = e[0]
+                    #row = {'halo_id': error_item[0], 'error': error_item[1], 'step': error_item[2]}
+                    #print(f'Halo id: {error_item[0]}, error: {error_item[1]} in step: {error_item[2]}')
+                    #errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
 
             dataset_dir = self.cfg.paths.datasets_dir
             path = dataset_dir + f'/../logs/errors/errors_{commit_hash}.csv'
