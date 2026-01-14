@@ -30,7 +30,7 @@ class LastStep:
 
         if len(errors) > 0:
             errors_df = pd.DataFrame(columns=['halo_id', 'error', 'step'])
-            error_list = errors
+            error_list = errors[0]
             for e in error_list:
                 if (isinstance(e, list) or isinstance(e, tuple)) and len(e) > 0:
                     error_item = e[0]
