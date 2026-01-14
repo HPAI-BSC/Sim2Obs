@@ -393,7 +393,7 @@ class MapStep(PipelineStep):
                 if halo not in self.cfg.catalog.ignore_halos:
 
                     # DEBUG
-                    if halo.halo_id % 2 == 0:
+                    if halo.halo_id % 2 != 0:
                         raise Exception('This is an error [test]')
 
                     # Check if this halo has been processed already
