@@ -30,10 +30,10 @@ class LastStep:
         logger.info(f"Commit hash:{commit_hash}")
 
         if len(errors) > 0:
-            error_list = errors[0]
+            error_list = errors
             for e in error_list:
                 print(e)
-                print()
+                print('-------')
 
         transition_radius_compute = False
         for feature in self.cfg.feature_names:
