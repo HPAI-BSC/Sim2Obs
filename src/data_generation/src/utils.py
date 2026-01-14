@@ -948,7 +948,7 @@ def check_corrupted_files(hdf5_folder):
     print(f"\nTotal corrupted files: {len(corrupted)}")
 
 
-def merge_json_files_to_csv(input_dir, output_file, chunk_size=1000, length=None):
+def merge_json_files_to_csv(input_dir, output_file, simulation, chunk_size=1000, length=None):
     """
     Efficiently merges many JSON files from a directory into one CSV.
 
@@ -957,7 +957,7 @@ def merge_json_files_to_csv(input_dir, output_file, chunk_size=1000, length=None
         output_file (str): Path to the output CSV file.
         chunk_size (int): Number of JSONs to load per chunk before writing to disk.
     """
-    json_files = [f for f in os.listdir(input_dir) if f.endswith('.json')]
+    json_files = [f for f in os.listdir(input_dir) if f.endswith('.json') and simulation in f]
 
     if length is not None:
         json_files = json_files[:length]

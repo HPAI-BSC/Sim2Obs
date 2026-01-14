@@ -53,7 +53,11 @@ class LastStep:
             dataset_dir = self.cfg.paths.datasets_dir
             path = dataset_dir + f'/../logs/transition_radius'
             output_file = dataset_dir + f'/../logs/transition_radius/merged.csv'
-            merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None)
+            name = self.cfg.catalog.path.replace(dataset_dir, '')
+            name = name.replace('/', '_')
+            # TODO DOUBLE CHECK WE CONSIDER JUST VALID JSONS
+            print(f'simulation: {name}')
+            merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None, simulation=name)
 
             df = pd.read_csv(output_file)
             df['transition_radius/R200'] = df['transition_radius'] / df['R200']
