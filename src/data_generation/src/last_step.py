@@ -26,6 +26,7 @@ class LastStep:
         logger.info('-------------------------------------------------------------------------------------')
         commit_hash = os.getenv("COMMIT_HASH", "unknown")
         logger.info(f"Commit hash:{commit_hash}")
+        print(errors)
 
         if len(errors) > 0:
             errors_df = pd.DataFrame(columns=['halo_id', 'error', 'step'])
