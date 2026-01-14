@@ -30,12 +30,20 @@ class LastStep:
         logger.info(f"Commit hash:{commit_hash}")
 
         if len(errors) > 0:
+            errors_df = pd.DataFrame(columns=['halo_id', 'error', 'step'])
             error_list = errors
             for e in error_list:
                 if isinstance(e, list):
                     error_item = e[0]
+                    row = {'halo_id': error_item[0], 'error': error_item[1], 'step': error_item[2]}
                     print(f'Halo id: {error_item[0]}, error: {error_item[1]} in step: {error_item[2]}')
-                print('-------')
+                    errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
+
+            dataset_dir = self.cfg.paths.datasets_dir
+            path = dataset_dir + f'/../logs/errors/{errors}_{commit_hash}.csv'
+            print(f'errors saved into: {path}')
+            print(errors_df['error'].value_counts())
+            errors_df.to_csv(path, index=False)
 
         transition_radius_compute = False
         for feature in self.cfg.feature_names:
