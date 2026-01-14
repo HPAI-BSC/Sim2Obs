@@ -261,8 +261,7 @@ class DataLoader(PipelineStep):
                     subhalo_ctx.preprocess(halo, lbox)
                 except Exception as e:
                     logger.error(f"Error with {halo.halo_id}: {e}")
-                    halo_dict = {'halo_id': halo.halo_id, 'error': str(e)}
-                    self.errors.append(halo_dict)
+                    self.errors.append((halo.halo_id, str(e), self.name))
                     continue
 
                 # Update cosmos instance
@@ -273,13 +272,6 @@ class DataLoader(PipelineStep):
 
                 # Analyze objects with errors offline
                 # ToDO (Pablo) - Try added due to permission denied errors. Remove when permission in '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/../logs/' granted.
-                try:
-                    if debug_halo_ids is not None and halo.halo_id in debug_halo_ids:
-                        pass
-                        #store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
-                except Exception as e:
-                    logger.error(f"Error with {halo.halo_id}: {e}")
-
                 # Got to the next step
                 if next_step is not None:
                     yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)

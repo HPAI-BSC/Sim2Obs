@@ -433,7 +433,7 @@ class MapStep(PipelineStep):
                     logger.debug(f'Ignoring halo: {cosmos_data.halo.halo_id}')
             except Exception as e:
                 logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
-                errors.append((halo, str(e), self.name))
+                errors.append((halo.halo_id, str(e), self.name))
                 continue
         yield errors
 

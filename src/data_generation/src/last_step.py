@@ -32,7 +32,9 @@ class LastStep:
         if len(errors) > 0:
             error_list = errors
             for e in error_list:
-                print(e)
+                if isinstance(e, list):
+                    error_item = e[0]
+                    print(f'Halo id: {error_item[0]}, error: {error_item[1]} in step: {error_item[2]}')
                 print('-------')
 
         transition_radius_compute = False
