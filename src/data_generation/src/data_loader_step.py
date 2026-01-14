@@ -132,8 +132,9 @@ class DataLoader(PipelineStep):
             dataset_dir = self.cfg.paths.datasets_dir
             name = self.cfg.catalog.path.replace(dataset_dir, '')
             name = name.replace('/', '_')
-            path = dataset_dir + f'/../logs/transition_radius/{name}_transition_radius_info_{halo.halo_id}.json'
-            error_path = dataset_dir + f'/../logs/errors/{name}_error_{halo.halo_id}.json'
+            commit_hash = os.getenv("COMMIT_HASH", "unknown")
+            path = dataset_dir + f'/../logs/transition_radius/{commit_hash}_{name}_transition_radius_info_{halo.halo_id}.json'
+            error_path = dataset_dir + f'/../logs/errors/{commit_hash}_{name}_error_{halo.halo_id}.json'
             logger.debug(f'{path}')
             # Do the transition radius analysis iff the halo has not been processed before
             if not os.path.exists(path):
@@ -170,14 +171,12 @@ class DataLoader(PipelineStep):
                     halo_dict = {'halo_id': halo.halo_id, 'R200': halo.r200,
                                  'transition_radius': output_feature.transition_radius}
                     with open(path, "w") as f:
-                        pass
-                        #json.dump(halo_dict, f, indent=4)
+                        json.dump(halo_dict, f, indent=4)
                 except Exception as e:
                     logger.error(f"Error with {halo.halo_id}: {e}")
                     halo_dict = {'halo_id': halo.halo_id, 'error': str(e)}
                     with open(error_path, "w") as f:
-                        pass
-                        #json.dump(halo_dict, f, indent=4)
+                        json.dump(halo_dict, f, indent=4)
                     continue
 
                 # Update cosmos instance
