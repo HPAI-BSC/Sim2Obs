@@ -21,7 +21,6 @@ class LastStep:
         self.cfg = cfg
 
     def process(self, errors):
-        # todo make errors pipeline or catalog dependent
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')
@@ -49,7 +48,6 @@ class LastStep:
         for feature in self.cfg.feature_names:
             transition_radius_compute = feature.get("transition_radius_compute", False)
 
-        '''
         if transition_radius_compute:
             # Transition radius analysis
             dataset_dir = self.cfg.paths.datasets_dir
@@ -61,35 +59,6 @@ class LastStep:
             df['transition_radius/R200'] = df['transition_radius'] / df['R200']
             print(f'n = {len(df)}')
             print(df.describe())
-
-            # Errors
-            path = dataset_dir + f'/../logs/errors'
-            output_file = dataset_dir + f'/../logs/errors/errors_merged.csv'
-            merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None)
-            logger.info(f'Storing errors at: {output_file}')
-            df = pd.read_csv(output_file)
-            print(f'n = {len(df)}')
-            print(df['error'].value_counts())
-        else:
-            dataset_dir = self.cfg.paths.datasets_dir
-            name = self.cfg.catalog.path.replace(dataset_dir, '')
-            name = name.replace('/', '_')
-            path = self.cfg.paths.datasets_dir + f'/../logs/errors_{name}.txt'
-            logger.info(f'Storing errors at: {path}')
-
-            if os.path.isdir(path):
-                shutil.rmtree(path)
-            elif os.path.isfile(path):
-                os.remove(path)
-
-            with open(path, 'w') as f:
-                for item in errors:
-                    if isinstance(item, list):
-                        for error in item:
-                            f.write(f"{error}\n")
-                    else:
-                        f.write(f"{item}\n")
-        '''
 
 
 

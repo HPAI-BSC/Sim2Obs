@@ -133,8 +133,7 @@ class DataLoader(PipelineStep):
             name = self.cfg.catalog.path.replace(dataset_dir, '')
             name = name.replace('/', '_')
             commit_hash = os.getenv("COMMIT_HASH", "unknown")
-            path = dataset_dir + f'/../logs/transition_radius/{commit_hash}_{name}_transition_radius_info_{halo.halo_id}.json'
-            error_path = dataset_dir + f'/../logs/errors/{commit_hash}_{name}_error_{halo.halo_id}.json'
+            path = dataset_dir + f'/../logs/transition_radius/{name}_transition_radius_info_{halo.halo_id}.json'
             logger.debug(f'{path}')
             # Do the transition radius analysis iff the halo has not been processed before
             if not os.path.exists(path):
@@ -167,22 +166,15 @@ class DataLoader(PipelineStep):
                     # Center subhalos positions respect to current halo, including overlapping subhalos
                     subhalo_ctx.preprocess(halo, lbox)
 
-                    # DEBUG
-                    if halo.halo_id % 2 == 0:
-                        raise Exception('This is an error [test]')
-
                     # Store info for log purposes
                     halo_dict = {'halo_id': halo.halo_id, 'R200': halo.r200,
                                  'transition_radius': output_feature.transition_radius}
-                    #with open(path, "w") as f:
-                    #    json.dump(halo_dict, f, indent=4)
+
+                    with open(path, "w") as f:
+                        json.dump(halo_dict, f, indent=4)
                 except Exception as e:
                     logger.error(f"Error with {halo.halo_id}: {e}")
-                    halo_dict = {'halo_id': halo.halo_id, 'error': str(e)}
-                    self.errors.append(halo_dict)
-
-                    #with open(error_path, "w") as f:
-                    #    json.dump(halo_dict, f, indent=4)
+                    self.errors.append((halo.halo_id, str(e), self.name))
                     continue
 
                 # Update cosmos instance
@@ -190,12 +182,6 @@ class DataLoader(PipelineStep):
                 cosmos_data.subhalo_particles = halo_particles_overlapping
                 cosmos_data.input_feature = input_feature
                 cosmos_data.output_feature = output_feature
-
-                # Analyze objects with errors offline
-                if debug_halo_ids is not None and halo.halo_id in debug_halo_ids:
-                    pass
-                    #store_obj(self.cfg, halo, subhalo_ctx, cosmos_data)
-
                 logger.info(f"Finished processing halo {halo.halo_id}")
             else:
                 logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')
@@ -271,7 +257,6 @@ class DataLoader(PipelineStep):
                 cosmos_data.output_feature = output_feature
 
                 # Analyze objects with errors offline
-                # ToDO (Pablo) - Try added due to permission denied errors. Remove when permission in '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/../logs/' granted.
                 # Got to the next step
                 if next_step is not None:
                     yield from next_step([(halo, subhalo_ctx, cosmos_data)], **kwargs)
