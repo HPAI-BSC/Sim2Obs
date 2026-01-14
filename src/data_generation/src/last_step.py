@@ -32,7 +32,7 @@ class LastStep:
             errors_df = pd.DataFrame(columns=['halo_id', 'error', 'step'])
             error_list = errors
             for e in error_list:
-                if isinstance(e, list) and len(e) > 0:
+                if (isinstance(e, list) or isinstance(e, tuple)) and len(e) > 0:
                     error_item = e[0]
                     row = {'halo_id': error_item[0], 'error': error_item[1], 'step': error_item[2]}
                     print(f'Halo id: {error_item[0]}, error: {error_item[1]} in step: {error_item[2]}')
