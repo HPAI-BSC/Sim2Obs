@@ -391,6 +391,11 @@ class MapStep(PipelineStep):
             logger.debug(f'Halo: {halo.halo_id}, {cosmos_data.halo.halo_id}')
             try:
                 if halo not in self.cfg.catalog.ignore_halos:
+
+                    # DEBUG
+                    if halo.halo_id % 2 == 0:
+                        raise Exception('This is an error [test]')
+
                     # Check if this halo has been processed already
                     if not self._is_halo_already_processed(cosmos_data.input_feature, halo, cosmos_data):
                         # Compute number of bins and store it in the metadata

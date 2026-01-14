@@ -167,6 +167,10 @@ class DataLoader(PipelineStep):
                     # Center subhalos positions respect to current halo, including overlapping subhalos
                     subhalo_ctx.preprocess(halo, lbox)
 
+                    # DEBUG
+                    if halo.halo_id % 2 == 0:
+                        raise Exception('This is an error [test]')
+
                     # Store info for log purposes
                     halo_dict = {'halo_id': halo.halo_id, 'R200': halo.r200,
                                  'transition_radius': output_feature.transition_radius}
