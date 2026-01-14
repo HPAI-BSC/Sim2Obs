@@ -39,8 +39,9 @@ class LastStep:
                     errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
 
             dataset_dir = self.cfg.paths.datasets_dir
-            path = dataset_dir + f'/../logs/errors/{errors}_{commit_hash}.csv'
+            path = dataset_dir + f'/../logs/errors/errors_{commit_hash}.csv'
             print(f'errors saved into: {path}')
+            print()
             print(errors_df['error'].value_counts())
             errors_df.to_csv(path, index=False)
 
