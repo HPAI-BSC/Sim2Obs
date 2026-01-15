@@ -26,7 +26,10 @@ class LastStep:
         logger.info('-------------------------------------------------------------------------------------')
         commit_hash = os.getenv("COMMIT_HASH", "unknown")
         logger.info(f"Commit hash:{commit_hash}")
-        print(errors)
+
+        dataset_dir = self.cfg.paths.datasets_dir
+        name = self.cfg.catalog.path.replace(dataset_dir, '')
+        name = name.replace('/', '_')
 
         if len(errors) > 0:
             errors_df = pd.DataFrame(columns=['halo_id', 'error', 'step'])
@@ -34,18 +37,24 @@ class LastStep:
             for e in error_list:
                 if (isinstance(e, list) or isinstance(e, tuple)) and len(e) > 0:
                     print(e)
+                    row = {'halo_id': e[0], 'error': e[1], 'step': e[2]}
+                    print(f'Halo id: {e[0]}, error: {e[1]} in step: {e[2]}')
+                    errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
                     print('------')
-                    #error_item = e[0]
-                    #row = {'halo_id': error_item[0], 'error': error_item[1], 'step': error_item[2]}
-                    #print(f'Halo id: {error_item[0]}, error: {error_item[1]} in step: {error_item[2]}')
-                    #errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
 
-            dataset_dir = self.cfg.paths.datasets_dir
-            path = dataset_dir + f'/../logs/errors/errors_{commit_hash}.csv'
+            path = dataset_dir + f'/../logs/errors/errors_{name}.csv'
+
+            if os.path.exists(path):
+                existing_df = pd.read_csv(path)
+                combined_df = pd.concat([existing_df, errors_df], ignore_index=True)
+            else:
+                combined_df = errors_df.copy()
+
+            # Remove duplicates
+            combined_df = combined_df.drop_duplicates()
+            combined_df.to_csv(path, index=False)
             print(f'errors saved into: {path}')
-            print()
             print(errors_df['error'].value_counts())
-            errors_df.to_csv(path, index=False)
 
         transition_radius_compute = False
         for feature in self.cfg.feature_names:
