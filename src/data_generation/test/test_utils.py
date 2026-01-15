@@ -114,11 +114,11 @@ class TestUtils(unittest.TestCase):
         store_overlapping_matrix_as_df(cfg_illustris, overlapping_matrix)
 
     def test_filter_outliers(self):
-        df = pd.read_csv('../../../transition_radius_data.csv')
+        df = pd.read_csv('../../../transition_radius_exploration/illustris/_illustris300_transition_radius.csv')
         transition_radius = df['transition_radius']
-        print(transition_radius.describe())
-
-        percentiles = [99, 98, 97, 96, 95]
+        tmp = df.describe()
+        percentiles = [97]
+        ignored_halos = []
 
         for percentile in percentiles:
             upper_bound = np.percentile(transition_radius, percentile)
@@ -126,11 +126,23 @@ class TestUtils(unittest.TestCase):
             filtered_df = df[(transition_radius >= lower_bound) & (transition_radius <= upper_bound)]
             print(f'Percentile: {percentile}, transition radius [kpc]: {upper_bound}, final size: {len(filtered_df)}, Ignored halos: {len(df) - len(filtered_df)}')
             ignored_halos = set(df['halo_id']) - set(filtered_df['halo_id'])
-            # print(ignored_halos)
+            print(ignored_halos)
 
             sns.histplot(filtered_df["transition_radius"]/filtered_df['R200'], bins=100, kde=True)
             plt.title(f"Transition radius/R200 distribution, percentile: {percentile}")
-            plt.show()
+            #plt.show()
+
+        ignored_halos = list(ignored_halos)
+        new_df = df[~df['halo_id'].isin(ignored_halos)]
+        sts = new_df.describe()
+        print()
+
+    def test_explore_problematic_halos(self):
+        # What does it have in common halos that don't have TR ?
+        df = pd.read_csv('../../../transition_radius_exploration/illustris/errors__illustris300.csv')
+        halos_id = df['halo_id']
+        print()
+
 
     def test_eagle_RefL0100N1504(self):
         halo_subhalo_list = joblib.load('../../../transition_radius_exploration/halo_subhalo_list_RefL0100N1504.joblib')
