@@ -141,8 +141,96 @@ class TestUtils(unittest.TestCase):
         # What does it have in common halos that don't have TR ?
         df = pd.read_csv('../../../transition_radius_exploration/illustris/errors__illustris300.csv')
         halos_id = df['halo_id']
-        print()
+        raw_halos = pd.read_csv('../../../illustris_halo_context_raw.csv')
+        problematic_halos = raw_halos[raw_halos['halo_id'].isin(halos_id)]
+        good_halos = raw_halos[~raw_halos['halo_id'].isin(halos_id)]
 
+        np.random.seed(0)
+
+        features = ['m200']
+
+        df1_long = problematic_halos[features].assign(dataset="problematic halos")
+        df2_long = good_halos[features].assign(dataset="good halos")
+        long_df = pd.concat([df1_long, df2_long], ignore_index=True)
+        long_df = long_df.melt(id_vars="dataset", var_name="feature", value_name="value")
+        plt.figure(figsize=(10, 6))
+
+        datasets = long_df["dataset"].unique()
+        features_unique = long_df["feature"].unique()
+
+        positions = []
+        data = []
+        pos = 1
+        width = 0.35
+
+        for feature in features_unique:
+            for i, ds in enumerate(datasets):
+                values = long_df[
+                    (long_df["feature"] == feature) &
+                    (long_df["dataset"] == ds)
+                    ]["value"].dropna()
+
+                data.append(values)
+                positions.append(pos + i * width)
+            pos += 1.5  # space between features
+
+        plt.boxplot(data, positions=positions, widths=0.3)
+
+        tick_positions = []
+        pos = 1
+        for _ in features_unique:
+            tick_positions.append(pos + width / 2)  # middle of each feature's box pair
+            pos += 1.5
+
+        plt.xticks(tick_positions, features_unique, rotation=30)
+
+        plt.ylabel("Value")
+        plt.title("Feature comparison between problematic halos and good halos")
+
+        # Add legend manually
+        for i, ds in enumerate(datasets):
+            plt.plot([], c='k', label=ds)
+        plt.legend()
+
+        plt.tight_layout()
+        plt.show()
+
+        # Data
+        x1 = problematic_halos['r200'].dropna()
+        x2 = good_halos['r200'].dropna()
+
+        # -----------------------
+        # Figure 1: Problematic halos
+        # -----------------------
+        plt.figure(figsize=(8, 5))
+
+        # Logarithmic bins (optional but better for mass distributions)
+        bins1 = np.logspace(np.log10(x1.min()), np.log10(x1.max()), 20)
+
+        plt.hist(x1, bins=bins1, alpha=0.7, color="blue", edgecolor="black")
+        plt.xscale("log")
+        plt.xlabel("r200")
+        plt.ylabel("Count")
+        plt.title("Distribution of r200 for Problematic Halos")
+        plt.tight_layout()
+        plt.savefig("problematic_halos_r200.png", dpi=300)  # dpi=300 for high quality
+        plt.show()
+
+        # -----------------------
+        # Figure 2: Good halos
+        # -----------------------
+        plt.figure(figsize=(8, 5))
+
+        bins2 = np.logspace(np.log10(x2.min()), np.log10(x2.max()), 20)
+
+        plt.hist(x2, bins=bins2, alpha=0.7, color="red", edgecolor="black")
+        plt.xscale("log")
+        plt.xlabel("r200")
+        plt.ylabel("Count")
+        plt.title("Distribution of r200 for Good Halos")
+        plt.tight_layout()
+        plt.savefig("good_halos_r200.png", dpi=300)  # dpi=300 for high quality
+        plt.show()
 
     def test_eagle_RefL0100N1504(self):
         halo_subhalo_list = joblib.load('../../../transition_radius_exploration/halo_subhalo_list_RefL0100N1504.joblib')
