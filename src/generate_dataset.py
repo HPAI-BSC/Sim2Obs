@@ -58,7 +58,9 @@ def main(cfg: DictConfig) -> Any:
     starting_idx = None
     ending_idx = None
 
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[])
+    check_corrupted_files(hdf5_folder='/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/tng_cluster/output/snapdir_084/.*.hdf5')
+
+    #_ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[])
 
 
 if __name__ == "__main__":
