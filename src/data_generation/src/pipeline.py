@@ -22,8 +22,8 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
 
     # TODO DEBUG
     dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
-    halo_context.data.to_csv(os.path.join(dataset_dir, 'illustris_halo_context.csv'))
-    subhalo_context.data.to_csv(os.path.join(dataset_dir, 'illustris_subhalo_context.csv'))
+    halo_context.data.to_csv(os.path.join(dataset_dir, 'tng_cluster_halo_context.csv'))
+    subhalo_context.data.to_csv(os.path.join(dataset_dir, 'tng_cluster_subhalo_context.csv'))
 
     if len(debug_halo_ids) > 0:
         print(f'Filtering halo context by the following halo ids: {debug_halo_ids}')
