@@ -168,13 +168,14 @@ class DataLoader(PipelineStep):
 
                     # Store info for log purposes
                     halo_dict = {'halo_id': halo.halo_id, 'R200': halo.r200,
+                                 'number_particles': len(halo_particles_overlapping.star_p),
                                  'transition_radius': output_feature.transition_radius}
 
                     with open(path, "w") as f:
                         json.dump(halo_dict, f, indent=4)
                 except Exception as e:
                     logger.error(f"Error with {halo.halo_id}: {e}")
-                    self.errors.append((halo.halo_id, str(e), self.name))
+                    self.errors.append((halo.halo_id, str(e), len(halo_particles_overlapping.star_p), self.name))
                     continue
 
                 # Update cosmos instance

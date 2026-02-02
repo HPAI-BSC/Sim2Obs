@@ -20,10 +20,10 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     halo_context = data_loader.fetcher.get_halos()
     subhalo_context = data_loader.fetcher.get_subhalos()
 
-    # TODO DEBUG
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
-    halo_context.data.to_csv(os.path.join(dataset_dir, 'tng_cluster_halo_context.csv'))
-    subhalo_context.data.to_csv(os.path.join(dataset_dir, 'tng_cluster_subhalo_context.csv'))
+    # DEBUG
+    # dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
+    # halo_context.data.to_csv(os.path.join(dataset_dir, 'tng_cluster_halo_context.csv'))
+    # subhalo_context.data.to_csv(os.path.join(dataset_dir, 'tng_cluster_subhalo_context.csv'))
 
     if len(debug_halo_ids) > 0:
         print(f'Filtering halo context by the following halo ids: {debug_halo_ids}')
@@ -37,9 +37,6 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
     halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
     halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
-
-    # TODO DEBUG
-    return
 
     if n is not None:
         halo_subhalo_list = halo_subhalo_list[:n]
