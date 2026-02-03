@@ -60,10 +60,11 @@ def main(cfg: DictConfig) -> Any:
 
     # tng-cluster
     # debug_halos = [15021486, 6712395, 15612231, 6009909]
+    no_subhalos_found = [1955843, 3085827, 262661, 8344073]
 
     # tng300
-    debug_halos = [3815, 4139, 3468, 3700]
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=debug_halos)
+    #debug_halos = [3815, 4139, 3468, 3700]
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=no_subhalos_found)
 
 
 if __name__ == "__main__":
