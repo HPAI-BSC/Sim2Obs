@@ -1,19 +1,17 @@
 import os.path
-import pickle
-import shutil
-
-import joblib
-import numpy as np
 import pandas as pd
 from omegaconf import DictConfig
 
-from src.data_generation.src.feature import ICLProcessor
-from src.data_generation.src.pipeline import get_pipeline_step
-from src.data_generation.src.utils import plot_transition_radius, setup_logger, plot_icl_bcg_profiles, \
-    merge_json_files_to_csv
+from src.data_generation.src.utils import setup_logger, merge_json_files_to_csv
 
 logger = setup_logger("LastStep")
 
+
+def get_pipeline_step(cfg: DictConfig, step_name: str):
+    return next(
+        (step for step in cfg.pipeline if step.name == step_name),
+        None
+    )
 
 class LastStep:
     name = 'LastStep'
