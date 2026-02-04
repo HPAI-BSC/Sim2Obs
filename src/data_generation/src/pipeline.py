@@ -25,14 +25,14 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     # halo_context.data.to_csv(os.path.join(dataset_dir, 'tng_cluster_halo_context.csv'))
     # subhalo_context.data.to_csv(os.path.join(dataset_dir, 'tng_cluster_subhalo_context.csv'))
 
-    if len(debug_halo_ids) > 0:
-        print(f'Filtering halo context by the following halo ids: {debug_halo_ids}')
-        halo_context = halo_context.filter_by_ids(debug_halo_ids)
-        print(f'Halo context size: {len(halo_context.data)}')
-
     if len(ignore_halos) > 0:
         print(f'Filtering ignore halos: {ignore_halos}')
         halo_context = halo_context.filter_by_ids(ignore_halos)
+        print(f'Halo context size: {len(halo_context.data)}')
+
+    if len(debug_halo_ids) > 0:
+        print(f'Filtering halo context by the following halo ids: {debug_halo_ids}')
+        halo_context = halo_context.filter_by_ids(debug_halo_ids)
         print(f'Halo context size: {len(halo_context.data)}')
 
     # Clean subhalo context to remove subhalos that belong to halos that do not exist

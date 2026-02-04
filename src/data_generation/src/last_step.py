@@ -20,17 +20,8 @@ class LastStep:
     def __init__(self, cfg: DictConfig):
         self.cfg = cfg
 
-    def process(self, errors):
-        logger.info('-------------------------------------------------------------------------------------')
-        logger.info(f"Last step")
-        logger.info('-------------------------------------------------------------------------------------')
-        commit_hash = os.getenv("COMMIT_HASH", "unknown")
-        logger.info(f"Commit hash:{commit_hash}")
-
-        dataset_dir = self.cfg.paths.datasets_dir
-        name = self.cfg.catalog.path.replace(dataset_dir, '')
-        name = name.replace('/', '_')
-
+    @staticmethod
+    def _inform_errors(errors, dataset_dir, name):
         if len(errors) > 0:
             errors_df = pd.DataFrame(columns=['halo_id', 'error', 'number of particles', 'step'])
             error_list = errors[0]
@@ -55,6 +46,7 @@ class LastStep:
             print(f'errors saved into: {path}')
             print(errors_df['error'].value_counts())
 
+    def _check_compute_transition_radius_analysis(self, name):
         transition_radius_compute = False
         for feature in self.cfg.feature_names:
             transition_radius_compute = feature.get("transition_radius_compute", False)
@@ -73,6 +65,39 @@ class LastStep:
             df['transition_radius/R200'] = df['transition_radius'] / df['R200']
             print(f'n = {len(df)}')
             print(df.describe())
+
+    def _check_maps(self):
+        required_keys = ['path', 'name', 'spatial_resolution']
+        for key in required_keys:
+            if key not in self.cfg:
+                if key not in self.cfg.get('catalog', {}):
+                    raise ValueError(f"Error, missing required configuration key: {key}")
+
+        map_step_dict = next((step for step in self.cfg.pipeline if step.name == cls.name), None)
+
+
+        setup_output_directories(self.map_configuration['root_path'],
+                                 self.map_configuration['rotation_angle'],
+                                 self.map_configuration['bin_spatial_resolution_scale'],
+                                 input_feature.name,
+                                 output_feature.name)
+
+    def process(self, errors):
+        logger.info('-------------------------------------------------------------------------------------')
+        logger.info(f"Last step")
+        logger.info('-------------------------------------------------------------------------------------')
+        commit_hash = os.getenv("COMMIT_HASH", "unknown")
+        logger.info(f"Commit hash:{commit_hash}")
+
+        dataset_dir = self.cfg.paths.datasets_dir
+        name = self.cfg.catalog.path.replace(dataset_dir, '')
+        name = name.replace('/', '_')
+
+        self._inform_errors(errors, dataset_dir, name)
+        self._check_compute_transition_radius_analysis(name)
+
+
+
 
 
 
