@@ -34,15 +34,17 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     subhalo_context.remove_subhalos_belonging_unvalid_halos(halo_context)
     print(f'Number of subhalos after removing unvalid fofs: {len(subhalo_context)}.')
 
-    overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
-    halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
-    halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
+    if subhalo_context.data.size() > 0:
+        overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
+        halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
+        halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
 
-    if n is not None:
-        halo_subhalo_list = halo_subhalo_list[:n]
+        if n is not None:
+            halo_subhalo_list = halo_subhalo_list[:n]
 
-    for halo_data in halo_subhalo_list:
-        yield halo_data  # T
+        for halo_data in halo_subhalo_list:
+            yield halo_data
+    return
 
 
 class Pipeline:

@@ -701,9 +701,7 @@ class ICLProcessor(FeatureProcessor):
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
         logger.debug(f'Computing transition radius for: {halo.halo_id}')
-
-        # TODO DEBUG
-        store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
+        # store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
 
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
@@ -748,8 +746,7 @@ class ICLProcessor(FeatureProcessor):
             logger.debug(f'Transition radius for halo: {halo.halo_id}: {transition_radius} '
                          f'({round(normalized_transition_radius, 2)} % r200), r200: {halo.r200}')
         else:
-            # todo debug
-            plot_icl_bcg_profiles_conflictive(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, halo.halo_id)
+            # plot_icl_bcg_profiles_conflictive(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, halo.halo_id)
             logger.error('No transition radius found; ICL never dominates.')
             raise Exception('No transition radius found; ICL never dominates.')
 
@@ -761,8 +758,7 @@ class ICLProcessor(FeatureProcessor):
         self.transition_radius = transition_radius
 
         # Build cumsum profiles
-        # TODO DEBUG
-        plot_icl_bcg_profiles(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
+        # plot_icl_bcg_profiles(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
 
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):
         """
