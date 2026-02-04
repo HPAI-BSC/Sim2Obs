@@ -27,7 +27,7 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
 
     if len(ignore_halos) > 0:
         print(f'Filtering ignore halos: {ignore_halos}')
-        halo_context = halo_context.filter_by_ids(ignore_halos)
+        halo_context = halo_context.remove_by_ids(ignore_halos)
         print(f'Halo context size: {len(halo_context.data)}')
 
     if len(debug_halo_ids) > 0:
