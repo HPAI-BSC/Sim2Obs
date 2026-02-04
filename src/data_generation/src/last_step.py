@@ -8,6 +8,7 @@ import pandas as pd
 from omegaconf import DictConfig
 
 from src.data_generation.src.feature import ICLProcessor
+from src.data_generation.src.pipeline import get_pipeline_step
 from src.data_generation.src.utils import plot_transition_radius, setup_logger, plot_icl_bcg_profiles, \
     merge_json_files_to_csv
 
@@ -73,14 +74,39 @@ class LastStep:
                 if key not in self.cfg.get('catalog', {}):
                     raise ValueError(f"Error, missing required configuration key: {key}")
 
-        map_step_dict = next((step for step in self.cfg.pipeline if step.name == cls.name), None)
+        map_step = get_pipeline_step(self.cfg, "map_step")
 
+        if map_step is not None:
+            dim = map_step.get("dim", None)
+            n_zooms = map_step.get("n_zooms", None)
+            print(dim, n_zooms)
 
-        setup_output_directories(self.map_configuration['root_path'],
-                                 self.map_configuration['rotation_angle'],
-                                 self.map_configuration['bin_spatial_resolution_scale'],
-                                 input_feature.name,
-                                 output_feature.name)
+        def get_defined_rotations(cfg):
+            return {
+                k: v
+                for k, v in cfg.items()
+                if k.startswith("rotation_")
+            }
+
+        rotations = get_defined_rotations(self.cfg)
+        has_rotations = len(rotations) > 0
+        print(rotations)
+        #'rotation_angle': rotation_angle
+
+        features_cfg = self.cfg.feature_names
+        feature_names = [f["name"] for f in features_cfg]
+        print(feature_names)
+
+        if len(feature_names) != 2:
+            raise ValueError(
+                f"Expected exactly 2 features, got {len(feature_names)}: {feature_names}"
+            )
+
+        root_path = self.cfg.catalog.path,
+        catalog_name = self.cfg.catalog.name,
+        spatial_resolution = self.cfg.catalog.spatial_resolution,
+        bin_spatial_resolution_scale = self.cfg.catalog.bin_spatial_resolution_scale
+        print(root_path, catalog_name, spatial_resolution, bin_spatial_resolution_scale)
 
     def process(self, errors):
         logger.info('-------------------------------------------------------------------------------------')
@@ -95,6 +121,7 @@ class LastStep:
 
         self._inform_errors(errors, dataset_dir, name)
         self._check_compute_transition_radius_analysis(name)
+        self._check_maps()
 
 
 

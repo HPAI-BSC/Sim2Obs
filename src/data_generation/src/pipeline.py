@@ -15,6 +15,13 @@ from src.data_generation.src.utils import setup_logger, plot_hist
 logger = setup_logger("Pipeline")
 
 
+def get_pipeline_step(cfg: DictConfig, step_name: str):
+    return next(
+        (step for step in cfg.pipeline if step.name == step_name),
+        None
+    )
+
+
 def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[], ignore_halos=[]):
     print(f'debug_halo_ids={debug_halo_ids}')
     halo_context = data_loader.fetcher.get_halos()
@@ -50,8 +57,9 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
         for halo_data in halo_subhalo_list:
             yield halo_data
 
-    logger.error('There are no subhalos found for the current configuration.')
-    return
+    else:
+        logger.error('There are no subhalos found for the current configuration.')
+        return
 
 
 class Pipeline:
