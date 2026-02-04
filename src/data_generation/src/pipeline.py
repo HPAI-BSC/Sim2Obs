@@ -44,6 +44,8 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
 
         for halo_data in halo_subhalo_list:
             yield halo_data
+
+    logger.error('There are no subhalos found for the current configuration.')
     return
 
 

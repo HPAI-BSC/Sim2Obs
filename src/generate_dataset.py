@@ -60,7 +60,7 @@ def main(cfg: DictConfig) -> Any:
 
     # tng-cluster
     # debug_halos = [15021486, 6712395, 15612231, 6009909]
-    no_subhalos_found = [1955843, 3085827, 262661, 8344073]
+    no_subhalos_found = [1955843, 3085827, 262661, 8344073, 4365342]
 
     # tng300
     #debug_halos = [3815, 4139, 3468, 3700]
