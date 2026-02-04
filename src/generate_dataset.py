@@ -2,7 +2,7 @@ import logging
 from typing import Any, List
 import hydra
 # from dotenv import load_dotenv, find_dotenv
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 # from rootutils import rootutils
 
 from src.data_generation.src.utils import setup_logger, check_corrupted_files
@@ -61,10 +61,10 @@ def main(cfg: DictConfig) -> Any:
     # tng-cluster
     # debug_halos = [15021486, 6712395, 15612231, 6009909]
     no_subhalos_found = [1955843, 3085827, 262661, 8344073, 4365342]
+    ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
 
-    # tng300
-    #debug_halos = [3815, 4139, 3468, 3700]
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=no_subhalos_found)
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=no_subhalos_found,
+                     ignore_halos=ignore_halos)
 
 
 if __name__ == "__main__":

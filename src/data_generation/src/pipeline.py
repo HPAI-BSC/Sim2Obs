@@ -15,7 +15,7 @@ from src.data_generation.src.utils import setup_logger, plot_hist
 logger = setup_logger("Pipeline")
 
 
-def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[]):
+def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[], ignore_halos=[]):
     print(f'debug_halo_ids={debug_halo_ids}')
     halo_context = data_loader.fetcher.get_halos()
     subhalo_context = data_loader.fetcher.get_subhalos()
@@ -30,11 +30,16 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
         halo_context = halo_context.filter_by_ids(debug_halo_ids)
         print(f'Halo context size: {len(halo_context.data)}')
 
+    if len(ignore_halos) > 0:
+        print(f'Filtering ignore halos: {ignore_halos}')
+        halo_context = halo_context.filter_by_ids(ignore_halos)
+        print(f'Halo context size: {len(halo_context.data)}')
+
     # Clean subhalo context to remove subhalos that belong to halos that do not exist
     subhalo_context.remove_subhalos_belonging_unvalid_halos(halo_context)
     print(f'Number of subhalos after removing unvalid fofs: {len(subhalo_context)}.')
 
-    if subhalo_context.data.size() > 0:
+    if not subhalo_context.data.empty:
         overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
         halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
@@ -97,7 +102,7 @@ class Pipeline:
 
         return pipeline
 
-    def run(self, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[]) -> Any:
+    def run(self, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[], ignore_halos=[]) -> Any:
         if not self.steps:
             logger.error("Error, please provide a non-empty pipeline, steps cannot be an empty list.")
             return None
@@ -111,7 +116,7 @@ class Pipeline:
 
         if len(step_list) > 0:
             data_loader = step_list[0]
-            input_gen = get_generator(data_loader, n, starting_idx, ending_idx, debug_halo_ids)
+            input_gen = get_generator(data_loader, n, starting_idx, ending_idx, debug_halo_ids, ignore_halos)
         else:
             raise Exception()
 
