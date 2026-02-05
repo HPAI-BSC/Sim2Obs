@@ -353,7 +353,9 @@ class MapStep(PipelineStep):
                                 feature_name)
 
         pattern = re.compile(re.escape(file) + ".*")  # escape special chars in string
-        print(pattern, path)
+        if not os.path.exists(path):
+            return False
+
         for filename in os.listdir(path):
             if pattern.match(filename):  # match at the start of the filename
                 return True
