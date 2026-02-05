@@ -7,11 +7,11 @@ H: 0.6774
 Lbox: 680000 # box size in kpc/h
 #transition_radius: 711.387 # kpc
 
-spatial_resolution: 1.5 # kpc
+spatial_resolution: 1.499 # kpc
 # bin_size = spatial_resolution * 1 ->
 # ensure that bins use a proper resolution,
 #bin_size > spatial resolution *1.5-2 times
-bin_spatial_resolution_scale: 1.499
+bin_spatial_resolution_scale: 1.5
 
 path: ${paths.datasets_dir}/tng_cluster
 
