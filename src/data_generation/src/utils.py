@@ -690,16 +690,21 @@ def setup_output_directories(catalog_path: str, rotation_angle: float, bin_spati
     - This function ensures that directories for both input and output features are properly organized under the
       specified catalog path, with an optional subdirectory for rotation angles.
     """
+    print(setup_output_directories)
     if os.path.exists(catalog_path):
+        print(catalog_path)
         if rotation_angle is not None:
             dataset_path = os.path.join(catalog_path, f'rotation_{rotation_angle}')
             dataset_path = f'{dataset_path}_s{bin_spatial_resolution_scale}'
             if not os.path.exists(dataset_path):
+                print('mkdir')
                 os.mkdir(dataset_path)
         else:
+            print('no_rotation')
             dataset_path = os.path.join(catalog_path, f'no_rotation')
             dataset_path = f'{dataset_path}_s{bin_spatial_resolution_scale}'
             if not os.path.exists(dataset_path):
+                print('mkdir')
                 os.mkdir(dataset_path)
 
         if not os.path.exists(os.path.join(dataset_path, output_feature_name)):
