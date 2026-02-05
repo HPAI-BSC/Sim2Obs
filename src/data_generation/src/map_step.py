@@ -353,6 +353,7 @@ class MapStep(PipelineStep):
                                 feature_name)
 
         pattern = re.compile(re.escape(file) + ".*")  # escape special chars in string
+        print(pattern)
         if not os.path.exists(path):
             return False
 
@@ -397,6 +398,9 @@ class MapStep(PipelineStep):
                     if self._is_halo_already_processed(cosmos_data.input_feature, halo, cosmos_data):
                         logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')
                         continue
+
+                if self.transition_radius is None:
+                    raise ValueError('Transition radius cannot be None.')
 
                 # Compute number of bins and store it in the metadata
                 fov = self.transition_radius * 2
