@@ -17,9 +17,12 @@ feature_names:
 #    transition_radius_compute: true
 
 # [angle, z axis, [rotation_axis]]
-rotation_45: [ 45, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]
-rotation_90: [ 90, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [ 0, 0, 1] ] ]
-rotation_120: [ 120, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]
+#rotation_45: [ 45, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]
+#rotation_90: [ 90, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [ 0, 0, 1] ] ]
+#rotation_120: [ 120, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]
+
+# This afects the entire pipeline
+skip_existing_halos: true
 
 pipeline:
   - name: data_loader

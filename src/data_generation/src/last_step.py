@@ -112,6 +112,9 @@ class LastStep:
         if os.path.exists(path_i):
             print(f'Path: {path_i} exists')
 
+
+        # TODO check whether the map exists and save the ones that don't
+
     def process(self, errors):
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")

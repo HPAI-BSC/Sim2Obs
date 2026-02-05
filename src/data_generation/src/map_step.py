@@ -390,42 +390,42 @@ class MapStep(PipelineStep):
         for halo, _, cosmos_data in g:
             logger.debug(f'Halo: {halo.halo_id}, {cosmos_data.halo.halo_id}')
             try:
-                if halo not in self.cfg.catalog.ignore_halos:
-                    # Check if this halo has been processed already
-                    if not self._is_halo_already_processed(cosmos_data.input_feature, halo, cosmos_data):
-                        # Compute number of bins and store it in the metadata
-                        fov = self.transition_radius * 2
-                        bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
+                # Check if this halo has been processed already
+                if self.cfg.skip_existing_halos:
+                    if self._is_halo_already_processed(cosmos_data.input_feature, halo, cosmos_data):
+                        logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')
+                        continue
 
-                        # Store num_bins
-                        cosmos_data.metadata['map']['bins'] = bins
-                        input_feature = cosmos_data.input_feature
-                        output_feature = cosmos_data.output_feature
-                        logger.debug(f'Number of bins: {bins}')
+                # Compute number of bins and store it in the metadata
+                fov = self.transition_radius * 2
+                bins = muse_bins_r(fov, self.spatial_resolution, self.bin_spatial_resolution_scale)
 
-                        interlopers_id = self._get_interlopers_id(cosmos_data)
-                        io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
+                # Store num_bins
+                cosmos_data.metadata['map']['bins'] = bins
+                input_feature = cosmos_data.input_feature
+                output_feature = cosmos_data.output_feature
+                logger.debug(f'Number of bins: {bins}')
 
-                        if self.dim == 2:
-                            projections = ["xy", "yz", "xz"]
-                            for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
-                                projection_name = projections[j]
-                                input_feature.map = map_f_i
-                                output_feature.map = map_f_o
-                                self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, rotation_axis,
-                                                         rotation_iteration, cosmos_data, input_feature, output_feature)
-                        elif self.dim == 3:
-                            pass
+                interlopers_id = self._get_interlopers_id(cosmos_data)
+                io_biny_projections = self._create_maps(cosmos_data, input_feature, output_feature)
 
-                        # Got to the next step
-                        if next_step is not None:
-                            yield from next_step([(halo, _, cosmos_data)], **kwargs)
-                        else:
-                            yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
-                    else:
-                        logger.debug(f'Halo already processed: {cosmos_data.halo.halo_id}, skipping it.')
+                if self.dim == 2:
+                    projections = ["xy", "yz", "xz"]
+                    for j, (map_f_i, map_f_o, biny_i) in enumerate(io_biny_projections):
+                        projection_name = projections[j]
+                        input_feature.map = map_f_i
+                        output_feature.map = map_f_o
+                        self._process_projection(map_f_o.shape, interlopers_id, biny_i, projection_name, rotation_axis,
+                                                 rotation_iteration, cosmos_data, input_feature, output_feature)
+                elif self.dim == 3:
+                    pass
+
+                # Got to the next step
+                if next_step is not None:
+                    yield from next_step([(halo, _, cosmos_data)], **kwargs)
                 else:
-                    logger.debug(f'Ignoring halo: {cosmos_data.halo.halo_id}')
+                    yield cosmos_data.halo, cosmos_data.input_feature, cosmos_data.output_feature
+
             except Exception as e:
                 logger.error(f"Failed to create maps for halo {cosmos_data.halo.halo_id}: {e}")
                 errors.append((halo.halo_id, str(e), self.name))
