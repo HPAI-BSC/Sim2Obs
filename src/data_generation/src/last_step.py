@@ -13,6 +13,7 @@ def get_pipeline_step(cfg: DictConfig, step_name: str):
         None
     )
 
+
 class LastStep:
     name = 'LastStep'
 
@@ -87,14 +88,16 @@ class LastStep:
             }
 
         rotations = get_defined_rotations(self.cfg)
-        has_rotations = len(rotations) > 0
-        print(rotations)
-        #'rotation_angle': rotation_angle
+        bin_spatial_resolution_scale = self.cfg.catalog.bin_spatial_resolution_scale
+
+        # Take the first key
+        rotation = f'no_rotation_{bin_spatial_resolution_scale}'
+        for key, values in rotations.items():
+            rotation = f'{key}_{bin_spatial_resolution_scale}'
+            break
 
         features_cfg = self.cfg.feature_names
         feature_names = [f["name"] for f in features_cfg]
-        print(feature_names)
-
         if len(feature_names) != 2:
             raise ValueError(
                 f"Expected exactly 2 features, got {len(feature_names)}: {feature_names}"
@@ -102,9 +105,12 @@ class LastStep:
 
         root_path = self.cfg.catalog.path,
         catalog_name = self.cfg.catalog.name,
-        spatial_resolution = self.cfg.catalog.spatial_resolution,
-        bin_spatial_resolution_scale = self.cfg.catalog.bin_spatial_resolution_scale
-        print(root_path, catalog_name, spatial_resolution, bin_spatial_resolution_scale)
+        path_i = os.path.join(root_path, catalog_name, rotation, feature_names[0])
+        path_o = os.path.join(root_path, catalog_name, rotation, feature_names[1])
+
+        print(path_i, path_o)
+        if os.path.exists(path_i):
+            print(f'Path: {path_i} exists')
 
     def process(self, errors):
         logger.info('-------------------------------------------------------------------------------------')
