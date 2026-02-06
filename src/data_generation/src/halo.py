@@ -210,3 +210,4 @@ class HaloContext:
         filtered_df = self.data[~self.data["halo_id"].isin(halo_ids)]
         return HaloContext.from_dataframe(filtered_df)
 
+

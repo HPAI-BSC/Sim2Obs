@@ -106,14 +106,12 @@ class LastStep:
         root_path = self.cfg.catalog.path
         catalog_name = self.cfg.catalog.name
         print(root_path, catalog_name, rotation, feature_names[0])
-        path_i = os.path.join(root_path, catalog_name, rotation, feature_names[0])
-        path_o = os.path.join(root_path, catalog_name, rotation, feature_names[1])
+        path_i = os.path.join(root_path, rotation, feature_names[0])
+        path_o = os.path.join(root_path, rotation, feature_names[1])
 
         print(path_i, path_o)
         if os.path.exists(path_i):
             print(f'Path: {path_i} exists')
-
-
         # TODO check whether the map exists and save the ones that don't
 
     def process(self, errors):
