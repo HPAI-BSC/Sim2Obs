@@ -103,8 +103,8 @@ class LastStep:
                 f"Expected exactly 2 features, got {len(feature_names)}: {feature_names}"
             )
 
-        root_path = self.cfg.catalog.path,
-        catalog_name = self.cfg.catalog.name,
+        root_path = self.cfg.catalog.path
+        catalog_name = self.cfg.catalog.name
         print(root_path, catalog_name, rotation, feature_names[0])
         path_i = os.path.join(root_path, catalog_name, rotation, feature_names[0])
         path_o = os.path.join(root_path, catalog_name, rotation, feature_names[1])
