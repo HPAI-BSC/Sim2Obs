@@ -91,7 +91,7 @@ class LastStep:
         bin_spatial_resolution_scale = self.cfg.catalog.bin_spatial_resolution_scale
 
         # Take the first key
-        rotation = f'no_rotation_{bin_spatial_resolution_scale}'
+        rotation = f'no_rotation_s{bin_spatial_resolution_scale}'
         for key, values in rotations.items():
             rotation = f'{key}_{bin_spatial_resolution_scale}'
             break
@@ -112,7 +112,18 @@ class LastStep:
         print(path_i, path_o)
         if os.path.exists(path_i):
             print(f'Path: {path_i} exists')
-        # TODO check whether the map exists and save the ones that don't
+
+        files_i = [f for f in os.listdir(path_i) if f.endswith('.npz')]
+        files_o = [f for f in os.listdir(path_o) if f.endswith('.npz')]
+
+        # Check number of files in both features
+        if len(files_i) == len(files_o):
+            pass
+
+        # TODO number of files generated, number of halos
+        # TODO check whether the map exists and save the ones that don't => they 're not in errors not in subhalos error
+
+
 
     def process(self, errors):
         logger.info('-------------------------------------------------------------------------------------')
