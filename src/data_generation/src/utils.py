@@ -955,7 +955,8 @@ def store_RF_input(cfg, halo, icl_mask, v_delta, distance):
     data_to_store["scaled_features"] = scaled_features
 
     datasets_dir = cfg.paths.datasets_dir
-    path = datasets_dir + f'/../logs/RF_input_halo_{halo.halo_id}.json'
+    name = cfg.catalog.name
+    path = datasets_dir + f'/../logs/RF_{name}_input_halo_{halo.halo_id}.json'
     with open(path, "w") as f:
         json.dump(data_to_store, f, indent=2)
     print(f"Saved RF input for halo {halo.halo_id} -> {path}")
