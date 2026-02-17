@@ -945,7 +945,8 @@ def store_RF_input(cfg, halo, icl_mask, v_delta, distance):
     }
 
     # Optional: add scaled/log features used by RF
-    V200 = np.sqrt(halo.G * halo.m200 / halo.r200)
+    G = 4.30091e-6
+    V200 = np.sqrt(G * halo.m200 / halo.r200)
     scaled_features = {
         "distance_scaled": np.log10(distance / halo.r200).tolist(),
         "velocity_scaled": (v_delta / V200).tolist(),
