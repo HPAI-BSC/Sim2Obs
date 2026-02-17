@@ -913,23 +913,32 @@ def store_obj(cfg, halo, subhalo_ctx, cosmos_data):
         pickle.dump(cosmos_data, f)
 
 
-def store_tr_obj(cfg, halo, subhalo_particles, icl_mask):
-    print(f'Storing oject for transition radius debugging for: {halo.halo_id}')
-    sim_code = cfg.catalog.path.split('/')[-1]
+def store_RF_input(cfg, halo, icl_mask, v_delta, distance):
+    # Build dictionary
+    data_to_store = {
+        "halo_id": halo.halo_id,
+        "m200": halo.m200,
+        "r200": halo.r200,
+        "gpos": halo.gpos.tolist() if hasattr(halo, "gpos") else None,
+        "icl_mask": icl_mask.tolist(),
+        "v_delta": v_delta.tolist(),
+        "distance": distance.tolist()
+    }
+
+    # Optional: add scaled/log features used by RF
+    V200 = np.sqrt(halo.G * halo.m200 / halo.r200)
+    scaled_features = {
+        "distance_scaled": np.log10(distance / halo.r200).tolist(),
+        "velocity_scaled": (v_delta / V200).tolist(),
+        "log_m200": [np.log10(halo.m200 * 1e-14)] * len(v_delta)
+    }
+    data_to_store["scaled_features"] = scaled_features
+
     datasets_dir = cfg.paths.datasets_dir
-    name = cfg.catalog.name
-    path = datasets_dir + f'/../logs/halo_{name}_{sim_code}_{halo.halo_id}.pkl'
-    print(path)
-    with open(path, 'wb') as f:
-        pickle.dump(halo, f)
-
-    path = datasets_dir + f'/../logs/subhalo_particles_{name}_{sim_code}_{halo.halo_id}.pkl'
-    print(path)
-    with open(path, 'wb') as f:
-        pickle.dump(subhalo_particles, f)
-
-    path = datasets_dir + f'/../logs/icl_mask_{name}_{sim_code}_{halo.halo_id}.npy'
-    np.save(path, icl_mask)
+    path = datasets_dir + f'/../logs/RF_input_halo_{halo.halo_id}.json'
+    with open(path, "w") as f:
+        json.dump(data_to_store, f, indent=2)
+    print(f"Saved RF input for halo {halo.halo_id} -> {path}")
 
 
 def check_corrupted_files(hdf5_folder):

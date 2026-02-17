@@ -16,7 +16,8 @@ from sklearn.exceptions import ConvergenceWarning, DataConversionWarning
 from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles, store_tr_obj, \
-    plot_icl_bcg_profiles_conflictive, convolve_and_pixelize_from_bins_1d, lsf_blur_via_sum_of_gaussians, avg_pool_2x2
+    plot_icl_bcg_profiles_conflictive, convolve_and_pixelize_from_bins_1d, lsf_blur_via_sum_of_gaussians, avg_pool_2x2, \
+    store_RF_input
 
 logger = setup_logger("FeatureProcessor")
 
@@ -675,6 +676,8 @@ class ICLProcessor(FeatureProcessor):
             raise ValueError("icl_mask is empty; no masking applied.")
 
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
+        # For debug purposes
+        store_RF_input(self.cfg, halo, icl_mask, v_delta, distance)
         return icl_mask
 
     def _compute_transition_radius(self, halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
