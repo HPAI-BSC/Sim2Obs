@@ -67,6 +67,7 @@ class LastStep:
             print(df.describe())
 
     def _check_maps(self):
+        print('_check_maps')
         required_keys = ['path', 'name', 'spatial_resolution']
         for key in required_keys:
             if key not in self.cfg:
@@ -74,6 +75,7 @@ class LastStep:
                     raise ValueError(f"Error, missing required configuration key: {key}")
 
         map_step = get_pipeline_step(self.cfg, "map_step")
+        print(map_step)
 
         if map_step is not None:
             dim = map_step.get("dim", None)
@@ -122,7 +124,6 @@ class LastStep:
 
         # TODO number of files generated, number of halos
         # TODO check whether the map exists and save the ones that don't => they 're not in errors not in subhalos error
-
 
 
     def process(self, errors):
