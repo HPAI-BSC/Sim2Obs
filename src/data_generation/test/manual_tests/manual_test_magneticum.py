@@ -131,7 +131,7 @@ SMST = fof.read('SMST', 1)   # shape: (N_subhalos, 6)
 # TODO one dim ? this is wrong # shape: (N_subhalos, 6)
 RHMS = fof.read('RHMS', 1)
 # Type index 4 = stars
-SubhaloMassType        = SMST[:, 4]   # stellar mass per subhalo
+SubhaloMassType = SMST[:, 4]   # stellar mass per subhalo
 
 
 # Reading Stellar Particles from Snapshot
