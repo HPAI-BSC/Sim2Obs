@@ -1,0 +1,91 @@
+# More details in src/data_generation/test/manual_tests/manual_test_magneticum.py
+
+name: magneticum
+snapnum: 120       # redshift 0.2125
+a: 0.8247          # from print(snap.header.__dict__)
+H: 0.704           # TODO confirm with Ilaria
+
+Lbox: 412365.83   # box size in kpc/h, box_size_raw = snap.header.BoxSize  # 352000.0 ckpc/h
+
+# TODO recompute it
+transition_radius: 637.031 # kpc
+spatial_resolution: 1.480 # kpc
+# bin_size = spatial_resolution * 1 ->
+# ensure that bins use a proper resolution,
+#bin_size > spatial resolution *1.5-2 times
+bin_spatial_resolution_scale: 1.5
+
+path: ${paths.datasets_dir}/magneticum
+
+# TODO review filters
+fields:
+  halo:
+    MCRI:
+      input: "10^10 Msun/h"
+      output: "Msun/h"
+      scaling: "x * 1e10"
+      name: "m200"
+      # Final units 1e13M⊙ to 6.77*1e12 M⊙/h
+      filter: ["> 1e13 * 0.6774"]
+    RCRI:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      name: "r200"
+    GPOS:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      name: "gpos"
+    FSUB:
+      input: null
+      output: null
+      scaling: null
+      name: "fsub"
+  subhalo:
+    SPOS:
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      name: "spos"
+    SMST:
+      input: "10^10 Msun/h"
+      output: "Msun"
+      scaling: "x * 1e10 / h"
+      index: 4
+      name: "mstr"
+      # Mass > 1e10 M⊙
+      filter: "> 1e10 "
+    stellar_half_mass_radius: # This variable is computed by a function
+      input: "ckpc/h"
+      output: "pkpc/h"
+      scaling: "x * a"
+      name: "shmr"
+      needs:
+        star: [POS, MASS] # These attributes should be added below
+    GRNR:
+      input: null
+      output: null
+      scaling: null
+      name: "id_parents"
+  particles:
+    star:
+      # <part_type>_<name> => ptype=4
+      POS:
+        input: "ckpc/h"
+        output: "pkpc/h"
+        scaling: "x * a"
+        name: "p"
+      VEL:
+        input: "km/s^-1"
+        output: "km/s^-1"
+        scaling: null
+        name: "v"
+      MASS:
+        input: "10^10 Msun/h"
+        output: "Msun/h"
+        scaling: "x * 1e10"
+        name: "m"
+
+
+ignore_halos: []
