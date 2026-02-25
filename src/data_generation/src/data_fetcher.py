@@ -2037,6 +2037,7 @@ class MagneticumFetcher(DataFetcher):
 
         # Batch read subhalo fields
         subhalo_catalog = g3read.read_new(group_base, ['SOFF', 'SLEN'], 1, is_snap=False, multiple_files=True)
+        print('subhalo_catalog', len(subhalo_catalog))
         self._soff = subhalo_catalog['SOFF']
         self._slen = subhalo_catalog['SLEN']
 
@@ -2046,12 +2047,14 @@ class MagneticumFetcher(DataFetcher):
         self._glen = halo_catalog['GLEN']
         self._fsub = halo_catalog['FSUB']
         self._nsub = halo_catalog['NSUB']
+        print('halo_catalog', halo_catalog)
 
         # PID stored under ptype=2
         self._pid = g3read.read_new(group_base, ['PID '], 2, is_snap=False, multiple_files=True)['PID ']
 
         # Cache snap data per particle type
         self._snap_cache = {}
+        print('Cache snap data per particle type')
         for part_type, type_config in self.catalog.fields.particles.items():
             fields = list(type_config.keys())
             if 'ID' not in fields:
@@ -2116,6 +2119,7 @@ class MagneticumFetcher(DataFetcher):
             self.column_map['FSUB'] = 'fsub'
 
         halos = g3read.read_new(self._group_base, self.halo_fields.copy(), 0, is_snap=False, multiple_files=True)
+        print(len(halos))
 
         if len(halos) == 0:
             logger.warning("No halos found.")
