@@ -2026,6 +2026,7 @@ class MagneticumFetcher(DataFetcher):
         logger.info(f"MagneticumFetcher initialized with config: {catalog.path}")
 
     def _load_catalog_cache(self):
+        print('_load_catalog_cache')
         path = self.catalog.path
         groups_dir = os.path.join(path, f'groups_{self.catalog.snapnum}')
         group_base = os.path.join(groups_dir, os.path.basename(groups_dir).replace('groups', 'sub'))
@@ -2036,6 +2037,7 @@ class MagneticumFetcher(DataFetcher):
         self._snap_base = snap_base
 
         # Batch read subhalo fields
+        print('Batch read subhalo fields')
         subhalo_catalog = g3read.read_new(group_base, ['SOFF', 'SLEN'], 1, is_snap=False, multiple_files=True)
         print('subhalo_catalog', len(subhalo_catalog))
         self._soff = subhalo_catalog['SOFF']
