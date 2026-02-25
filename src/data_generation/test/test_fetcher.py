@@ -18,6 +18,9 @@ from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 
 load_dotenv('../.env')
 
+# TODO, separate this into different classes
+# TODO do setup class for all the tests
+
 
 class TestFetcher(unittest.TestCase):
     def setUp(self):
@@ -49,7 +52,6 @@ class TestFetcher(unittest.TestCase):
         with initialize(config_path="../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
             self.cfg_eagle = compose(config_name="data_generation.yaml")
-
             self.cfg_millenium = compose(config_name="data_generation.yaml")
             self.cfg_flamingo = compose(config_name="data_generation.yaml")
 
@@ -57,7 +59,6 @@ class TestFetcher(unittest.TestCase):
             local_config = compose(config_name="paths/local.yaml")
             self.cfg_illustris.paths = local_config.paths
             self.cfg_eagle.paths = local_config.paths
-
             self.cfg_millenium.paths = local_config.paths
             self.cfg_flamingo.paths = local_config.paths
 
@@ -67,13 +68,13 @@ class TestFetcher(unittest.TestCase):
 
             # Enforce RefL0050N0752 simulation code
             self.cfg_eagle.catalog.simulation_code = "RefL0050N0752"
-            self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
+            #self.cfg_eagle.catalog.path = '../../../local/data/datasets/eagle/RefL0050N0752'
 
             self.cfg_millenium.catalog = compose("catalog/millenium.yaml")['catalog']
-            self.cfg_millenium.catalog.path = '../../../local/data/datasets/millenium/MTNG-L31.25-270-A'
+            #self.cfg_millenium.catalog.path = '../../../local/data/datasets/millenium/MTNG-L31.25-270-A'
 
             self.cfg_flamingo.catalog = compose("catalog/flamingo.yaml")['catalog']
-            self.cfg_flamingo.catalog.path = '../../../local/data/datasets/flamingo/L1000N0900'
+            #self.cfg_flamingo.catalog.path = '../../../local/data/datasets/flamingo/L1000N0900'
 
         os.environ['PROJECT_ROOT'] = '../../..'
 
@@ -81,10 +82,10 @@ class TestFetcher(unittest.TestCase):
         required_keys = ['G']
         data_loader_dict = next((step for step in self.cfg_eagle.pipeline if step.name == 'data_loader'), None)
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
-        self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
-        self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
-        self.fetcher_millenium = DataFetcherFactory.get_data_fetcher(self.cfg_millenium.catalog, **attr_dict)
-        self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
+        #self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
+        #self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
+        #self.fetcher_millenium = DataFetcherFactory.get_data_fetcher(self.cfg_millenium.catalog, **attr_dict)
+        #self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
 
     def test_get_halos_illustris(self):
         halo_context_1 = self.fetcher_illustris.get_halos()
@@ -293,12 +294,4 @@ class TestFetcher(unittest.TestCase):
 
         diff = set(halo_ids) - set(id_parents)
         print(f'Number of halos with no subhalos linked: {len(diff)}')
-
-
-
-
-
-
-
-
 

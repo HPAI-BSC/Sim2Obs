@@ -16,7 +16,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # from dotenv import load_dotenv, find_dotenv
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from scipy.spatial.distance import cosine
 from scipy.signal import fftconvolve
 
@@ -789,6 +789,12 @@ def apply_conversion(values, scaling_formula, scalefactor, h, **kwargs):
 
 
 def dict_depth(d, level=0):
+    # Omit 'needs' attribute, we don't needed to compute the depth of the tree
+    if isinstance(d, DictConfig) and 'needs' in d:
+        OmegaConf.set_struct(d, False)
+        del d['needs']
+        OmegaConf.set_struct(d, True)
+
     if (not isinstance(d, DictConfig) and not isinstance(d, dict)) or not d:  # Base case: not a dict or empty dict
         return level
     return max(dict_depth(v, level + 1) for v in d.values())

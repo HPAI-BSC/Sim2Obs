@@ -1,9 +1,9 @@
 import copy
-import logging
 import operator
 import os.path
+import g3read
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Dict
 
 import swiftsimio as sw
 
@@ -14,10 +14,14 @@ import illustris_python as il
 from omegaconf import DictConfig, ListConfig, OmegaConf
 from swiftsimio import SWIFTDataset
 
+from src.data_generation.src.feature_computer import FeatureComputer
 from src.data_generation.src.halo import HaloContext, Halo
+from src.data_generation.src.part_types import MAGNETICUM_PART_TYPES
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion, \
     dict_depth, to_list_in_batches
+import src.data_generation.src.features_dataset
+
 
 logger = setup_logger("DataFetcher")
 
@@ -50,6 +54,16 @@ def pipeline_step(func):
             return None  # Stop processing if data is None
         return func(data, *args, **kwargs)
     return wrapper
+
+
+@pipeline_step
+def remove_useless_columns(d: dict, fields: list):
+    diff = set(d.keys()).difference(set(fields))
+
+    for key in diff:
+        if key not in fields:
+            del d[key]
+    return d
 
 
 @pipeline_step
@@ -126,9 +140,8 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
             elif dict_depth(field_info) == 2:
                 tmp = OmegaConf.select(cfg, f"fields.{table}.{key}")
                 for key_ii in OmegaConf.select(cfg, f"fields.{table}.{key}"):
+                    # Rename the column in case the initial config format was not appropiate, ie: POS to 'POS '
                     field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
-                    if field_info_ii is None:
-                        print()
                     h = dict_depth(field_info_ii)
                     if h == 1:
                         if not getattr(field_info_ii, 'name', None):
@@ -199,12 +212,10 @@ def apply_filter_df(d, conditions, config):
     if isinstance(d, pd.DataFrame):
         mask = pd.Series(True, index=d.index)
         for key, condition in conditions.items():
+            #condition = OmegaConf.select(config, key) #TODO review
             if key not in d.columns:
                 raise Exception(f'Error, feature "{key}" is not present in the halo dataframe with columns:'
                                 f' {d.columns}')
-
-            condition = OmegaConf.select(config, key)
-
             if isinstance(condition.filter, ListConfig):
                 for expr in condition.filter:
                     if isinstance(expr, str):
@@ -456,6 +467,17 @@ class DataFetcher(ABC):
                 keys_branchs.append(full_key)
         return keys_branchs
 
+    def __find_keys_with_needs(self) -> dict:
+        result = {}
+        for k, v in self.catalog.fields.items():
+            if isinstance(v, DictConfig):
+                for k_ii, v_ii in v.items():
+                    if 'needs' in v_ii:
+                        if k not in result:
+                            result[k] = {}
+                        result[k][k_ii] = v_ii['needs']
+        return result
+
     def __build_config(self, **kwargs):
         """
         Build and initialize the configuration for halo, subhalo, and particle fields.
@@ -479,16 +501,29 @@ class DataFetcher(ABC):
         if not fields:
             raise ValueError("The catalog must contain a 'fields' attribute.")
 
-        self.halo_fields = self._get_nested_keys(self.catalog.fields.halo)
-        self.subhalo_fields = self._get_nested_keys(self.catalog.fields.subhalo)
-        particle_fields = self._get_nested_keys(self.catalog.fields.particles)
+        catalog = self.catalog.copy()
+        self.halo_fields = self._get_nested_keys(catalog.fields.halo)
+        self.subhalo_fields = self._get_nested_keys(catalog.fields.subhalo)
+        particle_fields = self._get_nested_keys(catalog.fields.particles)
         self.particle_fields = set([p.split('.')[0] for p in particle_fields])
 
-        kv_halo = self._get_attr(self.catalog.fields.halo, attr_name='name')
-        kv_subhalo = self._get_attr(self.catalog.fields.subhalo, attr_name='name')
-        kv_particles = self._get_attr(self.catalog.fields.particles, attr_name='name')
+        kv_halo = self._get_attr(catalog.fields.halo, attr_name='name')
+        kv_subhalo = self._get_attr(catalog.fields.subhalo, attr_name='name')
+        kv_particles = self._get_attr(catalog.fields.particles, attr_name='name')
 
         self.column_map = kv_halo | kv_subhalo | kv_particles
+
+        # Identify functions to be computed
+        public_methods = list(FeatureComputer._registry.keys())
+
+        # Map fuction - variables
+        self.function_needs = self.__find_keys_with_needs()
+
+        # Check functions with need are implemented
+        for key in self.function_needs.keys():
+            for key_ii in self.function_needs[key]:
+                if not key_ii in public_methods:
+                    raise NotImplementedError(f'Function {key} referenced in the config, it is not implemented.')
 
         for key, value in kwargs.items():
             setattr(self, key, value)
@@ -520,6 +555,8 @@ class DataFetcherFactory:
             return EagleFetcher(catalog, **kwargs)
         elif catalog.name == "flamingo":
             return FlamingoFetcher(catalog, **kwargs)
+        elif catalog.name == "magneticum":
+            return MagneticumFetcher(catalog, **kwargs)
         else:
             raise ValueError(f"Unsupported catalog={catalog.name} type")
 
@@ -1979,6 +2016,321 @@ class FlamingoFetcher(DataFetcher):
         particle_data = SubhaloParticles(d, self.catalog.fields.particles)
         logger.debug(f'Stellar particle size: {len(particle_data.star_p)}')
         return particle_data
+
+
+# TODO test
+class MagneticumFetcher(DataFetcher):
+
+    def __init__(self, catalog: DictConfig, **kwargs):
+        super().__init__(catalog, **kwargs)
+        logger.info(f"MagneticumFetcher initialized with config: {catalog.path}")
+
+    def _load_catalog_cache(self):
+        path = self.catalog.path
+        groups_dir = os.path.join(path, f'groups_{self.catalog.snapnum}')
+        group_base = os.path.join(groups_dir, os.path.basename(groups_dir).replace('groups', 'sub'))
+        snapshot_dir = os.path.join(path, f'snapdir_{self.catalog.snapnum}')
+        snap_base = os.path.join(snapshot_dir, os.path.basename(snapshot_dir).replace('snapdir', 'snap'))
+
+        self._group_base = group_base
+        self._snap_base = snap_base
+
+        # Batch read subhalo fields
+        subhalo_catalog = g3read.read_new(group_base, ['SOFF', 'SLEN'], 1, is_snap=False, multiple_files=True)
+        self._soff = subhalo_catalog['SOFF']
+        self._slen = subhalo_catalog['SLEN']
+
+        # Batch read halo fields
+        halo_catalog = g3read.read_new(group_base, ['GOFF', 'GLEN', 'FSUB', 'NSUB'], 0, is_snap=False, multiple_files=True)
+        self._goff = halo_catalog['GOFF']
+        self._glen = halo_catalog['GLEN']
+        self._fsub = halo_catalog['FSUB']
+        self._nsub = halo_catalog['NSUB']
+
+        # PID stored under ptype=2
+        self._pid = g3read.read_new(group_base, ['PID '], 2, is_snap=False, multiple_files=True)['PID ']
+
+        # Cache snap data per particle type
+        self._snap_cache = {}
+        for part_type, type_config in self.catalog.fields.particles.items():
+            fields = list(type_config.keys())
+            if 'ID' not in fields:
+                fields.append('ID')
+            fields_padded = [f.ljust(4) for f in fields]
+            ptype_int = MAGNETICUM_PART_TYPES[part_type]
+            snap_data = g3read.read_new(snap_base, fields_padded, ptype_int, multiple_files=True, do_flatten=False)
+            self._snap_cache[part_type] = {
+                'snap_data': snap_data[ptype_int],
+                'fields_padded': fields_padded,
+            }
+
+        # Pre-compute particle pipeline conditions once
+        self._particle_conditions = {
+            col: {t: cfg for t, cfg in type_config.items() if 'filter' in cfg}
+            for col, type_config in self.catalog.fields.particles.items()
+            if any('filter' in cfg for cfg in type_config.values())
+        }
+
+        self._cache_loaded = True
+        self._build_sorted_snap_cache()
+
+    def _build_sorted_snap_cache(self):
+        """Pre-sort snap IDs once — reused by _extract_particles and _load_subhalo_particles_cache."""
+        self._sorted_snap_cache = {
+            part_type: {
+                'sorted_idx': (idx := np.argsort(cache['snap_data']['ID  '])),
+                'sorted_ids': cache['snap_data']['ID  '][idx]
+            }
+            for part_type, cache in self._snap_cache.items()
+        }
+
+    def _get_fields(self):
+        values = OmegaConf.select(self.catalog, "fields")
+        return [
+            key
+            for section in ['halo', 'subhalo']
+            for key in values.get(section, {}).keys()
+        ]
+
+    def __get_children_vectorized(self, halo_ids: np.ndarray) -> list:
+        """Vectorized: get subhalo indices for all halos at once."""
+        first_sub = self._fsub[halo_ids]
+        n_subs = self._nsub[halo_ids]
+        return [np.arange(first_sub[i], first_sub[i] + n_subs[i]) for i in range(len(halo_ids))]
+
+    def get_halos(self, *args, **kwargs) -> HaloContext:
+        return self._get_halos()
+
+    def _get_halos(self) -> HaloContext:
+        logger.debug("Fetching halos from Magneticum...")
+        if not getattr(self, '_cache_loaded', False):
+            self._load_catalog_cache()
+
+        if 'FSUB' not in self.halo_fields:
+            self.halo_fields.append('FSUB')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.halo["FSUB"] = {
+                "input": None, "output": None, "scaling": None, "name": "fsub"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['FSUB'] = 'fsub'
+
+        halos = g3read.read_new(self._group_base, self.halo_fields.copy(), 0, is_snap=False, multiple_files=True)
+
+        if len(halos) == 0:
+            logger.warning("No halos found.")
+            return HaloContext(pd.DataFrame(), self.column_map)
+
+        table = 'halo'
+        halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
+        steps = [
+            lambda h: remove_useless_columns(h, self.halo_fields),
+            lambda h: assign_id(h, 'halo_id'),
+            lambda h: validate_and_process_fields(h, self.halo_fields, table, self.catalog),
+            lambda h: convert_to_dataframe(h),
+            lambda h: apply_unit_conversion(h, self.halo_fields, table, self.catalog),
+            lambda h: apply_filters(h, halo_conditions, self.catalog.fields.halo)
+        ]
+
+        processed_halos = run_pipeline(halos, steps)
+
+        # Vectorized subhalo children assignment
+        halo_ids = processed_halos['halo_id'].values
+        processed_halos['subhalo_ids'] = self.__get_children_vectorized(halo_ids)
+        self.column_map['subhalo_ids'] = 'subhalo_ids'
+
+        halo_context = HaloContext(processed_halos, self.column_map)
+        logger.debug(f"Halo data fetched successfully: {halo_context.data['halo_id'].nunique()} halos.")
+        return halo_context
+
+    def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
+        return self._get_subhalos()
+
+    def _get_subhalos(self) -> SubhaloContext:
+        logger.debug("Fetching subhalos from Magneticum...")
+        if not getattr(self, '_cache_loaded', False):
+            self._load_catalog_cache()
+
+        if 'GRNR' not in self.subhalo_fields:
+            self.subhalo_fields.append('GRNR')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.subhalo['GRNR'] = {
+                "input": None, "output": None, "scaling": None, "name": "id_parents"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['GRNR'] = 'id_parents'
+
+        computed_columns = self.function_needs.get('subhalo', {})
+        catalog_fields = [f for f in self.subhalo_fields if f not in computed_columns]
+        subhalos = g3read.read_new(self._group_base, catalog_fields, 1, is_snap=False, multiple_files=True)
+
+        if computed_columns:
+            if not getattr(self, '_subhalo_particles_cache_loaded', False):
+                self._load_subhalo_particles_cache()
+            for method_name, columns_needed in computed_columns.items():
+                subhalos[method_name] = FeatureComputer.compute(method_name, self.all_particles, columns_needed)
+
+        if isinstance(subhalos, np.ndarray):
+            subhalos = {self.fields[0]: subhalos}
+            subhalos['count'] = np.array(len(subhalos[self.fields[0]]))
+
+        if len(subhalos) == 0:
+            logger.warning("No subhalos found.")
+            return SubhaloContext(pd.DataFrame(), self.column_map)
+
+        table = 'subhalo'
+        subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
+        steps = [
+            lambda s: remove_useless_columns(s, self.subhalo_fields),
+            lambda s: assign_id(s, 'subhalo_id'),
+            lambda s: validate_and_process_fields(s, self.subhalo_fields, table, self.catalog),
+            lambda s: convert_to_dataframe(s),
+            lambda s: apply_unit_conversion(s, self.subhalo_fields, table, self.catalog),
+            lambda s: apply_filters(s, subhalo_conditions, self.catalog.fields.subhalo)
+        ]
+
+        processed_subhalos = run_pipeline(subhalos, steps)
+        subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
+        logger.debug(f"Subhalo data fetched successfully: {len(subhalo_context.data)} subhalos.")
+        return subhalo_context
+
+    def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
+        subhalo_id = kwargs.get('subhalo_id', None)
+        if subhalo_id is None:
+            raise ValueError("subhalo_id must be provided in kwargs")
+        return self._get_p_subhalo(subhalo_id)
+
+    def _extract_particles(self, pids: np.ndarray, entity_id: int) -> dict:
+        """Extract particles for a given set of PIDs using fast searchsorted."""
+        if not hasattr(self, '_sorted_snap_cache'):
+            self._build_sorted_snap_cache()
+
+        data = {}
+        for part_type, cache in self._snap_cache.items():
+            snap_data = cache['snap_data']
+            fields_padded = cache['fields_padded']
+            sorted_idx = self._sorted_snap_cache[part_type]['sorted_idx']
+            sorted_ids = self._sorted_snap_cache[part_type]['sorted_ids']
+
+            pids_array = np.asarray(pids)
+            positions = np.searchsorted(sorted_ids, pids_array)
+            valid_mask = positions < len(sorted_ids)
+            positions = positions[valid_mask]
+            matched_mask = sorted_ids[positions] == pids_array[valid_mask]
+            matched = sorted_idx[positions[matched_mask]]
+
+            if len(matched) == 0:
+                continue
+
+            particles = {b.strip(): snap_data[b][matched] for b in fields_padded}
+            data[part_type] = particles
+
+        return self._clean_particle_data(data, entity_id)
+
+    def _clean_particle_data(self, data: dict, entity_id: int) -> dict:
+        """Remove empty particle types and return cleaned data."""
+        if not data:
+            return {}
+        if all(len(v) == 0 for part in data.values() for v in part.values()):
+            logger.debug(f"No particles for any ptype, ignoring entity: {entity_id}")
+            return {}
+        return {
+            ptype: particles
+            for ptype, particles in data.items()
+            if not all(len(v) == 0 for v in particles.values())
+        }
+
+    def _run_particle_pipeline(self, data: dict) -> SubhaloParticles:
+        """Shared pipeline logic for both halo and subhalo particles."""
+        table = 'particles'
+        steps = [
+            lambda particles: validate_and_process_fields(particles, self.particle_fields, table, self.catalog),
+            lambda particles: convert_to_dataframe(particles),
+            lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+            lambda particles: apply_filters(particles, self._particle_conditions, self.catalog.fields.particles)
+        ]
+        processed_particles = run_pipeline(data, steps)
+        return SubhaloParticles(processed_particles, self.catalog.fields.particles)
+
+    def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
+        if not getattr(self, '_cache_loaded', False):
+            self._load_catalog_cache()
+
+        start = self._soff[subhalo_id]
+        end = start + self._slen[subhalo_id]
+        subhalo_pids = self._pid[start:end]
+
+        data = self._extract_particles(subhalo_pids, subhalo_id)
+        if len(data) > 0:
+            return self._run_particle_pipeline(data)
+        return SubhaloParticles({}, self.catalog.fields.particles)
+
+    def _load_subhalo_particles_cache(self):
+        """Cache raw particle data for all subhalos."""
+        if not getattr(self, '_cache_loaded', False):
+            self._load_catalog_cache()
+        if not hasattr(self, '_sorted_snap_cache'):
+            self._build_sorted_snap_cache()
+
+        n_subhalos = len(self._soff)
+        all_particles = {sub_idx: {} for sub_idx in range(n_subhalos)}
+
+        for part_type, cache in self._snap_cache.items():
+            snap_data = cache['snap_data']
+            fields_padded = cache['fields_padded']
+            sorted_idx = self._sorted_snap_cache[part_type]['sorted_idx']
+            sorted_ids = self._sorted_snap_cache[part_type]['sorted_ids']
+
+            for sub_idx in range(n_subhalos):
+                start = self._soff[sub_idx]
+                end = start + self._slen[sub_idx]
+                subhalo_pids = self._pid[start:end]
+
+                if len(subhalo_pids) == 0:
+                    continue
+
+                positions = np.searchsorted(sorted_ids, subhalo_pids)
+                valid_mask = positions < len(sorted_ids)
+                positions = positions[valid_mask]
+                matched_mask = sorted_ids[positions] == subhalo_pids[valid_mask]
+                matched = sorted_idx[positions[matched_mask]]
+
+                if len(matched) == 0:
+                    continue
+
+                particles = {b.strip(): snap_data[b][matched] for b in fields_padded}
+                all_particles[sub_idx][part_type] = particles
+
+        '''
+        self.all_particles = {
+            sub_idx: self._clean_particle_data(data, sub_idx)
+            for sub_idx, data in all_particles.items()
+            if data
+        }
+        '''
+        self.all_particles = all_particles
+        self._subhalo_particles_cache_loaded = True
+
+    def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
+        halo = kwargs.get('halo', None)
+        if halo is None:
+            raise ValueError("halo must be provided in kwargs")
+        return self._get_p_halo(halo)
+
+    def _get_p_halo(self, halo: Halo) -> SubhaloParticles:
+        if not getattr(self, '_cache_loaded', False):
+            self._load_catalog_cache()
+
+        start = self._goff[halo.halo_id]
+        end = start + self._glen[halo.halo_id]
+        halo_pids = self._pid[start:end]
+
+        data = self._extract_particles(halo_pids, halo.halo_id)
+        return self._run_particle_pipeline(data)
+
+
+
+
 
 
 

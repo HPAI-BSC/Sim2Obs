@@ -105,6 +105,7 @@ class LastStep:
                 f"Expected exactly 2 features, got {len(feature_names)}: {feature_names}"
             )
 
+        # todo fix that just if map step exist
         root_path = self.cfg.catalog.path
         catalog_name = self.cfg.catalog.name
         print(root_path, catalog_name, rotation, feature_names[0])

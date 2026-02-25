@@ -398,17 +398,20 @@ class SubhaloParticles:
                             value = np.array(value)
                         setattr(self, f'{fix_names.get(part_type, part_type)}_{var}', value)
         else:
-            for part_type in data:
-                for var in data[part_type]:
-                    if var in column_map[part_type]:
-                        value = data[part_type][var]
-                        if isinstance(value, (pd.Series, pd.Series)):
-                            value = np.stack(value.to_list())
-                        elif isinstance(value, list):
-                            value = np.array(value)
-                        name = column_map[part_type][var].name
-                        # Add attr with that provided name
-                        setattr(self, f'{fix_names.get(part_type, part_type)}_{name}', value)
+            try:
+                for part_type in data:
+                    for var in data[part_type]:
+                        if var in column_map[part_type]:
+                            value = data[part_type][var]
+                            if isinstance(value, (pd.Series, pd.Series)):
+                                value = np.stack(value.to_list())
+                            elif isinstance(value, list):
+                                value = np.array(value)
+                            name = column_map[part_type][var].name
+                            # Add attr with that provided name
+                            setattr(self, f'{fix_names.get(part_type, part_type)}_{name}', value)
+            except Exception as e:
+                print('need at least one array to stack')
 
     def __add__(self, other):
         if not isinstance(other, self.__class__):
@@ -497,6 +500,13 @@ class SubhaloParticles:
             if isinstance(attr_value, np.ndarray):
                 lines.append(f"{attr_name}: shape={attr_value.shape}")
         return " ".join(lines)
+
+    @property
+    def is_empty(self):
+        if self.__dict__:
+            return False
+        return True
+
 
 
 
