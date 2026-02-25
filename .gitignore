@@ -160,3 +160,4 @@ local/output/
 temp
 
 */sql_cookies.txt
+src/data_generation/test/data
