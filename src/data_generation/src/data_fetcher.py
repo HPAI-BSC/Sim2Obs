@@ -2039,7 +2039,7 @@ class MagneticumFetcher(DataFetcher):
         # Batch read subhalo fields
         logger.debug('Batch read subhalo fields')
         subhalo_catalog = g3read.read_new(group_base, ['SOFF', 'SLEN'], 1, is_snap=False, multiple_files=True)
-        logger.debug('subhalo_catalog', len(subhalo_catalog))
+        logger.debug('subhalo_catalog')
         self._soff = subhalo_catalog['SOFF']
         self._slen = subhalo_catalog['SLEN']
 
@@ -2049,7 +2049,7 @@ class MagneticumFetcher(DataFetcher):
         self._glen = halo_catalog['GLEN']
         self._fsub = halo_catalog['FSUB']
         self._nsub = halo_catalog['NSUB']
-        logger.debug('halo_catalog', halo_catalog)
+        logger.debug('halo_catalog')
 
         # PID stored under ptype=2
         self._pid = g3read.read_new(group_base, ['PID '], 2, is_snap=False, multiple_files=True)['PID ']
