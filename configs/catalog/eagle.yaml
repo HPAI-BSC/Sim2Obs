@@ -24,7 +24,7 @@ ignore_halos: [26000000000009]
 #simulation_code: RefL0100N1504
 #path: ${paths.datasets_dir}/eagle/RefL0100N1504
 
-spatial_resolution: 2.66  # kpc
+spatial_resolution: 3.3186  # kpc
 # bin_size = spatial_resolution * 1 ->
 # ensure that bins use a proper resolution,
 #bin_size > spatial resolution *1.5-2 times
@@ -40,7 +40,7 @@ fields:
       output: "Msun/h"
       scaling: "x * h"
       name: 'm200'
-      # Final unit measures
+      # Final unit measures TODO update
       filter: [ "> 1e13 * 0.6774" ]
     Group_R_Crit200:
       input: "pkpc"
