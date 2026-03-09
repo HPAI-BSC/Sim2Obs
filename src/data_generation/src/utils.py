@@ -938,6 +938,35 @@ def store_obj(cfg, halo, subhalo_ctx, cosmos_data):
         pickle.dump(cosmos_data, f)
 
 
+from omegaconf import DictConfig
+from typing import Optional, Any
+
+
+def find_item(cfg: DictConfig, list_name: str, item_name: str, name_key: str = "name", flag_key: Optional[str] = None
+              ) -> Optional[Any]:
+    """
+    Search for an item in a list of dicts inside cfg.
+
+    Args:
+        cfg: OmegaConf DictConfig
+        list_name: the list attribute in cfg (e.g., "pipeline" or "feature_names")
+        item_name: the value of the name_key to search for
+        name_key: the key used as identifier (default: "name")
+        flag_key: optional key to check inside the item
+
+    Returns:
+        - If flag_key is None: returns the whole item dict, or None if not found
+        - If flag_key is given: returns the value of the flag, or None if not found
+    """
+    items = getattr(cfg, list_name, [])
+    for item in items:
+        if item.get(name_key) == item_name:
+            if flag_key is None:
+                return item
+            return item.get(flag_key)
+    return None
+
+
 def store_RF_input(cfg, halo, icl_mask, v_delta, distance):
     # Build dictionary
     data_to_store = {

@@ -2,7 +2,7 @@ import os.path
 import pandas as pd
 from omegaconf import DictConfig
 
-from src.data_generation.src.utils import setup_logger, merge_json_files_to_csv
+from src.data_generation.src.utils import setup_logger, merge_json_files_to_csv, find_item
 
 logger = setup_logger("LastStep")
 
@@ -74,13 +74,13 @@ class LastStep:
                 if key not in self.cfg.get('catalog', {}):
                     raise ValueError(f"Error, missing required configuration key: {key}")
 
-        map_step = get_pipeline_step(self.cfg, "map_step")
-        print(map_step)
-
-        if map_step is not None:
-            dim = map_step.get("dim", None)
-            n_zooms = map_step.get("n_zooms", None)
-            print(dim, n_zooms)
+            map_step = find_item(self.cfg, "pipeline", "map_step")  # returns the dict
+            if map_step:
+                dim = map_step.get("dim")
+                n_zooms = map_step.get("n_zooms")
+                print("dim:", dim, "n_zooms:", n_zooms)
+            else:
+                print("map_step not found")
 
         def get_defined_rotations(cfg):
             return {
@@ -126,7 +126,6 @@ class LastStep:
         # TODO number of files generated, number of halos
         # TODO check whether the map exists and save the ones that don't => they 're not in errors not in subhalos error
 
-
     def process(self, errors):
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
@@ -139,8 +138,16 @@ class LastStep:
         name = name.replace('/', '_')
 
         self._inform_errors(errors, dataset_dir, name)
-        self._check_compute_transition_radius_analysis(name)
-        self._check_maps()
+
+        # Check if a feature flag is True
+        transition = find_item(self.cfg, "feature_names", "IntraClusterLight",
+                               flag_key="transition_radius_compute")
+        if transition:
+            self._check_compute_transition_radius_analysis(name)
+
+        exists = find_item(self.cfg, "pipeline", "map_step") is not None
+        if exists:
+            self._check_maps()
 
 
 
