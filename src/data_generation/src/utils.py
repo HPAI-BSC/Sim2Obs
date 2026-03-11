@@ -20,6 +20,9 @@ from omegaconf import DictConfig, OmegaConf
 from scipy.spatial.distance import cosine
 from scipy.signal import fftconvolve
 
+from src.data_generation.src.subhalo import SubhaloParticles
+
+
 # This will search for the .env file and load it if found
 # Uncomment to connect to eagle db for local test,
 # however MN5 does not have internet connection, then is not needed
@@ -897,6 +900,24 @@ def store_overlapping_matrix_as_df(cfg, overlapping_matrix):
 
     path = cfg.paths.datasets_dir + f'/../logs/overlapping_halos_{name}.csv'
     df.to_csv(path, index=False)
+
+
+# TODO
+def store_subhalo_particles(cfg, halo, subhalo_particles: SubhaloParticles, feature: np.ndarray,
+                            feature_name: str, ranging: tuple, axis: tuple):
+    if halo.halo_id in [26, 28, 69, 188, 836, 3147]:
+        print(f'ranging: {ranging}, axis: {axis}')
+        sim_code = cfg.catalog.path.split('/')[-1]
+        datasets_dir = cfg.paths.datasets_dir
+        name = cfg.catalog.name
+        path = datasets_dir + f'/../logs/subhalo_particles_{name}_{sim_code}_{halo.halo_id}.pkl'
+        print(path)
+        with open(path, 'wb') as f:
+            pickle.dump(subhalo_particles, f)
+
+        path = datasets_dir + f'/../logs/{feature_name}_{name}_{sim_code}_{halo.halo_id}.npy'
+        print(path)
+        np.save(path, feature)
 
 
 def store_tr_obj(cfg, halo, subhalo_particles, icl_mask):

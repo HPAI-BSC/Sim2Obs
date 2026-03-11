@@ -17,7 +17,7 @@ from src.data_generation.src.halo import Halo
 from src.data_generation.src.subhalo import SubhaloParticles
 from src.data_generation.src.utils import setup_logger, rotate, plot_icl_bcg_profiles, store_tr_obj, \
     plot_icl_bcg_profiles_conflictive, convolve_and_pixelize_from_bins_1d, lsf_blur_via_sum_of_gaussians, avg_pool_2x2, \
-    store_RF_input
+    store_RF_input, store_subhalo_particles
 
 logger = setup_logger("FeatureProcessor")
 
@@ -483,7 +483,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
         logger.info(f'Computed velocity dispersion for {len(subhalo_particles.star_v)} particles.')
         self.value = subhalo_particles.star_v
 
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple, muse_filter: bool = False) -> tuple:
+    def generate_map(self, cfg, halo, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple, muse_filter: bool = False) -> tuple:
         """
         Generate a 2D map of processed particle features using binned statistics.
 
@@ -511,6 +511,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
             Exception: If the `self.value` attribute is empty, indicating that the `process`
                 method needs to be called before generating the map.
         """
+        logger.debug(f'Generating maps for feature: {self.name}')
         pos_rot = subhalo_particles.star_p
         feature = self.value
 
@@ -522,6 +523,9 @@ class VelocityDispersionProcessor(FeatureProcessor):
 
             if isinstance(self.value, List):
                 self.value = np.array(self.value)
+
+            # TODO to remove after debug
+            store_subhalo_particles(cfg, halo, subhalo_particles, self.value, self.name, ranging, axis)
 
             components = {0, 1, 2}
             missing_component = components - set(axis)
@@ -789,7 +793,7 @@ class ICLProcessor(FeatureProcessor):
             elif self.cfg.catalog.get('transition_radius', None) is None:
                 logger.warning('Warning, you must define a transition radius for generating the maps')
 
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+    def generate_map(self, cfg, halo, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
         """
         Generate a 2D map of particle feature data using binned statistics.
 
@@ -826,6 +830,9 @@ class ICLProcessor(FeatureProcessor):
             if len(self.value) == 0:
                 logger.error('FeatureProcessor value is empty, call first process method.')
                 raise Exception('FeatureProcessor value is empty, call first process method.')
+
+            # TODO to remove after debug
+            store_subhalo_particles(cfg, halo, subhalo_particles, self.value, self.name, ranging, axis)
 
             assert pos_rot[:, i].size == pos_rot[:, j].size == len(self.value)
 
