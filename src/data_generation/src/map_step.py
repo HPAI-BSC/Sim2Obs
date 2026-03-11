@@ -209,7 +209,7 @@ class MapStep(PipelineStep):
 
             # Check if the mask is just zero
             if np.all(interlopers_mask == 0):
-                logger.warning(f'Mask is full of zeros for halo: {cosmos_data.halo.halo_id}')
+                logger.warning(f'Interlopers mask is full of zeros for halo: {cosmos_data.halo.halo_id}')
             interlopers_mask = interlopers_mask.astype(bool)
         except Exception as e:
             print(e)
