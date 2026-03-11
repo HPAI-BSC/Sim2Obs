@@ -20,8 +20,6 @@ from omegaconf import DictConfig, OmegaConf
 from scipy.spatial.distance import cosine
 from scipy.signal import fftconvolve
 
-from src.data_generation.src.subhalo import SubhaloParticles
-
 
 # This will search for the .env file and load it if found
 # Uncomment to connect to eagle db for local test,
@@ -903,7 +901,7 @@ def store_overlapping_matrix_as_df(cfg, overlapping_matrix):
 
 
 # TODO
-def store_subhalo_particles(cfg, halo, subhalo_particles: SubhaloParticles, feature: np.ndarray,
+def store_subhalo_particles(cfg, halo, subhalo_particles, feature: np.ndarray,
                             feature_name: str, ranging: tuple, axis: tuple):
     if halo.halo_id in [26, 28, 69, 188, 836, 3147]:
         print(f'ranging: {ranging}, axis: {axis}')
