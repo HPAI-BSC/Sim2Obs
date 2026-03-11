@@ -31,17 +31,21 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
         halo_context = halo_context.remove_by_ids(ignore_halos)
         print(f'Halo context size: {len(halo_context.data)}')
 
+    # Clean subhalo context to remove subhalos that belong to halos that do not exist
+    subhalo_context.remove_subhalos_belonging_unvalid_halos(halo_context)
+    print(f'Number of subhalos after removing unvalid fofs: {len(subhalo_context)}.')
+
+    # Compute overlapping matrix with the whole sample size
+    overlapping_matrix = None
+    if not subhalo_context.data.empty:
+        overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
+
     if len(debug_halo_ids) > 0:
         print(f'Filtering halo context by the following halo ids: {debug_halo_ids}')
         halo_context = halo_context.filter_by_ids(debug_halo_ids)
         print(f'Halo context size: {len(halo_context.data)}')
 
-    # Clean subhalo context to remove subhalos that belong to halos that do not exist
-    subhalo_context.remove_subhalos_belonging_unvalid_halos(halo_context)
-    print(f'Number of subhalos after removing unvalid fofs: {len(subhalo_context)}.')
-
     if not subhalo_context.data.empty:
-        overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
         halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
 
