@@ -13,7 +13,7 @@ task_name: "data_generation"
 
 feature_names:
   - name: VelocityDispersion
-#    simulate_muse: true
+    simulate_muse: false
   - name: IntraClusterLight
     transition_radius_compute: false
 
@@ -22,7 +22,7 @@ feature_names:
 #rotation_90: [ 90, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [ 0, 0, 1] ] ]
 #rotation_120: [ 120, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]
 
-# This affects the entire pipeline
+# This affects the entire pipeline when computing transition radius
 skip_existing_halos: false
 
 pipeline:
