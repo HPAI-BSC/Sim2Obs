@@ -151,14 +151,12 @@ class LastStep:
         exists = find_item(self.cfg, "pipeline", "map_step") is not None
         if exists:
             if len(errors) > 0:
-                print(errors)
                 errors_df = pd.DataFrame(columns=['halo_id', 'error', 'number of particles', 'step'])
                 for error in errors:
                     if len(error) > 0:
                         e = error[0]
                         if (isinstance(e, list) or isinstance(e, tuple)) and len(e) > 0:
                             row = {'halo_id': e[0], 'error': e[1], 'step': e[2]}
-                            print(f'Halo id: {e[0]}, error: {e[1]}, step: {e[2]}')
                             errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
                 print(f'error df size: {len(errors_df)}')
                 path = dataset_dir + f'/../logs/errors/errors_{name}.csv'
@@ -175,7 +173,7 @@ class LastStep:
                 print(f'errors saved into: {path}')
                 print(errors_df['error'].value_counts())
 
-            self._check_maps()
+            #self._check_maps()
 
 
 
