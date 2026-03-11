@@ -549,6 +549,9 @@ class VelocityDispersionProcessor(FeatureProcessor):
 
             else:
                 logger.debug(f"We do not apply MUSE filter.")
+                logger.debug(f'pos_rot: {pos_rot.shape}')
+                logger.debug(f'feature: {feature.shape}')
+                logger.debug(f'bins: {bins}, ranging: {ranging}')
                 input_ij, binx, biny, _ = stats.binned_statistic_2d(
                     pos_rot[:, i], pos_rot[:, j],
                     (feature[:, k]) ** 2,  # Access the relevant feature

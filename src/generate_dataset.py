@@ -59,7 +59,7 @@ def main(cfg: DictConfig) -> Any:
     ending_idx = None
 
     ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[],
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[26, 28, 69, 188],
                      ignore_halos=ignore_halos)
 
 

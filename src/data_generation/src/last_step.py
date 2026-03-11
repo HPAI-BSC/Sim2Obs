@@ -23,6 +23,7 @@ class LastStep:
     @staticmethod
     def _inform_errors(errors, dataset_dir, name):
         if len(errors) > 0:
+            print(errors)
             errors_df = pd.DataFrame(columns=['halo_id', 'error', 'number of particles', 'step'])
             error_list = errors[0]
             for e in error_list:
