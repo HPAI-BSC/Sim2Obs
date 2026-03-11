@@ -153,11 +153,12 @@ class LastStep:
             if len(errors) > 0:
                 print(errors)
                 errors_df = pd.DataFrame(columns=['halo_id', 'error', 'number of particles', 'step'])
-                for e in errors:
+                for error in errors:
+                    e = error[0]
                     print(type(e), e)
                     if (isinstance(e, list) or isinstance(e, tuple)) and len(e) > 0:
-                        row = {'halo_id': e[0], 'error': e[1], 'number of particles': e[2], 'step': e[3]}
-                        print(f'Halo id: {e[0]}, error: {e[1]}, number of particles: {e[2]} in step: {e[3]}')
+                        row = {'halo_id': e[0], 'error': e[1], 'step': e[2]}
+                        print(f'Halo id: {e[0]}, error: {e[1]}, step: {e[2]}')
                         errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
                         print('')
 
