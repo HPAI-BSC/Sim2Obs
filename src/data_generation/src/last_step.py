@@ -141,16 +141,40 @@ class LastStep:
         name = self.cfg.catalog.path.replace(dataset_dir, '')
         name = name.replace('/', '_')
 
-        self._inform_errors(errors, dataset_dir, name)
-
         # Check if a feature flag is True
         transition = find_item(self.cfg, "feature_names", "IntraClusterLight",
                                flag_key="transition_radius_compute")
         if transition:
             self._check_compute_transition_radius_analysis(name)
+            self._inform_errors(errors, dataset_dir, name)
 
         exists = find_item(self.cfg, "pipeline", "map_step") is not None
         if exists:
+            if len(errors) > 0:
+                print(errors)
+                errors_df = pd.DataFrame(columns=['halo_id', 'error', 'number of particles', 'step'])
+                for e in errors:
+                    print(type(e), e)
+                    if (isinstance(e, list) or isinstance(e, tuple)) and len(e) > 0:
+                        row = {'halo_id': e[0], 'error': e[1], 'number of particles': e[2], 'step': e[3]}
+                        print(f'Halo id: {e[0]}, error: {e[1]}, number of particles: {e[2]} in step: {e[3]}')
+                        errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
+                        print('')
+
+                path = dataset_dir + f'/../logs/errors/errors_{name}.csv'
+
+                if os.path.exists(path):
+                    existing_df = pd.read_csv(path)
+                    combined_df = pd.concat([existing_df, errors_df], ignore_index=True)
+                else:
+                    combined_df = errors_df.copy()
+
+                # Remove duplicates
+                combined_df = combined_df.drop_duplicates()
+                combined_df.to_csv(path, index=False)
+                print(f'errors saved into: {path}')
+                print(errors_df['error'].value_counts())
+
             self._check_maps()
 
 
