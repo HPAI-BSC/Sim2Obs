@@ -154,14 +154,13 @@ class LastStep:
                 print(errors)
                 errors_df = pd.DataFrame(columns=['halo_id', 'error', 'number of particles', 'step'])
                 for error in errors:
-                    e = error[0]
-                    print(type(e), e)
-                    if (isinstance(e, list) or isinstance(e, tuple)) and len(e) > 0:
-                        row = {'halo_id': e[0], 'error': e[1], 'step': e[2]}
-                        print(f'Halo id: {e[0]}, error: {e[1]}, step: {e[2]}')
-                        errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
-                        print('')
-
+                    if len(error) > 0:
+                        e = error[0]
+                        if (isinstance(e, list) or isinstance(e, tuple)) and len(e) > 0:
+                            row = {'halo_id': e[0], 'error': e[1], 'step': e[2]}
+                            print(f'Halo id: {e[0]}, error: {e[1]}, step: {e[2]}')
+                            errors_df = pd.concat([errors_df, pd.DataFrame([row])], ignore_index=True)
+                print(f'error df size: {len(errors_df)}')
                 path = dataset_dir + f'/../logs/errors/errors_{name}.csv'
 
                 if os.path.exists(path):
