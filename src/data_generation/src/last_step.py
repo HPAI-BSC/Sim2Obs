@@ -26,7 +26,10 @@ class LastStep:
             print(errors)
             errors_df = pd.DataFrame(columns=['halo_id', 'error', 'number of particles', 'step'])
             error_list = errors[0]
+            print()
+            print(error_list)
             for e in error_list:
+                print(type(e), e)
                 if (isinstance(e, list) or isinstance(e, tuple)) and len(e) > 0:
                     row = {'halo_id': e[0], 'error': e[1], 'number of particles': e[2], 'step': e[3]}
                     print(f'Halo id: {e[0]}, error: {e[1]}, number of particles: {e[2]} in step: {e[3]}')
