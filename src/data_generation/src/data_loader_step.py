@@ -234,12 +234,12 @@ class DataLoader(PipelineStep):
 
                 # Group all the particles together
                 if overlapping_subhalo_particles is not None:
-                    logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.m)}')
-                    logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.m)}')
-                    logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.p)}')
-                    logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.p)}')
-                    logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.v)}')
-                    logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.v)}')
+                    logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.star_m)}')
+                    logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.star_m)}')
+                    logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.star_p)}')
+                    logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.star_p)}')
+                    logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.star_v)}')
+                    logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.star_v)}')
                     halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
                 else:
                     halo_particles_overlapping = halo_particles_no_overlapping
