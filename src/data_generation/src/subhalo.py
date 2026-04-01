@@ -375,6 +375,9 @@ class SubhaloParticles:
         column_map : DictConfig
             Mapping of column names for each particle type.
         """
+        # Position id of the first overlapping particle
+        self.overlapping_particles_id = None
+
         # TODO complete
         fix_names = {'stars': 'star', 'dark_matter': 'dm'}
 
@@ -425,6 +428,9 @@ class SubhaloParticles:
                     other_val = getattr(other, key)
 
                     if isinstance(self_val, np.ndarray) and isinstance(other_val, np.ndarray):
+                        if self.overlapping_particles_id is None:
+                            self.overlapping_particles_id = len(self_val)
+                            logger.debug(f'overlapping_particles_id: {len(self_val)}')
                         data[key] = np.concatenate((self_val, other_val), axis=0)
                     else:
                         # Decide what to do with non-ndarray attributes here
