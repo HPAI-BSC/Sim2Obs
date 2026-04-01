@@ -241,9 +241,9 @@ class DataLoader(PipelineStep):
                     logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.star_v)}')
                     logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.star_v)}')
                     halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
-                    logger.debug(f'halo_particles_overlapping: {len(halo_particles_no_overlapping.star_m)}')
-                    logger.debug(f'halo_particles_overlapping: {len(halo_particles_no_overlapping.star_p)}')
-                    logger.debug(f'halo_particles_overlapping: {len(halo_particles_no_overlapping.star_v)}')
+                    logger.debug(f'halo_particles_overlapping: {len(halo_particles_overlapping.star_m)}')
+                    logger.debug(f'halo_particles_overlapping: {len(halo_particles_overlapping.star_p)}')
+                    logger.debug(f'halo_particles_overlapping: {len(halo_particles_overlapping.star_v)}')
                 else:
                     halo_particles_overlapping = halo_particles_no_overlapping
 
