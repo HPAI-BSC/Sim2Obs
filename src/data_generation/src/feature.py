@@ -524,9 +524,6 @@ class VelocityDispersionProcessor(FeatureProcessor):
             if isinstance(self.value, List):
                 self.value = np.array(self.value)
 
-            # TODO to remove after debug
-            store_subhalo_particles(cfg, halo, subhalo_particles, self.value, self.name, ranging, axis)
-
             components = {0, 1, 2}
             missing_component = components - set(axis)
             k = next(iter(missing_component))
@@ -830,9 +827,6 @@ class ICLProcessor(FeatureProcessor):
             if len(self.value) == 0:
                 logger.error('FeatureProcessor value is empty, call first process method.')
                 raise Exception('FeatureProcessor value is empty, call first process method.')
-
-            # TODO to remove after debug
-            store_subhalo_particles(cfg, halo, subhalo_particles, self.value, self.name, ranging, axis)
 
             assert pos_rot[:, i].size == pos_rot[:, j].size == len(self.value)
 
