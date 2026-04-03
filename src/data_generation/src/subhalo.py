@@ -375,9 +375,6 @@ class SubhaloParticles:
         column_map : DictConfig
             Mapping of column names for each particle type.
         """
-        # Position id of the first overlapping particle
-        self.overlapping_particles_id = None
-
         # TODO complete
         fix_names = {'stars': 'star', 'dark_matter': 'dm'}
 
@@ -416,11 +413,36 @@ class SubhaloParticles:
             except Exception as e:
                 print('need at least one array to stack')
 
+    # TODO test
+    @property
+    def non_overlapping(self):
+        if self.overlapping_particles_id is not None:
+            data = {}
+            for key in self.__dict__:
+                self_val = getattr(self, key)
+                if isinstance(self_val, np.ndarray):
+                    data[key] = self_val[:self.overlapping_particles_id]
+                else:
+                    data[key] = self_val
+            return self.__class__(data=data, column_map=None)
+        else:
+            logger.info('There are no overlapping particles, returning self.')
+            return self
+
     def __add__(self, other):
         if not isinstance(other, self.__class__):
             return NotImplemented
 
         data = {}
+
+        # Capture the boundary index once, before any concatenation
+        for key in self.__dict__:
+            self_val = getattr(self, key)
+            if isinstance(self_val, np.ndarray) and self.overlapping_particles_id is None:
+                self.overlapping_particles_id = len(self_val)
+                logger.debug(f'overlapping_particles_id: {self.overlapping_particles_id}')
+                break
+
         for key in self.__dict__:
             try:
                 self_val = getattr(self, key)
@@ -440,7 +462,10 @@ class SubhaloParticles:
             except Exception as e:
                 print(e)
                 continue
-        return self.__class__(data=data, column_map=None)
+
+        result = self.__class__(data=data, column_map=None)
+        result.overlapping_particles_id = self.overlapping_particles_id
+        return result
 
     def preprocess(self, halo: Halo, lbox: float = None):
         """
@@ -506,6 +531,12 @@ class SubhaloParticles:
             if isinstance(attr_value, np.ndarray):
                 lines.append(f"{attr_name}: shape={attr_value.shape}")
         return " ".join(lines)
+
+    def __len__(self):
+        for key in self.__dict__:
+            self_val = getattr(self, key)
+            if isinstance(self_val, np.ndarray):
+                return len(self_val)
 
     @property
     def is_empty(self):

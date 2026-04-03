@@ -236,20 +236,16 @@ class DataLoader(PipelineStep):
                 if overlapping_subhalo_particles is not None:
                     logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.star_m)}')
                     logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.star_m)}')
-                    logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.star_p)}')
-                    logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.star_p)}')
-                    logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.star_v)}')
-                    logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.star_v)}')
                     halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
                     logger.debug(f'halo_particles_overlapping: {len(halo_particles_overlapping.star_m)}')
-                    logger.debug(f'halo_particles_overlapping: {len(halo_particles_overlapping.star_p)}')
-                    logger.debug(f'halo_particles_overlapping: {len(halo_particles_overlapping.star_v)}')
                 else:
                     halo_particles_overlapping = halo_particles_no_overlapping
 
                 # Compute features with preprocessed and non-overlapping particles
+                # TODO check if we need to take overlapping here
                 input_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
-                output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
+                # Consider overlapping
+                output_feature.process(halo=halo, subhalo_particles=halo_particles_overlapping)
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 subhalo_ctx.preprocess(halo, lbox)
