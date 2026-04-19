@@ -184,6 +184,7 @@ class DataLoader(PipelineStep):
             # Update cosmos instance
             cosmos_data.subhalos = subhalo_ctx
             cosmos_data.subhalo_particles = halo_particles_overlapping
+            cosmos_data.non_overlapping = halo_particles_no_overlapping
             cosmos_data.input_feature = input_feature
             cosmos_data.output_feature = output_feature
             logger.info(f"Finished processing halo {halo.halo_id}")
@@ -343,7 +344,7 @@ class DataLoader(PipelineStep):
                 # Prepare a default cosmos_data placeholder to pass during pipeline build (adjust if needed)
                 subhalo_particles = SubhaloParticles({}, None)
                 cosmos_data = CosmosData(halo=halo, subhalo_id=halo.fsub, subhalos=subhalo_ctx,
-                                         subhalo_particles=subhalo_particles)
+                                         subhalo_particles=subhalo_particles, non_overlapping=subhalo_particles)
                 halo.add_children(subhalo_ctx)
 
                 # Find subhalo neighbours
