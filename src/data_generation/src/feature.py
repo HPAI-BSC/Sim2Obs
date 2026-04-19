@@ -782,6 +782,7 @@ class ICLProcessor(FeatureProcessor):
         """
         non_overlapping_particles = subhalo_particles.non_overlapping
         logger.debug(f'non_overlapping_particles: {len(non_overlapping_particles)}')
+        logger.debug(f'{len(subhalo_particles.star_m)}')
 
         # Non overlapping particles
         icl_mask = self._compute_icl_mask(halo, non_overlapping_particles)
