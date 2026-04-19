@@ -790,7 +790,7 @@ class ICLProcessor(FeatureProcessor):
         logger.debug(f'icl mask: {len(self.value)}')
 
         # Overlapping
-        self.value = np.concatenate((self.value, np.zeros(len(subhalo_particles))))
+        self.value = np.concatenate((self.value, np.zeros(len(subhalo_particles) - len(self.value))))
         logger.debug(f'icl mask: {len(self.value)}')
 
         if hasattr(self, 'transition_radius_compute'):
