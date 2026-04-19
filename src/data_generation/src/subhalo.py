@@ -456,6 +456,8 @@ class SubhaloParticles:
                             self.overlapping_particles_id = len(self_val)
                             logger.debug(f'overlapping_particles_id: {len(self_val)}')
                         data[key] = np.concatenate((self_val, other_val), axis=0)
+                    elif key == 'overlapping_particles_id':
+                        continue
                     else:
                         # Decide what to do with non-ndarray attributes here
                         raise TypeError(f"Cannot concatenate attribute '{key}' of type {type(self_val)}")
