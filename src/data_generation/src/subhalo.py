@@ -375,6 +375,8 @@ class SubhaloParticles:
         column_map : DictConfig
             Mapping of column names for each particle type.
         """
+        self.overlapping_particles_id = None
+
         # TODO complete
         fix_names = {'stars': 'star', 'dark_matter': 'dm'}
 
