@@ -3,11 +3,13 @@ from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 
 
 class CosmosData:
-    def __init__(self, halo: Halo, subhalos: SubhaloContext, subhalo_id: int, subhalo_particles: SubhaloParticles):
+    def __init__(self, halo: Halo, subhalos: SubhaloContext, subhalo_id: int, subhalo_particles: SubhaloParticles,
+                 non_overlapping: SubhaloParticles):
         self.halo = halo
         self.subhalos = subhalos
         # Subhalo particles
         self.subhalo_id = subhalo_id
+        self.non_overlapping = non_overlapping
         self.subhalo_particles = subhalo_particles
         self.metadata = {
             'rotation': {

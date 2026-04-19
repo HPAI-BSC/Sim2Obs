@@ -260,6 +260,7 @@ class DataLoader(PipelineStep):
             # Update cosmos instance
             cosmos_data.subhalos = subhalo_ctx
             cosmos_data.subhalo_particles = halo_particles_overlapping
+            cosmos_data.non_overlapping = halo_particles_no_overlapping
             cosmos_data.input_feature = input_feature
             cosmos_data.output_feature = output_feature
 

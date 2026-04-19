@@ -85,7 +85,12 @@ class MapStep(PipelineStep):
         Returns:
             List: A list of tuples containing the generated maps for each projection.
         """
+        # Subhalo particles with overlapping particles added
         subhalo_particles = cosmos_data.subhalo_particles
+
+        # Subhalo particles with NO overlapping particles
+        non_overlapping = cosmos_data.non_overlapping
+
         r = self.transition_radius
         bins = cosmos_data.metadata['map']['bins']
         logger.debug(f'Generating maps for r={r}, bins={bins} and num particles={len(subhalo_particles.star_p)}')
@@ -100,9 +105,9 @@ class MapStep(PipelineStep):
             # Map for the input feature
             halo = cosmos_data.halo
             # TODO REMOVE CFG AND HALO after debugging
-            input_xy, _, biny_xy = input_feature.generate_map(self.cfg, halo, subhalo_particles, bins, ranging, axis=(0, 1), muse_filter=self.simulate_muse)
-            input_yz, _, biny_yz = input_feature.generate_map(self.cfg, halo, subhalo_particles, bins, ranging, axis=(1, 2), muse_filter=self.simulate_muse)
-            input_xz, _, biny_xz = input_feature.generate_map(self.cfg, halo, subhalo_particles, bins, ranging, axis=(0, 2), muse_filter=self.simulate_muse)
+            input_xy, _, biny_xy = input_feature.generate_map(self.cfg, halo, non_overlapping, bins, ranging, axis=(0, 1), muse_filter=self.simulate_muse)
+            input_yz, _, biny_yz = input_feature.generate_map(self.cfg, halo, non_overlapping, bins, ranging, axis=(1, 2), muse_filter=self.simulate_muse)
+            input_xz, _, biny_xz = input_feature.generate_map(self.cfg, halo, non_overlapping, bins, ranging, axis=(0, 2), muse_filter=self.simulate_muse)
 
             # Map for the output feature
             output_xy, _, _ = output_feature.generate_map(self.cfg, halo, subhalo_particles, bins, ranging, axis=(0, 1))
