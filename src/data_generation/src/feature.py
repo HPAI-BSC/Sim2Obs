@@ -839,9 +839,10 @@ class ICLProcessor(FeatureProcessor):
 
             assert pos_rot[:, i].size == pos_rot[:, j].size == len(self.value)
 
-            # Check the range of your data and the bins
-            print("Range of pos_rot[:, i]:", np.min(pos_rot[:, i]), np.max(pos_rot[:, i]))
-            print("Range of pos_rot[:, j]:", np.min(pos_rot[:, j]), np.max(pos_rot[:, j]))
+            logger.debug(f"We do not apply MUSE filter.")
+            logger.debug(f'pos_rot: {pos_rot.shape}')
+            logger.debug(f'feature: {feature.shape}')
+            logger.debug(f'bins: {bins}, ranging: {ranging}')
 
             output_ij, binx, biny, _ = stats.binned_statistic_2d(
                 pos_rot[:, i], pos_rot[:, j],

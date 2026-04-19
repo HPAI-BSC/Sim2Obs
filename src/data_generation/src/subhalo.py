@@ -432,7 +432,6 @@ class SubhaloParticles:
             return self
 
     def __add__(self, other):
-        logger.debug(f'Executting __add__ overlapping_particles_id: {self.overlapping_particles_id}')
         if not isinstance(other, self.__class__):
             return NotImplemented
 
@@ -443,7 +442,6 @@ class SubhaloParticles:
             self_val = getattr(self, key)
             if isinstance(self_val, np.ndarray) and self.overlapping_particles_id is None:
                 self.overlapping_particles_id = len(self_val)
-                logger.debug(f'overlapping_particles_id: {self.overlapping_particles_id}')
                 break
 
         for key in self.__dict__:
@@ -455,7 +453,6 @@ class SubhaloParticles:
                     if isinstance(self_val, np.ndarray) and isinstance(other_val, np.ndarray):
                         if self.overlapping_particles_id is None:
                             self.overlapping_particles_id = len(self_val)
-                            logger.debug(f'overlapping_particles_id: {len(self_val)}')
                         data[key] = np.concatenate((self_val, other_val), axis=0)
                     elif key == 'overlapping_particles_id':
                         continue
