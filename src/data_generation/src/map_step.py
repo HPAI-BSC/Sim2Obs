@@ -328,6 +328,9 @@ class MapStep(PipelineStep):
                                   projection_str, rotation_axis, rotation_iteration, i)
             output_path = get_path(output_feature.name, cosmos_data.halo.halo_id, cosmos_data.subhalo_id,
                                    projection_str, rotation_axis, rotation_iteration, i)
+            logger.debug(f'input_path: {input_path}')
+            logger.debug(f'output_path: {output_path}')
+
             np.savez(input_path, input_feature_with_mask)
             np.savez(output_path, output_feature_with_mask)
 
