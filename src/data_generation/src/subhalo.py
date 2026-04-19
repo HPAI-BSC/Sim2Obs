@@ -432,6 +432,7 @@ class SubhaloParticles:
             return self
 
     def __add__(self, other):
+        logger.debug(f'Executting __add__ overlapping_particles_id: {self.overlapping_particles_id}')
         if not isinstance(other, self.__class__):
             return NotImplemented
 
