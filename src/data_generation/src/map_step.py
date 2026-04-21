@@ -95,7 +95,6 @@ class MapStep(PipelineStep):
         bins = cosmos_data.metadata['map']['bins']
         logger.debug(f'Generating maps for r={r}, bins={bins} and num particles={len(subhalo_particles.star_p)}')
 
-        print(f'--> MUSE filter: {self.simulate_muse}')
         if self.dim == 2:
             ranging = ((-r, r), (-r, r))  # Defines the range for the 2D maps
 

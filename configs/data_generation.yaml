@@ -13,7 +13,7 @@ task_name: "data_generation"
 
 feature_names:
   - name: VelocityDispersion
-    simulate_muse: true
+    simulate_muse: false
   - name: IntraClusterLight
 #    transition_radius_compute: false
 
