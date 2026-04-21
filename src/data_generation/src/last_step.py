@@ -113,12 +113,8 @@ class LastStep:
         root_path = self.cfg.catalog.path
         catalog_name = self.cfg.catalog.name
         print(root_path, catalog_name, rotation, feature_names[0])
-        if self.feature_names.simulate_muse:
-            path_i = os.path.join(root_path, 'simulate_muse', rotation, feature_names[0])
-            path_o = os.path.join(root_path, 'simulate_muse', rotation, feature_names[1])
-        else:
-            path_i = os.path.join(root_path, rotation, feature_names[0])
-            path_o = os.path.join(root_path, rotation, feature_names[1])
+        path_i = os.path.join(root_path, rotation, feature_names[0])
+        path_o = os.path.join(root_path, rotation, feature_names[1])
 
         print(path_i, path_o)
         if os.path.exists(path_i):

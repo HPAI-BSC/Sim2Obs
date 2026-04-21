@@ -62,6 +62,9 @@ class MapStep(PipelineStep):
         if rotate_step_dict is not None:
             rotation_angle, _, _ = rotate_step_dict.rotation_group
 
+        simulate_muse = cfg.get("feature_names", [{}])[0].get("simulate_muse")
+        print(f"Simulate_muse: {simulate_muse}")
+
         return {
             'dim': map_step_dict.get('dim', 2),
             'root_path': cfg.catalog.path,
@@ -69,7 +72,8 @@ class MapStep(PipelineStep):
             'catalog_name': cfg.catalog.name,
             'rotation_angle': rotation_angle,
             'spatial_resolution': cfg.catalog.spatial_resolution,
-            'bin_spatial_resolution_scale': cfg.catalog.bin_spatial_resolution_scale
+            'bin_spatial_resolution_scale': cfg.catalog.bin_spatial_resolution_scale,
+            'simulate_muse': simulate_muse
         }
 
     def _create_maps(self, cosmos_data: CosmosData, input_feature: FeatureProcessor,
@@ -354,9 +358,19 @@ class MapStep(PipelineStep):
         file = f'halo_{halo.halo_id}_subhalo_{cosmos_data.subhalo_id}'
 
         if self.map_configuration['rotation_angle'] is not None:
-            path = os.path.join(self.map_configuration['root_path'],
-                                f'rotation_{self.map_configuration["rotation_angle"]}_s{self.map_configuration["bin_spatial_resolution_scale"]}',
-                                feature_name)
+            if self.map_configuration['simulate_muse'] is not None and self.map_configuration['simulate_muse']:
+                path = os.path.join(self.map_configuration['root_path'], 'simulate_muse',
+                                    f'rotation_{self.map_configuration["rotation_angle"]}_s{self.map_configuration["bin_spatial_resolution_scale"]}',
+                                    feature_name)
+            else:
+                if self.map_configuration['simulate_muse'] is not None and self.map_configuration['simulate_muse']:
+                    path = os.path.join(self.map_configuration['root_path'], 'simulate_muse',
+                                        f'rotation_{self.map_configuration["rotation_angle"]}_s{self.map_configuration["bin_spatial_resolution_scale"]}',
+                                        feature_name)
+                else:
+                    path = os.path.join(self.map_configuration['root_path'],
+                                        f'rotation_{self.map_configuration["rotation_angle"]}_s{self.map_configuration["bin_spatial_resolution_scale"]}',
+                                        feature_name)
         else:
             path = os.path.join(self.map_configuration['root_path'],
                                 f'no_rotation_s{self.map_configuration["bin_spatial_resolution_scale"]}',
