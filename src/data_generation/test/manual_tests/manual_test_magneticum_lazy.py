@@ -1,10 +1,10 @@
 import tracemalloc
 import gc
-from rootutils import rootutils
+#from rootutils import rootutils
 
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 
-rootutils.setup_root(__file__, pythonpath=True)
+#rootutils.setup_root(__file__, pythonpath=True)
 
 from hydra import initialize, compose
 
