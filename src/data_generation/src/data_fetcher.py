@@ -2177,10 +2177,13 @@ class MagneticumFetcher(DataFetcher):
             fields_padded = config['fields_padded']
             ptype_int = config['ptype_int']
 
+            logger.debug('read_new')
             snap_data = g3read.read_new(
                 self._snap_base, fields_padded, ptype_int,
                 multiple_files=True, do_flatten=False
             )
+            logger.debug('read_new - end')
+
             logger.debug(len(snap_data))
             self._snap_cache[part_type] = {
                 'snap_data': snap_data[ptype_int],
