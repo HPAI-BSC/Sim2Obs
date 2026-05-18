@@ -2079,43 +2079,16 @@ class MagneticumFetcher(DataFetcher):
             }
 
         # Pre-compute particle pipeline conditions once
-        '''
+
         self._particle_conditions = {
             col: {t: cfg for t, cfg in type_config.items() if 'filter' in cfg}
             for col, type_config in self.catalog.fields.particles.items()
             if any('filter' in cfg for cfg in type_config.values())
         }
-        '''
+
         self._particle_conditions = {}
-
-        for col, type_config in self.catalog.fields.particles.items():
-            # Debug: inspect each column
-            logger.debug("COLUMN:", col)
-            logger.debug("TYPE CONFIG:", type_config)
-            filtered_types = {}
-            for t, cfg in type_config.items():
-
-                # Debug: inspect each config
-                logger.debug(f"  TYPE: {t}")
-                if 'filter' in cfg:
-                    logger.debug("-> has filter, keeping")
-                    filtered_types[t] = cfg
-                else:
-                    logger.debug("    -> no filter, skipping")
-
-            # Only keep column if at least one config has 'filter'
-            if filtered_types:
-                logger.debug(f"KEEPING COLUMN: {col}")
-                self._particle_conditions[col] = filtered_types
-            else:
-                logger.debug(f"DROPPING COLUMN: {col}")
-
         self._cache_loaded = True
 
-        logger.debug(self._snap_cache)
-        logger.debug(self._sorted_snap_cache)
-        logger.debug(self._snap_cache_config)
-        logger.debug(self._particle_conditions)
         logger.debug("Catalog metadata cache loaded successfully.")
         # todo check dictioaries are not empty
 
@@ -2191,6 +2164,7 @@ class MagneticumFetcher(DataFetcher):
         Lazily load snapshot data for a specific particle type.
         Only reads from disk if not already in memory.
         """
+        logger.info('_get_snap_cache')
         if part_type not in self._snap_cache:
             # Skip loading particle types you don't need
             if part_type != 'stars':
@@ -2205,6 +2179,7 @@ class MagneticumFetcher(DataFetcher):
                 self._snap_base, fields_padded, ptype_int,
                 multiple_files=True, do_flatten=False
             )
+            logger.debug(len(snap_data))
             self._snap_cache[part_type] = {
                 'snap_data': snap_data[ptype_int],
                 'fields_padded': fields_padded,
@@ -2370,7 +2345,9 @@ class MagneticumFetcher(DataFetcher):
         # Exclude computed columns from g3read call
         computed_columns = self.function_needs.get('subhalo', {})
         catalog_fields = [f for f in self.subhalo_fields if f not in computed_columns]
+        logger.debug(catalog_fields)
         subhalos = g3read.read_new(self._group_base, catalog_fields, 1, is_snap=False, multiple_files=True)
+        logger.debug(len(subhalos))
 
         # Compute derived features and pad with nan for empty subhalos
         if computed_columns:
@@ -2441,11 +2418,13 @@ class MagneticumFetcher(DataFetcher):
         Load particle data for all subhalos.
         Processes one particle type at a time and evicts after use to save memory.
         """
+        logger.info('_load_subhalo_particles_cache')
         if not getattr(self, '_cache_loaded', False):
             self._load_catalog_cache()
 
         n_subhalos = len(self._soff)
         self._n_subhalos_total = n_subhalos
+        logger.debug(f'_n_subhalos_total: {self._n_subhalos_total}')
         all_particles = {sub_idx: {} for sub_idx in range(n_subhalos)}
 
         for part_type in self._snap_cache_config:
