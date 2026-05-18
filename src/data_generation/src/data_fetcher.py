@@ -2165,6 +2165,7 @@ class MagneticumFetcher(DataFetcher):
         Only reads from disk if not already in memory.
         """
         logger.info('_get_snap_cache')
+        logger.debug(f'_snap_cache: {self._snap_cache}')
         if part_type not in self._snap_cache:
             # Skip loading particle types you don't need
             if part_type != 'stars':
