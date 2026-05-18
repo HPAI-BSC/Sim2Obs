@@ -2038,10 +2038,13 @@ class MagneticumFetcher(DataFetcher):
     def _load_catalog_cache(self):
         """Load lightweight metadata only. No PID array, no snapshot data."""
         path = self.catalog.path
+        logger.debug(f'Catalog path: {path}')
         groups_dir = os.path.join(path, f'groups_{self.catalog.snapnum}')
         group_base = os.path.join(groups_dir, os.path.basename(groups_dir).replace('groups', 'sub'))
+        logger.debug(f'Group dir base: {group_base}')
         snapshot_dir = os.path.join(path, f'snapdir_{self.catalog.snapnum}')
         snap_base = os.path.join(snapshot_dir, os.path.basename(snapshot_dir).replace('snapdir', 'snap'))
+        logger.debug(f'Snapdir base: {snap_base}')
 
         self._group_base = group_base
         self._snap_base = snap_base
@@ -2059,10 +2062,11 @@ class MagneticumFetcher(DataFetcher):
         self._nsub = halo_catalog['NSUB']
 
         # PID: build file boundary index only — never load full array
+        logger.debug('_pid_file_boundaries')
         self._pid_file_boundaries = self._build_pid_file_boundaries()
 
         # Snapshot: store config only — no data loaded yet
-        self._snap_cache  = {}
+        self._snap_cache = {}
         self._sorted_snap_cache = {}
         self._snap_cache_config = {}
         for part_type, type_config in self.catalog.fields.particles.items():
@@ -2071,7 +2075,7 @@ class MagneticumFetcher(DataFetcher):
                 fields.append('ID')
             self._snap_cache_config[part_type] = {
                 'fields_padded': [f.ljust(4) for f in fields],
-                'ptype_int' : MAGNETICUM_PART_TYPES[part_type],
+                'ptype_int': MAGNETICUM_PART_TYPES[part_type],
             }
 
         # Pre-compute particle pipeline conditions once
