@@ -2428,6 +2428,7 @@ class MagneticumFetcher(DataFetcher):
         all_particles = {sub_idx: {} for sub_idx in range(n_subhalos)}
 
         for part_type in self._snap_cache_config:
+            logger.debug(f'part_type: {part_type}')
             cache = self._get_snap_cache(part_type)
             snap_data = cache['snap_data']
             fields_padded = cache['fields_padded']
