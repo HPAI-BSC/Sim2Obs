@@ -2049,7 +2049,7 @@ class MagneticumFetcher(DataFetcher):
         self._group_base = group_base
         self._snap_base = snap_base
 
-        files = os.listdir(group_base)
+        files = os.listdir('/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/magneticum/groups_120')
         logger.debug(files)
 
         # Batch read halo metadata
