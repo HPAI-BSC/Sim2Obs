@@ -2079,11 +2079,36 @@ class MagneticumFetcher(DataFetcher):
             }
 
         # Pre-compute particle pipeline conditions once
+        '''
         self._particle_conditions = {
             col: {t: cfg for t, cfg in type_config.items() if 'filter' in cfg}
             for col, type_config in self.catalog.fields.particles.items()
             if any('filter' in cfg for cfg in type_config.values())
         }
+        '''
+        self._particle_conditions = {}
+
+        for col, type_config in self.catalog.fields.particles.items():
+            # Debug: inspect each column
+            logger.debug("COLUMN:", col)
+            logger.debug("TYPE CONFIG:", type_config)
+            filtered_types = {}
+            for t, cfg in type_config.items():
+
+                # Debug: inspect each config
+                logger.debug(f"  TYPE: {t}")
+                if 'filter' in cfg:
+                    logger.debug("-> has filter, keeping")
+                    filtered_types[t] = cfg
+                else:
+                    logger.debug("    -> no filter, skipping")
+
+            # Only keep column if at least one config has 'filter'
+            if filtered_types:
+                logger.debug(f"KEEPING COLUMN: {col}")
+                self._particle_conditions[col] = filtered_types
+            else:
+                logger.debug(f"DROPPING COLUMN: {col}")
 
         self._cache_loaded = True
 
