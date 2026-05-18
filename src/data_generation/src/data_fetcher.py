@@ -2087,11 +2087,12 @@ class MagneticumFetcher(DataFetcher):
 
         self._cache_loaded = True
 
-        logger.debug(self._snap_cache.keys())
-        logger.debug(self._sorted_snap_cache.keys())
-        logger.debug(self._snap_cache_config.keys())
-        logger.debug(self._particle_conditions.keys())
+        logger.debug(self._snap_cache)
+        logger.debug(self._sorted_snap_cache)
+        logger.debug(self._snap_cache_config)
+        logger.debug(self._particle_conditions)
         logger.debug("Catalog metadata cache loaded successfully.")
+        # todo check dictioaries are not empty
 
 
     # ── Cache: PID file boundaries ───────────────────────────────────────────
