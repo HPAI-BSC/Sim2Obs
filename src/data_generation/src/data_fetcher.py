@@ -2168,7 +2168,8 @@ class MagneticumFetcher(DataFetcher):
         logger.debug(f'_snap_cache: {self._snap_cache}')
         if part_type not in self._snap_cache:
             # Skip loading particle types you don't need
-            if part_type != 'stars':
+            # TODO WATCH THIS
+            if part_type not in ['stars', 'star']:
                 return None
 
             logger.debug(f"Lazy loading snapshot data for particle type: {part_type}")
