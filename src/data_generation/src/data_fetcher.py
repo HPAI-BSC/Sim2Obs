@@ -2049,9 +2049,6 @@ class MagneticumFetcher(DataFetcher):
         self._group_base = group_base
         self._snap_base = snap_base
 
-        files = os.listdir('/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/magneticum/groups_120')
-        logger.debug(files)
-
         # Batch read halo metadata
         halo_catalog = g3read.read_new(group_base, ['GOFF', 'GLEN', 'FSUB', 'NSUB'], 0, is_snap=False, multiple_files=True)
         self._goff = halo_catalog['GOFF']
@@ -2089,7 +2086,13 @@ class MagneticumFetcher(DataFetcher):
         }
 
         self._cache_loaded = True
+
+        logger.debug(self._snap_cache.keys())
+        logger.debug(self._sorted_snap_cache.keys())
+        logger.debug(self._snap_cache_config.keys())
+        logger.debug(self._particle_conditions.keys())
         logger.debug("Catalog metadata cache loaded successfully.")
+
 
     # ── Cache: PID file boundaries ───────────────────────────────────────────
 
@@ -2316,6 +2319,7 @@ class MagneticumFetcher(DataFetcher):
 
         halo_context = HaloContext(processed_halos, self.column_map)
         logger.debug(f"Halo data fetched: {halo_context.data['halo_id'].nunique()} halos.")
+        logger.debug(halo_context.data.head())
         return halo_context
 
     # ── Subhalos ──────────────────────────────────────────────────────────────
