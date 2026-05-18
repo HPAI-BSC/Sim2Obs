@@ -2049,10 +2049,8 @@ class MagneticumFetcher(DataFetcher):
         self._group_base = group_base
         self._snap_base = snap_base
 
-        # Batch read subhalo metadata
-        subhalo_catalog = g3read.read_new(group_base, ['SOFF', 'SLEN'], 1, is_snap=False, multiple_files=True)
-        self._soff = subhalo_catalog['SOFF']
-        self._slen = subhalo_catalog['SLEN']
+        files = os.listdir(group_base)
+        logger.debug(files)
 
         # Batch read halo metadata
         halo_catalog = g3read.read_new(group_base, ['GOFF', 'GLEN', 'FSUB', 'NSUB'], 0, is_snap=False, multiple_files=True)
@@ -2060,6 +2058,11 @@ class MagneticumFetcher(DataFetcher):
         self._glen = halo_catalog['GLEN']
         self._fsub = halo_catalog['FSUB']
         self._nsub = halo_catalog['NSUB']
+
+        # Batch read subhalo metadata
+        subhalo_catalog = g3read.read_new(group_base, ['SOFF', 'SLEN'], 1, is_snap=False, multiple_files=True)
+        self._soff = subhalo_catalog['SOFF']
+        self._slen = subhalo_catalog['SLEN']
 
         # PID: build file boundary index only — never load full array
         logger.debug('_pid_file_boundaries')
