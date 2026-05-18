@@ -6,6 +6,7 @@ from omegaconf import DictConfig, OmegaConf
 # from rootutils import rootutils
 
 from src.data_generation.src.utils import setup_logger, check_corrupted_files
+from src.data_generation.test.manual_tests.manual_test_magneticum_lazy import magneticum_particle_test
 
 logger = setup_logger("Generate-dataset")
 
@@ -63,4 +64,6 @@ def main(cfg: DictConfig) -> Any:
 
 
 if __name__ == "__main__":
-    main()
+    # TODO DEBUG
+    magneticum_particle_test()
+    #main()

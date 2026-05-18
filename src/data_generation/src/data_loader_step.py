@@ -1,6 +1,7 @@
+import gc
 import json
-import logging
 import traceback
+import tracemalloc
 from typing import Tuple, List, Optional, Callable, Any
 import os
 
@@ -11,7 +12,7 @@ from scipy.spatial import cKDTree
 
 from src.data_generation.src.cosmos import CosmosData
 from src.data_generation.src.data_fetcher import DataFetcherFactory
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 
 from src.data_generation.src.feature import FeatureProcessorFactory, attach_models_to_features
 from src.data_generation.src.halo import Halo, HaloContext
@@ -23,6 +24,24 @@ logger = setup_logger("DataLoader-step")
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 
+
+def magneticum_test(halo_context, fetcher):
+    tracemalloc.start()
+
+    halo_ids = [0, 1, 2, 3, 4]  # your test halo ids
+
+    for halo_id in halo_ids:
+        halo = halo_context.get_halo_by_id(halo_id)
+
+        particles = fetcher.get_p_halo(halo=halo)
+
+        current, peak = tracemalloc.get_traced_memory()
+        print(f"halo_id={halo_id} | stars={len(particles)} | "
+              f"mem current={current / 1e6:.1f} MB | peak={peak / 1e6:.1f} MB")
+
+        del particles
+        gc.collect()
+    tracemalloc.stop()
 
 def filter_outliers_transition_radius(transition_radius_path):
     df = pd.read_csv(transition_radius_path)

@@ -2156,6 +2156,10 @@ class MagneticumFetcher(DataFetcher):
         Only reads from disk if not already in memory.
         """
         if part_type not in self._snap_cache:
+            # Skip loading particle types you don't need
+            if part_type != 'stars':
+                return None
+
             logger.debug(f"Lazy loading snapshot data for particle type: {part_type}")
             config = self._snap_cache_config[part_type]
             fields_padded = config['fields_padded']
@@ -2169,15 +2173,13 @@ class MagneticumFetcher(DataFetcher):
                 'snap_data': snap_data[ptype_int],
                 'fields_padded': fields_padded,
             }
-            # Build sorted index immediately
             idx = np.argsort(self._snap_cache[part_type]['snap_data']['ID  '])
             self._sorted_snap_cache[part_type] = {
                 'sorted_idx': idx,
                 'sorted_ids': self._snap_cache[part_type]['snap_data']['ID  '][idx]
             }
-            logger.debug(f"Snapshot data loaded for particle type: {part_type}")
 
-        return self._snap_cache[part_type]
+        return self._snap_cache.get(part_type)
 
     def _evict_snap_cache(self, part_type: str):
         """Free snapshot data for a particle type from memory."""
@@ -2190,11 +2192,16 @@ class MagneticumFetcher(DataFetcher):
     # ── Particle extraction ──────────────────────────────────────────────────
 
     def _extract_particles(self, pids: np.ndarray, entity_id: int) -> dict:
-        """Extract particles for a given set of PIDs using fast searchsorted."""
+        """Extract particles — skip types that return None from cache."""
         data = {}
 
         for part_type in self._snap_cache_config:
             cache = self._get_snap_cache(part_type)
+
+            # None means this part_type was skipped
+            if cache is None:
+                continue
+
             snap_data = cache['snap_data']
             fields_padded = cache['fields_padded']
             sorted_idx = self._sorted_snap_cache[part_type]['sorted_idx']
@@ -2463,6 +2470,11 @@ class MagneticumFetcher(DataFetcher):
         )
 
         data = self._extract_particles(halo_pids, halo.halo_id)
+
+        # Evict snapshot cache after each halo to free memory
+        for part_type in list(self._snap_cache.keys()):
+            self._evict_snap_cache(part_type)
+
         return self._run_particle_pipeline(data)
 
 
