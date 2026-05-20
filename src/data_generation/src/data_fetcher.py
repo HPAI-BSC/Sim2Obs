@@ -4,6 +4,7 @@ import operator
 import os.path
 from pathlib import Path
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 import g3read
@@ -149,6 +150,8 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
                     # Rename the column in case the initial config format was not appropiate, ie: POS to 'POS '
                     field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
                     h = dict_depth(field_info_ii)
+                    if cfg.name == 'magneticum':
+                        key_ii = key_ii.ljust(4)
                     if h == 1:
                         if not getattr(field_info_ii, 'name', None):
                             raise ValueError(f"Error: The field '{key}' must have a name.")
@@ -190,6 +193,54 @@ def convert_to_dataframe(d: dict):
         return d
     else:
         raise ValueError(f'The format of the data is not correct, {dict_depth(d)} levels of data detected.')
+
+# TODO TEST
+def apply_filter_arrow(table: pa.Table, conditions: dict, config):
+    """
+    Arrow-native filtering using boolean masks.
+    """
+
+    mask = pa.array([True] * table.num_rows)
+
+    for key, condition in conditions.items():
+
+        if key not in table.column_names:
+            raise Exception(
+                f'Feature "{key}" not in table. Columns: {table.column_names}'
+            )
+
+        col = table[key]
+
+        # MULTI-CONDITION SUPPORT
+        filters = condition.filter
+
+        if not isinstance(filters, list):
+            filters = [filters]
+
+        for expr in filters:
+
+            if isinstance(expr, str):
+                symbol = expr.split(" ")[0]
+                right_expr = " ".join(expr.split(" ")[1:])
+                value = float(eval(right_expr))
+
+                arr = col
+
+                # map operator
+                if symbol == ">":
+                    mask = pc.and_(mask, pc.greater(arr, value))
+                elif symbol == "<":
+                    mask = pc.and_(mask, pc.less(arr, value))
+                elif symbol == ">=":
+                    mask = pc.and_(mask, pc.greater_equal(arr, value))
+                elif symbol == "<=":
+                    mask = pc.and_(mask, pc.less_equal(arr, value))
+                elif symbol == "==":
+                    mask = pc.and_(mask, pc.equal(arr, value))
+                else:
+                    raise ValueError(f"Unknown operator: {symbol}")
+
+    return table.filter(mask)
 
 
 def apply_filter_df(d, conditions, config):
@@ -259,12 +310,15 @@ def apply_filters(d: Any, conditions: dict, config: DictConfig):
     """
     if isinstance(d, pd.DataFrame):
         return apply_filter_df(d, conditions, config)
+    elif isinstance(d, pa.Table):
+        return apply_filter_arrow(d, conditions, config)
     elif isinstance(d, dict):
         for key in d:
             d[key] = apply_filter_df(d[key], conditions.get(key, {}), config)
         return d
 
 
+# TO TEST
 @pipeline_step
 def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig, **kwargs):
     """
@@ -284,6 +338,7 @@ def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig, **
     Any
         Filtered data, either as a DataFrame or dictionary of DataFrames.
     """
+
     for key in fields:
         if key in df:
             field_info = OmegaConf.select(cfg, f"fields.{table}.{key}")
@@ -292,6 +347,8 @@ def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig, **
                 for key_ii in field_info:
                     field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
                     if field_info_ii.scaling is not None:
+                        if cfg.name == 'magneticum':
+                            key_ii = key_ii.ljust(4)
                         df[key][key_ii] = apply_conversion(df[key][key_ii], field_info_ii.scaling, cfg.a, cfg.H,
                                                            **kwargs)
             else:
@@ -2085,7 +2142,6 @@ class MagneticumFetcher(DataFetcher):
             }
 
         # Pre-compute particle pipeline conditions once
-
         self._particle_conditions = {
             col: {t: cfg for t, cfg in type_config.items() if 'filter' in cfg}
             for col, type_config in self.catalog.fields.particles.items()
@@ -2547,6 +2603,26 @@ class MagneticumFetcherV2(DataFetcher):
 
         logger.debug("Catalog metadata cache loaded successfully.")
 
+    def _load_particle_cache(self):
+        self._snap_cache_config = {}
+        for part_type, type_config in self.catalog.fields.particles.items():
+            fields = list(type_config.keys())
+            if 'ID' not in fields:
+                fields.append('ID')
+            self._snap_cache_config[part_type] = {
+                'fields_padded': [f.ljust(4) for f in fields],
+                'ptype_int': MAGNETICUM_PART_TYPES[part_type],
+            }
+
+        # Pre-compute particle pipeline conditions once
+        self._particle_conditions = {
+            col: {t: cfg for t, cfg in type_config.items() if 'filter' in cfg}
+            for col, type_config in self.catalog.fields.particles.items()
+            if any('filter' in cfg for cfg in type_config.values())
+        }
+
+        self._particle_conditions = {}
+
     def _build_pid_file_boundaries(self) -> list:
         """
         Build a lookup table of {file, start, end} for PID files.
@@ -2674,9 +2750,11 @@ class MagneticumFetcherV2(DataFetcher):
         # Check if preprocessed parquet files already exist
         path = self.catalog.path
         subhalos_parquet = os.path.join(path, 'subhalos_parquet')
-        if path.exists(subhalos_parquet):
+        if os.path.exists(subhalos_parquet):
             logger.info(f"Loading preprocessed subhalos from: {subhalos_parquet}")
-            return LazySubhaloContext(subhalos_parquet)
+            subhalo_context = LazySubhaloContext(subhalos_parquet)
+            logger.debug(f"Subhalo data fetched: {subhalo_context.dataset.count_rows()} rows.")
+            return subhalo_context
 
         # Setup fields
         if 'GRNR' not in self.subhalo_fields:
@@ -2784,6 +2862,155 @@ class MagneticumFetcherV2(DataFetcher):
         subhalo_context = LazySubhaloContext(subhalos_parquet)
         logger.debug(f"Subhalo data fetched: {subhalo_context.dataset.count_rows()} rows.")
         return subhalo_context
+
+    def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
+        halo = kwargs.get('halo', None)
+        if halo is None:
+            raise ValueError("halo must be provided in kwargs")
+        return self._get_p_halo(halo)
+
+    def _build_halo_intervals(self):
+        """
+        Build compact halo representation without expanding particle IDs.
+        Each halo is represented by (min_pid, max_pid, halo_id).
+        """
+
+        intervals = []
+
+        for halo_id in range(len(self._glen)):
+            pids = self._get_pid_for_entity(
+                offset=int(self._goff[halo_id]),
+                length=int(self._glen[halo_id])
+            )
+
+            # only boundaries, NOT full expansion
+            intervals.append(
+                (pids.min(), pids.max(), halo_id)
+            )
+
+        # sort by start of interval
+        intervals.sort(key=lambda x: x[0])
+
+        self._halo_intervals = intervals
+
+    def _assign_halo_ids(self, ids):
+        """
+        Vectorized assignment using interval scanning.
+        No dicts, no concatenation, no full mapping.
+        """
+
+        halo_ids = np.full(len(ids), -1, dtype=np.int32)
+
+        intervals = self._halo_intervals
+
+        for start, end, halo_id in intervals:
+
+            # early skip (important optimization)
+            if start > ids.max():
+                break
+
+            mask = (ids >= start) & (ids <= end)
+
+            halo_ids[mask] = halo_id
+
+        return halo_ids
+
+    def _run_particle_pipeline(self, data: dict) -> SubhaloParticles:
+        """Shared pipeline logic for both halo and subhalo particles."""
+        table = 'particles'
+        steps = [
+            lambda particles: validate_and_process_fields(particles, self.particle_fields, table, self.catalog),
+            lambda particles: convert_to_dataframe(particles),
+            lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+            lambda particles: apply_filters(particles, self._particle_conditions, self.catalog.fields.particles)
+        ]
+        processed_particles = run_pipeline(data, steps)
+        return processed_particles
+
+    # TODO test
+    # TODO update it to return LazySubhahoParticles
+    def _store_particles(self):
+        if not getattr(self, '_cache_loaded', False):
+            self._load_catalog_cache()
+            self._load_particle_cache()
+
+        logger.info("Starting star particle ingestion pipeline")
+        path = self.catalog.path
+        particles_parquet = os.path.join(path, 'particles_parquet')
+
+        # BUILD GLOBAL MAP (once)
+        self._build_halo_intervals()
+
+        #  PROCESS SNAPSHOT FILES ONCE
+        for part_type in self.particle_fields:
+            if part_type not in ["stars", "star"]:
+                continue
+            config = self._snap_cache_config[part_type]
+            fields_padded = config["fields_padded"]
+            ptype_int = config["ptype_int"]
+
+            # Read file by file
+            for snap_file in g3read.yield_all_files(self._snap_base):
+                # TODO add try-except
+                snap_data = g3read.read_new(snap_file, fields_padded, ptype_int, multiple_files=False,
+                                            do_flatten=False)[ptype_int]
+                if snap_data is None or len(snap_data) == 0:
+                    continue
+
+                # 3. Filter particles belonging to halo
+                ids = snap_data["ID  "]
+
+                # VECTORISED halo assignment (FAST)
+                halo_ids = self._assign_halo_ids(ids)
+
+                mask = halo_ids != -1
+                if not np.any(mask):
+                    continue
+
+                # 4. BUILD OUTPUT
+                data = {k: v[mask] for k, v in snap_data.items()}
+                data["parent_id"] = halo_ids[mask]
+                for field_name, array in snap_data.items():
+                    if isinstance(array, np.ndarray) and array.ndim > 1:
+                        data[field_name] = to_list_in_batches(data, field_name)
+                data_particles = {part_type: data}
+                processed = self._run_particle_pipeline(data_particles)
+                table = pa.Table.from_pydict(processed[part_type])
+                pq.write_to_dataset(table, root_path=particles_parquet, partition_cols=["parent_id"])
+
+        logger.info("Star particle ingestion completed")
+
+    def _get_p_halo(self, halo: Halo) -> SubhaloParticles:
+        if not getattr(self, '_cache_loaded', False):
+            self._load_catalog_cache()
+            self._load_particle_cache()
+
+        halo_pids = self._get_pid_for_entity(
+            offset=int(self._goff[halo.halo_id]),
+            length=int(self._glen[halo.halo_id])
+        )
+        print()
+
+        for part_type in self.particle_fields:
+            if part_type not in ['stars', 'star']:
+                return None
+
+            logger.debug(f"Lazy loading snapshot data for particle type: {part_type}")
+            config = self._snap_cache_config[part_type]
+            fields_padded = config['fields_padded']
+            ptype_int = config['ptype_int']
+
+
+            logger.debug('read_new')
+            snap_data = g3read.read_new(
+                self._snap_base, fields_padded, ptype_int,
+                multiple_files=True, do_flatten=False
+            )
+            logger.debug('read_new - end')
+
+
+
+        return None
 
 
 

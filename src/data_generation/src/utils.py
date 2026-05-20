@@ -785,6 +785,9 @@ def apply_conversion(values, scaling_formula, scalefactor, h, **kwargs):
     # Prepare a safe eval context
     context = {"x": values, "a": scalefactor, "h": h, "np": np, "math": math}
     context.update(kwargs)
+    if isinstance(values, list):
+        x = np.stack(values)
+        context["x"] = x
 
     return eval(scaling_formula, context)
 

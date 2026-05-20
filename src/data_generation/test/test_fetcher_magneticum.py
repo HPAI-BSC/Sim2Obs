@@ -1,6 +1,8 @@
 import os
+import pickle
 import unittest
 
+import pyarrow.dataset
 import pytest
 from rootutils import rootutils
 
@@ -13,7 +15,8 @@ from unittest.mock import patch
 from omegaconf import OmegaConf
 
 from src.data_generation.src.data_fetcher import DataFetcherFactory, MagneticumFetcherV2
-from src.data_generation.src.halo import HaloContext
+from src.data_generation.src.halo import HaloContext, Halo
+from src.data_generation.src.lazy_subhalo import LazySubhaloContext
 
 load_dotenv('../.env')
 
@@ -144,4 +147,19 @@ class TestFetcherMagneticum(unittest.TestCase):
     def test_get_subhalos(self):
         fetcher = self.fetcher_magneticum
         result = fetcher.get_subhalos()
+        import pyarrow.dataset as ds
+        self.assertIsInstance(result, LazySubhaloContext)
+        self.assertIsInstance(result.dataset, ds.Dataset)
+
+    def no_test_get_p_halo(self):
+        mock_halo = {'halo_id': 0, 'm200': 26000000, 'r200': 744.56, 'fsub': 0, 'gpos': [200, 200, 200]}
+        halo = Halo(**mock_halo)
+        fetcher = self.fetcher_magneticum
+        result = fetcher.get_p_halo(halo=halo)
+
+    def test_store_particles(self):
+        fetcher = self.fetcher_magneticum
+        fetcher._store_particles()
+
+
 
