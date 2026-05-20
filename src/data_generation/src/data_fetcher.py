@@ -3,6 +3,8 @@ import gc
 import operator
 import os.path
 from pathlib import Path
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 import g3read
 from abc import ABC, abstractmethod
@@ -19,6 +21,7 @@ from swiftsimio import SWIFTDataset
 
 from src.data_generation.src.feature_computer import FeatureComputer
 from src.data_generation.src.halo import HaloContext, Halo
+from src.data_generation.src.lazy_subhalo import LazySubhaloContext
 from src.data_generation.src.part_types import MAGNETICUM_PART_TYPES
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion, \
@@ -2660,22 +2663,22 @@ class MagneticumFetcherV2(DataFetcher):
     def get_p_subhalo(self, *args, **kwargs):
         pass
 
-    def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
+    def get_subhalos(self, *args, **kwargs) -> SubhaloContext | LazySubhaloContext:
         return self._get_subhalos()
 
-    def _get_subhalos(self, batch_size: int = 10_000) -> None: #SubhaloContext:
+    def _get_subhalos(self, batch_size: int=10_000) -> SubhaloContext | LazySubhaloContext:
         logger.debug("Fetching subhalos from Magneticum in batches...")
         if not getattr(self, '_cache_loaded', False):
-            # TODO - modify this
             self._load_catalog_cache()
 
-        # ── Check if preprocessed HDF5 already exists ─────────────────────────
-        output_path = Path(self.catalog.path) / f"subhalos_{self.catalog.snapnum}.hdf5"
-        if output_path.exists():
-            logger.info(f"Loading subhalos from preprocessed HDF5: {output_path}")
-            return SubhaloContext.from_hdf5_full(output_path)
+        # Check if preprocessed parquet files already exist
+        path = self.catalog.path
+        subhalos_parquet = os.path.join(path, 'subhalos_parquet')
+        if path.exists(subhalos_parquet):
+            logger.info(f"Loading preprocessed subhalos from: {subhalos_parquet}")
+            return LazySubhaloContext(subhalos_parquet)
 
-        # ── Setup fields ──────────────────────────────────────────────────────
+        # Setup fields
         if 'GRNR' not in self.subhalo_fields:
             self.subhalo_fields.append('GRNR')
             OmegaConf.set_struct(self.catalog, False)
@@ -2697,21 +2700,17 @@ class MagneticumFetcherV2(DataFetcher):
         processed_batches = []
         global_offset = 0
 
-        # ── Read file by file ─────────────────────────────────────────────────
+        # Read file by file
         for group_file in g3read.yield_all_files(self._group_base):
             try:
-                raw = g3read.read_new(
-                    group_file, catalog_fields, 1,
-                    is_snap=False, multiple_files=False
-                )
-
+                raw = g3read.read_new(group_file, catalog_fields, 1, is_snap=False, multiple_files=False)
                 if raw is None or len(raw) == 0:
                     continue
 
                 n_in_file = len(next(iter(raw.values())))
                 logger.debug(f"File {group_file}: {n_in_file} subhalos")
 
-                # ── Process in batches within each file ───────────────────────
+                # Process in batches within each file
                 for batch_start in range(0, n_in_file, batch_size):
                     batch_end = min(batch_start + batch_size, n_in_file)
                     batch = {k: v[batch_start:batch_end] for k, v in raw.items()}
@@ -2741,14 +2740,24 @@ class MagneticumFetcherV2(DataFetcher):
                 logger.warning(f"Skipping file {group_file}: {e}")
                 continue
 
-        # ── Merge all batches ─────────────────────────────────────────────────
         if not processed_batches:
             logger.warning("No subhalos found.")
             return SubhaloContext(pd.DataFrame(), self.column_map)
 
-        logger.debug(f"Merging {len(processed_batches)} batches...")
-        # this won't work
-        #all_subhalos = pd.concat(processed_batches, ignore_index=True)
+        logger.debug(f"Storing {len(processed_batches)} batches...")
+        logger.debug(f'Subhalos parquet path: {subhalos_parquet}')
+
+        for df in processed_batches:
+            df = df.rename(columns=self.column_map)
+            table = pa.Table.from_pandas(df, preserve_index=False)
+
+            pq.write_to_dataset(
+                table,
+                root_path=subhalos_parquet,
+                partition_cols=['id_parents'],
+                use_threads=True
+            )
+
         del processed_batches
         gc.collect()
 
@@ -2770,15 +2779,11 @@ class MagneticumFetcherV2(DataFetcher):
                     result_full[sub_idx] = result_sparse[i]
                 all_subhalos[method_name] = result_full[all_subhalos['subhalo_id'].values]
             
-
-        # ── Save to HDF5 ──────────────────────────────────────────────────────
-        SubhaloContext.save_to_hdf5(all_subhalos, output_path)
-
-        subhalo_context = SubhaloContext(all_subhalos, self.column_map)
-        logger.debug(f"Subhalo data fetched: {len(subhalo_context.data)} subhalos.")
-        return subhalo_context
         '''
-        return None
+
+        subhalo_context = LazySubhaloContext(subhalos_parquet)
+        logger.debug(f"Subhalo data fetched: {subhalo_context.dataset.count_rows()} rows.")
+        return subhalo_context
 
 
 
