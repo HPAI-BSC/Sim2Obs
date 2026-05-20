@@ -1,6 +1,9 @@
 import copy
+import gc
 import operator
 import os.path
+from pathlib import Path
+
 import g3read
 from abc import ABC, abstractmethod
 from typing import Any, Dict
@@ -67,7 +70,7 @@ def remove_useless_columns(d: dict, fields: list):
 
 
 @pipeline_step
-def assign_id(d: dict, id_column: str):
+def assign_id(d: dict, id_column: str, offset=0):
     """
     Assign an ID to each subhalo/halo.
 
@@ -91,7 +94,7 @@ def assign_id(d: dict, id_column: str):
     else:
         first_key = next(iter(d))
         num = len(d[first_key])
-        d[id_column] = np.arange(num)
+        d[id_column] = np.arange(offset, offset + num)
     return d
 
 
@@ -2657,8 +2660,125 @@ class MagneticumFetcherV2(DataFetcher):
     def get_p_subhalo(self, *args, **kwargs):
         pass
 
-    def get_subhalos(self, *args, **kwargs):
-        pass
+    def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
+        return self._get_subhalos()
+
+    def _get_subhalos(self, batch_size: int = 10_000) -> None: #SubhaloContext:
+        logger.debug("Fetching subhalos from Magneticum in batches...")
+        if not getattr(self, '_cache_loaded', False):
+            # TODO - modify this
+            self._load_catalog_cache()
+
+        # ── Check if preprocessed HDF5 already exists ─────────────────────────
+        output_path = Path(self.catalog.path) / f"subhalos_{self.catalog.snapnum}.hdf5"
+        if output_path.exists():
+            logger.info(f"Loading subhalos from preprocessed HDF5: {output_path}")
+            return SubhaloContext.from_hdf5_full(output_path)
+
+        # ── Setup fields ──────────────────────────────────────────────────────
+        if 'GRNR' not in self.subhalo_fields:
+            self.subhalo_fields.append('GRNR')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.subhalo['GRNR'] = {
+                "input": None, "output": None, "scaling": None, "name": "id_parents"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['GRNR'] = 'id_parents'
+
+        computed_columns = self.function_needs.get('subhalo', {})
+        catalog_fields = [f for f in self.subhalo_fields if f not in computed_columns]
+        table = 'subhalo'
+        subhalo_conditions = {
+            col: data
+            for col, data in self.catalog.fields.subhalo.items()
+            if 'filter' in data
+        }
+
+        processed_batches = []
+        global_offset = 0
+
+        # ── Read file by file ─────────────────────────────────────────────────
+        for group_file in g3read.yield_all_files(self._group_base):
+            try:
+                raw = g3read.read_new(
+                    group_file, catalog_fields, 1,
+                    is_snap=False, multiple_files=False
+                )
+
+                if raw is None or len(raw) == 0:
+                    continue
+
+                n_in_file = len(next(iter(raw.values())))
+                logger.debug(f"File {group_file}: {n_in_file} subhalos")
+
+                # ── Process in batches within each file ───────────────────────
+                for batch_start in range(0, n_in_file, batch_size):
+                    batch_end = min(batch_start + batch_size, n_in_file)
+                    batch = {k: v[batch_start:batch_end] for k, v in raw.items()}
+
+                    steps = [
+                        lambda s: remove_useless_columns(s, self.subhalo_fields),
+                        lambda s, o=global_offset + batch_start: assign_id(s, 'subhalo_id', offset=o),
+                        lambda s: validate_and_process_fields(s, self.subhalo_fields, table, self.catalog),
+                        lambda s: convert_to_dataframe(s),
+                        lambda s: apply_unit_conversion(s, self.subhalo_fields, table, self.catalog),
+                        lambda s: apply_filters(s, subhalo_conditions, self.catalog.fields.subhalo)
+                    ]
+
+                    processed = run_pipeline(batch, steps)
+
+                    if processed is not None and len(processed) > 0:
+                        processed_batches.append(processed)
+
+                    del batch, processed
+                    gc.collect()
+
+                global_offset += n_in_file
+                del raw
+                gc.collect()
+
+            except Exception as e:
+                logger.warning(f"Skipping file {group_file}: {e}")
+                continue
+
+        # ── Merge all batches ─────────────────────────────────────────────────
+        if not processed_batches:
+            logger.warning("No subhalos found.")
+            return SubhaloContext(pd.DataFrame(), self.column_map)
+
+        logger.debug(f"Merging {len(processed_batches)} batches...")
+        # this won't work
+        #all_subhalos = pd.concat(processed_batches, ignore_index=True)
+        del processed_batches
+        gc.collect()
+
+        '''
+        # ── Computed columns ──────────────────────────────────────────────────
+        if computed_columns:
+            if not getattr(self, '_subhalo_particles_cache_loaded', False):
+                # TODO
+                #self._load_subhalo_particles_cache()
+                pass
+
+            # TODO take this out, this is assuming that particles are also stored
+            
+            for method_name, columns_needed in computed_columns.items():
+                result_sparse = FeatureComputer.compute(method_name, self.all_particles, columns_needed)
+                n_subhalos = self._n_subhalos_total
+                result_full = np.full(n_subhalos, np.nan)
+                for i, sub_idx in enumerate(self.all_particles.keys()):
+                    result_full[sub_idx] = result_sparse[i]
+                all_subhalos[method_name] = result_full[all_subhalos['subhalo_id'].values]
+            
+
+        # ── Save to HDF5 ──────────────────────────────────────────────────────
+        SubhaloContext.save_to_hdf5(all_subhalos, output_path)
+
+        subhalo_context = SubhaloContext(all_subhalos, self.column_map)
+        logger.debug(f"Subhalo data fetched: {len(subhalo_context.data)} subhalos.")
+        return subhalo_context
+        '''
+        return None
 
 
 

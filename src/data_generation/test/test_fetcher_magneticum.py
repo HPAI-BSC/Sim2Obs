@@ -140,3 +140,8 @@ class TestFetcherMagneticum(unittest.TestCase):
         with patch('g3read.read_new', return_value=make_fake_halos(5)):
             fetcher.get_halos()
         self.assertTrue(fetcher._cache_loaded)
+
+    def test_get_subhalos(self):
+        fetcher = self.fetcher_magneticum
+        result = fetcher.get_subhalos()
+

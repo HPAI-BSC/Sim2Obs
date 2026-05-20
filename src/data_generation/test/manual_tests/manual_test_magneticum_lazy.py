@@ -24,23 +24,8 @@ def magneticum_particle_test():
     fetcher_magneticum = DataFetcherFactory.get_data_fetcher(cfg_magneticum.catalog, **attr_dict)
 
     tracemalloc.start()
-
-    halo_ids = [0, 1, 2, 3, 4]  # your test halo ids
-
     halo_context = fetcher_magneticum.get_halos()
     subhalo_context = fetcher_magneticum.get_subhalos()
-
-    for halo_id in halo_ids:
-        halo = halo_context.get_halo_by_id(halo_id)
-        particles = fetcher_magneticum.get_p_halo(halo=halo)
-
-        current, peak = tracemalloc.get_traced_memory()
-        print(f"halo_id={halo_id} | stars={len(particles)} | "
-              f"mem current={current/1e6:.1f} MB | peak={peak/1e6:.1f} MB")
-
-        del particles
-        gc.collect()
-
     tracemalloc.stop()
 
 
