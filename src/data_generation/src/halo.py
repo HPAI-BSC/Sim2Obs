@@ -109,6 +109,9 @@ class HaloContext:
             if not isinstance(df, pd.DataFrame):
                 raise Exception(f"Halo data must be a pd.DataFrame instead of {type(df)}")
 
+            if len(df) == 0:
+                raise Exception('The halo dataframe is empty.')
+
             # Create a DataFrame and set index
             df = df.rename(columns=column_map)
             df = df.rename(columns={'subhalo_id': 'fsub'})

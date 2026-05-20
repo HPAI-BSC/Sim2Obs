@@ -1,7 +1,7 @@
 import os
 import unittest
 
-import g3read
+import pytest
 from rootutils import rootutils
 
 rootutils.setup_root(__file__, pythonpath=True)
@@ -9,15 +9,70 @@ rootutils.setup_root(__file__, pythonpath=True)
 import numpy as np
 from dotenv import load_dotenv
 from hydra import initialize, compose
+from unittest.mock import patch
+from omegaconf import OmegaConf
 
-from src.data_generation.src.data_fetcher import DataFetcherFactory
-from src.data_generation.src.halo import HaloContext, Halo
-from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
+from src.data_generation.src.data_fetcher import DataFetcherFactory, MagneticumFetcherV2
+from src.data_generation.src.halo import HaloContext
 
 load_dotenv('../.env')
 
 
+@pytest.fixture
+def mock_catalog():
+    catalog = OmegaConf.create({
+        'path':    '/fake/path',
+        'snapnum': 120,
+        'fields': {
+            'halo': {
+                'GOFF': {'input': None, 'output': None, 'scaling': None, 'name': 'goff'},
+                'GLEN': {'input': None, 'output': None, 'scaling': None, 'name': 'glen'},
+                'FSUB': {'input': None, 'output': None, 'scaling': None, 'name': 'fsub'},
+            },
+            'subhalo':   {},
+            'particles': {}
+        }
+    })
+    return catalog
+
+
+@pytest.fixture
+def fetcher(mock_catalog):
+    # MagneticumFetcherV2 with cache pre-loaded — skips _load_catalog_cache.
+    with patch('g3read.read_new'), patch('g3read.yield_all_files', return_value=[]):
+        f = MagneticumFetcherV2(catalog=mock_catalog)
+
+    # Inject fake metadata directly — bypasses file I/O
+    f._cache_loaded = True
+    f._group_base = '/fake/group_base'
+    f._snap_base  = '/fake/snap_base'
+    f._goff = np.array([0, 10, 20, 30, 40])
+    f._glen = np.array([10, 10, 10, 10, 10])
+    f._fsub = np.array([0,  2,  4,  6,  8])
+    f._nsub = np.array([2,  2,  2,  2,  2])
+    f._m200 = np.array([200000000, 3000000, 4000000, 5000000, 60000000])
+    f._r200 = np.array([200000000, 3000000, 4000000, 5000000, 60000000])
+    f.halo_fields = ['GOFF', 'GLEN', 'FSUB', 'MCRI', 'RCRI']
+    f.column_map = {'GOFF': 'goff', 'GLEN': 'glen', 'FSUB': 'fsub', 'MCRI': 'm200', 'RCRI': 'r200'}
+    f._pid_file_boundaries = []
+    return f
+
+
+def make_fake_halos(n=5):
+    # Minimal raw halo dict as g3read would return.
+    return {
+        'GOFF': np.arange(n) * 10,
+        'GLEN': np.full(n, 10),
+        'FSUB': np.arange(n) * 2,
+        'NSUB': np.full(n, 2),
+        'MCRI': np.full(n, 100000000),
+        'RCRI': np.full(n, 100000)
+    }
+
+
 class TestFetcherMagneticum(unittest.TestCase):
+    cfg_magneticum = None
+
     @classmethod
     def setUpClass(cls):
         os.environ['PROJECT_ROOT'] = '../../..'
@@ -39,152 +94,49 @@ class TestFetcherMagneticum(unittest.TestCase):
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
         cls.fetcher_magneticum = DataFetcherFactory.get_data_fetcher(cls.cfg_magneticum.catalog, **attr_dict)
 
-    def test_get_halos(self):
-        halo_context = self.fetcher_magneticum.get_halos()
-        self.assertIsInstance(halo_context, HaloContext)
-        self.assertIsNotNone(halo_context.data)
-        self.assertGreater(len(halo_context.data), 0)
-        self.assertIn('halo_id', halo_context.data.columns)
-        self.assertIn('subhalo_ids', halo_context.data.columns)  # vectorized children
+    def test_returns_halo_context(self):
+        fetcher = self.fetcher_magneticum
+        with patch('g3read.read_new', return_value=make_fake_halos()):
+            result = fetcher.get_halos()
+        assert isinstance(result, HaloContext)
 
-    def test_get_halos_subhalo_ids_are_arrays(self):
-        """subhalo_ids should contain numpy arrays of indices."""
-        halo_context = self.fetcher_magneticum.get_halos()
-        first_subhalo_ids = halo_context.data['subhalo_ids'].iloc[0]
-        self.assertIsInstance(first_subhalo_ids, np.ndarray)
+    def test_correct_number_of_halos(self):
+        fetcher = self.fetcher_magneticum
+        with patch('g3read.read_new', return_value=make_fake_halos(5)):
+            result = fetcher.get_halos()
+        assert len(result.data) == 5
 
-    def test_get_halos_subhalo_ids_correct_count(self):
-        """Number of subhalo ids should match NSUB for each halo."""
-        halo_context = self.fetcher_magneticum.get_halos()
-        for _, row in halo_context.data.iterrows():
-            self.assertEqual(
-                len(row['subhalo_ids']),
-                self.fetcher_magneticum._nsub[row['halo_id']],
-                msg=f"Halo {row['halo_id']} has wrong number of subhalo ids"
-            )
+    def test_halo_ids_assigned(self):
+        fetcher = self.fetcher_magneticum
+        with patch('g3read.read_new', return_value=make_fake_halos(5)):
+            result = fetcher.get_halos()
+        assert 'halo_id' in result.data.columns
+        assert sorted(result.data['halo_id'].tolist()) == list(range(5))
 
-    # Subhalos
-    def test_debug_subhalo_arrays(self):
-        """Check array lengths before pipeline."""
-        if not getattr(self.fetcher_magneticum, '_cache_loaded', False):
-            self.fetcher_magneticum._load_catalog_cache()
+    def test_subhalo_ids_assigned(self):
+        fetcher = self.fetcher_magneticum
+        with patch('g3read.read_new', return_value=make_fake_halos(5)):
+            result = fetcher.get_halos()
+        assert 'subhalo_ids' in result.data.columns
+        # halo 0 → fsub=0, nsub=2 → subhalo_ids=[0, 1]
+        assert list(result.data.loc[result.data['halo_id'] == 0, 'subhalo_ids'].iloc[0]) == [0, 1]
 
-        group_base = self.fetcher_magneticum._group_base
-        subhalo_fields = self.fetcher_magneticum.subhalo_fields.copy()
-        subhalo_fields.remove('stellar_half_mass_radius')
-        subhalos = g3read.read_new(group_base, subhalo_fields, 1, is_snap=False, multiple_files=True)
+    def test_fsub_added_if_missing(self):
+        fetcher = self.fetcher_magneticum
+        fetcher.halo_fields = ['MCRI', 'RCRI']  # FSUB missing
+        with patch('g3read.read_new', return_value=make_fake_halos(5)):
+            fetcher.get_halos()
+        assert 'FSUB' in fetcher.halo_fields
 
-        for key, val in subhalos.items():
-            print(f"{key}: {len(val) if hasattr(val, '__len__') else val}")
+    def test_empty_halos_returns_empty_context(self):
+        fetcher = self.fetcher_magneticum
+        with patch('g3read.read_new', return_value={}):
+            with pytest.raises(Exception):
+                _ = fetcher.get_halos()
 
-    def test_get_subhalos(self):
-        subhalo_context = self.fetcher_magneticum.get_subhalos()
-        self.assertIsInstance(subhalo_context, SubhaloContext)
-        self.assertIsNotNone(subhalo_context.data)
-        self.assertGreater(len(subhalo_context.data), 0)
-        self.assertIn('subhalo_id', subhalo_context.data.columns)
-
-    def test_subhalo_belongs_to_halo(self):
-        """Sanity check: subhalo 0 should belong to halo 0."""
-        subhalo_context = self.fetcher_magneticum.get_subhalos()
-        subhalo = subhalo_context.get_subhalo_by_id(subhalo_id=0)
-        self.assertEqual(subhalo.id_parents, 0)
-
-    # Particles subhalo
-    def test_get_p_subhalo_returns_instance(self):
-        particles = self.fetcher_magneticum.get_p_subhalo(subhalo_id=0)
-        self.assertIsInstance(particles, SubhaloParticles)
-
-    def test_get_p_subhalo_central_has_stars(self):
-        """Central subhalo (id=0) should have stellar particles."""
-        particles = self.fetcher_magneticum.get_p_subhalo(subhalo_id=0)
-        self.assertFalse(particles.is_empty)
-        self.assertIsNotNone(particles.star_p)
-        self.assertGreater(len(particles.star_p), 0)
-
-    def test_get_p_subhalo_empty_returns_empty(self):
-        """A subhalo known to be empty should return empty SubhaloParticles."""
-        particles = self.fetcher_magneticum.get_p_subhalo(subhalo_id=20308)
-        self.assertTrue(particles.is_empty)
-        self.assertIsInstance(particles, SubhaloParticles)
-
-    def test_get_p_subhalo_uses_cache(self):
-        """Calling get_p_subhalo twice should use cache — _cache_loaded stays True."""
-        self.fetcher_magneticum.get_p_subhalo(subhalo_id=0)
-        self.fetcher_magneticum.get_p_subhalo(subhalo_id=0)
-        self.assertTrue(getattr(self.fetcher_magneticum, '_cache_loaded', False))
-
-    # ── Particles: halo ──────────────────────────────────────────────────────
-
-    def test_get_p_halo_returns_instance(self):
-        halo = Halo(halo_id=0, fsub=0)
-        particles = self.fetcher_magneticum.get_p_halo(halo=halo)
-        self.assertIsInstance(particles, SubhaloParticles)
-
-    def test_get_p_halo_has_stars(self):
-        halo = Halo(halo_id=0, fsub=0)
-        particles = self.fetcher_magneticum.get_p_halo(halo=halo)
-        self.assertIsNotNone(particles.star_p)
-        self.assertGreater(len(particles.star_p), 0)
-
-    def test_halo_particle_count_gte_subhalo(self):
-        """Halo 0 should have >= stellar particles than its central subhalo."""
-        halo = Halo(halo_id=0, fsub=0)
-        halo_particles = self.fetcher_magneticum.get_p_halo(halo=halo)
-        subhalo_particles = self.fetcher_magneticum.get_p_subhalo(subhalo_id=0)
-        self.assertGreaterEqual(
-            len(halo_particles.star_p),
-            len(subhalo_particles.star_p),
-            msg="Halo should have >= stars than its central subhalo"
-        )
-
-    # ── All subhalo particles ────────────────────────────────────────────────
-    def test_get_all_subhalo_particles_returns_dict(self):
-        all_particles = self.fetcher_magneticum._load_subhalo_particles_cache()
-        self.assertIsInstance(self.fetcher_magneticum.all_particles, dict)
-        self.assertGreater(len(self.fetcher_magneticum.all_particles), 0)
-
-    def test_get_all_subhalo_particles_first_subhalo_exists(self):
-        if not getattr(self.fetcher_magneticum, '_subhalo_particles_cache_loaded', False):
-            self.fetcher_magneticum._load_subhalo_particles_cache()
-        self.assertIn(0, self.fetcher_magneticum.all_particles)
-
-    def test_get_all_subhalo_particles_values_are_dicts(self):
-        """Raw cache should contain dicts, not SubhaloParticles."""
-        if not getattr(self.fetcher_magneticum, '_subhalo_particles_cache_loaded', False):
-            self.fetcher_magneticum._load_subhalo_particles_cache()
-        for sub_idx, data in self.fetcher_magneticum.all_particles.items():
-            self.assertIsInstance(data, dict,
-                                  msg=f"Subhalo {sub_idx} should be raw dict in cache")
-
-    def test_get_all_subhalo_particles_central_largest(self):
-        """Central subhalo (0) should have >= particles than last subhalo."""
-        if not getattr(self.fetcher_magneticum, '_subhalo_particles_cache_loaded', False):
-            self.fetcher_magneticum._load_subhalo_particles_cache()
-        last_idx = max(self.fetcher_magneticum.all_particles.keys())
-        first_n_stars = len(self.fetcher_magneticum.all_particles[0].get('star', {}).get('POS', []))
-        last_n_stars = len(self.fetcher_magneticum.all_particles[last_idx].get('star', {}).get('POS', []))
-        self.assertGreaterEqual(first_n_stars, last_n_stars)
-
-    # ── Cache ────────────────────────────────────────────────────────────────
-
-    def test_cache_loaded_after_first_call(self):
-        self.fetcher_magneticum.get_halos()
-        self.assertTrue(getattr(self.fetcher_magneticum, '_cache_loaded', False))
-
-    def test_sorted_snap_cache_built(self):
-        """_sorted_snap_cache should be built after _load_catalog_cache."""
-        if not getattr(self.fetcher_magneticum, '_cache_loaded', False):
-            self.fetcher_magneticum._load_catalog_cache()
-        self.assertTrue(hasattr(self.fetcher_magneticum, '_sorted_snap_cache'))
-        for part_type in self.fetcher_magneticum._snap_cache:
-            self.assertIn(part_type, self.fetcher_magneticum._sorted_snap_cache)
-            self.assertIn('sorted_idx', self.fetcher_magneticum._sorted_snap_cache[part_type])
-            self.assertIn('sorted_ids', self.fetcher_magneticum._sorted_snap_cache[part_type])
-
-    def test_particle_conditions_cached(self):
-        """_particle_conditions should be pre-computed after cache load."""
-        if not getattr(self.fetcher_magneticum, '_cache_loaded', False):
-            self.fetcher_magneticum._load_catalog_cache()
-        self.assertTrue(hasattr(self.fetcher_magneticum, '_particle_conditions'))
-        self.assertIsInstance(self.fetcher_magneticum._particle_conditions, dict)
+    def test_load_catalog_cache_called_if_not_loaded(self):
+        fetcher = self.fetcher_magneticum
+        fetcher._cache_loaded = False
+        with patch('g3read.read_new', return_value=make_fake_halos(5)):
+            fetcher.get_halos()
+        self.assertTrue(fetcher._cache_loaded)

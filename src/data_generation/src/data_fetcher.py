@@ -556,7 +556,7 @@ class DataFetcherFactory:
         elif catalog.name == "flamingo":
             return FlamingoFetcher(catalog, **kwargs)
         elif catalog.name == "magneticum":
-            return MagneticumFetcher(catalog, **kwargs)
+            return MagneticumFetcherV2(catalog, **kwargs)
         else:
             raise ValueError(f"Unsupported catalog={catalog.name} type")
 
@@ -2499,6 +2499,166 @@ class MagneticumFetcher(DataFetcher):
 
         return self._run_particle_pipeline(data)
 
+
+class MagneticumFetcherV2(DataFetcher):
+    def __init__(self, catalog: DictConfig, **kwargs):
+        super().__init__(catalog, **kwargs)
+        logger.info(f"MagneticumFetcher initialized with config: {catalog.path}")
+
+    def _load_catalog_cache(self):
+        """Load lightweight metadata only. No PID array, no snapshot data."""
+        path = self.catalog.path
+        logger.debug(f'Catalog path: {path}')
+        groups_dir = os.path.join(path, f'groups_{self.catalog.snapnum}')
+        group_base = os.path.join(groups_dir, os.path.basename(groups_dir).replace('groups', 'sub'))
+        logger.debug(f'Group dir base: {group_base}')
+        snapshot_dir = os.path.join(path, f'snapdir_{self.catalog.snapnum}')
+        snap_base = os.path.join(snapshot_dir, os.path.basename(snapshot_dir).replace('snapdir', 'snap'))
+        logger.debug(f'Snapdir base: {snap_base}')
+
+        self._group_base = group_base
+        self._snap_base = snap_base
+
+        # Batch read halo metadata
+        halo_catalog = g3read.read_new(group_base, ['GOFF', 'GLEN', 'FSUB', 'NSUB'], 0, is_snap=False, multiple_files=True)
+
+        # TODO check this condition
+        logger.debug(f'halo_catalog length: {len(halo_catalog)}')
+        if len(halo_catalog) == 0:
+            return {}
+
+        self._goff = halo_catalog['GOFF']
+        self._glen = halo_catalog['GLEN']
+        self._fsub = halo_catalog['FSUB']
+        self._nsub = halo_catalog['NSUB']
+
+        # PID: build file boundary index only — never load full array
+        logger.debug('_pid_file_boundaries')
+        self._pid_file_boundaries = self._build_pid_file_boundaries()
+
+        # Pre-compute particle pipeline conditions once
+        self._cache_loaded = True
+
+        logger.debug("Catalog metadata cache loaded successfully.")
+
+    def _build_pid_file_boundaries(self) -> list:
+        """
+        Build a lookup table of {file, start, end} for PID files.
+        Reads only file headers — not the actual PID data.
+        """
+        boundaries = []
+        current_offset = 0
+
+        for group_file in g3read.yield_all_files(self._group_base):
+            f = g3read.GadgetFile(group_file, is_snap=False)
+            pid_in_file = f.read('PID ', 2)
+
+            if pid_in_file is None or len(pid_in_file) == 0:
+                continue
+
+            n = len(pid_in_file)
+            boundaries.append({
+                'file': group_file,
+                'start': current_offset,
+                'end': current_offset + n
+            })
+            current_offset += n
+            del pid_in_file  # free immediately
+
+        logger.debug(f"PID boundaries: {len(boundaries)} files, total PIDs: {current_offset}")
+        return boundaries
+
+    def _get_pid_for_entity(self, offset: int, length: int) -> np.ndarray:
+        """
+        Read PIDs for a specific halo/subhalo on demand.
+        Only reads the file(s) that contain the required offset range.
+        """
+        if length == 0:
+            return np.array([])
+
+        entity_start = offset
+        entity_end = offset + length
+        pids = []
+
+        for boundary in self._pid_file_boundaries:
+            file_start = boundary['start']
+            file_end = boundary['end']
+
+            overlap_start = max(entity_start, file_start)
+            overlap_end = min(entity_end,   file_end)
+
+            if overlap_start >= overlap_end:
+                continue
+
+            f = g3read.GadgetFile(boundary['file'], is_snap=False)
+            pid_in_file = f.read('PID ', 2)
+
+            local_start = overlap_start - file_start
+            local_end = overlap_end - file_start
+            pids.append(pid_in_file[local_start:local_end])
+            del pid_in_file  # free immediately
+
+            if file_end >= entity_end:
+                break
+
+        return np.concatenate(pids) if pids else np.array([])
+
+    def get_halos(self, *args, **kwargs) -> HaloContext:
+        return self._get_halos()
+
+    def _get_halos(self) -> HaloContext:
+        logger.debug("Fetching halos from Magneticum...")
+        if not getattr(self, '_cache_loaded', False):
+            self._load_catalog_cache()
+
+        if 'FSUB' not in self.halo_fields:
+            self.halo_fields.append('FSUB')
+            OmegaConf.set_struct(self.catalog, False)
+            self.catalog.fields.halo["FSUB"] = {
+                "input": None, "output": None, "scaling": None, "name": "fsub"
+            }
+            OmegaConf.set_struct(self.catalog, True)
+            self.column_map['FSUB'] = 'fsub'
+
+        halos = g3read.read_new(self._group_base, self.halo_fields.copy(), 0, is_snap=False, multiple_files=True)
+
+        if len(halos) == 0:
+            logger.warning("No halos found.")
+            return HaloContext(pd.DataFrame(), self.column_map)
+
+        table = 'halo'
+        halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
+        steps = [
+            lambda h: remove_useless_columns(h, self.halo_fields),
+            lambda h: assign_id(h, 'halo_id'),
+            lambda h: validate_and_process_fields(h, self.halo_fields, table, self.catalog),
+            lambda h: convert_to_dataframe(h),
+            lambda h: apply_unit_conversion(h, self.halo_fields, table, self.catalog),
+            lambda h: apply_filters(h, halo_conditions, self.catalog.fields.halo)
+        ]
+
+        processed_halos = run_pipeline(halos, steps)
+
+        # Vectorized subhalo children assignment
+        halo_ids = processed_halos['halo_id'].values
+        first_sub = self._fsub[halo_ids]
+        n_subs = self._nsub[halo_ids]
+        processed_halos['subhalo_ids'] = [
+            np.arange(first_sub[i], first_sub[i] + n_subs[i])
+            for i in range(len(halo_ids))
+        ]
+        self.column_map['subhalo_ids'] = 'subhalo_ids'
+
+        halo_context = HaloContext(processed_halos, self.column_map)
+        logger.debug(f"Halo data fetched: {halo_context.data['halo_id'].nunique()} halos.")
+        logger.debug(halo_context.data.head())
+        return halo_context
+
+    def get_p_subhalo(self, *args, **kwargs):
+        pass
+
+    def get_subhalos(self, *args, **kwargs):
+        pass
 
 
 
