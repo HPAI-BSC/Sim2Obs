@@ -8,8 +8,13 @@ class LazySubhaloContext:
         self.dataset = ds.dataset(path, format="parquet")
 
     def load_halo(self, parent_id):
+        bucket = parent_id % 128
+
         table = self.dataset.to_table(
-            filter=ds.field("parent_id") == parent_id
+            filter=(
+                    (ds.field("parent_bucket") == bucket) &
+                    (ds.field("id_parents") == parent_id)
+            )
         )
         return table.to_pandas()
 

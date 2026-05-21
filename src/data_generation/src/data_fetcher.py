@@ -2827,12 +2827,15 @@ class MagneticumFetcherV2(DataFetcher):
 
         for df in processed_batches:
             df = df.rename(columns=self.column_map)
+            # Create low-cardinality partition key
+            df["parent_bucket"] = df["id_parents"] % 128
+
             table = pa.Table.from_pandas(df, preserve_index=False)
 
             pq.write_to_dataset(
                 table,
                 root_path=subhalos_parquet,
-                partition_cols=['id_parents'],
+                partition_cols=["parent_bucket"],
                 use_threads=True
             )
 
