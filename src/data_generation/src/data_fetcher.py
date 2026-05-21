@@ -22,7 +22,7 @@ from swiftsimio import SWIFTDataset
 
 from src.data_generation.src.feature_computer import FeatureComputer
 from src.data_generation.src.halo import HaloContext, Halo
-from src.data_generation.src.lazy_subhalo import LazySubhaloContext
+from src.data_generation.src.lazy_subhalo import LazySubhaloContext, LazySubhaloParticles
 from src.data_generation.src.part_types import MAGNETICUM_PART_TYPES
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion, \
@@ -2842,6 +2842,7 @@ class MagneticumFetcherV2(DataFetcher):
         del processed_batches
         gc.collect()
 
+        # TODO
         '''
         # ── Computed columns ──────────────────────────────────────────────────
         if computed_columns:
@@ -2973,47 +2974,41 @@ class MagneticumFetcherV2(DataFetcher):
                 # 4. BUILD OUTPUT
                 data = {k: v[mask] for k, v in snap_data.items()}
                 data["parent_id"] = halo_ids[mask]
+                data["parent_bucket"] = halo_ids[mask] % 128
+                data["parent_bucket_data"] = data["parent_bucket"]  # copy to keep in files
                 for field_name, array in snap_data.items():
                     if isinstance(array, np.ndarray) and array.ndim > 1:
                         data[field_name] = to_list_in_batches(data, field_name)
                 data_particles = {part_type: data}
                 processed = self._run_particle_pipeline(data_particles)
                 table = pa.Table.from_pydict(processed[part_type])
-                pq.write_to_dataset(table, root_path=particles_parquet, partition_cols=["parent_id"])
+                pq.write_to_dataset(table, root_path=particles_parquet, partition_cols=["parent_bucket"])
+
+        gc.collect()
 
         logger.info("Star particle ingestion completed")
+        subhalo_particles = LazySubhaloParticles(particles_parquet)
+        logger.debug(f"Subhalo data fetched: {subhalo_particles.dataset.count_rows()} rows.")
+        return subhalo_particles
 
-    def _get_p_halo(self, halo: Halo) -> SubhaloParticles:
+    def _get_p_halo(self, halo: Halo) -> SubhaloParticles | LazySubhaloParticles:
         if not getattr(self, '_cache_loaded', False):
             self._load_catalog_cache()
             self._load_particle_cache()
 
-        halo_pids = self._get_pid_for_entity(
-            offset=int(self._goff[halo.halo_id]),
-            length=int(self._glen[halo.halo_id])
-        )
-        print()
+        # Check if preprocessed parquet files already exist
+        path = self.catalog.path
+        particles_parquet = os.path.join(path, 'particles_parquet')
+        if os.path.exists(particles_parquet):
+            logger.info(f"Loading preprocessed particles from: {particles_parquet}")
+            subhalo_particles = LazySubhaloParticles(particles_parquet)
+            logger.debug(f"Subhalo particles data fetched: {subhalo_particles.dataset.count_rows()} rows.")
+            return subhalo_particles
 
-        for part_type in self.particle_fields:
-            if part_type not in ['stars', 'star']:
-                return None
-
-            logger.debug(f"Lazy loading snapshot data for particle type: {part_type}")
-            config = self._snap_cache_config[part_type]
-            fields_padded = config['fields_padded']
-            ptype_int = config['ptype_int']
+        subhalo_particles = self._store_particles()
+        return subhalo_particles
 
 
-            logger.debug('read_new')
-            snap_data = g3read.read_new(
-                self._snap_base, fields_padded, ptype_int,
-                multiple_files=True, do_flatten=False
-            )
-            logger.debug('read_new - end')
-
-
-
-        return None
 
 
 

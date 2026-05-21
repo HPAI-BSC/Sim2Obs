@@ -2,6 +2,8 @@ import pyarrow.dataset as ds
 
 from src.data_generation.src.subhalo import SubHalo
 
+# TODO finish missing methods
+
 
 class LazySubhaloContext:
     def __init__(self, path) -> None:
@@ -26,3 +28,8 @@ class LazySubhaloContext:
             table = self.dataset.to_table(filter=(ds.field("subhalo_id") == subhalo_id))
         df = table.to_pandas()
         return df
+
+
+class LazySubhaloParticles:
+    def __init__(self, path) -> None:
+        self.dataset = ds.dataset(path, format="parquet")

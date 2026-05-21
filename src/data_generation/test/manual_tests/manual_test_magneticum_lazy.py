@@ -10,6 +10,8 @@ from src.data_generation.src.data_fetcher import DataFetcherFactory
 
 from hydra import initialize, compose
 
+from src.data_generation.src.halo import Halo
+
 
 def magneticum_particle_test():
     with initialize(config_path="'../../../../../../configs"):
@@ -41,6 +43,16 @@ def magneticum_particle_test():
     unique_ids = pc.unique(table["id_parents"])
     print("Unique halos stored:", len(unique_ids))
 
+    print('-------- Subhalo Particles --------')
+    mock_halo = {'halo_id': 0, 'm200': 26000000, 'r200': 744.56, 'fsub': 0, 'gpos': [200, 200, 200]}
+    halo = Halo(**mock_halo)
+    subhalo_particles = fetcher_magneticum.get_p_halo(halo=halo)
+    total_rows = subhalo_particles.dataset.count_rows()
+    print("Total rows:", total_rows)
+    table = subhalo_particles.dataset.to_table(columns=["parent_bucket_data"])
+    buckets = pc.unique(table["parent_bucket_data"])
+    print("Num buckets:", len(buckets))
+    print("Buckets:", buckets.to_pylist())
     tracemalloc.stop()
 
 
