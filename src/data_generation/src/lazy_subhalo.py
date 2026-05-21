@@ -2,7 +2,7 @@ import numpy as np
 import pyarrow.dataset as ds
 import pyarrow as pa
 
-from src.data_generation.src.halo import HaloContext, Halo
+from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.subhalo import SubHalo
 from src.data_generation.src.utils import setup_logger, rotate
 

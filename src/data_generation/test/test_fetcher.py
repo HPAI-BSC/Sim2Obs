@@ -48,6 +48,9 @@ class TestFetcher(unittest.TestCase):
         with open("data/eagle/subhalo_context_0.pkl", "rb") as file:
             self.subhalo_context_eagle = pickle.load(file)
 
+        with open("data/illustris/subhalo_particles_0.pkl", "rb") as file:
+            self.subhalo_particles_illustris = pickle.load(file)
+
         # Initialize Hydra and load configuration
         with initialize(config_path="../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")

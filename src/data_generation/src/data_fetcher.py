@@ -619,7 +619,7 @@ class DataFetcherFactory:
         elif catalog.name == "flamingo":
             return FlamingoFetcher(catalog, **kwargs)
         elif catalog.name == "magneticum":
-            return MagneticumFetcherV2(catalog, **kwargs)
+            return MagneticumFetcher(catalog, **kwargs)
         else:
             raise ValueError(f"Unsupported catalog={catalog.name} type")
 
@@ -2081,574 +2081,116 @@ class FlamingoFetcher(DataFetcher):
         return particle_data
 
 
-# TODO test
 class MagneticumFetcher(DataFetcher):
-    """
-    Data fetcher for the Magneticum catalog.
-
-    Cache design:
-    - Metadata cache: small arrays (SOFF, SLEN, GOFF, GLEN, FSUB, NSUB) + PID file boundaries
-    - PID: never loaded fully — read on demand per halo/subhalo from file boundaries
-    - Snapshot data: lazy loaded one particle type at a time, freed after use
-    """
-
     def __init__(self, catalog: DictConfig, **kwargs):
         super().__init__(catalog, **kwargs)
         logger.info(f"MagneticumFetcher initialized with config: {catalog.path}")
 
-    # ── Cache: metadata ──────────────────────────────────────────────────────
+    # cache loading
 
     def _load_catalog_cache(self):
-        """Load lightweight metadata only. No PID array, no snapshot data."""
+        """Load lightweight metadata only. No snapshot data."""
         path = self.catalog.path
-        logger.debug(f'Catalog path: {path}')
-        groups_dir = os.path.join(path, f'groups_{self.catalog.snapnum}')
-        group_base = os.path.join(groups_dir, os.path.basename(groups_dir).replace('groups', 'sub'))
-        logger.debug(f'Group dir base: {group_base}')
-        snapshot_dir = os.path.join(path, f'snapdir_{self.catalog.snapnum}')
-        snap_base = os.path.join(snapshot_dir, os.path.basename(snapshot_dir).replace('snapdir', 'snap'))
-        logger.debug(f'Snapdir base: {snap_base}')
+        logger.debug(f"Catalog path: {path}")
+
+        groups_dir = os.path.join(path, f"groups_{self.catalog.snapnum}")
+        group_base = os.path.join(
+            groups_dir,
+            os.path.basename(groups_dir).replace("groups", "sub")
+        )
+        logger.debug(f"Group dir base: {group_base}")
+
+        snapshot_dir = os.path.join(path, f"snapdir_{self.catalog.snapnum}")
+        snap_base = os.path.join(
+            snapshot_dir,
+            os.path.basename(snapshot_dir).replace("snapdir", "snap")
+        )
+        logger.debug(f"Snapdir base: {snap_base}")
 
         self._group_base = group_base
         self._snap_base = snap_base
 
-        # Batch read halo metadata
-        halo_catalog = g3read.read_new(group_base, ['GOFF', 'GLEN', 'FSUB', 'NSUB'], 0, is_snap=False, multiple_files=True)
-        self._goff = halo_catalog['GOFF']
-        self._glen = halo_catalog['GLEN']
-        self._fsub = halo_catalog['FSUB']
-        self._nsub = halo_catalog['NSUB']
-
-        # Batch read subhalo metadata
-        subhalo_catalog = g3read.read_new(group_base, ['SOFF', 'SLEN'], 1, is_snap=False, multiple_files=True)
-        self._soff = subhalo_catalog['SOFF']
-        self._slen = subhalo_catalog['SLEN']
-
-        # PID: build file boundary index only — never load full array
-        logger.debug('_pid_file_boundaries')
-        self._pid_file_boundaries = self._build_pid_file_boundaries()
-
-        # Snapshot: store config only — no data loaded yet
-        self._snap_cache = {}
-        self._sorted_snap_cache = {}
-        self._snap_cache_config = {}
-        for part_type, type_config in self.catalog.fields.particles.items():
-            fields = list(type_config.keys())
-            if 'ID' not in fields:
-                fields.append('ID')
-            self._snap_cache_config[part_type] = {
-                'fields_padded': [f.ljust(4) for f in fields],
-                'ptype_int': MAGNETICUM_PART_TYPES[part_type],
-            }
-
-        # Pre-compute particle pipeline conditions once
-        self._particle_conditions = {
-            col: {t: cfg for t, cfg in type_config.items() if 'filter' in cfg}
-            for col, type_config in self.catalog.fields.particles.items()
-            if any('filter' in cfg for cfg in type_config.values())
-        }
-
-        self._particle_conditions = {}
-        self._cache_loaded = True
-
-        logger.debug("Catalog metadata cache loaded successfully.")
-        # todo check dictioaries are not empty
-
-
-    # ── Cache: PID file boundaries ───────────────────────────────────────────
-
-    def _build_pid_file_boundaries(self) -> list:
-        """
-        Build a lookup table of {file, start, end} for PID files.
-        Reads only file headers — not the actual PID data.
-        """
-        boundaries = []
-        current_offset = 0
-
-        for group_file in g3read.yield_all_files(self._group_base):
-            f  = g3read.GadgetFile(group_file, is_snap=False)
-            pid_in_file = f.read('PID ', 2)
-
-            if pid_in_file is None or len(pid_in_file) == 0:
-                continue
-
-            n = len(pid_in_file)
-            boundaries.append({
-                'file': group_file,
-                'start': current_offset,
-                'end': current_offset + n
-            })
-            current_offset += n
-            del pid_in_file  # free immediately
-
-        logger.debug(f"PID boundaries: {len(boundaries)} files, total PIDs: {current_offset}")
-        return boundaries
-
-    def _get_pid_for_entity(self, offset: int, length: int) -> np.ndarray:
-        """
-        Read PIDs for a specific halo/subhalo on demand.
-        Only reads the file(s) that contain the required offset range.
-        """
-        if length == 0:
-            return np.array([])
-
-        entity_start = offset
-        entity_end = offset + length
-        pids = []
-
-        for boundary in self._pid_file_boundaries:
-            file_start = boundary['start']
-            file_end = boundary['end']
-
-            overlap_start = max(entity_start, file_start)
-            overlap_end = min(entity_end,   file_end)
-
-            if overlap_start >= overlap_end:
-                continue
-
-            f = g3read.GadgetFile(boundary['file'], is_snap=False)
-            pid_in_file = f.read('PID ', 2)
-
-            local_start = overlap_start - file_start
-            local_end = overlap_end - file_start
-            pids.append(pid_in_file[local_start:local_end])
-            del pid_in_file  # free immediately
-
-            if file_end >= entity_end:
-                break
-
-        return np.concatenate(pids) if pids else np.array([])
-
-    # ── Cache: snapshot data (lazy) ──────────────────────────────────────────
-
-    def _get_snap_cache(self, part_type: str) -> dict:
-        """
-        Lazily load snapshot data for a specific particle type.
-        Only reads from disk if not already in memory.
-        """
-        logger.info('_get_snap_cache')
-        logger.debug(f'_snap_cache: {self._snap_cache}')
-        if part_type not in self._snap_cache:
-            # Skip loading particle types you don't need
-            # TODO WATCH THIS
-            if part_type not in ['stars', 'star']:
-                return None
-
-            logger.debug(f"Lazy loading snapshot data for particle type: {part_type}")
-            config = self._snap_cache_config[part_type]
-            fields_padded = config['fields_padded']
-            ptype_int = config['ptype_int']
-
-            logger.debug('read_new')
-            snap_data = g3read.read_new(
-                self._snap_base, fields_padded, ptype_int,
-                multiple_files=True, do_flatten=False
-            )
-            logger.debug('read_new - end')
-
-            logger.debug(len(snap_data))
-            self._snap_cache[part_type] = {
-                'snap_data': snap_data[ptype_int],
-                'fields_padded': fields_padded,
-            }
-            idx = np.argsort(self._snap_cache[part_type]['snap_data']['ID  '])
-            self._sorted_snap_cache[part_type] = {
-                'sorted_idx': idx,
-                'sorted_ids': self._snap_cache[part_type]['snap_data']['ID  '][idx]
-            }
-
-        return self._snap_cache.get(part_type)
-
-    def _evict_snap_cache(self, part_type: str):
-        """Free snapshot data for a particle type from memory."""
-        if part_type in self._snap_cache:
-            del self._snap_cache[part_type]
-        if part_type in self._sorted_snap_cache:
-            del self._sorted_snap_cache[part_type]
-        logger.debug(f"Evicted snapshot cache for particle type: {part_type}")
-
-    # ── Particle extraction ──────────────────────────────────────────────────
-
-    def _extract_particles(self, pids: np.ndarray, entity_id: int) -> dict:
-        """Extract particles — skip types that return None from cache."""
-        data = {}
-
-        for part_type in self._snap_cache_config:
-            cache = self._get_snap_cache(part_type)
-
-            # None means this part_type was skipped
-            if cache is None:
-                continue
-
-            snap_data = cache['snap_data']
-            fields_padded = cache['fields_padded']
-            sorted_idx = self._sorted_snap_cache[part_type]['sorted_idx']
-            sorted_ids = self._sorted_snap_cache[part_type]['sorted_ids']
-
-            pids_array = np.asarray(pids)
-            positions = np.searchsorted(sorted_ids, pids_array)
-            valid_mask = positions < len(sorted_ids)
-            positions = positions[valid_mask]
-            matched_mask = sorted_ids[positions] == pids_array[valid_mask]
-            matched = sorted_idx[positions[matched_mask]]
-
-            if len(matched) == 0:
-                continue
-
-            particles = {b.strip(): snap_data[b][matched] for b in fields_padded}
-            data[part_type] = particles
-
-        return self._clean_particle_data(data, entity_id)
-
-    def _clean_particle_data(self, data: dict, entity_id: int) -> dict:
-        """Remove empty particle types and return cleaned data."""
-        if not data:
-            return {}
-        if all(len(v) == 0 for part in data.values() for v in part.values()):
-            logger.debug(f"No particles for any ptype, ignoring entity: {entity_id}")
-            return {}
-        return {
-            ptype: particles
-            for ptype, particles in data.items()
-            if not all(len(v) == 0 for v in particles.values())
-        }
-
-    # ── Pipeline ─────────────────────────────────────────────────────────────
-
-    def _run_particle_pipeline(self, data: dict) -> SubhaloParticles:
-        """Shared pipeline logic for both halo and subhalo particles."""
-        table = 'particles'
-        steps = [
-            lambda particles: validate_and_process_fields(particles, self.particle_fields, table, self.catalog),
-            lambda particles: convert_to_dataframe(particles),
-            lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
-            lambda particles: apply_filters(particles, self._particle_conditions, self.catalog.fields.particles)
-        ]
-        processed_particles = run_pipeline(data, steps)
-        return SubhaloParticles(processed_particles, self.catalog.fields.particles)
-
-    # ── Fields ───────────────────────────────────────────────────────────────
-
-    def _get_fields(self):
-        values = OmegaConf.select(self.catalog, "fields")
-        return [
-            key
-            for section in ['halo', 'subhalo']
-            for key in values.get(section, {}).keys()
-        ]
-
-    # ── Halos ─────────────────────────────────────────────────────────────────
-
-    def get_halos(self, *args, **kwargs) -> HaloContext:
-        return self._get_halos()
-
-    def _get_halos(self) -> HaloContext:
-        logger.debug("Fetching halos from Magneticum...")
-        if not getattr(self, '_cache_loaded', False):
-            self._load_catalog_cache()
-
-        if 'FSUB' not in self.halo_fields:
-            self.halo_fields.append('FSUB')
-            OmegaConf.set_struct(self.catalog, False)
-            self.catalog.fields.halo["FSUB"] = {
-                "input": None, "output": None, "scaling": None, "name": "fsub"
-            }
-            OmegaConf.set_struct(self.catalog, True)
-            self.column_map['FSUB'] = 'fsub'
-
-        halos = g3read.read_new(self._group_base, self.halo_fields.copy(), 0, is_snap=False, multiple_files=True)
-
-        if len(halos) == 0:
-            logger.warning("No halos found.")
-            return HaloContext(pd.DataFrame(), self.column_map)
-
-        table = 'halo'
-        halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
-        steps = [
-            lambda h: remove_useless_columns(h, self.halo_fields),
-            lambda h: assign_id(h, 'halo_id'),
-            lambda h: validate_and_process_fields(h, self.halo_fields, table, self.catalog),
-            lambda h: convert_to_dataframe(h),
-            lambda h: apply_unit_conversion(h, self.halo_fields, table, self.catalog),
-            lambda h: apply_filters(h, halo_conditions, self.catalog.fields.halo)
-        ]
-
-        processed_halos = run_pipeline(halos, steps)
-
-        # Vectorized subhalo children assignment
-        halo_ids = processed_halos['halo_id'].values
-        first_sub = self._fsub[halo_ids]
-        n_subs = self._nsub[halo_ids]
-        processed_halos['subhalo_ids'] = [
-            np.arange(first_sub[i], first_sub[i] + n_subs[i])
-            for i in range(len(halo_ids))
-        ]
-        self.column_map['subhalo_ids'] = 'subhalo_ids'
-
-        halo_context = HaloContext(processed_halos, self.column_map)
-        logger.debug(f"Halo data fetched: {halo_context.data['halo_id'].nunique()} halos.")
-        logger.debug(halo_context.data.head())
-        return halo_context
-
-    # ── Subhalos ──────────────────────────────────────────────────────────────
-
-    def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
-        return self._get_subhalos()
-
-    def _get_subhalos(self) -> SubhaloContext:
-        logger.debug("Fetching subhalos from Magneticum...")
-        if not getattr(self, '_cache_loaded', False):
-            self._load_catalog_cache()
-
-        if 'GRNR' not in self.subhalo_fields:
-            self.subhalo_fields.append('GRNR')
-            OmegaConf.set_struct(self.catalog, False)
-            self.catalog.fields.subhalo['GRNR'] = {
-                "input": None, "output": None, "scaling": None, "name": "id_parents"
-            }
-            OmegaConf.set_struct(self.catalog, True)
-            self.column_map['GRNR'] = 'id_parents'
-
-        # Exclude computed columns from g3read call
-        computed_columns = self.function_needs.get('subhalo', {})
-        catalog_fields = [f for f in self.subhalo_fields if f not in computed_columns]
-        logger.debug(catalog_fields)
-        subhalos = g3read.read_new(self._group_base, catalog_fields, 1, is_snap=False, multiple_files=True)
-        logger.debug(len(subhalos))
-
-        # Compute derived features and pad with nan for empty subhalos
-        if computed_columns:
-            if not getattr(self, '_subhalo_particles_cache_loaded', False):
-                self._load_subhalo_particles_cache()
-
-            n_subhalos = self._n_subhalos_total
-
-            for method_name, columns_needed in computed_columns.items():
-                result_sparse = FeatureComputer.compute(method_name, self.all_particles, columns_needed)
-
-                result_full = np.full(n_subhalos, np.nan)
-                for i, sub_idx in enumerate(self.all_particles.keys()):
-                    result_full[sub_idx] = result_sparse[i]
-
-                subhalos[method_name] = result_full
-
-        if isinstance(subhalos, np.ndarray):
-            subhalos = {self.subhalo_fields[0]: subhalos}
-            subhalos['count'] = np.array(len(subhalos[self.subhalo_fields[0]]))
-
-        if len(subhalos) == 0:
-            logger.warning("No subhalos found.")
-            return SubhaloContext(pd.DataFrame(), self.column_map)
-
-        table = 'subhalo'
-        subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
-        steps = [
-            lambda s: remove_useless_columns(s, self.subhalo_fields),
-            lambda s: assign_id(s, 'subhalo_id'),
-            lambda s: validate_and_process_fields(s, self.subhalo_fields, table, self.catalog),
-            lambda s: convert_to_dataframe(s),
-            lambda s: apply_unit_conversion(s, self.subhalo_fields, table, self.catalog),
-            lambda s: apply_filters(s, subhalo_conditions, self.catalog.fields.subhalo)
-        ]
-
-        processed_subhalos = run_pipeline(subhalos, steps)
-        subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
-        logger.debug(f"Subhalo data fetched: {len(subhalo_context.data)} subhalos.")
-        return subhalo_context
-
-    # ── Particles: subhalo ───────────────────────────────────────────────────
-
-    def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
-        subhalo_id = kwargs.get('subhalo_id', None)
-        if subhalo_id is None:
-            raise ValueError("subhalo_id must be provided in kwargs")
-        return self._get_p_subhalo(subhalo_id)
-
-    def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
-        if not getattr(self, '_cache_loaded', False):
-            self._load_catalog_cache()
-
-        subhalo_pids = self._get_pid_for_entity(
-            offset=int(self._soff[subhalo_id]),
-            length=int(self._slen[subhalo_id])
+        # Batch read halo metadata (block type 0)
+        halo_catalog = g3read.read_new(
+            group_base, ["GOFF", "GLEN", "FSUB", "NSUB"],
+            0, is_snap=False, multiple_files=True
         )
 
-        data = self._extract_particles(subhalo_pids, subhalo_id)
-        if len(data) > 0:
-            return self._run_particle_pipeline(data)
-        return SubhaloParticles({}, self.catalog.fields.particles)
-
-    # ── Particles: all subhalos ──────────────────────────────────────────────
-
-    def _load_subhalo_particles_cache(self):
-        """
-        Load particle data for all subhalos.
-        Processes one particle type at a time and evicts after use to save memory.
-        """
-        logger.info('_load_subhalo_particles_cache')
-        if not getattr(self, '_cache_loaded', False):
-            self._load_catalog_cache()
-
-        n_subhalos = len(self._soff)
-        self._n_subhalos_total = n_subhalos
-        logger.debug(f'_n_subhalos_total: {self._n_subhalos_total}')
-        all_particles = {sub_idx: {} for sub_idx in range(n_subhalos)}
-
-        for part_type in self._snap_cache_config:
-            logger.debug(f'part_type: {part_type}')
-            cache = self._get_snap_cache(part_type)
-            snap_data = cache['snap_data']
-            fields_padded = cache['fields_padded']
-            sorted_idx = self._sorted_snap_cache[part_type]['sorted_idx']
-            sorted_ids = self._sorted_snap_cache[part_type]['sorted_ids']
-
-            logger.debug(f"Processing particle type '{part_type}' for all subhalos...")
-
-            for sub_idx in range(n_subhalos):
-                subhalo_pids = self._get_pid_for_entity(
-                    offset=int(self._soff[sub_idx]),
-                    length=int(self._slen[sub_idx])
-                )
-
-                if len(subhalo_pids) == 0:
-                    continue
-
-                positions = np.searchsorted(sorted_ids, subhalo_pids)
-                valid_mask = positions < len(sorted_ids)
-                positions = positions[valid_mask]
-                matched_mask = sorted_ids[positions] == subhalo_pids[valid_mask]
-                matched = sorted_idx[positions[matched_mask]]
-
-                if len(matched) == 0:
-                    continue
-
-                particles = {b.strip(): snap_data[b][matched] for b in fields_padded}
-                all_particles[sub_idx][part_type] = particles
-
-            # Evict this particle type from memory before loading next
-            self._evict_snap_cache(part_type)
-
-        self.all_particles = {
-            sub_idx: cleaned
-            for sub_idx, data in all_particles.items()
-            if data and (cleaned := self._clean_particle_data(data, sub_idx))
-        }
-        self._subhalo_particles_cache_loaded = True
-        logger.debug(f"Subhalo particles cache loaded: {len(self.all_particles)} subhalos with particles.")
-
-    # ── Particles: halo ──────────────────────────────────────────────────────
-
-    def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
-        halo = kwargs.get('halo', None)
-        if halo is None:
-            raise ValueError("halo must be provided in kwargs")
-        return self._get_p_halo(halo)
-
-    def _get_p_halo(self, halo: Halo) -> SubhaloParticles:
-        if not getattr(self, '_cache_loaded', False):
-            self._load_catalog_cache()
-
-        halo_pids = self._get_pid_for_entity(
-            offset=int(self._goff[halo.halo_id]),
-            length=int(self._glen[halo.halo_id])
-        )
-
-        data = self._extract_particles(halo_pids, halo.halo_id)
-
-        # Evict snapshot cache after each halo to free memory
-        for part_type in list(self._snap_cache.keys()):
-            self._evict_snap_cache(part_type)
-
-        return self._run_particle_pipeline(data)
-
-
-class MagneticumFetcherV2(DataFetcher):
-    def __init__(self, catalog: DictConfig, **kwargs):
-        super().__init__(catalog, **kwargs)
-        logger.info(f"MagneticumFetcher initialized with config: {catalog.path}")
-
-    def _load_catalog_cache(self):
-        """Load lightweight metadata only. No PID array, no snapshot data."""
-        path = self.catalog.path
-        logger.debug(f'Catalog path: {path}')
-        groups_dir = os.path.join(path, f'groups_{self.catalog.snapnum}')
-        group_base = os.path.join(groups_dir, os.path.basename(groups_dir).replace('groups', 'sub'))
-        logger.debug(f'Group dir base: {group_base}')
-        snapshot_dir = os.path.join(path, f'snapdir_{self.catalog.snapnum}')
-        snap_base = os.path.join(snapshot_dir, os.path.basename(snapshot_dir).replace('snapdir', 'snap'))
-        logger.debug(f'Snapdir base: {snap_base}')
-
-        self._group_base = group_base
-        self._snap_base = snap_base
-
-        # Batch read halo metadata
-        halo_catalog = g3read.read_new(group_base, ['GOFF', 'GLEN', 'FSUB', 'NSUB'], 0, is_snap=False,
-                                       multiple_files=True)
-
-        # TODO check this condition
-        logger.debug(f'halo_catalog length: {len(halo_catalog)}')
         if len(halo_catalog) == 0:
+            logger.warning("Empty halo catalog — aborting cache load.")
             return {}
 
-        self._goff = halo_catalog['GOFF']
-        self._glen = halo_catalog['GLEN']
-        self._fsub = halo_catalog['FSUB']
-        self._nsub = halo_catalog['NSUB']
+        self._goff = halo_catalog["GOFF"]
+        self._glen = halo_catalog["GLEN"]
+        self._fsub = halo_catalog["FSUB"]
+        self._nsub = halo_catalog["NSUB"]
 
-        # PID: build file boundary index only — never load full array
-        logger.debug('_pid_file_boundaries')
+        # Subhalo offset/length (block type 1)
+        self._soff = g3read.read_new(
+            group_base, ["SOFF"], 1, is_snap=False, multiple_files=True
+        )["SOFF"]
+        self._slen = g3read.read_new(
+            group_base, ["SLEN"], 1, is_snap=False, multiple_files=True
+        )["SLEN"]
+
+        # Full subhalo PID array (block type 2) — loaded eagerly.
+        # Acceptable when it fits in RAM; for very large boxes consider the
+        # same lazy boundary approach used for halo PIDs.
+        self._subhalos_pid = g3read.read_new(
+            group_base, ["PID "], 2, is_snap=False, multiple_files=True
+        )["PID "]
+
+        # Halo PID file boundaries — lazy index, never loads full array
+        logger.debug("Building _pid_file_boundaries...")
         self._pid_file_boundaries = self._build_pid_file_boundaries()
 
-        # Pre-compute particle pipeline conditions once
         self._cache_loaded = True
-
         logger.debug("Catalog metadata cache loaded successfully.")
 
     def _load_particle_cache(self):
+        """Pre-compute per-particle-type field lists and filter conditions."""
         self._snap_cache_config = {}
         for part_type, type_config in self.catalog.fields.particles.items():
             fields = list(type_config.keys())
-            if 'ID' not in fields:
-                fields.append('ID')
+            if "ID" not in fields:
+                fields.append("ID")
             self._snap_cache_config[part_type] = {
-                'fields_padded': [f.ljust(4) for f in fields],
-                'ptype_int': MAGNETICUM_PART_TYPES[part_type],
+                "fields_padded": [f.ljust(4) for f in fields],
+                "ptype_int": MAGNETICUM_PART_TYPES[part_type],
             }
 
-        # Pre-compute particle pipeline conditions once
-        self._particle_conditions = {
-            col: {t: cfg for t, cfg in type_config.items() if 'filter' in cfg}
-            for col, type_config in self.catalog.fields.particles.items()
-            if any('filter' in cfg for cfg in type_config.values())
-        }
-
+        # FIX: removed dead first assignment that was immediately overwritten
         self._particle_conditions = {}
+
+    # PID helpers (halos)
 
     def _build_pid_file_boundaries(self) -> list:
         """
         Build a lookup table of {file, start, end} for PID files.
-        Reads only file headers — not the actual PID data.
+        Reads only file content for PID block — not full snapshot data.
         """
         boundaries = []
         current_offset = 0
 
         for group_file in g3read.yield_all_files(self._group_base):
             f = g3read.GadgetFile(group_file, is_snap=False)
-            pid_in_file = f.read('PID ', 2)
+            pid_in_file = f.read("PID ", 2)
 
             if pid_in_file is None or len(pid_in_file) == 0:
                 continue
 
             n = len(pid_in_file)
             boundaries.append({
-                'file': group_file,
-                'start': current_offset,
-                'end': current_offset + n
+                "file":  group_file,
+                "start": current_offset,
+                "end":   current_offset + n,
             })
             current_offset += n
-            del pid_in_file  # free immediately
+            del pid_in_file
 
-        logger.debug(f"PID boundaries: {len(boundaries)} files, total PIDs: {current_offset}")
+        logger.debug(
+            f"PID boundaries: {len(boundaries)} files, total PIDs: {current_offset}"
+        )
         return boundaries
 
     def _get_pid_for_entity(self, offset: int, length: int) -> np.ndarray:
@@ -2657,152 +2199,162 @@ class MagneticumFetcherV2(DataFetcher):
         Only reads the file(s) that contain the required offset range.
         """
         if length == 0:
-            return np.array([])
+            return np.array([], dtype=np.int64)
 
         entity_start = offset
         entity_end = offset + length
         pids = []
 
         for boundary in self._pid_file_boundaries:
-            file_start = boundary['start']
-            file_end = boundary['end']
+            file_start = boundary["start"]
+            file_end = boundary["end"]
 
             overlap_start = max(entity_start, file_start)
-            overlap_end = min(entity_end,   file_end)
+            overlap_end = min(entity_end,file_end)
 
             if overlap_start >= overlap_end:
                 continue
 
-            f = g3read.GadgetFile(boundary['file'], is_snap=False)
-            pid_in_file = f.read('PID ', 2)
+            f = g3read.GadgetFile(boundary["file"], is_snap=False)
+            pid_in_file = f.read("PID ", 2)
 
             local_start = overlap_start - file_start
             local_end = overlap_end - file_start
             pids.append(pid_in_file[local_start:local_end])
-            del pid_in_file  # free immediately
+            del pid_in_file
 
             if file_end >= entity_end:
                 break
 
-        return np.concatenate(pids) if pids else np.array([])
+        return np.concatenate(pids) if pids else np.array([], dtype=np.int64)
+
+    # halo fetching
 
     def get_halos(self, *args, **kwargs) -> HaloContext:
         return self._get_halos()
 
     def _get_halos(self) -> HaloContext:
         logger.debug("Fetching halos from Magneticum...")
-        if not getattr(self, '_cache_loaded', False):
+        if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
 
-        if 'FSUB' not in self.halo_fields:
-            self.halo_fields.append('FSUB')
+        if "FSUB" not in self.halo_fields:
+            self.halo_fields.append("FSUB")
             OmegaConf.set_struct(self.catalog, False)
             self.catalog.fields.halo["FSUB"] = {
                 "input": None, "output": None, "scaling": None, "name": "fsub"
             }
             OmegaConf.set_struct(self.catalog, True)
-            self.column_map['FSUB'] = 'fsub'
+            self.column_map["FSUB"] = "fsub"
 
-        halos = g3read.read_new(self._group_base, self.halo_fields.copy(), 0, is_snap=False, multiple_files=True)
+        halos = g3read.read_new(
+            self._group_base, self.halo_fields.copy(),
+            0, is_snap=False, multiple_files=True
+        )
 
         if len(halos) == 0:
             logger.warning("No halos found.")
             return HaloContext(pd.DataFrame(), self.column_map)
 
-        table = 'halo'
-        halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
+        table = "halo"
+        halo_conditions = {
+            col: data
+            for col, data in self.catalog.fields.halo.items()
+            if "filter" in data
+        }
         steps = [
             lambda h: remove_useless_columns(h, self.halo_fields),
-            lambda h: assign_id(h, 'halo_id'),
+            lambda h: assign_id(h, "halo_id"),
             lambda h: validate_and_process_fields(h, self.halo_fields, table, self.catalog),
             lambda h: convert_to_dataframe(h),
             lambda h: apply_unit_conversion(h, self.halo_fields, table, self.catalog),
-            lambda h: apply_filters(h, halo_conditions, self.catalog.fields.halo)
+            lambda h: apply_filters(h, halo_conditions, self.catalog.fields.halo),
         ]
-
         processed_halos = run_pipeline(halos, steps)
 
-        # Vectorized subhalo children assignment
-        halo_ids = processed_halos['halo_id'].values
+        # Vectorised subhalo children assignment
+        halo_ids = processed_halos["halo_id"].values
         first_sub = self._fsub[halo_ids]
         n_subs = self._nsub[halo_ids]
-        processed_halos['subhalo_ids'] = [
+        processed_halos["subhalo_ids"] = [
             np.arange(first_sub[i], first_sub[i] + n_subs[i])
             for i in range(len(halo_ids))
         ]
-        self.column_map['subhalo_ids'] = 'subhalo_ids'
+        self.column_map["subhalo_ids"] = "subhalo_ids"
 
         halo_context = HaloContext(processed_halos, self.column_map)
-        logger.debug(f"Halo data fetched: {halo_context.data['halo_id'].nunique()} halos.")
-        logger.debug(halo_context.data.head())
+        logger.debug(
+            f"Halo data fetched: {halo_context.data['halo_id'].nunique()} halos."
+        )
         return halo_context
 
-    def get_p_subhalo(self, *args, **kwargs):
-        pass
+    # subhalo fetching
 
     def get_subhalos(self, *args, **kwargs) -> SubhaloContext | LazySubhaloContext:
         return self._get_subhalos()
 
-    def _get_subhalos(self, batch_size: int=10_000) -> SubhaloContext | LazySubhaloContext:
+    def _get_subhalos(self, batch_size: int = 10_000) -> SubhaloContext | LazySubhaloContext:
         logger.debug("Fetching subhalos from Magneticum in batches...")
-        if not getattr(self, '_cache_loaded', False):
+        if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
 
-        # Check if preprocessed parquet files already exist
         path = self.catalog.path
-        subhalos_parquet = os.path.join(path, 'subhalos_parquet')
+        subhalos_parquet = os.path.join(path, "subhalos_parquet")
+
         if os.path.exists(subhalos_parquet):
             logger.info(f"Loading preprocessed subhalos from: {subhalos_parquet}")
             subhalo_context = LazySubhaloContext(subhalos_parquet)
-            logger.debug(f"Subhalo data fetched: {subhalo_context.dataset.count_rows()} rows.")
+            logger.debug(
+                f"Subhalo data fetched: {subhalo_context.dataset.count_rows()} rows."
+            )
             return subhalo_context
 
-        # Setup fields
-        if 'GRNR' not in self.subhalo_fields:
-            self.subhalo_fields.append('GRNR')
+        if "GRNR" not in self.subhalo_fields:
+            self.subhalo_fields.append("GRNR")
             OmegaConf.set_struct(self.catalog, False)
-            self.catalog.fields.subhalo['GRNR'] = {
+            self.catalog.fields.subhalo["GRNR"] = {
                 "input": None, "output": None, "scaling": None, "name": "id_parents"
             }
             OmegaConf.set_struct(self.catalog, True)
-            self.column_map['GRNR'] = 'id_parents'
+            self.column_map["GRNR"] = "id_parents"
 
-        computed_columns = self.function_needs.get('subhalo', {})
+        computed_columns = self.function_needs.get("subhalo", {})
         catalog_fields = [f for f in self.subhalo_fields if f not in computed_columns]
-        table = 'subhalo'
+        table = "subhalo"
         subhalo_conditions = {
             col: data
             for col, data in self.catalog.fields.subhalo.items()
-            if 'filter' in data
+            if "filter" in data
         }
 
         processed_batches = []
         global_offset = 0
 
-        # Read file by file
         for group_file in g3read.yield_all_files(self._group_base):
             try:
-                raw = g3read.read_new(group_file, catalog_fields, 1, is_snap=False, multiple_files=False)
+                raw = g3read.read_new(
+                    group_file, catalog_fields, 1,
+                    is_snap=False, multiple_files=False
+                )
                 if raw is None or len(raw) == 0:
                     continue
 
                 n_in_file = len(next(iter(raw.values())))
                 logger.debug(f"File {group_file}: {n_in_file} subhalos")
 
-                # Process in batches within each file
                 for batch_start in range(0, n_in_file, batch_size):
                     batch_end = min(batch_start + batch_size, n_in_file)
                     batch = {k: v[batch_start:batch_end] for k, v in raw.items()}
 
+                    # default-arg trick captures current offset correctly
                     steps = [
                         lambda s: remove_useless_columns(s, self.subhalo_fields),
-                        lambda s, o=global_offset + batch_start: assign_id(s, 'subhalo_id', offset=o),
+                        lambda s, o=global_offset + batch_start: assign_id(s, "subhalo_id", offset=o),
                         lambda s: validate_and_process_fields(s, self.subhalo_fields, table, self.catalog),
                         lambda s: convert_to_dataframe(s),
                         lambda s: apply_unit_conversion(s, self.subhalo_fields, table, self.catalog),
-                        lambda s: apply_filters(s, subhalo_conditions, self.catalog.fields.subhalo)
+                        lambda s: apply_filters(s, subhalo_conditions, self.catalog.fields.subhalo),
                     ]
-
                     processed = run_pipeline(batch, steps)
 
                     if processed is not None and len(processed) > 0:
@@ -2823,191 +2375,259 @@ class MagneticumFetcherV2(DataFetcher):
             logger.warning("No subhalos found.")
             return SubhaloContext(pd.DataFrame(), self.column_map)
 
-        logger.debug(f"Storing {len(processed_batches)} batches...")
-        logger.debug(f'Subhalos parquet path: {subhalos_parquet}')
+        logger.debug(f"Storing {len(processed_batches)} batches to {subhalos_parquet}...")
 
         for df in processed_batches:
             df = df.rename(columns=self.column_map)
-            # Create low-cardinality partition key
             df["parent_bucket"] = df["id_parents"] % 128
-            df["parent_bucket_data"] = df["parent_bucket"]  # copy to keep in files
-            table = pa.Table.from_pandas(df, preserve_index=False)
-
+            df["parent_bucket_data"] = df["parent_bucket"]
+            arrow_table = pa.Table.from_pandas(df, preserve_index=False)
             pq.write_to_dataset(
-                table,
+                arrow_table,
                 root_path=subhalos_parquet,
                 partition_cols=["parent_bucket"],
-                use_threads=True
+                use_threads=True,
             )
 
         del processed_batches
         gc.collect()
 
-        # TODO
-        '''
-        # ── Computed columns ──────────────────────────────────────────────────
-        if computed_columns:
-            if not getattr(self, '_subhalo_particles_cache_loaded', False):
-                # TODO
-                #self._load_subhalo_particles_cache()
-                pass
-
-            # TODO take this out, this is assuming that particles are also stored
-            
-            for method_name, columns_needed in computed_columns.items():
-                result_sparse = FeatureComputer.compute(method_name, self.all_particles, columns_needed)
-                n_subhalos = self._n_subhalos_total
-                result_full = np.full(n_subhalos, np.nan)
-                for i, sub_idx in enumerate(self.all_particles.keys()):
-                    result_full[sub_idx] = result_sparse[i]
-                all_subhalos[method_name] = result_full[all_subhalos['subhalo_id'].values]
-            
-        '''
-
         subhalo_context = LazySubhaloContext(subhalos_parquet)
-        logger.debug(f"Subhalo data fetched: {subhalo_context.dataset.count_rows()} rows.")
+        logger.debug(
+            f"Subhalo data fetched: {subhalo_context.dataset.count_rows()} rows."
+        )
         return subhalo_context
 
-    def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
-        halo = kwargs.get('halo', None)
-        if halo is None:
-            raise ValueError("halo must be provided in kwargs")
-        return self._get_p_halo(halo)
+    # halo interval index (for particle → halo assignment)
 
     def _build_halo_intervals(self):
         """
         Build compact halo representation without expanding particle IDs.
         Each halo is represented by (min_pid, max_pid, halo_id).
         """
-
         intervals = []
 
         for halo_id in range(len(self._glen)):
+            # guard against empty halos (GLEN == 0) to avoid pids.min() raising
+            if int(self._glen[halo_id]) == 0:
+                continue
+
             pids = self._get_pid_for_entity(
                 offset=int(self._goff[halo_id]),
-                length=int(self._glen[halo_id])
+                length=int(self._glen[halo_id]),
             )
 
-            # only boundaries, NOT full expansion
-            intervals.append(
-                (pids.min(), pids.max(), halo_id)
-            )
+            if len(pids) == 0:
+                continue
 
-        # sort by start of interval
+            intervals.append((int(pids.min()), int(pids.max()), halo_id))
+
         intervals.sort(key=lambda x: x[0])
-
         self._halo_intervals = intervals
 
-    def _assign_halo_ids(self, ids):
+    def _assign_halo_ids(self, ids: np.ndarray) -> np.ndarray:
         """
-        Vectorized assignment using interval scanning.
-        No dicts, no concatenation, no full mapping.
+        Vectorised halo assignment via interval scanning.
+        Returns array of halo_ids, -1 where unassigned.
+        Note: uses min/max PID bounds per halo — particles whose PID falls
+        inside an interval but doesn't truly belong are misassigned. This is
+        a known approximation; replace with exact set lookup for full accuracy.
         """
+        # guard against empty input
+        if len(ids) == 0:
+            return np.array([], dtype=np.int32)
 
         halo_ids = np.full(len(ids), -1, dtype=np.int32)
+        id_max = ids.max()
 
-        intervals = self._halo_intervals
-
-        for start, end, halo_id in intervals:
-
-            # early skip (important optimization)
-            if start > ids.max():
+        for start, end, halo_id in self._halo_intervals:
+            if start > id_max:
                 break
-
             mask = (ids >= start) & (ids <= end)
-
             halo_ids[mask] = halo_id
 
         return halo_ids
 
-    def _run_particle_pipeline(self, data: dict) -> SubhaloParticles:
-        """Shared pipeline logic for both halo and subhalo particles."""
-        table = 'particles'
-        steps = [
-            lambda particles: validate_and_process_fields(particles, self.particle_fields, table, self.catalog),
-            lambda particles: convert_to_dataframe(particles),
-            lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
-            lambda particles: apply_filters(particles, self._particle_conditions, self.catalog.fields.particles)
-        ]
-        processed_particles = run_pipeline(data, steps)
-        return processed_particles
+    # subhalo index (for particle => subhalo assignment)
 
-    # TODO test
-    # TODO update it to return LazySubhahoParticles
-    def _store_particles(self):
-        if not getattr(self, '_cache_loaded', False):
+    def _build_subhalo_index(self):
+        """
+        Build a compact subhalo index using exact SOFF/SLEN slices
+        into self._subhalos_pid.
+
+        Structure:
+            self._subhalo_index[subhalo_idx] = (start, end)
+            where start/end are indices into self._subhalos_pid.
+        """
+        soff = self._soff
+        slen = self._slen
+
+        self._subhalo_index = []
+
+        for sub_idx in range(len(soff)):
+            start = int(soff[sub_idx])
+            end = start + int(slen[sub_idx])
+            self._subhalo_index.append((start, end))
+
+    def _build_pid_to_subhalo_map(self):
+        """
+        Build a flat pid → subhalo_idx lookup dict from the subhalo index.
+        Called once and cached on self.
+        """
+        logger.info("Building PID => subhalo map...")
+        pid_to_subhalo = {}
+
+        for sub_idx, (start, end) in enumerate(self._subhalo_index):
+            for pid in self._subhalos_pid[start:end]:
+                pid_to_subhalo[int(pid)] = sub_idx
+
+        self._pid_to_subhalo = pid_to_subhalo
+        logger.info(f"PID => subhalo map built: {len(pid_to_subhalo)} entries")
+
+    def _assign_subhalo_ids(self, particle_ids: np.ndarray) -> np.ndarray:
+        """
+        Vectorised subhalo assignment via sorted-array bisect lookup.
+        Returns array of subhalo indices, -1 where unassigned.
+        """
+        if not hasattr(self, "_pid_to_subhalo"):
+            self._build_pid_to_subhalo_map()
+
+        if len(particle_ids) == 0:
+            return np.array([], dtype=np.int32)
+
+        keys  = np.fromiter(self._pid_to_subhalo.keys(),   dtype=np.int64)
+        values = np.fromiter(self._pid_to_subhalo.values(), dtype=np.int32)
+
+        sorter = np.argsort(keys)
+        keys = keys[sorter]
+        values = values[sorter]
+
+        indices = np.searchsorted(keys, particle_ids)
+        indices = np.clip(indices, 0, len(keys) - 1)
+
+        result = np.full(len(particle_ids), -1, dtype=np.int32)
+        matched = keys[indices] == particle_ids
+        result[matched] = values[indices[matched]]
+        return result
+
+    # particle pipeline
+
+    def _run_particle_pipeline(self, data: dict) -> dict:
+        """Shared pipeline logic for both halo and subhalo particles."""
+        table = "particles"
+        steps = [
+            lambda particles: validate_and_process_fields(
+                particles, self.particle_fields, table, self.catalog
+            ),
+            lambda particles: convert_to_dataframe(particles),
+            lambda particles: apply_unit_conversion(
+                particles, self.particle_fields, table, self.catalog
+            ),
+            lambda particles: apply_filters(
+                particles, self._particle_conditions, self.catalog.fields.particles
+            ),
+        ]
+        return run_pipeline(data, steps)
+
+    def _store_particles(self) -> LazySubhaloParticles:
+        if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
             self._load_particle_cache()
 
         logger.info("Starting star particle ingestion pipeline")
         path = self.catalog.path
-        particles_parquet = os.path.join(path, 'particles_parquet')
+        particles_parquet = os.path.join(path, "particles_parquet")
 
-        # BUILD GLOBAL MAP (once)
+        # Build global maps once before the file loop
         self._build_halo_intervals()
+        self._build_subhalo_index()
+        self._build_pid_to_subhalo_map()
 
-        #  PROCESS SNAPSHOT FILES ONCE
         for part_type in self.particle_fields:
-            if part_type not in ["stars", "star"]:
+            if part_type not in ("stars", "star"):
                 continue
+
             config = self._snap_cache_config[part_type]
             fields_padded = config["fields_padded"]
             ptype_int = config["ptype_int"]
 
-            # Read file by file
             for snap_file in g3read.yield_all_files(self._snap_base):
-                # TODO add try-except
-                snap_data = g3read.read_new(snap_file, fields_padded, ptype_int, multiple_files=False,
-                                            do_flatten=False)[ptype_int]
+                snap_data = g3read.read_new(
+                    snap_file, fields_padded, ptype_int,
+                    multiple_files=False, do_flatten=False
+                )[ptype_int]
+
                 if snap_data is None or len(snap_data) == 0:
                     continue
 
-                # 3. Filter particles belonging to halo
                 ids = snap_data["ID  "]
 
-                # VECTORISED halo assignment (FAST)
                 halo_ids = self._assign_halo_ids(ids)
+                subhalo_ids = self._assign_subhalo_ids(ids)
 
+                # Keep only particles that belong to a halo
                 mask = halo_ids != -1
                 if not np.any(mask):
                     continue
 
-                # 4. BUILD OUTPUT
+                # FIX: iterate over already-masked `data`, not raw `snap_data`,
+                # so to_list_in_batches operates on the correctly filtered arrays
                 data = {k: v[mask] for k, v in snap_data.items()}
                 data["parent_id"] = halo_ids[mask]
+                data["subhalo_id"] = subhalo_ids[mask]
                 data["parent_bucket"] = halo_ids[mask] % 128
-                data["parent_bucket_data"] = data["parent_bucket"]  # copy to keep in files
-                for field_name, array in snap_data.items():
+                data["parent_bucket_data"] = data["parent_bucket"].copy()
+
+                for field_name, array in data.items():
                     if isinstance(array, np.ndarray) and array.ndim > 1:
                         data[field_name] = to_list_in_batches(data, field_name)
+
                 data_particles = {part_type: data}
                 processed = self._run_particle_pipeline(data_particles)
-                table = pa.Table.from_pydict(processed[part_type])
-                pq.write_to_dataset(table, root_path=particles_parquet, partition_cols=["parent_bucket"])
+                arrow_table = pa.Table.from_pydict(processed[part_type])
+                pq.write_to_dataset(
+                    arrow_table,
+                    root_path=particles_parquet,
+                    partition_cols=["parent_bucket"],
+                )
 
         gc.collect()
-
         logger.info("Star particle ingestion completed")
+
         subhalo_particles = LazySubhaloParticles(particles_parquet)
-        logger.debug(f"Subhalo data fetched: {subhalo_particles.dataset.count_rows()} rows.")
+        logger.debug(
+            f"Particles fetched: {subhalo_particles.dataset.count_rows()} rows."
+        )
         return subhalo_particles
 
-    def _get_p_halo(self, halo: Halo) -> SubhaloParticles | LazySubhaloParticles:
-        if not getattr(self, '_cache_loaded', False):
+    def get_p_subhalo(self, *args, **kwargs):
+        pass
+
+    def get_p_halo(self, *args, **kwargs) -> SubhaloParticles | LazySubhaloParticles:
+        halo = kwargs.get("halo", None)
+        if halo is None:
+            raise ValueError("halo must be provided in kwargs")
+        return self._get_p_halo(halo)
+
+    def _get_p_halo(self, halo) -> SubhaloParticles | LazySubhaloParticles:
+        if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
             self._load_particle_cache()
 
-        # Check if preprocessed parquet files already exist
         path = self.catalog.path
-        particles_parquet = os.path.join(path, 'particles_parquet')
+        particles_parquet = os.path.join(path, "particles_parquet")
+
         if os.path.exists(particles_parquet):
             logger.info(f"Loading preprocessed particles from: {particles_parquet}")
             subhalo_particles = LazySubhaloParticles(particles_parquet)
-            logger.debug(f"Subhalo particles data fetched: {subhalo_particles.dataset.count_rows()} rows.")
+            logger.debug(
+                f"Particles fetched: {subhalo_particles.dataset.count_rows()} rows."
+            )
             return subhalo_particles
 
-        subhalo_particles = self._store_particles()
-        return subhalo_particles
+        return self._store_particles()
+
+    # TODO ADD COMPUTED FEATURES
 
 
 
