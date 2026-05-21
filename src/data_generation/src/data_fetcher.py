@@ -2138,9 +2138,7 @@ class MagneticumFetcher(DataFetcher):
         # Acceptable when it fits in RAM; for very large boxes consider the
         # same lazy boundary approach used for halo PIDs.
         logger.debug('Reading PIDs')
-        self._subhalos_pid = g3read.read_new(
-            group_base, ["PID "], 2, is_snap=False, multiple_files=True
-        )["PID "]
+        self._subhalo_pid_boundaries = self._build_subhalo_pid_file_boundaries()
 
         # Halo PID file boundaries — lazy index, never loads full array
         logger.debug("Building _pid_file_boundaries...")
@@ -2163,6 +2161,7 @@ class MagneticumFetcher(DataFetcher):
 
         # FIX: removed dead first assignment that was immediately overwritten
         self._particle_conditions = {}
+
 
     # PID helpers (halos)
 
@@ -2213,6 +2212,72 @@ class MagneticumFetcher(DataFetcher):
 
             overlap_start = max(entity_start, file_start)
             overlap_end = min(entity_end,file_end)
+
+            if overlap_start >= overlap_end:
+                continue
+
+            f = g3read.GadgetFile(boundary["file"], is_snap=False)
+            pid_in_file = f.read("PID ", 2)
+
+            local_start = overlap_start - file_start
+            local_end = overlap_end - file_start
+            pids.append(pid_in_file[local_start:local_end])
+            del pid_in_file
+
+            if file_end >= entity_end:
+                break
+
+        return np.concatenate(pids) if pids else np.array([], dtype=np.int64)
+
+    def _build_subhalo_pid_file_boundaries(self) -> list:
+        """
+        Build a lookup table of {file, start, end} for subhalo PID files (block 2).
+        Mirrors _build_pid_file_boundaries but for the subhalo PID block.
+        Reads only file content for PID block — not full snapshot data.
+        """
+        boundaries = []
+        current_offset = 0
+
+        for group_file in g3read.yield_all_files(self._group_base):
+            f = g3read.GadgetFile(group_file, is_snap=False)
+            pid_in_file = f.read("PID ", 2)
+
+            if pid_in_file is None or len(pid_in_file) == 0:
+                continue
+
+            n = len(pid_in_file)
+            boundaries.append({
+                "file": group_file,
+                "start": current_offset,
+                "end": current_offset + n,
+            })
+            current_offset += n
+            del pid_in_file
+
+        logger.debug(
+            f"Subhalo PID boundaries: {len(boundaries)} files, "
+            f"total subhalo PIDs: {current_offset}"
+        )
+        return boundaries
+
+    def _get_subhalo_pid_for_entity(self, offset: int, length: int) -> np.ndarray:
+        """
+        Read subhalo PIDs for a specific subhalo on demand using SOFF/SLEN.
+        Only reads the file(s) that contain the required offset range.
+        """
+        if length == 0:
+            return np.array([], dtype=np.int64)
+
+        entity_start = offset
+        entity_end = offset + length
+        pids = []
+
+        for boundary in self._subhalo_pid_boundaries:
+            file_start = boundary["start"]
+            file_end = boundary["end"]
+
+            overlap_start = max(entity_start, file_start)
+            overlap_end = min(entity_end, file_end)
 
             if overlap_start >= overlap_end:
                 continue
@@ -2472,19 +2537,17 @@ class MagneticumFetcher(DataFetcher):
             self._subhalo_index.append((start, end))
 
     def _build_pid_to_subhalo_map(self):
-        """
-        Build a flat pid → subhalo_idx lookup dict from the subhalo index.
-        Called once and cached on self.
-        """
-        logger.info("Building PID => subhalo map...")
+        logger.info("Building PID → subhalo map...")
         pid_to_subhalo = {}
 
         for sub_idx, (start, end) in enumerate(self._subhalo_index):
-            for pid in self._subhalos_pid[start:end]:
+            # CHANGED: read lazily instead of indexing self._subhalos_pid
+            pids = self._get_subhalo_pid_for_entity(offset=start, length=end - start)
+            for pid in pids:
                 pid_to_subhalo[int(pid)] = sub_idx
 
         self._pid_to_subhalo = pid_to_subhalo
-        logger.info(f"PID => subhalo map built: {len(pid_to_subhalo)} entries")
+        logger.info(f"PID → subhalo map built: {len(pid_to_subhalo)} entries")
 
     def _assign_subhalo_ids(self, particle_ids: np.ndarray) -> np.ndarray:
         """
