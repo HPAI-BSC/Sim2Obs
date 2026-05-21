@@ -28,10 +28,7 @@ def make_mock_subhalo_dataset(path: str, n_halos: int = 5, subhalos_per_halo: in
                 "parent_bucket_data": bucket,   # regular column — stays inside the parquet file
                 "group_number": halo_id * 10,
 
-                "spos": np.random.uniform(-1.0,  1.0, 3).tolist(),
-                "star_m": np.random.uniform(1e8,   1e12),
-                "star_p": np.random.uniform(-1.0,  1.0, 3).tolist(),
-                "star_v": np.random.uniform(-500, 500,  3).tolist(),
+                "spos": np.random.uniform(-1.0,  1.0, 3).tolist()
             })
             subhalo_counter += 1
 
@@ -91,8 +88,7 @@ class TestLazySubhaloContext:
     def test_get_items_by_halo_has_expected_columns(self, ctx):
         result = ctx.get_items_by_halo(parent_id=0)
         # parent_bucket_data is the in-file column; parent_bucket is the partition dir (absent)
-        assert {"subhalo_id", "parent_id", "parent_bucket_data",
-                "star_m", "star_p", "star_v", "spos"}.issubset(result.columns)
+        assert {"subhalo_id", "parent_id", "parent_bucket_data", "spos"}.issubset(result.columns)
 
     def test_get_items_by_halo_unknown_id_returns_empty(self, ctx):
         result = ctx.get_items_by_halo(parent_id=9999)

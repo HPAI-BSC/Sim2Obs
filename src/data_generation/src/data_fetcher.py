@@ -2582,7 +2582,8 @@ class MagneticumFetcherV2(DataFetcher):
         self._snap_base = snap_base
 
         # Batch read halo metadata
-        halo_catalog = g3read.read_new(group_base, ['GOFF', 'GLEN', 'FSUB', 'NSUB'], 0, is_snap=False, multiple_files=True)
+        halo_catalog = g3read.read_new(group_base, ['GOFF', 'GLEN', 'FSUB', 'NSUB'], 0, is_snap=False,
+                                       multiple_files=True)
 
         # TODO check this condition
         logger.debug(f'halo_catalog length: {len(halo_catalog)}')
