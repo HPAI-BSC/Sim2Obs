@@ -2829,7 +2829,7 @@ class MagneticumFetcherV2(DataFetcher):
             df = df.rename(columns=self.column_map)
             # Create low-cardinality partition key
             df["parent_bucket"] = df["id_parents"] % 128
-
+            df["parent_bucket_data"] = df["parent_bucket"]  # copy to keep in files
             table = pa.Table.from_pandas(df, preserve_index=False)
 
             pq.write_to_dataset(

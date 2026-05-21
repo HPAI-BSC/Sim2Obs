@@ -1,5 +1,7 @@
 import tracemalloc
 import gc
+
+import pandas as pd
 #from rootutils import rootutils
 import pyarrow.compute as pc
 from src.data_generation.src.data_fetcher import DataFetcherFactory
@@ -30,8 +32,8 @@ def magneticum_particle_test():
     total_rows = subhalo_context.dataset.count_rows()
     print("Total rows:", total_rows)
 
-    table = subhalo_context.dataset.to_table(columns=["parent_bucket"])
-    buckets = pc.unique(table["parent_bucket"])
+    table = subhalo_context.dataset.to_table(columns=["parent_bucket_data"])
+    buckets = pc.unique(table["parent_bucket_data"])
     print("Num buckets:", len(buckets))
     print("Buckets:", buckets.to_pylist())
 
