@@ -2126,6 +2126,7 @@ class MagneticumFetcher(DataFetcher):
         self._nsub = halo_catalog["NSUB"]
 
         # Subhalo offset/length (block type 1)
+        logger.debug('Subhalo offset/length (block type 1)')
         self._soff = g3read.read_new(
             group_base, ["SOFF"], 1, is_snap=False, multiple_files=True
         )["SOFF"]
@@ -2136,6 +2137,7 @@ class MagneticumFetcher(DataFetcher):
         # Full subhalo PID array (block type 2) — loaded eagerly.
         # Acceptable when it fits in RAM; for very large boxes consider the
         # same lazy boundary approach used for halo PIDs.
+        logger.debug('Reading PIDs')
         self._subhalos_pid = g3read.read_new(
             group_base, ["PID "], 2, is_snap=False, multiple_files=True
         )["PID "]
