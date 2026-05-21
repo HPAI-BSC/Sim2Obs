@@ -1,7 +1,7 @@
 import tracemalloc
 import gc
 #from rootutils import rootutils
-
+import pyarrow.compute as pc
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 
 #rootutils.setup_root(__file__, pythonpath=True)
@@ -26,6 +26,19 @@ def magneticum_particle_test():
     tracemalloc.start()
     halo_context = fetcher_magneticum.get_halos()
     subhalo_context = fetcher_magneticum.get_subhalos()
+
+    total_rows = subhalo_context.dataset.count_rows()
+    print("Total rows:", total_rows)
+
+    table = subhalo_context.dataset.to_table(columns=["parent_bucket"])
+    buckets = pc.unique(table["parent_bucket"])
+    print("Num buckets:", len(buckets))
+    print("Buckets:", buckets.to_pylist())
+
+    table = subhalo_context.dataset.to_table(columns=["id_parents"])
+    unique_ids = pc.unique(table["id_parents"])
+    print("Unique halos stored:", len(unique_ids))
+
     tracemalloc.stop()
 
 
