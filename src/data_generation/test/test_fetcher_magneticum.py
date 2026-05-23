@@ -434,7 +434,7 @@ class TestMagneticumFetcher:
 
     def test_assign_halo_ids_early_exit_past_max(self, fetcher):
         fetcher._halo_intervals = [(0, 9, 0), (100, 200, 1)]
-        ids    = np.array([5], dtype=np.int64)
+        ids = np.array([5], dtype=np.int64)
         result = fetcher._assign_halo_ids(ids)
         # Halo 1 start (100) > ids.max() (5) → early exit; only halo 0 can match
         assert result[0] == 0
