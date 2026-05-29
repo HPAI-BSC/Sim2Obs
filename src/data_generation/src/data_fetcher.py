@@ -2750,6 +2750,7 @@ class MagneticumFetcher(DataFetcher):
         path              = self.catalog.path
         particles_parquet = os.path.join(path, "particles_parquet")
 
+        '''
         if os.path.exists(particles_parquet):
             logger.info(f"Loading preprocessed particles from: {particles_parquet}")
             subhalo_particles = LazySubhaloParticles(particles_parquet)
@@ -2757,6 +2758,7 @@ class MagneticumFetcher(DataFetcher):
                 f"Particles fetched: {subhalo_particles.dataset.count_rows()} rows."
             )
             return subhalo_particles
+        '''
 
         return self._store_particles()
 
