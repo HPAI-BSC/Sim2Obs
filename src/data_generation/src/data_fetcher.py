@@ -2640,7 +2640,7 @@ class MagneticumFetcher(DataFetcher):
             self._load_particle_cache()
 
         logger.info("Starting star particle ingestion pipeline")
-        path              = self.catalog.path
+        path = self.catalog.path
         particles_parquet = os.path.join(path, "particles_parquet")
 
         # Build global maps once before the file loop
@@ -2648,13 +2648,33 @@ class MagneticumFetcher(DataFetcher):
         self._build_subhalo_index()
         self._build_subhalo_pid_arrays()
 
+        # Pre-compute which buckets are already done
+        n_buckets = 128
+        completed_buckets = set()
+        if os.path.exists(particles_parquet):
+            for entry in os.scandir(particles_parquet):
+                if entry.is_dir() and entry.name.startswith("parent_bucket="):
+                    try:
+                        bucket_id = int(entry.name.split("=")[1])
+                        completed_buckets.add(bucket_id)
+                    except ValueError:
+                        continue
+            logger.info(
+                f"Resuming — {len(completed_buckets)}/{n_buckets} buckets already done: {sorted(completed_buckets)}")
+        else:
+            logger.info("No existing particles_parquet — starting fresh")
+
+        if len(completed_buckets) == n_buckets:
+            logger.info("All buckets already processed — skipping ingestion")
+            return LazySubhaloParticles(particles_parquet)
+
         for part_type in self.particle_fields:
             if part_type not in ("stars", "star"):
                 continue
 
-            config        = self._snap_cache_config[part_type]
+            config = self._snap_cache_config[part_type]
             fields_padded = config["fields_padded"]
-            ptype_int     = config["ptype_int"]
+            ptype_int = config["ptype_int"]
 
             for snap_file in g3read.yield_all_files(self._snap_base):
                 snap_data = g3read.read_new(
@@ -2666,41 +2686,51 @@ class MagneticumFetcher(DataFetcher):
                     continue
 
                 ids = snap_data["ID  "]
-
-                halo_ids    = self._assign_halo_ids(ids)
+                halo_ids = self._assign_halo_ids(ids)
                 subhalo_ids = self._assign_subhalo_ids(ids)
 
-                # Keep only particles that belong to a halo
                 mask = halo_ids != -1
                 if not np.any(mask):
                     continue
 
                 data = {k: v[mask] for k, v in snap_data.items()}
-                data["parent_id"]          = halo_ids[mask]
-                data["subhalo_id"]         = subhalo_ids[mask]
-                data["parent_bucket"]      = halo_ids[mask] % 128
+                data["parent_id"] = halo_ids[mask]
+                data["subhalo_id"] = subhalo_ids[mask]
+                data["parent_bucket"] = halo_ids[mask] % 128
                 data["parent_bucket_data"] = data["parent_bucket"].copy()
+
+                # ── Skip rows that belong to already completed buckets ─────────
+                pending_mask = ~np.isin(data["parent_bucket"], list(completed_buckets))
+                if not np.any(pending_mask):
+                    logger.debug(f"All particles in {snap_file} belong to completed buckets — skipping")
+                    del snap_data, data
+                    gc.collect()
+                    continue
+
+                data = {k: v[pending_mask] for k, v in data.items()}
+                # ─────────────────────────────────────────────────────────────────
 
                 for field_name, array in data.items():
                     if isinstance(array, np.ndarray) and array.ndim > 1:
                         data[field_name] = to_list_in_batches(data, field_name)
 
                 data_particles = {part_type: data}
-                processed      = self._run_particle_pipeline(data_particles)
-                arrow_table    = pa.Table.from_pydict(processed[part_type])
+                processed = self._run_particle_pipeline(data_particles)
+                arrow_table = pa.Table.from_pydict(processed[part_type])
                 pq.write_to_dataset(
                     arrow_table,
                     root_path=particles_parquet,
                     partition_cols=["parent_bucket"],
                 )
 
+                del snap_data, data, processed, arrow_table
+                gc.collect()
+
         gc.collect()
         logger.info("Star particle ingestion completed")
 
         subhalo_particles = LazySubhaloParticles(particles_parquet)
-        logger.debug(
-            f"Particles fetched: {subhalo_particles.dataset.count_rows()} rows."
-        )
+        logger.debug(f"Particles fetched: {subhalo_particles.dataset.count_rows()} rows.")
         return subhalo_particles
 
     def get_p_subhalo(self, *args, **kwargs):
