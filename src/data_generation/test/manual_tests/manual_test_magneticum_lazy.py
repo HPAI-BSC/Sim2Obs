@@ -45,8 +45,10 @@ def magneticum_particle_test():
     print("Unique halos stored:", len(unique_ids))
 
     print('-------- Subhalo Particles --------')
+    '''
     mock_halo = {'halo_id': 0, 'm200': 26000000, 'r200': 744.56, 'fsub': 0, 'gpos': [200, 200, 200]}
     halo = Halo(**mock_halo)
+    '''
     subhalo_particles = fetcher_magneticum.get_p_halo(halo=halo)
     total_rows = subhalo_particles.dataset.count_rows()
     print("Total rows:", total_rows)
