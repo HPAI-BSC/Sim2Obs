@@ -28,7 +28,7 @@ def magneticum_particle_test():
     fetcher_magneticum = DataFetcherFactory.get_data_fetcher(cfg_magneticum.catalog, **attr_dict)
 
     tracemalloc.start()
-
+    '''
     halo_context = fetcher_magneticum.get_halos()
     subhalo_context = fetcher_magneticum.get_subhalos()
 
@@ -54,6 +54,10 @@ def magneticum_particle_test():
     buckets = pc.unique(table["parent_bucket_data"])
     print("Num buckets:", len(buckets))
     print("Buckets:", buckets.to_pylist())
+    '''
+    subhalo_particles_0 = fetcher_magneticum.get_p_halo(halo=halo)
+    print(type(subhalo_particles_0))
+    print(subhalo_particles_0)
     tracemalloc.stop()
 
 

@@ -2733,6 +2733,7 @@ class MagneticumFetcher(DataFetcher):
         logger.debug(f"Particles fetched: {subhalo_particles.dataset.count_rows()} rows.")
         return subhalo_particles
 
+    # TODO
     def get_p_subhalo(self, *args, **kwargs):
         pass
 
@@ -2742,6 +2743,43 @@ class MagneticumFetcher(DataFetcher):
             raise ValueError("halo must be provided in kwargs")
         return self._get_p_halo(halo)
 
+    def _load_halo_particles(self, halo_id: int, particles_parquet: str) -> SubhaloParticles:
+        """
+        Load particles for a specific halo from parquet.
+        Uses parent_bucket partition to avoid full scan,
+        then filters by parent_id == halo_id.
+        """
+        bucket = halo_id % 128
+
+        logger.debug(f"Loading particles for halo_id={halo_id} bucket={bucket}")
+
+        try:
+            df = pd.read_parquet(
+                particles_parquet,
+                filters=[
+                    ('parent_bucket', '==', bucket),
+                    ('parent_id', '==', halo_id),
+                ]
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load particles for halo_id={halo_id}: {e}")
+            return SubhaloParticles({}, self.catalog.fields.particles)
+
+        if len(df) == 0:
+            logger.warning(f"No particles found for halo_id={halo_id}")
+            return SubhaloParticles({}, self.catalog.fields.particles)
+
+        logger.debug(f"Loaded {len(df)} particles for halo_id={halo_id}")
+
+        # Convert DataFrame back to SubhaloParticles format
+        data = {}
+        for col in df.columns:
+            if col in ('parent_id', 'subhalo_id', 'parent_bucket', 'parent_bucket_data'):
+                continue
+            data[col] = df[col].to_numpy()
+
+        return SubhaloParticles(data=data, column_map=None)
+
     def _get_p_halo(self, halo) -> SubhaloParticles | LazySubhaloParticles:
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
@@ -2750,15 +2788,10 @@ class MagneticumFetcher(DataFetcher):
         path              = self.catalog.path
         particles_parquet = os.path.join(path, "particles_parquet")
 
-        if os.path.exists(particles_parquet):
-            logger.info(f"Loading preprocessed particles from: {particles_parquet}")
-            subhalo_particles = LazySubhaloParticles(particles_parquet)
-            logger.debug(
-                f"Particles fetched: {subhalo_particles.dataset.count_rows()} rows."
-            )
-            return subhalo_particles
+        if not os.path.exists(particles_parquet):
+            self._store_particles()
 
-        return self._store_particles()
+        return self._load_halo_particles(halo.halo_id, particles_parquet)
 
 
 
