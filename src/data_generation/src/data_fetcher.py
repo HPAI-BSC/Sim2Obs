@@ -2769,28 +2769,21 @@ class MagneticumFetcher(DataFetcher):
 
     def _load_subhalo_particles(self, subhalo_id: int, particles_parquet: str) -> SubhaloParticles:
         """
-        Load particles for a specific subhalo from parquet.
-        Uses parent_bucket partition to avoid full scan,
-        then filters by subhalo_id.
+        Load particles for a specific subhalo directly from parquet.
+        No PID reindexing needed — subhalo_id is already stored as a column.
+        Uses parent_bucket = halo_id % 128 to avoid full scan.
         """
-        # We need the parent halo to compute the bucket
-        # subhalo_id maps to a halo via _subhalo_sorted_ids — build if needed
-        if not hasattr(self, "_subhalo_sorted_pids"):
-            self._build_subhalo_index()
-            self._build_subhalo_pid_arrays()
-
-        # Find parent halo_id for this subhalo
+        # Resolve parent halo to get the correct bucket
         halo_id = self._get_halo_id_for_subhalo(subhalo_id)
         bucket = halo_id % 128 if halo_id != -1 else subhalo_id % 128
 
         logger.debug(f"Loading particles for subhalo_id={subhalo_id} bucket={bucket}")
 
         try:
-            filters = [('parent_bucket', '==', bucket),
-                       ('subhalo_id', '==', subhalo_id)]
-
-            # If we found the parent halo, add it as an extra filter
-            # to further narrow the read within the bucket
+            filters = [
+                ('parent_bucket', '==', bucket),
+                ('subhalo_id', '==', subhalo_id),
+            ]
             if halo_id != -1:
                 filters.append(('parent_id', '==', halo_id))
 
