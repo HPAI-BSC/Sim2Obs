@@ -2735,7 +2735,84 @@ class MagneticumFetcher(DataFetcher):
 
     # TODO
     def get_p_subhalo(self, *args, **kwargs):
-        pass
+        subhalo_id = kwargs.get('subhalo_id', None)
+
+        if subhalo_id is None:
+            logger.error("subhalo_id must be provided in kwargs")
+            raise ValueError("subhalo_id must be provided in kwargs")
+
+        # logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
+        return self._get_p_subhalo(subhalo_id)
+
+    def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
+        if not getattr(self, "_cache_loaded", False):
+            self._load_catalog_cache()
+            self._load_particle_cache()
+
+        path = self.catalog.path
+        particles_parquet = os.path.join(path, "particles_parquet")
+
+        if not os.path.exists(particles_parquet):
+            self._store_particles()
+
+        return self._load_subhalo_particles(subhalo_id, particles_parquet)
+
+    def _load_subhalo_particles(self, subhalo_id: int, particles_parquet: str) -> SubhaloParticles:
+        """
+        Load particles for a specific subhalo from parquet.
+        Uses parent_bucket partition to avoid full scan,
+        then filters by subhalo_id.
+        """
+        # We need the parent halo to compute the bucket
+        # subhalo_id maps to a halo via _subhalo_sorted_ids — build if needed
+        if not hasattr(self, "_subhalo_sorted_pids"):
+            self._build_subhalo_index()
+            self._build_subhalo_pid_arrays()
+
+        # Find parent halo_id for this subhalo
+        halo_id = self._get_halo_id_for_subhalo(subhalo_id)
+        bucket = halo_id % 128 if halo_id != -1 else subhalo_id % 128
+
+        logger.debug(f"Loading particles for subhalo_id={subhalo_id} bucket={bucket}")
+
+        try:
+            filters = [('parent_bucket', '==', bucket),
+                       ('subhalo_id', '==', subhalo_id)]
+
+            # If we found the parent halo, add it as an extra filter
+            # to further narrow the read within the bucket
+            if halo_id != -1:
+                filters.append(('parent_id', '==', halo_id))
+
+            df = pd.read_parquet(particles_parquet, filters=filters)
+
+        except Exception as e:
+            logger.warning(f"Failed to load particles for subhalo_id={subhalo_id}: {e}")
+            return SubhaloParticles({}, self.catalog.fields.particles)
+
+        if len(df) == 0:
+            logger.warning(f"No particles found for subhalo_id={subhalo_id}")
+            return SubhaloParticles({}, self.catalog.fields.particles)
+
+        logger.debug(f"Loaded {len(df)} particles for subhalo_id={subhalo_id}")
+
+        data = {}
+        for col in df.columns:
+            if col in ('parent_id', 'subhalo_id', 'parent_bucket', 'parent_bucket_data'):
+                continue
+            data[col] = df[col].to_numpy()
+
+        return SubhaloParticles(data=data, column_map=None)
+
+    def _get_halo_id_for_subhalo(self, subhalo_id: int) -> int:
+        """
+        Resolve the parent halo_id for a given subhalo_id using FSUB/NSUB metadata.
+        Returns -1 if not found.
+        """
+        for halo_id, (first_sub, n_sub) in enumerate(zip(self._fsub, self._nsub)):
+            if first_sub <= subhalo_id < first_sub + n_sub:
+                return halo_id
+        return -1
 
     def get_p_halo(self, *args, **kwargs) -> SubhaloParticles | LazySubhaloParticles:
         halo = kwargs.get("halo", None)

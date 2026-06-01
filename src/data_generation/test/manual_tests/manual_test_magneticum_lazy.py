@@ -60,6 +60,11 @@ def magneticum_particle_test():
     subhalo_particles_0 = fetcher_magneticum.get_p_halo(halo=halo)
     print(type(subhalo_particles_0))
     print(subhalo_particles_0)
+
+    subhalo_particles_ = fetcher_magneticum.get_p_subhalo(subhalo_id=1)
+    print(type(subhalo_particles_))
+    print(subhalo_particles_)
+
     tracemalloc.stop()
 
 
