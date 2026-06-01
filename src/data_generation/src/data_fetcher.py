@@ -273,19 +273,29 @@ def apply_filter_df(d, conditions, config):
             if key not in d.columns:
                 raise Exception(f'Error, feature "{key}" is not present in the halo dataframe with columns:'
                                 f' {d.columns}')
-            if isinstance(condition.filter, ListConfig):
-                for expr in condition.filter:
-                    if isinstance(expr, str):
-                        symbol = expr.split(' ')[0]
-                        right_expr = ' '.join(expr.split(' ')[1:])
+            if hasattr(condition, 'filter'):
+                if isinstance(condition.filter, ListConfig):
+                    for expr in condition.filter:
+                        if isinstance(expr, str):
+                            symbol = expr.split(' ')[0]
+                            right_expr = ' '.join(expr.split(' ')[1:])
+                            value = float(eval(right_expr))
+                            mask &= operators[symbol](d[key], value)
+                else:
+                    if isinstance(condition.filter, str):
+                        symbol = condition.filter.split(' ')[0]
+                        right_expr = ' '.join(condition.filter.split(' ')[1:])
                         value = float(eval(right_expr))
                         mask &= operators[symbol](d[key], value)
             else:
-                if isinstance(condition.filter, str):
-                    symbol = condition.filter.split(' ')[0]
-                    right_expr = ' '.join(condition.filter.split(' ')[1:])
-                    value = float(eval(right_expr))
-                    mask &= operators[symbol](d[key], value)
+                if isinstance(condition, ListConfig):
+                    for expr in condition:
+                        if isinstance(expr, str):
+                            symbol = expr.split(' ')[0]
+                            right_expr = ' '.join(expr.split(' ')[1:])
+                            value = float(eval(right_expr))
+                            mask &= operators[symbol](d[key], value)
+
         return d[mask]
 
 
