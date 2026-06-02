@@ -2082,11 +2082,13 @@ class FlamingoFetcher(DataFetcher):
         d = {}
         columns = list(processed_particles.columns)
         for part_type in part_types:
+            logger.debug(f'part type:{part_type}')
             filtered_columns = [column for column in columns if part_type in column]
             renamed_columns = [column.replace(f'{part_type}.', '') for column in filtered_columns]
             rename_dict = dict(zip(filtered_columns, renamed_columns))
             tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
             d[part_type] = tmp
+            logger.debug(len(tmp), type(tmp))
 
         particle_data = SubhaloParticles(d, self.catalog.fields.particles)
         logger.debug(f'Stellar particle size: {len(particle_data.star_p)}')
