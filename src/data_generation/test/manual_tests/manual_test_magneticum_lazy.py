@@ -57,10 +57,11 @@ def magneticum_particle_test():
     buckets = pc.unique(table["parent_bucket_data"])
     print("Num buckets:", len(buckets))
     print("Buckets:", buckets.to_pylist())
-    '''
+    
     subhalo_particles_0 = fetcher_magneticum.get_p_halo(halo=halo)
     print(type(subhalo_particles_0))
     print(subhalo_particles_0)
+    '''
 
     particles_parquet = f"{fetcher_magneticum.catalog.path}/particles_parquet"
 
@@ -84,7 +85,7 @@ def magneticum_particle_test():
     subhalo_particles = fetcher_magneticum.get_p_subhalo(subhalo_id=int(valid_subhalo_id))
     print(f"Particles loaded: {len(subhalo_particles)}")
 
-    subhalo_particles_ = fetcher_magneticum.get_p_subhalo(subhalo_id=1)
+    subhalo_particles_ = fetcher_magneticum.get_p_subhalo(subhalo_id=valid_subhalo_id)
     print(type(subhalo_particles_))
     print(subhalo_particles_)
     tracemalloc.stop()
