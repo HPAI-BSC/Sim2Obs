@@ -56,11 +56,11 @@ def main(cfg: DictConfig) -> Any:
     steps = get_pipeline_steps(cfg)
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
-    starting_idx = None
-    ending_idx = None
+    starting_idx = 0
+    ending_idx = 100
 
     ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[16221], ignore_halos=ignore_halos)
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[], ignore_halos=ignore_halos)
 
 
 if __name__ == "__main__":
