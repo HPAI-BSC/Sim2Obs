@@ -154,6 +154,8 @@ class DataLoader(PipelineStep):
 
             path = dataset_dir + f'/../logs/transition_radius/{name}_transition_radius_info_{halo.halo_id}.json'
             logger.debug(f'{path}')
+            halo_particles_overlapping = None
+
             if self.cfg.skip_existing_halos:
                 if os.path.exists(path):
                     logger.debug(f'Halo {halo.halo_id} has been already processed, skipping it.')
@@ -166,7 +168,6 @@ class DataLoader(PipelineStep):
                 attach_models_to_features([input_feature, output_feature], models)
 
                 # Load particles for all the subhalos in that halo
-                halo_particles_no_overlapping = None
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
 
                 # Preprocessed all particles for current halo
