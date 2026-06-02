@@ -84,7 +84,13 @@ def mock_catalog():
                 "MCRI": {"input": None, "output": None, "scaling": None, "name": "m200"},
                 "RCRI": {"input": None, "output": None, "scaling": None, "name": "r200"},
             },
-            "subhalo":   {},
+            "subhalo":   {
+                "SPOS": {"input": None, "output": None, "scaling": None, "name": "spos"},
+                "SMST": {"input": None, "output": None, "scaling": None, "name": "mstr"},
+                "stellar_half_mass_radius": {"input": None, "output": None, "scaling": None, "name": "shmr", "needs": {
+                    "star": ["POS", "MASS"]
+                }},
+            },
             "particles": {},
         },
     })

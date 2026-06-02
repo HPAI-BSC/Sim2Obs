@@ -588,6 +588,8 @@ class DataFetcher(ABC):
 
         # Identify functions to be computed
         public_methods = list(FeatureComputer._registry.keys())
+        # TODO define whether is subhalo level, halo or particles
+        logger.info(public_methods)
 
         # Map fuction - variables
         self.function_needs = self.__find_keys_with_needs()
@@ -2089,7 +2091,8 @@ class FlamingoFetcher(DataFetcher):
             rename_dict = dict(zip(filtered_columns, renamed_columns))
             tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
             d[part_type] = tmp
-            logger.debug(len(tmp), type(tmp))
+            logger.debug(len(tmp))
+            logger.debug(type(tmp))
 
         logger.debug(d)
         particle_data = SubhaloParticles(d, self.catalog.fields.particles)
@@ -2400,6 +2403,7 @@ class MagneticumFetcher(DataFetcher):
             OmegaConf.set_struct(self.catalog, True)
             self.column_map["GRNR"] = "id_parents"
 
+        # TODO
         computed_columns   = self.function_needs.get("subhalo", {})
         catalog_fields     = [f for f in self.subhalo_fields if f not in computed_columns]
         table              = "subhalo"
@@ -2877,6 +2881,16 @@ class MagneticumFetcher(DataFetcher):
             self._store_particles()
 
         return self._load_halo_particles(halo.halo_id, particles_parquet)
+
+    def _compute_features(self, table):
+        # function needs dictionary subhalo: {'stellar_half_mass_radius': {'star': ['POS', 'MASS']}}
+        logger.info(self.function_needs)
+        methods_to_compute = self.function_needs.get(table, {})
+        for method in methods_to_compute:
+            logger.debug(f'Computing feature: {method}')
+            #result = FeatureComputer.compute(method, empty_particles, {})
+
+
 
 
 
