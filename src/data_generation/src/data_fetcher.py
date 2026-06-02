@@ -2065,13 +2065,13 @@ class FlamingoFetcher(DataFetcher):
 
             if np.all(particles_mask_primary == False):
                 logger.warning(f'Halo {halo.halo_id} has no particles.')
+                raise ValueError(f'Halo {halo.halo_id} has no particles.')
 
         particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
         filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
         particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
         data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
                                                  mask=type_mask)
-        logger.debug(data)
         table = 'particles'
         steps = [
             lambda particles: convert_to_dataframe(data),
@@ -2080,8 +2080,6 @@ class FlamingoFetcher(DataFetcher):
         ]
 
         processed_particles = run_pipeline(data, steps)
-        logger.debug("Halo particles data fetched successfully.")
-        logger.debug(processed_particles)
 
         # SubhaloParticles is expecting a dict with part_types - df
         d = {}
@@ -2093,10 +2091,7 @@ class FlamingoFetcher(DataFetcher):
             rename_dict = dict(zip(filtered_columns, renamed_columns))
             tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
             d[part_type] = tmp
-            logger.debug(len(tmp))
-            logger.debug(type(tmp))
 
-        logger.debug(d)
         particle_data = SubhaloParticles(d, self.catalog.fields.particles)
         logger.debug(f'Stellar particle size: {len(particle_data.star_p)}')
         return particle_data
