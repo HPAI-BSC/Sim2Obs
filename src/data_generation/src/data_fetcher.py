@@ -2062,7 +2062,8 @@ class FlamingoFetcher(DataFetcher):
 
             if np.all(particles_mask_satellites == False):
                 logger.warning(f'Halo {halo.halo_id} has no satellites.')
-            elif np.all(particles_mask_primary == False):
+
+            if np.all(particles_mask_primary == False):
                 logger.warning(f'Halo {halo.halo_id} has no particles.')
 
         particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
@@ -2070,6 +2071,7 @@ class FlamingoFetcher(DataFetcher):
         particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
         data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
                                                  mask=type_mask)
+        logger.debug(data)
         table = 'particles'
         steps = [
             lambda particles: convert_to_dataframe(data),
