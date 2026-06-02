@@ -2060,6 +2060,8 @@ class FlamingoFetcher(DataFetcher):
 
             if np.all(particles_mask_satellites == False):
                 logger.warning(f'Halo {halo.halo_id} has no satellites.')
+            elif np.all(particles_mask_primary == False):
+                logger.warning(f'Halo {halo.halo_id} has no particles.')
 
         particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
         filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
