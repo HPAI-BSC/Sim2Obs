@@ -197,7 +197,10 @@ class DataLoader(PipelineStep):
                     json.dump(halo_dict, f, indent=4)
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
-                self.errors.append((halo.halo_id, str(e), len(halo_particles_overlapping.star_p), self.name))
+                if halo_particles_overlapping is not None:
+                    self.errors.append((halo.halo_id, str(e), len(halo_particles_overlapping.star_p), self.name))
+                else:
+                    self.errors.append((halo.halo_id, str(e), None, self.name))
                 continue
 
             # Update cosmos instance
