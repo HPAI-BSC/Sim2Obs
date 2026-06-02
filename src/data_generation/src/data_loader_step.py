@@ -166,6 +166,7 @@ class DataLoader(PipelineStep):
                 attach_models_to_features([input_feature, output_feature], models)
 
                 # Load particles for all the subhalos in that halo
+                halo_particles_no_overlapping = None
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
 
                 # Preprocessed all particles for current halo
