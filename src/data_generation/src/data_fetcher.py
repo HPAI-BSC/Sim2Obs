@@ -2077,6 +2077,7 @@ class FlamingoFetcher(DataFetcher):
 
         processed_particles = run_pipeline(data, steps)
         logger.debug("Halo particles data fetched successfully.")
+        logger.debug(processed_particles)
 
         # SubhaloParticles is expecting a dict with part_types - df
         d = {}
@@ -2090,6 +2091,7 @@ class FlamingoFetcher(DataFetcher):
             d[part_type] = tmp
             logger.debug(len(tmp), type(tmp))
 
+        logger.debug(d)
         particle_data = SubhaloParticles(d, self.catalog.fields.particles)
         logger.debug(f'Stellar particle size: {len(particle_data.star_p)}')
         return particle_data
@@ -2747,7 +2749,6 @@ class MagneticumFetcher(DataFetcher):
         logger.debug(f"Particles fetched: {subhalo_particles.dataset.count_rows()} rows.")
         return subhalo_particles
 
-    # TODO
     def get_p_subhalo(self, *args, **kwargs):
         subhalo_id = kwargs.get('subhalo_id', None)
 
