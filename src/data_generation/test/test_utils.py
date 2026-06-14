@@ -54,13 +54,13 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(all(np.array_equal(a, b) for a, b in zip(converted, converted_ii)))
 
     def test_find_values(self):
-        comoving_resolution = 2.66 # for Ref-L0050N0752
-        scale_factor = 0.84551589459619
+        comoving_resolution = 22.3 # for flamingo
+        scale_factor = 0.8333333333333335
         spatial_resolution = comoving_resolution / scale_factor # Convert to physical kpc
         print(spatial_resolution)
 
         # bin calculation
-        fov = 526.68 # 526.68 (should we use the same fov ? than illustris )
+        fov = 429352.020 * 2
         r = fov / 2  # Radius of the field of view
 
         bin_size = spatial_resolution * 3
@@ -114,7 +114,7 @@ class TestUtils(unittest.TestCase):
         store_overlapping_matrix_as_df(cfg_illustris, overlapping_matrix)
 
     def test_filter_outliers(self):
-        df = pd.read_csv('../../../transition_radius_exploration/illustris/_illustris300_transition_radius.csv')
+        df = pd.read_csv('../../../transition_radius_exploration/flamingo_L1000N0900/_flamingo_L1000N0900_transition_radius.csv')
         transition_radius = df['transition_radius']
         tmp = df.describe()
         percentiles = [97]
@@ -135,6 +135,11 @@ class TestUtils(unittest.TestCase):
         ignored_halos = list(ignored_halos)
         new_df = df[~df['halo_id'].isin(ignored_halos)]
         sts = new_df.describe()
+        print()
+
+        errors_df = pd.read_csv('../../../transition_radius_exploration/flamingo_L1000N0900/errors__flamingo_L1000N0900.csv')
+        halos = errors_df['halo_id']
+        final_set = set(ignored_halos).union(set(halos))
         print()
 
     def test_explore_problematic_halos(self):

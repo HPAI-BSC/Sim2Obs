@@ -16,7 +16,7 @@ feature_names:
   - name: VelocityDispersion
     simulate_muse: false
   - name: IntraClusterLight
-    transition_radius_compute: true
+    transition_radius_compute: false
 
 # [angle, z axis, [rotation_axis]]
 #rotation_45: [ 45, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]
@@ -29,9 +29,9 @@ skip_existing_halos: true
 pipeline:
   - name: data_loader
     G: 4.30091e-6              # Gravitational constant in units of kpc Msun^-1 (km/s)^2
-  #- name: map_step
-  #  dim: 2 # new
-  #  n_zooms: 1
+  - name: map_step
+    dim: 2 # new
+    n_zooms: 1
 
 
 
