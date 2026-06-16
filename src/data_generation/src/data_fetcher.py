@@ -905,8 +905,6 @@ class Illustris300Fetcher(DataFetcher):
                             num_particles = particles[key].shape[0]
                             #logger.debug(f"Particle data fetched successfully, particles retrieved: {num_particles}")
                             break
-                else:
-                    logger.debug(f'Subhalo {subhalo_id} does not have {part_type} particles.')
             else:
                 logger.warning(f"No particle data found for subhalo {subhalo_id}.")
 
