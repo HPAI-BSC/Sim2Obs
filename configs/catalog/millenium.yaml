@@ -22,13 +22,13 @@ bin_spatial_resolution_scale: 1.5
 #ignore_halos: []
 
 # transition_radius: XX # kpc
-Lbox: 62500 # kpc/h
-path: ${paths.datasets_dir}/millenium/MTNG-L62.5-540-A
+#Lbox: 62500 # kpc/h
+#path: ${paths.datasets_dir}/millenium/MTNG-L62.5-540-A
 ignore_halos: []
 
 # transition_radius: XX # kpc
-# Lbox: 500000 # kpc/h
-# path: ${paths.datasets_dir}/millenium/MTNG-L500-4320-A
+Lbox: 500000 # kpc/h
+path: ${paths.datasets_dir}/millenium/MTNG-L500-4320-A
 # ignore_halos: []
 
 fields:
