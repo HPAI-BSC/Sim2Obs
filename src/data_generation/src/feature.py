@@ -738,6 +738,7 @@ class ICLProcessor(FeatureProcessor):
 
         # Identify transition radius where ICL surpasses BCG
         transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
+        logger.debug(f'Transition index: {transition_index}')
 
         # To analyze cumsum profiles
         r_by_r200 = sorted_distances #/ halo.r200
@@ -753,6 +754,7 @@ class ICLProcessor(FeatureProcessor):
                         max_diff = diff
                         max_pos = i
 
+            logger.debug(f'Max pos: {max_pos}')
             logger.debug(f'Index for the transition radius: {transition_index[max_pos]}')
             transition_radius = sorted_distances[transition_index[max_pos]]
             normalized_transition_radius = transition_radius / halo.r200
