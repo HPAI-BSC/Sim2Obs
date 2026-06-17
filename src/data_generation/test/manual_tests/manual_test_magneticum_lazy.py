@@ -29,7 +29,7 @@ def magneticum_particle_test():
     fetcher_magneticum = DataFetcherFactory.get_data_fetcher(cfg_magneticum.catalog, **attr_dict)
 
     tracemalloc.start()
-    '''
+
     halo_context = fetcher_magneticum.get_halos()
     subhalo_context = fetcher_magneticum.get_subhalos()
 
@@ -46,10 +46,10 @@ def magneticum_particle_test():
     print("Unique halos stored:", len(unique_ids))
 
     print('-------- Subhalo Particles --------')
-    '''
+
     mock_halo = {'halo_id': 0, 'm200': 26000000, 'r200': 744.56, 'fsub': 0, 'gpos': [200, 200, 200]}
     halo = Halo(**mock_halo)
-    '''
+
     subhalo_particles = fetcher_magneticum.get_p_halo(halo=halo)
     total_rows = subhalo_particles.dataset.count_rows()
     print("Total rows:", total_rows)
@@ -61,7 +61,6 @@ def magneticum_particle_test():
     subhalo_particles_0 = fetcher_magneticum.get_p_halo(halo=halo)
     print(type(subhalo_particles_0))
     print(subhalo_particles_0)
-    '''
 
     particles_parquet = f"{fetcher_magneticum.catalog.path}/particles_parquet"
 
