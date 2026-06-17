@@ -58,14 +58,14 @@ def main(cfg: DictConfig) -> Any:
 
     # todo test
     starting_idx = 0
-    ending_idx = 100
+    ending_idx = 10
 
     ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[], ignore_halos=ignore_halos)
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[0, 4, 9], ignore_halos=ignore_halos)
 
 
 if __name__ == "__main__":
     # TODO DEBUG
-    magneticum_particle_test()
+    #magneticum_particle_test()
     #magneticum_sample_size()
-    #main()
+    main()
