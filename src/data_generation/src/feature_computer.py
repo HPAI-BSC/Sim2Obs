@@ -24,8 +24,13 @@ class FeatureComputer:
         return cls._registry[name](*args, **kwargs)
 
     @staticmethod
-    def _subhalo_shmr(particles: dict) -> float:
+    def _subhalo_shmr(**kwargs) -> float:
         """Compute stellar half mass radius for a single subhalo."""
+        particles = kwargs.get('particles', None)
+
+        if particles is None:
+            raise ValueError('Particles cannot be None.')
+
         pos = particles.get('POS', None)
         mass = particles.get('MASS', None)
 
