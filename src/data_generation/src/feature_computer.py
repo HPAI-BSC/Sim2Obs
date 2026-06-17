@@ -1,7 +1,5 @@
 from typing import Dict
 
-import numpy as np
-
 
 class FeatureComputer:
     # Registry of available feature computations
