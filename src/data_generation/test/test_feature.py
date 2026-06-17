@@ -260,6 +260,46 @@ class TestFeature(unittest.TestCase):
 
         plot_particles(x, y, z, halo_center=[0, 0, 0])
 
+    def test_exploration_transition_radius_millenium(self):
+        def plot_particles(x, y, z, halo_center):
+            # Create a 3D scatter plot
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+
+            # Plot all the particles
+            ax.scatter(x, y, z, c='r', marker='o')  # Particles in red
+
+            # Plot the halo center with a different color (e.g., blue) and a larger marker
+            ax.scatter(halo_center[0], halo_center[1], halo_center[2], c='b', marker='*',
+                       s=100)  # Halo center in blue, larger marker
+
+            # Add labels for clarity
+            ax.set_xlabel('X Label')
+            ax.set_ylabel('Y Label')
+            ax.set_zlabel('Z Label')
+            plt.show()
+
+        halo_id = 0
+        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/halo_illustris-300_MTNG-L500-4320-A_{halo_id}.pkl'
+        with open(path, "rb") as file:
+            halo = pickle.load(file)
+
+        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/subhalo_particles_illustris-300_MTNG-L500-4320-A_{halo_id}.pkl'
+        with open(path, "rb") as file:
+            subhalo_particles = pickle.load(file)
+
+        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/icl_mask_illustris-300_MTNG-L500-4320-A_{halo_id}.npy'
+        icl_mask = np.load(path)
+
+        self.output_feature_millenium._compute_transition_radius(halo, subhalo_particles, icl_mask)
+        print(self.output_feature_millenium.transition_radius)
+
+        # Extract x, y, z coordinates
+        x = subhalo_particles.star_p[:, 0]
+        y = subhalo_particles.star_p[:, 1]
+        z = subhalo_particles.star_p[:, 2]
+        plot_particles(x, y, z, halo_center=[0, 0, 0])
+
     def test_icl_never_dominates(self):
         def plot_particles(x, y, z, halo_center):
             # Create a 3D scatter plot
