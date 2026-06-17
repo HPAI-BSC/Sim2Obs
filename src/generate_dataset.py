@@ -66,6 +66,6 @@ def main(cfg: DictConfig) -> Any:
 
 if __name__ == "__main__":
     # TODO DEBUG
-    #magneticum_particle_test()
+    magneticum_particle_test()
     #magneticum_sample_size()
-    main()
+    #main()
