@@ -641,6 +641,10 @@ class ICLProcessor(FeatureProcessor):
 
         # Create a DataFrame with features required by the model
         # Features are: log-scaled distance (r/R200), scaled velocity (modulo_v/V200), and log-scaled halo mass (M200)
+        logger.debug(f'ICL prediction for: {halo.halo_id}')
+        logger.debug(f'distance: {distance}')
+        logger.debug(f'r200: {halo.r200}')
+
         Data = pd.DataFrame({
             'distance': np.log10(distance / halo.r200),  # Log-scaled distance
             'velocity': v_delta / V200,  # Scaled velocity
