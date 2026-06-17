@@ -16,36 +16,10 @@ class FeatureComputer:
         return decorator
 
     @classmethod
-    def compute(cls, name: str, *args, **kwargs):
+    def compute(cls, name: str, **kwargs):
         if name not in cls._registry:
             raise NotImplementedError(f"Feature '{name}' is not implemented in FeatureComputer.")
-        return cls._registry[name](*args, **kwargs)
-
-    @staticmethod
-    def _subhalo_shmr(**kwargs) -> float:
-        """Compute stellar half mass radius for a single subhalo."""
-        particles = kwargs.get('particles', None)
-
-        if particles is None:
-            raise ValueError('Particles cannot be None.')
-
-        pos = particles.get('POS', None)
-        mass = particles.get('MASS', None)
-
-        if pos is None or mass is None or len(mass) == 0:
-            return np.nan
-
-        pos = np.asarray(pos)
-        mass = np.asarray(mass)
-
-        center = np.average(pos, weights=mass, axis=0)
-        r = np.linalg.norm(pos - center, axis=1)
-        sort_idx = np.argsort(r)
-        cumulative_mass = np.cumsum(mass[sort_idx])
-        half_mass = cumulative_mass[-1] / 2.0
-        idx = np.clip(np.searchsorted(cumulative_mass, half_mass), 0, len(r) - 1)
-
-        return r[sort_idx[idx]]
+        return cls._registry[name](**kwargs)
 
 
 # --- Auto-discover and register all features at import time ---

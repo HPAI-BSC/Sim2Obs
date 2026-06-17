@@ -11,6 +11,8 @@ from src.data_generation.src.data_fetcher import DataFetcherFactory
 from hydra import initialize, compose
 import pyarrow.parquet as pq
 import pyarrow.dataset as ds
+
+from src.data_generation.src.feature_computer import FeatureComputer
 from src.data_generation.src.halo import Halo
 
 
@@ -90,6 +92,9 @@ def magneticum_particle_test():
     subhalo_particles_ = fetcher_magneticum.get_p_subhalo(subhalo_id=valid_subhalo_id)
     print(type(subhalo_particles_))
     print(subhalo_particles_)
+    result = FeatureComputer.compute('stellar_half_mass_radius', particles=subhalo_particles_)
+    print(f'shmr: {result}')
+
     tracemalloc.stop()
 
 
