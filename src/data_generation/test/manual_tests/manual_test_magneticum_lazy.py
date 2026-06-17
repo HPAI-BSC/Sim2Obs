@@ -86,9 +86,6 @@ def magneticum_particle_test():
     valid_subhalo_id = subhalo_ids['subhalo_id'].iloc[0]
     print(f"\nTesting with subhalo_id={valid_subhalo_id}")
 
-    subhalo_particles = fetcher_magneticum.get_p_subhalo(subhalo_id=int(valid_subhalo_id))
-    print(f"Particles loaded: {len(subhalo_particles)}")
-
     subhalo_particles_ = fetcher_magneticum.get_p_subhalo(subhalo_id=valid_subhalo_id)
     print(type(subhalo_particles_))
     print(subhalo_particles_)
