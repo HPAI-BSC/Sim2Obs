@@ -72,7 +72,7 @@ class TestFeature(unittest.TestCase):
         required_keys = ['G']
         data_loader_dict = next((step for step in self.cfg_eagle.pipeline if step.name == 'data_loader'), None)
         attr_dict = {key: data_loader_dict[key] for key in required_keys if key in data_loader_dict}
-        self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
+        # self.fetcher_flamingo = DataFetcherFactory.get_data_fetcher(self.cfg_flamingo.catalog, **attr_dict)
         self.fetcher_illustris = DataFetcherFactory.get_data_fetcher(self.cfg_illustris.catalog, **attr_dict)
         self.fetcher_millenium = DataFetcherFactory.get_data_fetcher(self.cfg_millenium.catalog, **attr_dict)
         self.fetcher_eagle = DataFetcherFactory.get_data_fetcher(self.cfg_eagle.catalog, **attr_dict)
@@ -299,6 +299,114 @@ class TestFeature(unittest.TestCase):
         y = subhalo_particles.star_p[:, 1]
         z = subhalo_particles.star_p[:, 2]
         plot_particles(x, y, z, halo_center=[0, 0, 0])
+
+    def test_exploration_stellar_particles_R200_millenium(self):
+        def plot_particles_with_r200(x, y, z, halo_center, r200, icl_mask):
+            fig = plt.figure(figsize=(8, 8))
+            ax = fig.add_subplot(111, projection='3d')
+
+            icl_mask_bool = icl_mask.astype(bool)
+            non_icl = ~icl_mask_bool
+
+            ax.scatter(
+                x[non_icl], y[non_icl], z[non_icl],
+                s=1, alpha=0.2, c='r', label='Stellar particles'
+            )
+            ax.scatter(
+                x[icl_mask_bool], y[icl_mask_bool], z[icl_mask_bool],
+                s=1, alpha=0.4, c='cyan', label='ICL particles'
+            )
+
+            ax.scatter(
+                halo_center[0], halo_center[1], halo_center[2],
+                c='b', marker='*', s=100, label='Halo center'
+            )
+
+            u = np.linspace(0, 2 * np.pi, 50)
+            v = np.linspace(0, np.pi, 50)
+
+            xs = halo_center[0] + r200 * np.outer(np.cos(u), np.sin(v))
+            ys = halo_center[1] + r200 * np.outer(np.sin(u), np.sin(v))
+            zs = halo_center[2] + r200 * np.outer(np.ones(np.size(u)), np.cos(v))
+
+            ax.plot_wireframe(xs, ys, zs, alpha=0.3, linewidth=0.5, label='R200')
+
+            ax.set_xlabel('X [kpc]')
+            ax.set_ylabel('Y [kpc]')
+            ax.set_zlabel('Z [kpc]')
+            ax.legend()
+            plt.show()
+
+        halo_id = 0
+
+        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/halo_illustris-300_MTNG-L500-4320-A_{halo_id}.pkl'
+        with open(path, "rb") as file:
+            halo = pickle.load(file)
+
+        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/subhalo_particles_illustris-300_MTNG-L500-4320-A_{halo_id}.pkl'
+        with open(path, "rb") as file:
+            subhalo_particles = pickle.load(file)
+
+        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/icl_mask_illustris-300_MTNG-L500-4320-A_{halo_id}.npy'
+        icl_mask = np.load(path)
+
+        x = subhalo_particles.star_p[:, 0]
+        y = subhalo_particles.star_p[:, 1]
+        z = subhalo_particles.star_p[:, 2]
+
+        print(f"Halo center: {halo.gpos}")
+        print(f"R200: {halo.r200}")
+        print(
+            f"ICL particles: {icl_mask.astype(bool).sum()} / {len(icl_mask)} ({100 * icl_mask.astype(bool).mean():.1f}%)")
+
+        plot_particles_with_r200(
+            x, y, z,
+            halo_center=halo.gpos,
+            r200=halo.r200,
+            icl_mask=icl_mask,
+        )
+
+    def test_exploration_bcg_icl_particles_millenium(self):
+        def plot_bcg_icl_particles(x, y, z, icl_mask):
+            fig = plt.figure(figsize=(8, 8))
+            ax = fig.add_subplot(111, projection='3d')
+
+            icl_mask_bool = icl_mask.astype(bool)
+            bcg_mask = ~icl_mask_bool
+
+            ax.scatter(
+                x[bcg_mask], y[bcg_mask], z[bcg_mask],
+                s=1, alpha=0.2, c='r', label='BCG particles'
+            )
+            ax.scatter(
+                x[icl_mask_bool], y[icl_mask_bool], z[icl_mask_bool],
+                s=1, alpha=0.4, c='cyan', label='ICL particles'
+            )
+
+            ax.set_xlabel('X [kpc]')
+            ax.set_ylabel('Y [kpc]')
+            ax.set_zlabel('Z [kpc]')
+            ax.legend()
+            plt.show()
+
+        halo_id = 0
+
+        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/subhalo_particles_illustris-300_MTNG-L500-4320-A_{halo_id}.pkl'
+        with open(path, "rb") as file:
+            subhalo_particles = pickle.load(file)
+
+        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/icl_mask_illustris-300_MTNG-L500-4320-A_{halo_id}.npy'
+        icl_mask = np.load(path)
+
+        x = subhalo_particles.star_p[:, 0]
+        y = subhalo_particles.star_p[:, 1]
+        z = subhalo_particles.star_p[:, 2]
+
+        icl_bool = icl_mask.astype(bool)
+        print(f"BCG particles: {(~icl_bool).sum()} / {len(icl_mask)} ({100 * (~icl_bool).mean():.1f}%)")
+        print(f"ICL particles: {icl_bool.sum()} / {len(icl_mask)} ({100 * icl_bool.mean():.1f}%)")
+
+        plot_bcg_icl_particles(x, y, z, icl_mask=icl_mask)
 
     def test_icl_never_dominates(self):
         def plot_particles(x, y, z, halo_center):

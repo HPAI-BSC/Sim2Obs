@@ -280,5 +280,11 @@ class TestFlamingoData(unittest.TestCase):
         tmp = subhalo_context_1.get_items_by_halo(4)
         self.assertSetEqual(set(expected_child_list), set(child_list))
 
+    def test_particle_distribution(self):
+        df = pd.read_csv('../../../../transition_radius_exploration/flamingo_L1000N0900/_flamingo_L1000N0900_transition_radius.csv')
+        tmp = df.sort_values(by='number_particles', ascending=False).head(n=5)
+        print(list(df.sort_values(by='number_particles', ascending=False).head(n=5)['halo_id']))
+
+
 
 

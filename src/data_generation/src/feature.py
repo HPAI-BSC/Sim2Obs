@@ -686,12 +686,12 @@ class ICLProcessor(FeatureProcessor):
             icl_mask[ids] = 1
         else:
             logger.warning('No particles predicted as ICL.')
-            #store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
+            store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
             raise ValueError("icl_mask is empty; no masking applied.")
 
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
         # For debug purposes
-        # store_RF_input(self.cfg, halo, icl_mask, v_delta, distance)
+        store_RF_input(self.cfg, halo, icl_mask, v_delta, distance)
         return icl_mask
 
     def _compute_transition_radius(self, halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
@@ -718,7 +718,7 @@ class ICLProcessor(FeatureProcessor):
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
         logger.debug(f'Computing transition radius for: {halo.halo_id}')
-        # store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
+        store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
 
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle

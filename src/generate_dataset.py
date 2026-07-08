@@ -56,16 +56,16 @@ def main(cfg: DictConfig) -> Any:
     steps = get_pipeline_steps(cfg)
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
-    # todo test
-    starting_idx = 0
-    ending_idx = 100
+    starting_idx = None
+    ending_idx = None
 
     ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[], ignore_halos=ignore_halos)
+    more_particles = [295168, 114571, 913428, 639531, 216740]
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=more_particles, ignore_halos=ignore_halos)
 
 
 if __name__ == "__main__":
     # TODO DEBUG
-    magneticum_particle_test()
+    #magneticum_particle_test()
     #magneticum_sample_size()
-    #main()
+    main()
