@@ -300,7 +300,7 @@ class TestFeature(unittest.TestCase):
         z = subhalo_particles.star_p[:, 2]
         plot_particles(x, y, z, halo_center=[0, 0, 0])
 
-    def test_exploration_stellar_particles_R200_millenium(self):
+    def test_exploration_stellar_particles_R200(self):
         def plot_particles_with_r200(x, y, z, halo_center, r200, icl_mask):
             fig = plt.figure(figsize=(8, 8))
             ax = fig.add_subplot(111, projection='3d')
@@ -336,18 +336,17 @@ class TestFeature(unittest.TestCase):
             ax.set_zlabel('Z [kpc]')
             ax.legend()
             plt.show()
+        halo_id = 639531
 
-        halo_id = 0
-
-        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/halo_illustris-300_MTNG-L500-4320-A_{halo_id}.pkl'
+        path = f'../../../transition_radius_exploration/flamingo_L1000N0900/halo_flamingo_L1000N0900_{halo_id}.pkl'
         with open(path, "rb") as file:
             halo = pickle.load(file)
 
-        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/subhalo_particles_illustris-300_MTNG-L500-4320-A_{halo_id}.pkl'
+        path = f'../../../transition_radius_exploration/flamingo_L1000N0900/subhalo_particles_flamingo_L1000N0900_{halo_id}.pkl'
         with open(path, "rb") as file:
             subhalo_particles = pickle.load(file)
 
-        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/icl_mask_illustris-300_MTNG-L500-4320-A_{halo_id}.npy'
+        path = f'../../../transition_radius_exploration/flamingo_L1000N0900/icl_mask_flamingo_L1000N0900_{halo_id}.npy'
         icl_mask = np.load(path)
 
         x = subhalo_particles.star_p[:, 0]
@@ -366,7 +365,7 @@ class TestFeature(unittest.TestCase):
             icl_mask=icl_mask,
         )
 
-    def test_exploration_bcg_icl_particles_millenium(self):
+    def test_exploration_bcg_icl_particles(self):
         def plot_bcg_icl_particles(x, y, z, icl_mask):
             fig = plt.figure(figsize=(8, 8))
             ax = fig.add_subplot(111, projection='3d')
@@ -389,13 +388,13 @@ class TestFeature(unittest.TestCase):
             ax.legend()
             plt.show()
 
-        halo_id = 0
+        halo_id = 913428
 
-        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/subhalo_particles_illustris-300_MTNG-L500-4320-A_{halo_id}.pkl'
+        path = f'../../../transition_radius_exploration/flamingo_L1000N0900/subhalo_particles_flamingo_L1000N0900_{halo_id}.pkl'
         with open(path, "rb") as file:
             subhalo_particles = pickle.load(file)
 
-        path = f'../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/icl_mask_illustris-300_MTNG-L500-4320-A_{halo_id}.npy'
+        path = f'../../../transition_radius_exploration/flamingo_L1000N0900/icl_mask_flamingo_L1000N0900_{halo_id}.npy'
         icl_mask = np.load(path)
 
         x = subhalo_particles.star_p[:, 0]

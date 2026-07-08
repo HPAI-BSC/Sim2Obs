@@ -18,8 +18,8 @@ class TestFlamingoData(unittest.TestCase):
         fof_subhalos_file = '../../../../local/data/datasets/flamingo/L1000N0900/SOAP-HBT/halo_properties_0073.hdf5'
         self.h = 0.6774
 
-        self.fof_subhalos = sw.load(fof_subhalos_file)
-        self.data = sw.load(particles_file)
+        #self.fof_subhalos = sw.load(fof_subhalos_file)
+        #self.data = sw.load(particles_file)
         self.filtered_halos = None
 
     def test_load_fof(self):

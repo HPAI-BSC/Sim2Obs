@@ -60,8 +60,9 @@ def main(cfg: DictConfig) -> Any:
     ending_idx = None
 
     ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
-    more_particles = [295168, 114571, 913428, 639531, 216740]
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=more_particles, ignore_halos=ignore_halos)
+    # TODO remove (just for flamingo)
+    ignore_halos = []
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[], ignore_halos=ignore_halos)
 
 
 if __name__ == "__main__":
