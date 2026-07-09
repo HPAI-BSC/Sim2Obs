@@ -22,9 +22,9 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     subhalo_context = data_loader.fetcher.get_subhalos()
 
     # TODO DEBUG
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
-    halo_context.data.to_csv(os.path.join(dataset_dir, 'flamingo_L1000N0900_halo_context.csv'))
-    subhalo_context.data.to_csv(os.path.join(dataset_dir, 'flamingo_L1000N0900_subhalo_context.csv'))
+    # dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
+    # halo_context.data.to_csv(os.path.join(dataset_dir, 'flamingo_L1000N0900_halo_context.csv'))
+    # subhalo_context.data.to_csv(os.path.join(dataset_dir, 'flamingo_L1000N0900_subhalo_context.csv'))
 
     if len(ignore_halos) > 0:
         print(f'Filtering ignore halos: {ignore_halos}')
