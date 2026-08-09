@@ -43,6 +43,7 @@ def magneticum_test(halo_context, fetcher):
         gc.collect()
     tracemalloc.stop()
 
+
 def filter_outliers_transition_radius(transition_radius_path):
     df = pd.read_csv(transition_radius_path)
     transition_radius = df['transition_radius']
@@ -197,6 +198,12 @@ class DataLoader(PipelineStep):
 
                 with open(path, "w") as f:
                     json.dump(halo_dict, f, indent=4)
+
+                # TODO debugging
+                halo_particles = halo_particles_no_overlapping.p
+                path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_p_{halo.halo_id}.json'
+                np.save(path_, halo_particles)
+
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
                 if halo_particles_overlapping is not None:
