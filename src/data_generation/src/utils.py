@@ -7,6 +7,8 @@ import traceback
 from pathlib import Path
 import eagleSqlTools as sql
 import h5py
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 import numpy as np
 
