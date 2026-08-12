@@ -200,6 +200,7 @@ class DataLoader(PipelineStep):
                     json.dump(halo_dict, f, indent=4)
 
                 # TODO debugging
+                logger.debug(vars(halo_particles_no_overlapping).keys())
                 halo_particles = halo_particles_no_overlapping.p
                 path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_p_{halo.halo_id}.json'
                 np.save(path_, halo_particles)

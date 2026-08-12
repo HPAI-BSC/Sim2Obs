@@ -642,7 +642,6 @@ class ICLProcessor(FeatureProcessor):
         # Create a DataFrame with features required by the model
         # Features are: log-scaled distance (r/R200), scaled velocity (modulo_v/V200), and log-scaled halo mass (M200)
         logger.debug(f'ICL prediction for: {halo.halo_id}')
-        logger.debug(f'distance: {distance}')
         logger.debug(f'r200: {halo.r200}')
 
         Data = pd.DataFrame({
@@ -742,7 +741,6 @@ class ICLProcessor(FeatureProcessor):
 
         # Identify transition radius where ICL surpasses BCG
         transition_index = np.where(icl_cumulative > bcg_cumulative)[0]
-        logger.debug(f'Transition index: {transition_index}')
 
         # To analyze cumsum profiles
         r_by_r200 = sorted_distances #/ halo.r200
