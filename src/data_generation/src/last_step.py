@@ -1,8 +1,10 @@
 import os.path
 import pandas as pd
+import pyarrow.parquet as pq
 from omegaconf import DictConfig
 
-from src.data_generation.src.utils import setup_logger, merge_json_files_to_csv, find_item
+from src.data_generation.src.utils import setup_logger, merge_json_files_to_csv, find_item, \
+    particle_numpy_files_to_parquet
 
 logger = setup_logger("LastStep")
 
@@ -174,6 +176,19 @@ class LastStep:
                 print(errors_df['error'].value_counts())
 
             #self._check_maps()
+
+        # Storing particle data - Flamingo
+        dataset_dir = self.cfg.paths.datasets_dir
+        path = dataset_dir + f'/../logs/transition_radius'
+        output_file = dataset_dir + f'/../logs/transition_radius/{name}_particle_particle_data.csv'
+
+        name = self.cfg.catalog.path.replace(dataset_dir, '')
+        name = name.replace('/', '_')
+        print(f'simulation: {name}')
+        particle_numpy_files_to_parquet(path, output_file, name, chunk_size=1000, length=None)
+        table = pq.ParquetFile(output_file)
+        n_rows = table.metadata.num_rows
+        print(f"n = {n_rows}")
 
 
 

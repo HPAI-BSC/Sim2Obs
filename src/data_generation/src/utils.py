@@ -1092,12 +1092,203 @@ def merge_json_files_to_csv(input_dir, output_file, simulation, chunk_size=1000,
     print(f"Merge complete. Output saved to {output_file}")
 
 
+def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_size=1000, length=None):
+    """
+    Merge particle position and mass NumPy files into one Parquet file.
+
+    Each halo should have:
+        - one particle position file: particle_p
+        - one particle mass file: particle_m
+
+    Position arrays are expected to have shape (N, 3).
+    Mass arrays are expected to have shape (N,).
+
+    The resulting Parquet file has one row per particle:
+
+        halo_id | x | y | z | mass
+
+    Args:
+        input_dir (str):
+            Directory containing the NumPy files.
+
+        output_file (str):
+            Path of the output Parquet file.
+
+        simulation (str):
+            Simulation identifier used to filter files.
+
+        chunk_size (int):
+            Number of halos to process before writing a chunk.
+
+        length (int, optional):
+            If provided, process only the first `length` halos.
+    """
+
+    # Find position and mass files
+    p_mass_files = [
+        f for f in os.listdir(input_dir)
+        if f.endswith(".numpy")
+        and simulation in f
+        and "particle_m" in f
+    ]
+
+    p_position_files = [
+        f for f in os.listdir(input_dir)
+        if f.endswith(".numpy")
+        and simulation in f
+        and "particle_p" in f
+    ]
+
+    # Create dictionaries indexed by filename/halo identifier
+    mass_files = {
+        f.replace("particle_m", "particle_p"): f
+        for f in p_mass_files
+    }
+
+    position_files = {
+        f: f
+        for f in p_position_files
+    }
+
+    # Keep only halos for which both files exist
+    paired_files = [
+        (position_files[p], mass_files[p])
+        for p in position_files
+        if p in mass_files
+    ]
+
+    # Sort files
+    paired_files.sort()
+
+    if length is not None:
+        paired_files = paired_files[:length]
+
+    total = len(paired_files)
+
+    if total == 0:
+        print("No matching particle position/mass files found.")
+        return
+
+    print(
+        f"Found {total} halos. "
+        f"Merging in chunks of {chunk_size}..."
+    )
+
+    # Remove existing output
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+    writer = None
+    buffer = []
+
+    try:
+
+        for i, (position_filename, mass_filename) in enumerate(
+            paired_files, start=1
+        ):
+
+            position_path = os.path.join(
+                input_dir,
+                position_filename
+            )
+
+            mass_path = os.path.join(
+                input_dir,
+                mass_filename
+            )
+
+            try:
+                # Load arrays
+                positions = np.load(position_path)
+                masses = np.load(mass_path)
+
+                # Check shapes
+                if positions.ndim != 2 or positions.shape[1] != 3:
+                    print(
+                        f"Skipping {position_filename}: "
+                        f"unexpected position shape {positions.shape}"
+                    )
+                    continue
+
+                if masses.ndim != 1:
+                    masses = masses.reshape(-1)
+
+                if len(positions) != len(masses):
+                    print(
+                        f"Skipping {position_filename}: "
+                        f"{len(positions)} positions but "
+                        f"{len(masses)} masses"
+                    )
+                    continue
+
+                # Extract halo ID from filename
+                # Adapt this if your filename convention is different
+                halo_id = position_filename.split("_")[-1].replace(
+                    ".numpy", ""
+                )
+
+                # Create dataframe for this halo
+                df_halo = pd.DataFrame({
+                    "halo_id": halo_id,
+                    "x": positions[:, 0],
+                    "y": positions[:, 1],
+                    "z": positions[:, 2],
+                    "mass": masses
+                })
+
+                buffer.append(df_halo)
+
+            except Exception as e:
+                print(
+                    f"Error reading {position_filename} / "
+                    f"{mass_filename}: {e}"
+                )
+                continue
+
+            # Write chunk
+            if len(buffer) >= chunk_size or i == total:
+
+                df = pd.concat(
+                    buffer,
+                    ignore_index=True
+                )
+
+                table = pa.Table.from_pandas(
+                    df,
+                    preserve_index=False
+                )
+
+                if writer is None:
+                    writer = pq.ParquetWriter(
+                        output_file,
+                        table.schema
+                    )
+
+                writer.write_table(table)
+
+                buffer.clear()
+
+                print(
+                    f"Processed {i}/{total} halos "
+                    f"({(i / total) * 100:.1f}%)"
+                )
+
+    finally:
+
+        if writer is not None:
+            writer.close()
+
+    print(
+        f"Merge complete. Output saved to {output_file}"
+    )
+
 def gaussian_kernel_1d(ksize, sigma, normalize=True):
     x = np.arange(ksize) - ksize//2
     K = np.exp(-(x**2)/(2*sigma**2))
     if normalize:
         K /= K.sum()
     return K
+
 
 def rebin_1d(arr, factor, agg="mean"):
     """

@@ -201,11 +201,11 @@ class DataLoader(PipelineStep):
 
                 # TODO debugging
                 halo_particles = halo_particles_no_overlapping.star_p
-                path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_p_{halo.halo_id}.json'
+                path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_p_{halo.halo_id}'
                 np.save(path_, halo_particles)
 
                 halo_particles = halo_particles_no_overlapping.star_m
-                path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_m_{halo.halo_id}.json'
+                path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_m_{halo.halo_id}'
                 np.save(path_, halo_particles)
 
             except Exception as e:
