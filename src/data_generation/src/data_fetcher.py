@@ -2181,11 +2181,11 @@ class MagneticumFetcher(DataFetcher):
         Build a lookup table of {file, start, end} for halo PID files (block 0).
         Reads only file content for PID block — not full snapshot data.
         """
-        boundaries     = []
+        boundaries = []
         current_offset = 0
 
         for group_file in g3read.yield_all_files(self._group_base):
-            f           = g3read.GadgetFile(group_file, is_snap=False)
+            f = g3read.GadgetFile(group_file, is_snap=False)
             pid_in_file = f.read("PID ", 2)
 
             if pid_in_file is None or len(pid_in_file) == 0:
@@ -2214,24 +2214,24 @@ class MagneticumFetcher(DataFetcher):
             return np.array([], dtype=np.int64)
 
         entity_start = offset
-        entity_end   = offset + length
-        pids         = []
+        entity_end = offset + length
+        pids = []
 
         for boundary in self._pid_file_boundaries:
             file_start = boundary["start"]
-            file_end   = boundary["end"]
+            file_end = boundary["end"]
 
             overlap_start = max(entity_start, file_start)
-            overlap_end   = min(entity_end,   file_end)
+            overlap_end = min(entity_end,   file_end)
 
             if overlap_start >= overlap_end:
                 continue
 
-            f           = g3read.GadgetFile(boundary["file"], is_snap=False)
+            f = g3read.GadgetFile(boundary["file"], is_snap=False)
             pid_in_file = f.read("PID ", 2)
 
             local_start = overlap_start - file_start
-            local_end   = overlap_end   - file_start
+            local_end = overlap_end - file_start
             pids.append(pid_in_file[local_start:local_end])
             del pid_in_file
 
@@ -2248,11 +2248,11 @@ class MagneticumFetcher(DataFetcher):
         Mirrors _build_pid_file_boundaries for the subhalo PID block.
         Replaces the old eager full-array load of self._subhalos_pid.
         """
-        boundaries     = []
+        boundaries = []
         current_offset = 0
 
         for group_file in g3read.yield_all_files(self._group_base):
-            f           = g3read.GadgetFile(group_file, is_snap=False)
+            f = g3read.GadgetFile(group_file, is_snap=False)
             pid_in_file = f.read("PID ", 2)
 
             if pid_in_file is None or len(pid_in_file) == 0:
@@ -2282,24 +2282,24 @@ class MagneticumFetcher(DataFetcher):
             return np.array([], dtype=np.int64)
 
         entity_start = offset
-        entity_end   = offset + length
-        pids         = []
+        entity_end = offset + length
+        pids = []
 
         for boundary in self._subhalo_pid_boundaries:
             file_start = boundary["start"]
-            file_end   = boundary["end"]
+            file_end = boundary["end"]
 
             overlap_start = max(entity_start, file_start)
-            overlap_end   = min(entity_end,   file_end)
+            overlap_end = min(entity_end,   file_end)
 
             if overlap_start >= overlap_end:
                 continue
 
-            f           = g3read.GadgetFile(boundary["file"], is_snap=False)
+            f = g3read.GadgetFile(boundary["file"], is_snap=False)
             pid_in_file = f.read("PID ", 2)
 
             local_start = overlap_start - file_start
-            local_end   = overlap_end   - file_start
+            local_end = overlap_end - file_start
             pids.append(pid_in_file[local_start:local_end])
             del pid_in_file
 
@@ -2336,7 +2336,7 @@ class MagneticumFetcher(DataFetcher):
             logger.warning("No halos found.")
             return HaloContext(pd.DataFrame(), self.column_map)
 
-        table           = "halo"
+        table = "halo"
         halo_conditions = {
             col: data
             for col, data in self.catalog.fields.halo.items()
@@ -2353,9 +2353,9 @@ class MagneticumFetcher(DataFetcher):
         processed_halos = run_pipeline(halos, steps)
 
         # Vectorised subhalo children assignment
-        halo_ids  = processed_halos["halo_id"].values
+        halo_ids = processed_halos["halo_id"].values
         first_sub = self._fsub[halo_ids]
-        n_subs    = self._nsub[halo_ids]
+        n_subs = self._nsub[halo_ids]
         processed_halos["subhalo_ids"] = [
             np.arange(first_sub[i], first_sub[i] + n_subs[i])
             for i in range(len(halo_ids))
@@ -2378,7 +2378,7 @@ class MagneticumFetcher(DataFetcher):
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
 
-        path             = self.catalog.path
+        path = self.catalog.path
         subhalos_parquet = os.path.join(path, "subhalos_parquet")
 
         if os.path.exists(subhalos_parquet):
@@ -2399,9 +2399,9 @@ class MagneticumFetcher(DataFetcher):
             self.column_map["GRNR"] = "id_parents"
 
         # TODO
-        computed_columns   = self.function_needs.get("subhalo", {})
-        catalog_fields     = [f for f in self.subhalo_fields if f not in computed_columns]
-        table              = "subhalo"
+        computed_columns = self.function_needs.get("subhalo", {})
+        catalog_fields = [f for f in self.subhalo_fields if f not in computed_columns]
+        table = "subhalo"
         subhalo_conditions = {
             col: data
             for col, data in self.catalog.fields.subhalo.items()
@@ -2409,7 +2409,7 @@ class MagneticumFetcher(DataFetcher):
         }
 
         processed_batches = []
-        global_offset     = 0
+        global_offset = 0
 
         for group_file in g3read.yield_all_files(self._group_base):
             try:
@@ -2425,7 +2425,7 @@ class MagneticumFetcher(DataFetcher):
 
                 for batch_start in range(0, n_in_file, batch_size):
                     batch_end = min(batch_start + batch_size, n_in_file)
-                    batch     = {k: v[batch_start:batch_end] for k, v in raw.items()}
+                    batch = {k: v[batch_start:batch_end] for k, v in raw.items()}
 
                     # default-arg trick captures current offset correctly
                     steps = [
@@ -2460,7 +2460,7 @@ class MagneticumFetcher(DataFetcher):
 
         for df in processed_batches:
             df = df.rename(columns=self.column_map)
-            df["parent_bucket"]      = df["id_parents"] % 128
+            df["parent_bucket"] = df["id_parents"] % 128
             df["parent_bucket_data"] = df["parent_bucket"]
             arrow_table = pa.Table.from_pandas(df, preserve_index=False)
             pq.write_to_dataset(
@@ -2518,12 +2518,12 @@ class MagneticumFetcher(DataFetcher):
             return np.array([], dtype=np.int32)
 
         halo_ids = np.full(len(ids), -1, dtype=np.int32)
-        id_max   = ids.max()
+        id_max = ids.max()
 
         for start, end, halo_id in self._halo_intervals:
             if start > id_max:
                 break
-            mask           = (ids >= start) & (ids <= end)
+            mask = (ids >= start) & (ids <= end)
             halo_ids[mask] = halo_id
 
         return halo_ids
@@ -2547,7 +2547,7 @@ class MagneticumFetcher(DataFetcher):
 
         for sub_idx in range(len(soff)):
             start = int(soff[sub_idx])
-            end   = start + int(slen[sub_idx])
+            end = start + int(slen[sub_idx])
             self._subhalo_index.append((start, end))
 
     def _build_subhalo_pid_arrays(self):
@@ -2602,7 +2602,7 @@ class MagneticumFetcher(DataFetcher):
 
         sorter = np.argsort(all_pids, kind="stable")
         self._subhalo_sorted_pids = all_pids[sorter]
-        self._subhalo_sorted_ids  = all_sids[sorter]
+        self._subhalo_sorted_ids = all_sids[sorter]
 
         logger.info(f"Subhalo PID arrays built: {cursor:,} entries")
 
@@ -2625,8 +2625,8 @@ class MagneticumFetcher(DataFetcher):
         indices = np.searchsorted(self._subhalo_sorted_pids, particle_ids)
         indices = np.clip(indices, 0, len(self._subhalo_sorted_pids) - 1)
 
-        result          = np.full(len(particle_ids), -1, dtype=np.int32)
-        matched         = self._subhalo_sorted_pids[indices] == particle_ids
+        result = np.full(len(particle_ids), -1, dtype=np.int32)
+        matched = self._subhalo_sorted_pids[indices] == particle_ids
         result[matched] = self._subhalo_sorted_ids[indices[matched]]
         return result
 
@@ -2870,7 +2870,7 @@ class MagneticumFetcher(DataFetcher):
             self._load_catalog_cache()
             self._load_particle_cache()
 
-        path              = self.catalog.path
+        path = self.catalog.path
         particles_parquet = os.path.join(path, "particles_parquet")
 
         if not os.path.exists(particles_parquet):

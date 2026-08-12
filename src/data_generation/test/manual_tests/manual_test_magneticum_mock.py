@@ -127,7 +127,7 @@ def magneticum_sample_size():
     logger.info("Building Hydra config...")
     cfg = build_config()
 
-    required_keys    = ["G"]
+    required_keys = ["G"]
     data_loader_dict = next(
         (step for step in cfg.pipeline if step.name == "data_loader"), None
     )
@@ -148,7 +148,7 @@ def magneticum_sample_size():
     logger.info(f"Cache loaded in {time.perf_counter() - t0:.1f}s")
     snapshot_ram("after catalog cache")
 
-    n_halos    = len(fetcher._glen)
+    n_halos = len(fetcher._glen)
     n_subhalos = len(fetcher._soff)
     logger.info(f"Halos: {n_halos:,}   subhalos: {n_subhalos:,}")
 
@@ -172,9 +172,7 @@ def magneticum_sample_size():
     target_nsub = int(fetcher._nsub[target_id])
     target_fsub = int(fetcher._fsub[target_id])
     target_goff = int(fetcher._goff[target_id])
-    size_est    = estimate_particle_bytes(target_glen)
-
-
+    size_est = estimate_particle_bytes(target_glen)
 
     summary = [
         f"=== Halo probe (halo_id={target_id}) ===",
@@ -213,7 +211,7 @@ def magneticum_sample_size():
         ].copy()
 
     elapsed_sub = time.perf_counter() - t0
-    ram_sub     = snapshot_ram("after subhalo extraction")
+    ram_sub = snapshot_ram("after subhalo extraction")
     logger.info(f"Subhalos: {len(subs_df)} rows in {elapsed_sub:.1f}s")
 
     summary += [
@@ -270,8 +268,8 @@ def magneticum_sample_size():
             ].copy()
 
         elapsed_part = time.perf_counter() - t0
-        actual_ram   = parts_df.memory_usage(deep=True).sum()
-        ram_part     = snapshot_ram("after particle extraction")
+        actual_ram = parts_df.memory_usage(deep=True).sum()
+        ram_part = snapshot_ram("after particle extraction")
 
         logger.info(
             f"Particles: {len(parts_df):,} rows  "
