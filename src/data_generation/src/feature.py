@@ -775,7 +775,7 @@ class ICLProcessor(FeatureProcessor):
         self.transition_radius = transition_radius
 
         # Build cumsum profiles
-        plot_icl_bcg_profiles(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
+        #plot_icl_bcg_profiles(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
 
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):
         """
