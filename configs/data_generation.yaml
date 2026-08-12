@@ -25,7 +25,7 @@ feature_names:
 #rotation_120: [ 120, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]
 
 # This affects the entire pipeline when computing maps
-skip_existing_halos: true
+skip_existing_halos: false
 
 pipeline:
   - name: data_loader
