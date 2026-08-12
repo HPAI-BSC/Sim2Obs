@@ -1127,14 +1127,14 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
     # Find position and mass files
     p_mass_files = [
         f for f in os.listdir(input_dir)
-        if f.endswith(".numpy")
+        if f.endswith(".npy")
         and simulation in f
         and "particle_m" in f
     ]
 
     p_position_files = [
         f for f in os.listdir(input_dir)
-        if f.endswith(".numpy")
+        if f.endswith(".npy")
         and simulation in f
         and "particle_p" in f
     ]
