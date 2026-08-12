@@ -1226,7 +1226,7 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
                 # Extract halo ID from filename
                 # Adapt this if your filename convention is different
                 halo_id = position_filename.split("_")[-1].replace(
-                    ".numpy", ""
+                    ".npy", ""
                 )
 
                 # Create dataframe for this halo
