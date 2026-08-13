@@ -2766,8 +2766,10 @@ class MagneticumFetcher(DataFetcher):
 
         path = self.catalog.path
         particles_parquet = os.path.join(path, "particles_parquet")
+        print(particles_parquet)
 
         if not os.path.exists(particles_parquet):
+            print('Store_particle call')
             self._store_particles()
 
         return self._load_subhalo_particles(subhalo_id, particles_parquet)
@@ -2779,6 +2781,7 @@ class MagneticumFetcher(DataFetcher):
         Uses parent_bucket = halo_id % 128 to avoid full scan.
         """
         # Resolve parent halo to get the correct bucket
+        print('_load_subhalo_particles')
         halo_id = self._get_halo_id_for_subhalo(subhalo_id)
         bucket = halo_id % 128 if halo_id != -1 else subhalo_id % 128
 
