@@ -409,11 +409,10 @@ class SubhaloParticles:
                             value = np.stack(value.to_list())
                         if isinstance(value, list):
                             value = np.array(value)
-                        name = column_map[var].name
+                        name = column_map[var]
                         # Add attr with that provided name
                         # TODO avoid hardcoding
                         setattr(self, f'star_{name}', value)
-
                 elif dict_depth(data) == 2:
                     for part_type in data:
                         print(part_type)
