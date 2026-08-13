@@ -2808,6 +2808,7 @@ class MagneticumFetcher(DataFetcher):
         logger.debug(f"Loaded {len(df)} particles for subhalo_id={subhalo_id}")
 
         data = {}
+        print(df.columns)
         for col in df.columns:
             if col in ('parent_id', 'subhalo_id', 'parent_bucket', 'parent_bucket_data'):
                 continue
