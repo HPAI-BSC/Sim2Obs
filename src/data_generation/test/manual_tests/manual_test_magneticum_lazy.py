@@ -55,9 +55,9 @@ def magneticum_particle_test():
     subhalo_particles = fetcher_magneticum.get_p_halo(halo=halo)
     print(type(subhalo_particles))
 
-
     total_rows = subhalo_particles.dataset.count_rows()
     print("Total rows:", total_rows)
+    print(vars(subhalo_particles).keys())
     table = subhalo_particles.dataset.to_table(columns=["parent_bucket_data"])
     buckets = pc.unique(table["parent_bucket_data"])
     print("Num buckets:", len(buckets))
