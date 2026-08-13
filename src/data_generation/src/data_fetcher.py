@@ -2821,7 +2821,7 @@ class MagneticumFetcher(DataFetcher):
             print(key, len(value))
 
         # TODO avoid hardcoding this => centralize
-        return SubhaloParticles(data=data, column_map={'star': {'POS': 'p', 'MASS': 'm', 'VEL': 'v'}})
+        return SubhaloParticles(data=data, column_map={'POS': 'p', 'MASS': 'm', 'VEL': 'v'})
 
     def _get_halo_id_for_subhalo(self, subhalo_id: int) -> int:
         """

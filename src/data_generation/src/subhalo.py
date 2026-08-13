@@ -401,20 +401,34 @@ class SubhaloParticles:
                         setattr(self, f'{fix_names.get(part_type, part_type)}_{var}', value)
         else:
             try:
-                for part_type in data:
-                    print(part_type)
-                    for var in data[part_type]:
-                        print(var)
-                        if var in column_map[part_type]:
-                            value = data[part_type][var]
-                            print(value)
-                            if isinstance(value, (pd.Series, pd.Series)):
-                                value = np.stack(value.to_list())
-                            elif isinstance(value, list):
-                                value = np.array(value)
-                            name = column_map[part_type][var].name
-                            # Add attr with that provided name
-                            setattr(self, f'{fix_names.get(part_type, part_type)}_{name}', value)
+                if dict_depth(data) == 1:
+                    for var in column_map.keys():
+                        value = data[var]
+                        print(value)
+                        if isinstance(value, (pd.Series, pd.Series)):
+                            value = np.stack(value.to_list())
+                        if isinstance(value, list):
+                            value = np.array(value)
+                        name = column_map[var].name
+                        # Add attr with that provided name
+                        # TODO avoid hardcoding
+                        setattr(self, f'star_{name}', value)
+
+                elif dict_depth(data) == 2:
+                    for part_type in data:
+                        print(part_type)
+                        for var in data[part_type]:
+                            print(var)
+                            if var in column_map[part_type]:
+                                value = data[part_type][var]
+                                print(value)
+                                if isinstance(value, (pd.Series, pd.Series)):
+                                    value = np.stack(value.to_list())
+                                elif isinstance(value, list):
+                                    value = np.array(value)
+                                name = column_map[part_type][var].name
+                                # Add attr with that provided name
+                                setattr(self, f'{fix_names.get(part_type, part_type)}_{name}', value)
             except Exception as e:
                 print(f'need at least one array to stack: {e}')
 
