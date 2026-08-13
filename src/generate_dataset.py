@@ -59,13 +59,12 @@ def main(cfg: DictConfig) -> Any:
     starting_idx = None
     ending_idx = None
 
-    # ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
-    # TODO
-    ignore_halos = []
-    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[], ignore_halos=ignore_halos)
+    ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
+    # ignore_halos = []
+    _ = pipeline.run(starting_idx=starting_idx, ending_idx=ending_idx, debug_halo_ids=[1651, 1712], ignore_halos=ignore_halos)
 
 
 if __name__ == "__main__":
     # TODO DEBUG
-    magneticum_particle_test()
-    # main()
+    # magneticum_particle_test()
+    main()
