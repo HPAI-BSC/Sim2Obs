@@ -49,11 +49,6 @@ def magneticum_particle_test():
 
     print('-------- Subhalo Particles --------')
 
-    mock_halo = {'halo_id': 0, 'm200': 26000000, 'r200': 744.56, 'fsub': 0, 'gpos': [200, 200, 200]}
-    halo = Halo(**mock_halo)
-
-    subhalo_particles = fetcher_magneticum.get_p_halo(halo=halo)
-    print(type(subhalo_particles))
 
     '''
     total_rows = subhalo_particles.dataset.count_rows()
@@ -64,10 +59,6 @@ def magneticum_particle_test():
     print("Num buckets:", len(buckets))
     print("Buckets:", buckets.to_pylist())
     '''
-
-    subhalo_particles_0 = fetcher_magneticum.get_p_halo(halo=halo)
-    print(type(subhalo_particles_0))
-    print(subhalo_particles_0)
 
     subhalos_parquet = f"{fetcher_magneticum.catalog.path}/subhalos_parquet"
     # Read just the subhalo_id column from bucket 0, fast, no full load
@@ -81,7 +72,6 @@ def magneticum_particle_test():
     )
 
     print(f"Total unique subhalo_ids: {len(subhalo_ids)}")
-    print(subhalo_ids.head(20))
 
     # Pick a valid one
     valid_subhalo_id = subhalo_ids['subhalo_id'].iloc[0]
@@ -93,7 +83,6 @@ def magneticum_particle_test():
     print(subhalo_particles_)
     result = FeatureComputer.compute('stellar_half_mass_radius', particles=subhalo_particles_)
     print(f'shmr: {result}')
-
     tracemalloc.stop()
 
 
