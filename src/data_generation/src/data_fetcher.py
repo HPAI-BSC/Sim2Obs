@@ -2813,10 +2813,15 @@ class MagneticumFetcher(DataFetcher):
             if col in ('parent_id', 'subhalo_id', 'parent_bucket', 'parent_bucket_data'):
                 continue
             data[col] = df[col].to_numpy()
+            print(f'{col}: {len(data[col])}')
 
-        print(list(data.keys()))
+        # Remove white spaces on the right
+        data = {key.rstrip(): value for key, value in data.items()}
+        for key, value in data.items():
+            print(key, len(value))
+
         # TODO avoid hardcoding this => centralize
-        return SubhaloParticles(data=data, column_map={'star': {'POS ': 'p', 'MASS': 'm', 'VEL ': 'v'}})
+        return SubhaloParticles(data=data, column_map={'star': {'POS': 'p', 'MASS': 'm', 'VEL': 'v'}})
 
     def _get_halo_id_for_subhalo(self, subhalo_id: int) -> int:
         """

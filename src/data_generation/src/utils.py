@@ -34,28 +34,16 @@ from scipy.signal import fftconvolve
 
 
 def setup_logger(name: str) -> logging.Logger:
-    """
-    Sets up and returns a logger instance with both console and file handlers.
-
-    Parameters:
-    -----------
-    name : str
-        The name of the logger instance.
-
-    Returns:
-    --------
-    logging.Logger
-        Configured logger instance.
-    """
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
+    logger.propagate = False  # don't pass messages up to root logger
 
-    # Only add a handler if none exists
-    if not logger.hasHandlers():
+    if not logger.handlers:
         console_handler = logging.StreamHandler()
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
+
     return logger
 
 
