@@ -31,7 +31,7 @@ def stellar_half_mass_radius(**kwargs) -> float:
         if table.num_rows == 0:
             return np.nan
 
-        pos  = np.array(table['star_p'].to_pylist())   # (N, 3)
+        pos = np.array(table['star_p'].to_pylist())   # (N, 3)
         mass = np.array(table['star_m'].to_pylist())   # (N,)
 
     else:
