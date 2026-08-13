@@ -5,6 +5,7 @@ from src.data_generation.src.lazy_subhalo import LazySubhaloParticles
 from src.data_generation.src.subhalo import SubhaloParticles
 
 
+# TODO check whether compute if correct
 @FeatureComputer.register('stellar_half_mass_radius')
 def stellar_half_mass_radius(**kwargs) -> float:
     """Compute stellar half mass radius for a single subhalo."""
@@ -48,7 +49,6 @@ def stellar_half_mass_radius(**kwargs) -> float:
     if pos.ndim == 1:
         pos = np.stack(pos)
 
-    print(pos.shape)
     center = np.average(pos, weights=mass, axis=0)
     r = np.linalg.norm(pos - center, axis=1)
     sort_idx = np.argsort(r)

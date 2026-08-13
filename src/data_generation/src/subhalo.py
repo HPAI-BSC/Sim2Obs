@@ -431,46 +431,40 @@ class SubhaloParticles:
             except Exception as e:
                 print(f'need at least one array to stack: {e}')
 
-    # TODO FIX
     @property
-    def non_overlapping(self, particle_type='star'):
-        return self._non_overlapping_for(particle_type)
+    def non_overlapping(self):
+        return self._non_overlapping_for()
 
-    # TODO FIX
-    def _non_overlapping_for(self, particle_type: str):
+    def _non_overlapping_for(self, particle_type: str = None):
         """
-        Return non-overlapping particles for a specific particle type.
+        Return the particles that belong to the original (non-overlapping) subhalo.
+
+        `self.overlapping_particles_id` is the index (int) marking where the
+        original subhalo's particles end and the appended/overlapping particles
+        begin. Every particle array is sliced as [0:boundary].
 
         Parameters
         ----------
-        particle_type : str
-            Particle type prefix, e.g. 'star', 'gas', 'dm'
+        particle_type : str, optional
+            Unused now that the boundary applies globally across all particle
+            arrays rather than per particle type. Kept for backward compatibility.
         """
         if self.overlapping_particles_id is None or self.overlapping_particles_id == 0:
             logger.info('There are no overlapping particles, returning self.')
             return self
 
-        if particle_type not in self.overlapping_particles_id:
-            raise ValueError(
-                f"Particle type '{particle_type}' not found in overlapping boundaries. "
-                f"Available: {list(self.overlapping_particles_id.keys())}"
-            )
-
-        # Per each particle type take the slide from which particles are not overlapping particles
-        # [0 ... overlapping_particles_id - 1]
-        boundary = self.overlapping_particles_id[particle_type]
+        boundary = self.overlapping_particles_id
 
         data = {}
         for key in self.__dict__:
             self_val = getattr(self, key)
-            if isinstance(self_val, np.ndarray) and key.startswith(f'{particle_type}_'):
+            if isinstance(self_val, np.ndarray):
                 data[key] = self_val[:boundary]
             else:
                 data[key] = self_val
 
         return self.__class__(data=data, column_map=None)
 
-    # TODO FIX => update tests
     def __add__(self, other):
         if not isinstance(other, self.__class__):
             return NotImplemented
