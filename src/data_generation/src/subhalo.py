@@ -415,21 +415,40 @@ class SubhaloParticles:
             except Exception as e:
                 print('need at least one array to stack')
 
-    # TODO test
     @property
     def non_overlapping(self):
-        if self.overlapping_particles_id is not None:
-            data = {}
-            for key in self.__dict__:
-                self_val = getattr(self, key)
-                if isinstance(self_val, np.ndarray):
-                    data[key] = self_val[:self.overlapping_particles_id]
-                else:
-                    data[key] = self_val
-            return self.__class__(data=data, column_map=None)
-        else:
+        return self._non_overlapping_for('star')
+
+    def _non_overlapping_for(self, particle_type: str):
+        """
+        Return non-overlapping particles for a specific particle type.
+
+        Parameters
+        ----------
+        particle_type : str
+            Particle type prefix, e.g. 'star', 'gas', 'dm'
+        """
+        if self.overlapping_particles_id is None:
             logger.info('There are no overlapping particles, returning self.')
             return self
+
+        if particle_type not in self.overlapping_particles_id:
+            raise ValueError(
+                f"Particle type '{particle_type}' not found in overlapping boundaries. "
+                f"Available: {list(self.overlapping_particles_id.keys())}"
+            )
+
+        boundary = self.overlapping_particles_id[particle_type]
+
+        data = {}
+        for key in self.__dict__:
+            self_val = getattr(self, key)
+            if isinstance(self_val, np.ndarray) and key.startswith(f'{particle_type}_'):
+                data[key] = self_val[:boundary]
+            else:
+                data[key] = self_val
+
+        return self.__class__(data=data, column_map=None)
 
     def __add__(self, other):
         if not isinstance(other, self.__class__):
