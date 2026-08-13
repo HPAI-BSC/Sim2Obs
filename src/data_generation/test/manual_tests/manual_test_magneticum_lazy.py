@@ -80,7 +80,11 @@ def magneticum_particle_test():
     particles_parquet = f"{fetcher_magneticum.catalog.path}/particles_parquet"
     subhalo_particles_ = fetcher_magneticum.get_p_subhalo(subhalo_id=valid_subhalo_id)
     print(type(subhalo_particles_))
+    print(subhalo_particles_.star_p.size)
+    print(type(subhalo_particles_.star_p))
     print(subhalo_particles_.star_p)
+
+
     result = FeatureComputer.compute('stellar_half_mass_radius', particles=subhalo_particles_)
     print(f'shmr: {result}')
     tracemalloc.stop()
