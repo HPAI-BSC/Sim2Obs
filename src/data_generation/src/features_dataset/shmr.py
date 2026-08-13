@@ -14,6 +14,7 @@ def stellar_half_mass_radius(**kwargs) -> float:
         raise ValueError('Particles cannot be None.')
 
     if isinstance(particles, SubhaloParticles):
+        print(vars(particles).keys())
         pos = particles.star_p
         mass = particles.star_m
 
