@@ -2759,6 +2759,7 @@ class MagneticumFetcher(DataFetcher):
         return self._get_p_subhalo(subhalo_id)
 
     def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
+        print('_get_p_subhalo')
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
             self._load_particle_cache()

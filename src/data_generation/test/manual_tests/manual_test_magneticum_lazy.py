@@ -69,10 +69,9 @@ def magneticum_particle_test():
     print(type(subhalo_particles_0))
     print(subhalo_particles_0)
 
-    particles_parquet = f"{fetcher_magneticum.catalog.path}/particles_parquet"
-
+    subhalos_parquet = f"{fetcher_magneticum.catalog.path}/subhalos_parquet"
     # Read just the subhalo_id column from bucket 0, fast, no full load
-    dataset = ds.dataset(particles_parquet, format='parquet', partitioning='hive')
+    dataset = ds.dataset(subhalos_parquet, format='parquet', partitioning='hive')
     subhalo_ids = (
         dataset
         .to_table(columns=['subhalo_id', 'parent_id', 'parent_bucket'])
@@ -88,6 +87,7 @@ def magneticum_particle_test():
     valid_subhalo_id = subhalo_ids['subhalo_id'].iloc[0]
     print(f"\nTesting with subhalo_id={valid_subhalo_id}")
 
+    particles_parquet = f"{fetcher_magneticum.catalog.path}/particles_parquet"
     subhalo_particles_ = fetcher_magneticum.get_p_subhalo(subhalo_id=valid_subhalo_id)
     print(type(subhalo_particles_))
     print(subhalo_particles_)
