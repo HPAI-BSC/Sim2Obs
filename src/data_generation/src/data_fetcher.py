@@ -2814,6 +2814,7 @@ class MagneticumFetcher(DataFetcher):
                 continue
             data[col] = df[col].to_numpy()
 
+        print(list(data.keys()))
         # TODO avoid hardcoding this => centralize
         return SubhaloParticles(data=data, column_map={'star': {'POS': 'p', 'MASS': 'm', 'VEL': 'v'}})
 
