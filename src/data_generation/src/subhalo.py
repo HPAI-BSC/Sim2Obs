@@ -456,6 +456,8 @@ class SubhaloParticles:
                 f"Available: {list(self.overlapping_particles_id.keys())}"
             )
 
+        # Per each particle type take the slide from which particles are not overlapping particles
+        # [0 ... overlapping_particles_id - 1]
         boundary = self.overlapping_particles_id[particle_type]
 
         data = {}

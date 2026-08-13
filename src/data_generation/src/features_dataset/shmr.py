@@ -48,6 +48,7 @@ def stellar_half_mass_radius(**kwargs) -> float:
     if pos.ndim == 1:
         pos = np.stack(pos)
 
+    print(pos.shape)
     center = np.average(pos, weights=mass, axis=0)
     r = np.linalg.norm(pos - center, axis=1)
     sort_idx = np.argsort(r)
