@@ -685,7 +685,7 @@ class ICLProcessor(FeatureProcessor):
             icl_mask[ids] = 1
         else:
             logger.warning('No particles predicted as ICL.')
-            # store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
+            store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
             raise ValueError("icl_mask is empty; no masking applied.")
 
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
@@ -775,7 +775,7 @@ class ICLProcessor(FeatureProcessor):
         self.transition_radius = transition_radius
 
         # Build cumsum profiles
-        #plot_icl_bcg_profiles(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
+        plot_icl_bcg_profiles(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
 
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):
         """
