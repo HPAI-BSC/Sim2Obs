@@ -499,7 +499,7 @@ class TestSubhaloParticles:
                     [0.0, 1.0, 0.0],
                 ]),
             },
-            'gass': {}
+            'gas': {}
         }
 
         column_map = OmegaConf.create({
