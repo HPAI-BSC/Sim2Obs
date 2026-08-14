@@ -4,8 +4,8 @@ defaults:
 #  - catalog: tngcluster
 #  - catalog: illustris300
 #  - catalog: magneticum
-#  - catalog: flamingo
-  - catalog: millenium
+  - catalog: flamingo
+#  - catalog: millenium
   - extras: default
   - hydra: default
 

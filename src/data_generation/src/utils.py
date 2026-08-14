@@ -1082,7 +1082,13 @@ def merge_json_files_to_csv(input_dir, output_file, simulation, chunk_size=1000,
     print(f"Merge complete. Output saved to {output_file}")
 
 
-def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_size=1000, length=None):
+def particle_numpy_files_to_parquet(
+    input_dir,
+    output_file,
+    simulation,
+    chunk_size=1000,
+    length=None,
+):
     """
     Merge particle position and mass NumPy files into one Parquet file.
 
@@ -1096,6 +1102,13 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
     The resulting Parquet file has one row per particle:
 
         halo_id | x | y | z | mass
+
+    Dtypes:
+        halo_id : int64
+        x       : float64
+        y       : float64
+        z       : float64
+        mass    : float64
 
     Args:
         input_dir (str):
@@ -1114,28 +1127,38 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
             If provided, process only the first `length` halos.
     """
 
+    # ---------------------------------------------------------
     # Find position and mass files
+    # ---------------------------------------------------------
+
     p_mass_files = [
         f for f in os.listdir(input_dir)
-        if f.endswith(".npy")
-        and simulation in f
-        and "particle_m" in f
+        if (
+            f.endswith(".npy")
+            and simulation in f
+            and "particle_m" in f
+        )
     ]
 
     p_position_files = [
         f for f in os.listdir(input_dir)
-        if f.endswith(".npy")
-        and simulation in f
-        and "particle_p" in f
+        if (
+            f.endswith(".npy")
+            and simulation in f
+            and "particle_p" in f
+        )
     ]
 
-    logger.debug('Mass files')
+    logger.debug("Mass files")
     logger.debug(p_mass_files)
 
-    logger.debug('Position files')
+    logger.debug("Position files")
     logger.debug(p_position_files)
 
-    # Create dictionaries indexed by filename/halo identifier
+    # ---------------------------------------------------------
+    # Pair position and mass files
+    # ---------------------------------------------------------
+
     mass_files = {
         f.replace("particle_m", "particle_p"): f
         for f in p_mass_files
@@ -1146,14 +1169,12 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
         for f in p_position_files
     }
 
-    # Keep only halos for which both files exist
     paired_files = [
         (position_files[p], mass_files[p])
         for p in position_files
         if p in mass_files
     ]
 
-    # Sort files
     paired_files.sort()
 
     if length is not None:
@@ -1170,7 +1191,10 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
         f"Merging in chunks of {chunk_size}..."
     )
 
+    # ---------------------------------------------------------
     # Remove existing output
+    # ---------------------------------------------------------
+
     if os.path.exists(output_file):
         os.remove(output_file)
 
@@ -1180,34 +1204,54 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
     try:
 
         for i, (position_filename, mass_filename) in enumerate(
-            paired_files, start=1
+            paired_files,
+            start=1,
         ):
 
             position_path = os.path.join(
                 input_dir,
-                position_filename
+                position_filename,
             )
 
             mass_path = os.path.join(
                 input_dir,
-                mass_filename
+                mass_filename,
             )
 
             try:
+
+                # -------------------------------------------------
                 # Load arrays
+                # -------------------------------------------------
+
                 positions = np.load(position_path)
                 masses = np.load(mass_path)
 
-                # Check shapes
-                if positions.ndim != 2 or positions.shape[1] != 3:
+                # -------------------------------------------------
+                # Check position shape
+                # -------------------------------------------------
+
+                if (
+                    positions.ndim != 2
+                    or positions.shape[1] != 3
+                ):
                     print(
                         f"Skipping {position_filename}: "
-                        f"unexpected position shape {positions.shape}"
+                        f"unexpected position shape "
+                        f"{positions.shape}"
                     )
                     continue
 
+                # -------------------------------------------------
+                # Check / normalize mass shape
+                # -------------------------------------------------
+
                 if masses.ndim != 1:
                     masses = masses.reshape(-1)
+
+                # -------------------------------------------------
+                # Check number of particles
+                # -------------------------------------------------
 
                 if len(positions) != len(masses):
                     print(
@@ -1217,47 +1261,104 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
                     )
                     continue
 
-                # Extract halo ID from filename
-                # Adapt this if your filename convention is different
+                # -------------------------------------------------
+                # Extract halo ID
+                # -------------------------------------------------
+
                 halo_id = int(
-                    position_filename.split("_")[-1].replace(".npy", "")
+                    position_filename
+                    .split("_")[-1]
+                    .replace(".npy", "")
                 )
 
-                # Create dataframe for this halo
+                # Explicit dtype
+                halo_id = np.int64(halo_id)
+
+                # -------------------------------------------------
+                # Explicitly convert particle data to float64
+                # -------------------------------------------------
+
+                positions = np.asarray(
+                    positions,
+                    dtype=np.float64,
+                )
+
+                masses = np.asarray(
+                    masses,
+                    dtype=np.float64,
+                )
+
+                # -------------------------------------------------
+                # Create dataframe
+                # -------------------------------------------------
+
                 df_halo = pd.DataFrame({
-                    "halo_id": halo_id,
-                    "x": positions[:, 0],
-                    "y": positions[:, 1],
-                    "z": positions[:, 2],
-                    "mass": masses
+                    "halo_id": np.full(
+                        len(positions),
+                        halo_id,
+                        dtype=np.int64,
+                    ),
+                    "x": positions[:, 0].astype(np.float64),
+                    "y": positions[:, 1].astype(np.float64),
+                    "z": positions[:, 2].astype(np.float64),
+                    "mass": masses.astype(np.float64),
+                })
+
+                # Explicitly enforce DataFrame dtypes
+                df_halo = df_halo.astype({
+                    "halo_id": "int64",
+                    "x": "float64",
+                    "y": "float64",
+                    "z": "float64",
+                    "mass": "float64",
                 })
 
                 buffer.append(df_halo)
 
             except Exception as e:
+
                 print(
-                    f"Error reading {position_filename} / "
+                    f"Error reading "
+                    f"{position_filename} / "
                     f"{mass_filename}: {e}"
                 )
+
                 continue
 
+            # -----------------------------------------------------
             # Write chunk
-            if len(buffer) >= chunk_size or i == total:
+            # -----------------------------------------------------
+
+            if (
+                len(buffer) >= chunk_size
+                or i == total
+            ):
 
                 df = pd.concat(
                     buffer,
-                    ignore_index=True
+                    ignore_index=True,
                 )
+
+                # Make absolutely sure the final chunk has
+                # the expected schema.
+                df = df.astype({
+                    "halo_id": "int64",
+                    "x": "float64",
+                    "y": "float64",
+                    "z": "float64",
+                    "mass": "float64",
+                })
 
                 table = pa.Table.from_pandas(
                     df,
-                    preserve_index=False
+                    preserve_index=False,
                 )
 
                 if writer is None:
+
                     writer = pq.ParquetWriter(
                         output_file,
-                        table.schema
+                        table.schema,
                     )
 
                 writer.write_table(table)
@@ -1277,7 +1378,6 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
     print(
         f"Merge complete. Output saved to {output_file}"
     )
-
 
 def gaussian_kernel_1d(ksize, sigma, normalize=True):
     x = np.arange(ksize) - ksize//2
