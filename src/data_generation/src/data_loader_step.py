@@ -172,6 +172,7 @@ class DataLoader(PipelineStep):
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
                 print('halo_particles_no_overlapping')
                 print(halo_particles_no_overlapping)
+                print(type(halo_particles_no_overlapping))
                 print(halo_particles_overlapping.overlapping_particles_id)
 
                 # Preprocessed all particles for current halo

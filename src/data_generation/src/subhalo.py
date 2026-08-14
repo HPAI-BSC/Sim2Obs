@@ -586,6 +586,7 @@ class SubhaloParticles:
         for attr_name, attr_value in self.__dict__.items():
             if isinstance(attr_value, np.ndarray):
                 lines.append(f"{attr_name}: shape={attr_value.shape}")
+            lines.append(f'overlapping_id: {self.overlapping_particles_id}')
         return " ".join(lines)
 
     def __len__(self):
