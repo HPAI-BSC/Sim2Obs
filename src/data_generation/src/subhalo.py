@@ -379,6 +379,7 @@ class SubhaloParticles:
 
         # TODO complete
         fix_names = {'stars': 'star', 'dark_matter': 'dm'}
+        print(column_map)
 
         if column_map is None:
             if dict_depth(data) == 1:
