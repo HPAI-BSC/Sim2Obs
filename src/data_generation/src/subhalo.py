@@ -430,9 +430,16 @@ class SubhaloParticles:
                                     value = np.stack(value.to_list())
                                 elif isinstance(value, list):
                                     value = np.array(value)
-                                name = column_map[part_type][var].name
+
+                                if hasattr(column_map[part_type][var], "name"):
+                                    name = column_map[part_type][var].name
+                                else:
+                                    name = column_map[part_type][var]
+
                                 # Add attr with that provided name
-                                setattr(self, f'{fix_names.get(part_type, part_type)}_{name}', value)
+                                attr_name = f'{fix_names.get(part_type, part_type)}_{name}'
+                                logger.debug(f'Added attribute name: {attr_name}')
+                                setattr(self, attr_name, value)
             except Exception as e:
                 print(f'need at least one array to stack: {e}')
 

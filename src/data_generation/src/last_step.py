@@ -178,6 +178,7 @@ class LastStep:
             #self._check_maps()
 
         # Storing particle data - Flamingo
+        '''
         dataset_dir = self.cfg.paths.datasets_dir
         path = dataset_dir + f'/../logs/transition_radius'
         output_file = dataset_dir + f'/../logs/transition_radius/{name}_particle_particle_data.parquet'
@@ -189,6 +190,7 @@ class LastStep:
         table = pq.ParquetFile(output_file)
         n_rows = table.metadata.num_rows
         print(f"n = {n_rows}")
+        '''
 
 
 
