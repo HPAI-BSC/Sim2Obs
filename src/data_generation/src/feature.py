@@ -641,7 +641,7 @@ class ICLProcessor(FeatureProcessor):
 
         # Create a DataFrame with features required by the model
         # Features are: log-scaled distance (r/R200), scaled velocity (modulo_v/V200), and log-scaled halo mass (M200)
-        logger.debug(f'ICL prediction for: {halo.halo_id}')
+        logger.debug(f'ICL prediction for halo_id: {halo.halo_id}')
         logger.debug(f'r200: {halo.r200}')
 
         Data = pd.DataFrame({
@@ -792,7 +792,7 @@ class ICLProcessor(FeatureProcessor):
         """
         non_overlapping_particles = subhalo_particles.non_overlapping
         logger.debug('Computing icl ...')
-        logger.debug(f'non_overlapping_particles: {len(non_overlapping_particles)}')
+        logger.debug(f'non_overlapping_particles:')
         logger.debug(f'{len(subhalo_particles.star_m)}')
 
         # Non overlapping particles
@@ -803,6 +803,7 @@ class ICLProcessor(FeatureProcessor):
         # Overlapping
         # TODO just do it when there are overlapping
         if subhalo_particles.overlapping_particles_id is not None or not subhalo_particles.overlapping_particles_id == 0:
+            logger.debug(f'subhalo_particles.overlapping_particles_id: {subhalo_particles.overlapping_particles_id}')
             self.value = np.concatenate((self.value, np.zeros(len(subhalo_particles) - len(self.value))))
             logger.debug(f'icl mask: {len(self.value)}')
 

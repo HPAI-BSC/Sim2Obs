@@ -428,7 +428,6 @@ class SubhaloParticles:
 
                         name = column_map[var]
                         # Add attr with that provided name
-                        attr_name = f'{particle_type}_{name}'
                         setattr(self, f'{particle_type}_{name}', value)
                 elif dict_depth(data) == 2:
                     for part_type in data:
