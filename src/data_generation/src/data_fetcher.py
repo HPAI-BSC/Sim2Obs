@@ -2892,15 +2892,6 @@ class MagneticumFetcher(DataFetcher):
 
         return self._load_halo_particles(halo.halo_id, particles_parquet)
 
-    # TODO define when to call it
-    def _compute_features(self, table):
-        # function needs dictionary subhalo: {'stellar_half_mass_radius': {'star': ['POS', 'MASS']}}
-        logger.info(self.function_needs)
-        methods_to_compute = self.function_needs.get(table, {})
-        for method in methods_to_compute:
-            logger.debug(f'Computing feature: {method}')
-            #result = FeatureComputer.compute(method, empty_particles, {})
-
 
 
 

@@ -1129,6 +1129,12 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
         and "particle_p" in f
     ]
 
+    logger.debug('Mass files')
+    logger.debug(p_mass_files)
+
+    logger.debug('Position files')
+    logger.debug(p_position_files)
+
     # Create dictionaries indexed by filename/halo identifier
     mass_files = {
         f.replace("particle_m", "particle_p"): f

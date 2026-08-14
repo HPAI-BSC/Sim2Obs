@@ -178,19 +178,19 @@ class LastStep:
             #self._check_maps()
 
         # Storing particle data - Flamingo
-        '''
-        dataset_dir = self.cfg.paths.datasets_dir
-        path = dataset_dir + f'/../logs/transition_radius'
-        output_file = dataset_dir + f'/../logs/transition_radius/{name}_particle_particle_data.parquet'
+        if 'flamingo' in name:
+            dataset_dir = self.cfg.paths.datasets_dir
+            path = dataset_dir + f'/../logs/transition_radius'
+            output_file = dataset_dir + f'/../logs/transition_radius/{name}_particle_particle_data.parquet'
 
-        name = self.cfg.catalog.path.replace(dataset_dir, '')
-        name = name.replace('/', '_')
-        print(f'simulation: {name}, saving results to: {output_file}')
-        particle_numpy_files_to_parquet(path, output_file, name, chunk_size=1000, length=None)
-        table = pq.ParquetFile(output_file)
-        n_rows = table.metadata.num_rows
-        print(f"n = {n_rows}")
-        '''
+            name = self.cfg.catalog.path.replace(dataset_dir, '')
+            name = name.replace('/', '_')
+            print(f'simulation: {name}, saving results to: {output_file}')
+            particle_numpy_files_to_parquet(path, output_file, name, chunk_size=1000, length=None)
+            table = pq.ParquetFile(output_file)
+            n_rows = table.metadata.num_rows
+            print(f"n = {n_rows}")
+
 
 
 
