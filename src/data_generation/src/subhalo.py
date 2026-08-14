@@ -409,15 +409,20 @@ class SubhaloParticles:
 
                 if dict_depth(data) == 1:
                     for var in column_map.keys():
+                        print('var', var)
                         value = data[var]
                         if isinstance(value, (pd.Series, pd.Series)):
                             value = np.stack(value.to_list())
                         if isinstance(value, list):
                             value = np.array(value)
+                        print('value', value)
                         name = column_map[var]
+
+                        print('name', name)
                         # Add attr with that provided name
-                        # TODO avoid hardcoding
-                        setattr(self, f'star_{name}', value)
+                        attr_name = f'{var}_{name}'
+                        logger.debug(f'Added attribute name: {attr_name}')
+                        setattr(self, f'{var}_{name}', value)
                 elif dict_depth(data) == 2:
                     for part_type in data:
                         print(part_type)
