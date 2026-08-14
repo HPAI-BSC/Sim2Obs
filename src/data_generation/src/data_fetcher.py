@@ -926,10 +926,6 @@ class Illustris300Fetcher(DataFetcher):
         ]
 
         processed_particles = run_pipeline(data, steps)
-        #logger.debug("Particle data fetched successfully.")
-        logger.debug(f'processed particles: {type(processed_particles)}')
-        logger.debug(self.catalog.fields.particles)
-        logger.debug('Converting to subhalo particles')
         particle_data = SubhaloParticles(processed_particles, self.catalog.fields.particles)
         return particle_data
 
@@ -949,6 +945,8 @@ class Illustris300Fetcher(DataFetcher):
                 particles_halo = particles
             else:
                 particles_halo += particles
+
+        particles_halo.overlapping_particles_id = None
         logger.debug(f"Particle data for halo {halo.halo_id}: {particles_halo}")
         return particles_halo
 

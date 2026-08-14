@@ -170,15 +170,15 @@ class DataLoader(PipelineStep):
 
                 # Load particles for all the subhalos in that halo
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
-                logger.debug('halo_particles_no_overlapping')
-                logger.debug(halo_particles_no_overlapping)
-                logger.debug(halo_particles_overlapping.overlapping_particles_id)
+                print('halo_particles_no_overlapping')
+                print(halo_particles_no_overlapping)
+                print(halo_particles_overlapping.overlapping_particles_id)
 
                 # Preprocessed all particles for current halo
                 halo_particles_no_overlapping.preprocess(halo, lbox)
-                logger.debug('halo_particles_no_overlapping after preprocessing')
-                logger.debug(halo_particles_no_overlapping)
-                logger.debug(halo_particles_overlapping.overlapping_particles_id)
+                print('halo_particles_no_overlapping after preprocessing')
+                print(halo_particles_no_overlapping)
+                print(halo_particles_overlapping.overlapping_particles_id)
 
                 # Load preprocessed particles for overlapping halos
                 overlapping_subhalo_particles, subhalos_with_errors = \

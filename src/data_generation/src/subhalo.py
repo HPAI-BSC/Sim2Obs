@@ -447,7 +447,6 @@ class SubhaloParticles:
 
                                 # Add attr with that provided name
                                 attr_name = f'{fix_names.get(part_type, part_type)}_{name}'
-                                logger.debug(f'Added attribute name: {attr_name}')
                                 setattr(self, attr_name, value)
             except Exception as e:
                 print(f'need at least one array to stack: {e}')
