@@ -791,6 +791,7 @@ class ICLProcessor(FeatureProcessor):
             ValueError: If the scaled particle data is empty.
         """
         non_overlapping_particles = subhalo_particles.non_overlapping
+        logger.debug('Computing icl ...')
         logger.debug(f'non_overlapping_particles: {len(non_overlapping_particles)}')
         logger.debug(f'{len(subhalo_particles.star_m)}')
 
@@ -800,8 +801,10 @@ class ICLProcessor(FeatureProcessor):
         logger.debug(f'icl mask: {len(self.value)}')
 
         # Overlapping
-        self.value = np.concatenate((self.value, np.zeros(len(subhalo_particles) - len(self.value))))
-        logger.debug(f'icl mask: {len(self.value)}')
+        # TODO just do it when there are overlapping
+        if subhalo_particles.overlapping_particles_id is not None or not subhalo_particles.overlapping_particles_id == 0:
+            self.value = np.concatenate((self.value, np.zeros(len(subhalo_particles) - len(self.value))))
+            logger.debug(f'icl mask: {len(self.value)}')
 
         if hasattr(self, 'transition_radius_compute'):
             if self.transition_radius_compute:
