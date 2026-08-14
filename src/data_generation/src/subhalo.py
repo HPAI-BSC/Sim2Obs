@@ -401,6 +401,7 @@ class SubhaloParticles:
                         setattr(self, f'{fix_names.get(part_type, part_type)}_{var}', value)
         else:
             try:
+                # TODO posible bug in here
                 logger.debug(f'Depth data: {dict_depth(data)}')
                 for key, value in data.items():
                     print(key, type(value), len(value))
