@@ -379,7 +379,7 @@ class SubhaloParticles:
 
         # TODO complete
         fix_names = {'stars': 'star', 'dark_matter': 'dm'}
-        print(column_map)
+        print(f'column_map: {column_map}')
 
         if column_map is None:
             if dict_depth(data) == 1:
@@ -403,7 +403,7 @@ class SubhaloParticles:
         else:
             try:
                 # TODO posible bug in here
-                logger.debug(f'Depth data: {dict_depth(data)}')
+                print(f'Depth data: {dict_depth(data)}')
                 for key, value in data.items():
                     print(key, type(value), len(value))
 
@@ -421,16 +421,14 @@ class SubhaloParticles:
                         print('name', name)
                         # Add attr with that provided name
                         attr_name = f'{var}_{name}'
-                        logger.debug(f'Added attribute name: {attr_name}')
+                        print(f'Added attribute name: {attr_name}')
                         setattr(self, f'{var}_{name}', value)
                 elif dict_depth(data) == 2:
                     for part_type in data:
-                        print(part_type)
                         for var in data[part_type]:
-                            print(var)
                             if var in column_map[part_type]:
                                 value = data[part_type][var]
-                                print(value)
+
                                 if isinstance(value, (pd.Series, pd.Series)):
                                     value = np.stack(value.to_list())
                                 elif isinstance(value, list):
