@@ -415,6 +415,8 @@ class SubhaloParticles:
                             value = np.stack(value.to_list())
                         if isinstance(value, list):
                             value = np.array(value)
+                            if isinstance(value, pd.DataFrame):
+                                print('columns', value.columns)
                         print('value', value)
                         name = column_map[var]
 
