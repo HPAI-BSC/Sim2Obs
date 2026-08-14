@@ -414,31 +414,21 @@ class SubhaloParticles:
                         setattr(self, f'{fix_names.get(part_type, part_type)}_{var}', value)
         else:
             try:
-                # TODO posible bug in here
-                print(f'Depth data: {dict_depth(data)}')
-                # TODO hardcoded
                 particle_type = 'star'
                 if dict_depth(data) == 1:
                     for var in column_map.keys():
-                        print('var', var)
                         value = data[var]
                         if isinstance(value, pd.DataFrame):
                             value = value.to_dict()
-
                         if isinstance(value, (pd.Series, pd.Series)):
                             print('series')
                             value = np.stack(value.to_list())
                         if isinstance(value, list):
                             value = np.array(value)
 
-                        print('value', value)
-                        # TODO bug
                         name = column_map[var]
-
-                        print('name', name)
                         # Add attr with that provided name
                         attr_name = f'{particle_type}_{name}'
-                        print(f'Added attribute name: {attr_name}')
                         setattr(self, f'{particle_type}_{name}', value)
                 elif dict_depth(data) == 2:
                     for part_type in data:

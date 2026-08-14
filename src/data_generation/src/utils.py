@@ -1219,8 +1219,8 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
 
                 # Extract halo ID from filename
                 # Adapt this if your filename convention is different
-                halo_id = position_filename.split("_")[-1].replace(
-                    ".npy", ""
+                halo_id = int(
+                    position_filename.split("_")[-1].replace(".npy", "")
                 )
 
                 # Create dataframe for this halo
@@ -1277,6 +1277,7 @@ def particle_numpy_files_to_parquet(input_dir, output_file, simulation, chunk_si
     print(
         f"Merge complete. Output saved to {output_file}"
     )
+
 
 def gaussian_kernel_1d(ksize, sigma, normalize=True):
     x = np.arange(ksize) - ksize//2
