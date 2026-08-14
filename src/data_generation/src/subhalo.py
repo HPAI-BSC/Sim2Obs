@@ -401,10 +401,13 @@ class SubhaloParticles:
                         setattr(self, f'{fix_names.get(part_type, part_type)}_{var}', value)
         else:
             try:
+                logger.debug(f'Depth data: {dict_depth(data)}')
+                for key, value in data.items():
+                    print(key, type(value), len(value))
+
                 if dict_depth(data) == 1:
                     for var in column_map.keys():
                         value = data[var]
-                        print(value)
                         if isinstance(value, (pd.Series, pd.Series)):
                             value = np.stack(value.to_list())
                         if isinstance(value, list):
