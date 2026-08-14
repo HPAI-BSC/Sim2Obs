@@ -390,7 +390,6 @@ class SubhaloParticles:
 
         # TODO complete
         fix_names = {'stars': 'star', 'dark_matter': 'dm'}
-        print(f'column_map: {column_map}')
 
         data = convert_to_dict(data)
 
