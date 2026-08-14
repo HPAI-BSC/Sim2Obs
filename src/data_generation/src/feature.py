@@ -802,7 +802,7 @@ class ICLProcessor(FeatureProcessor):
 
         # Overlapping
         # TODO just do it when there are overlapping
-        if subhalo_particles.overlapping_particles_id is not None or not subhalo_particles.overlapping_particles_id == 0:
+        if subhalo_particles.overlapping_particles_id is not None:
             logger.debug(f'subhalo_particles.overlapping_particles_id: {subhalo_particles.overlapping_particles_id}')
             self.value = np.concatenate((self.value, np.zeros(len(subhalo_particles) - len(self.value))))
             logger.debug(f'icl mask: {len(self.value)}')
