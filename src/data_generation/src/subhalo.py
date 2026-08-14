@@ -346,6 +346,17 @@ class SubhaloContext:
         return len(self.data)
 
 
+def convert_to_dict(obj):
+    if isinstance(obj, pd.DataFrame):
+        return obj.to_dict(orient="list")
+
+    if isinstance(obj, dict):
+        return {key: convert_to_dict(value) for key, value in obj.items()}
+
+    # Keep numpy arrays and lists unchanged
+    return obj
+
+
 class SubhaloParticles:
     """
     A class to manage the particles of a subhalo, including their mass, position, and velocity data.
@@ -381,6 +392,8 @@ class SubhaloParticles:
         fix_names = {'stars': 'star', 'dark_matter': 'dm'}
         print(f'column_map: {column_map}')
 
+        data = convert_to_dict(data)
+
         if column_map is None:
             if dict_depth(data) == 1:
                 for var in data:
@@ -390,7 +403,6 @@ class SubhaloParticles:
                     elif isinstance(value, list):
                         value = np.array(value)
                     setattr(self, var, value)
-
             elif dict_depth(data) == 2:
                 for part_type in data:
                     for var in data[part_type]:
@@ -404,29 +416,30 @@ class SubhaloParticles:
             try:
                 # TODO posible bug in here
                 print(f'Depth data: {dict_depth(data)}')
-                for key, value in data.items():
-                    print(key, type(value), len(value))
-
+                # TODO hardcoded
+                particle_type = 'star'
                 if dict_depth(data) == 1:
                     for var in column_map.keys():
                         print('var', var)
                         value = data[var]
+                        if isinstance(value, pd.DataFrame):
+                            value = value.to_dict()
+
                         if isinstance(value, (pd.Series, pd.Series)):
                             print('series')
                             value = np.stack(value.to_list())
                         if isinstance(value, list):
                             value = np.array(value)
-                        if isinstance(value, pd.DataFrame):
-                            print('columns', value.columns)
+
                         print('value', value)
                         # TODO bug
                         name = column_map[var]
 
                         print('name', name)
                         # Add attr with that provided name
-                        attr_name = f'{var}_{name}'
+                        attr_name = f'{particle_type}_{name}'
                         print(f'Added attribute name: {attr_name}')
-                        setattr(self, f'{var}_{name}', value)
+                        setattr(self, f'{particle_type}_{name}', value)
                 elif dict_depth(data) == 2:
                     for part_type in data:
                         for var in data[part_type]:

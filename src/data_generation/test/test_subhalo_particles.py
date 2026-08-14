@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 from omegaconf import OmegaConf
 
@@ -493,7 +494,7 @@ class TestSubhaloParticles:
                     [0.0, 1.0, 2.0],
                     [3.0, 4.0, 5.0],
                 ]),
-                "masses": np.array([1.0, 2.0]),
+                "Masses": np.array([1.0, 2.0]),
                 "Velocities": np.array([
                     [1.0, 0.0, 0.0],
                     [0.0, 1.0, 0.0],
@@ -530,4 +531,53 @@ class TestSubhaloParticles:
             ctx.star_v,
             data["star"]["Velocities"],
         )
+
+    def test_init_with_column_map_depth_2_pd(self):
+        data = {
+            "Coordinates": np.array([
+                [0.0, 1.0, 2.0],
+                [3.0, 4.0, 5.0],
+            ]),
+            "Masses": np.array([1.0, 2.0]),
+            "Velocities": np.array([
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+            ])
+        }
+
+        df = pd.DataFrame({
+            "Coordinates": data["Coordinates"].tolist(),
+            "Masses": data["Masses"],
+            "Velocities": data["Velocities"].tolist()
+            })
+
+        column_map = OmegaConf.create({
+            "star": {
+                "Coordinates": {"name": "p"},
+                "Velocities": {"name": "v"},
+                "Masses": {"name": "m"},
+            },
+            "gas": {
+                "Masses": {"name": "m"},
+            },
+        })
+
+        ctx = SubhaloParticles(
+            data={'star': df, 'gas': {}},
+            column_map=column_map,
+        )
+
+        np.testing.assert_array_equal(
+            ctx.star_p,
+            data["Coordinates"],
+        )
+        np.testing.assert_array_equal(
+            ctx.star_m,
+            data["Masses"],
+        )
+        np.testing.assert_array_equal(
+            ctx.star_v,
+            data["Velocities"],
+        )
+
 
