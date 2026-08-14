@@ -412,12 +412,14 @@ class SubhaloParticles:
                         print('var', var)
                         value = data[var]
                         if isinstance(value, (pd.Series, pd.Series)):
+                            print('series')
                             value = np.stack(value.to_list())
                         if isinstance(value, list):
                             value = np.array(value)
-                            if isinstance(value, pd.DataFrame):
-                                print('columns', value.columns)
+                        if isinstance(value, pd.DataFrame):
+                            print('columns', value.columns)
                         print('value', value)
+                        # TODO bug
                         name = column_map[var]
 
                         print('name', name)
