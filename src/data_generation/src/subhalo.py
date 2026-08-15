@@ -595,11 +595,14 @@ class SubhaloParticles:
                 return len(self_val)
 
     @property
+    @property
     def is_empty(self):
-        if self.__dict__:
-            return False
+        for key, value in self.__dict__.items():
+            if key == 'overlapping_particles_id':
+                continue
+            if isinstance(value, np.ndarray) and len(value) > 0:
+                return False
         return True
-
 
 
 
