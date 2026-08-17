@@ -170,21 +170,13 @@ class DataLoader(PipelineStep):
 
                 # Load particles for all the subhalos in that halo
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
-                print('halo_particles_no_overlapping')
-                print(halo_particles_no_overlapping)
-                print(type(halo_particles_no_overlapping))
 
                 # Preprocessed all particles for current halo
                 halo_particles_no_overlapping.preprocess(halo, lbox)
-                print('halo_particles_no_overlapping after preprocessing')
-                print(halo_particles_no_overlapping)
 
                 # Load preprocessed particles for overlapping halos
                 overlapping_subhalo_particles, subhalos_with_errors = \
                     self._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
-
-                print('overlapping_subhalo_particles')
-                print(overlapping_subhalo_particles)
 
                 # Group all the particles together
                 if overlapping_subhalo_particles is not None:
@@ -192,15 +184,9 @@ class DataLoader(PipelineStep):
                 else:
                     halo_particles_overlapping = halo_particles_no_overlapping
 
-                print('overlapping_subhalo_particles')
-                print(overlapping_subhalo_particles)
-
-                print('halo_particles_no_overlapping before processing features')
-                print(halo_particles_no_overlapping)
-
                 # Compute features with preprocessed and non-overlapping particles
                 input_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
-                print(halo_particles_overlapping)
+                print('halo_particles_overlapping', halo_particles_overlapping)
                 output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
@@ -213,6 +199,15 @@ class DataLoader(PipelineStep):
 
                 with open(path, "w") as f:
                     json.dump(halo_dict, f, indent=4)
+
+                # TODO debugging
+                halo_particles = halo_particles_no_overlapping.star_p
+                path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_p_{halo.halo_id}'
+                np.save(path_, halo_particles)
+
+                halo_particles = halo_particles_no_overlapping.star_m
+                path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_m_{halo.halo_id}'
+                np.save(path_, halo_particles)
 
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
