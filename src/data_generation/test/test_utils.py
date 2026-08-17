@@ -114,7 +114,7 @@ class TestUtils(unittest.TestCase):
         store_overlapping_matrix_as_df(cfg_illustris, overlapping_matrix)
 
     def test_filter_outliers(self):
-        df = pd.read_csv('../../../transition_radius_exploration/flamingo_L1000N0900/_flamingo_L1000N0900_transition_radius.csv')
+        df = pd.read_csv('../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/_millenium_MTNG-L500-4320-A_transition_radius.csv')
         transition_radius = df['transition_radius']
         tmp = df.describe()
         percentiles = [97]
@@ -130,14 +130,14 @@ class TestUtils(unittest.TestCase):
 
             sns.histplot(filtered_df["transition_radius"]/filtered_df['R200'], bins=100, kde=True)
             plt.title(f"Transition radius/R200 distribution, percentile: {percentile}")
-            #plt.show()
+            plt.show()
 
         ignored_halos = list(ignored_halos)
         new_df = df[~df['halo_id'].isin(ignored_halos)]
         sts = new_df.describe()
         print()
 
-        errors_df = pd.read_csv('../../../transition_radius_exploration/flamingo_L1000N0900/errors__flamingo_L1000N0900.csv')
+        errors_df = pd.read_csv('../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/errors__millenium_MTNG-L500-4320-A.csv')
         halos = errors_df['halo_id']
         final_set = set(ignored_halos).union(set(halos))
         print()
