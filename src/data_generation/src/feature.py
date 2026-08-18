@@ -643,6 +643,7 @@ class ICLProcessor(FeatureProcessor):
         # Features are: log-scaled distance (r/R200), scaled velocity (modulo_v/V200), and log-scaled halo mass (M200)
         logger.debug(f'ICL prediction for halo_id: {halo.halo_id}')
         logger.debug(f'r200: {halo.r200}')
+        logger.debug(f'V200: {V200}')
 
         Data = pd.DataFrame({
             'distance': np.log10(distance / halo.r200),  # Log-scaled distance
@@ -652,11 +653,11 @@ class ICLProcessor(FeatureProcessor):
         })
 
         # TODO debug
-        dataset_dir = self.cfg.paths.datasets_dir
-        name = self.cfg.catalog.path.replace(dataset_dir, '')
-        name = name.replace('/', '_')
-        path = dataset_dir + f'/../logs/{name}_rf_data_{halo.halo_id}.csv'
-        Data.to_csv(path)
+        #dataset_dir = self.cfg.paths.datasets_dir
+        #name = self.cfg.catalog.path.replace(dataset_dir, '')
+        #name = name.replace('/', '_')
+        #path = dataset_dir + f'/../logs/{name}_rf_data_{halo.halo_id}.csv'
+        #Data.to_csv(path)
 
         # Replace any infinite values in the DataFrame with NaN, then drop all rows with NaN values
         Data = Data.replace([np.inf, -np.inf], np.nan).dropna(axis=0)
@@ -724,7 +725,7 @@ class ICLProcessor(FeatureProcessor):
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
         logger.debug(f'Computing transition radius for: {halo.halo_id}')
-        # store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
+        store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
 
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
