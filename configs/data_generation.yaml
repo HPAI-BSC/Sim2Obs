@@ -2,10 +2,10 @@ defaults:
   - _self_
   - paths: gpfs
 #  - catalog: tngcluster
-  - catalog: illustris300
+#  - catalog: illustris300
 #  - catalog: magneticum
 #  - catalog: flamingo
-#  - catalog: millenium
+  - catalog: millenium
   - extras: default
   - hydra: default
 
