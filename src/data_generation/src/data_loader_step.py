@@ -201,6 +201,7 @@ class DataLoader(PipelineStep):
                     json.dump(halo_dict, f, indent=4)
 
                 # TODO debugging
+                '''
                 halo_particles = halo_particles_no_overlapping.star_p
                 path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_p_{halo.halo_id}'
                 np.save(path_, halo_particles)
@@ -208,6 +209,7 @@ class DataLoader(PipelineStep):
                 halo_particles = halo_particles_no_overlapping.star_m
                 path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_m_{halo.halo_id}'
                 np.save(path_, halo_particles)
+                '''
 
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
