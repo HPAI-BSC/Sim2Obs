@@ -674,10 +674,17 @@ class ICLProcessor(FeatureProcessor):
         return final_predictions
 
     def _compute_icl_mask(self, halo: Halo, subhalo_particles: SubhaloParticles):
-        particle_velocity = subhalo_particles.star_v
+        particle_velocity = np.asarray(
+            subhalo_particles.star_v,
+            dtype=np.float64
+        )
         particle_position = subhalo_particles.star_p
 
         v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
+        v_cm = np.asarray(
+            v_cm,
+            dtype=np.float64
+        )
         # Computing the Euclidean distance from the new origin to each particle,
         # this value will be normalized inside predict method
         distance = np.sqrt((particle_position ** 2).sum(axis=1))
