@@ -122,7 +122,7 @@ def magneticum_compute_features_test():
         bucket = hid % 128
 
         subhalo_rows = subhalo_context.dataset.to_table(
-            columns=['id_parents', 'subhalo_id', 'spos'],
+            columns=['id_parents', 'subhalo_id', 'spos', 'mstr'],
             filter=ds.field('id_parents') == hid
         ).to_pandas()
         if subhalo_rows.empty:
