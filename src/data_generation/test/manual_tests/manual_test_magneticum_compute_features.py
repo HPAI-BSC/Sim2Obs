@@ -112,7 +112,7 @@ def magneticum_compute_features_test():
     # verification pass -- collected for inspection afterward instead.
     pbc_violations = []
 
-    n_check = 5
+    n_check = 10
     checked = 0
     for hid in candidate_ids:
         if checked >= n_check:
@@ -276,6 +276,7 @@ def magneticum_compute_features_test():
     else:
         for _, row in sample.iterrows():
             print(f"id_parents={row['id_parents']}, subhalo_id={row['subhalo_id']}, "
+                  f"mstr={row['mstr']}, "
                   f"stellar_half_mass_radius={row['stellar_half_mass_radius']}")
 
         n_nan = sample['stellar_half_mass_radius'].isna().sum()
