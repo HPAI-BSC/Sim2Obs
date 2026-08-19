@@ -10,7 +10,8 @@ from hydra import initialize, compose
 import pyarrow.dataset as ds
 
 
-from src.data_generation.src.features_dataset.compute_features import _load_bucket_particle_groups
+from src.data_generation.src.features_dataset.compute_features import _load_bucket_particle_groups, \
+    compute_features_stage
 from src.data_generation.src.subhalo import SubhaloContext
 
 
