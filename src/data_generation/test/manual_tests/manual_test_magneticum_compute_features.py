@@ -128,6 +128,7 @@ def magneticum_compute_features_test():
         if subhalo_rows.empty:
             continue
 
+        print(subhalo_rows.columns.tolist())
         particle_groups = _load_bucket_particle_groups(fetcher_magneticum, bucket)
 
         # Find a subhalo of this halo that actually has star particles --
@@ -276,7 +277,6 @@ def magneticum_compute_features_test():
     else:
         for _, row in sample.iterrows():
             print(f"id_parents={row['id_parents']}, subhalo_id={row['subhalo_id']}, "
-                  f"mstr={row['mstr']}, "
                   f"stellar_half_mass_radius={row['stellar_half_mass_radius']}")
 
         n_nan = sample['stellar_half_mass_radius'].isna().sum()
