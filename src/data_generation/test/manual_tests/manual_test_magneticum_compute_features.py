@@ -1,12 +1,16 @@
+import os
 import tracemalloc
+import gc
 
+import pandas as pd
 import pyarrow.compute as pc
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 
 from hydra import initialize, compose
+import pyarrow.parquet as pq
 import pyarrow.dataset as ds
 
-from src.data_generation.src.features_dataset.compute_features import compute_features_stage
+from src.data_generation.src.compute_features_stage import compute_features_stage
 
 
 def magneticum_compute_features_test():
@@ -53,8 +57,33 @@ def magneticum_compute_features_test():
     #   - force_recompute=True since this is a first cluster run and there
     #     is no prior "_DONE" marker to respect yet; safe to leave True on
     #     reruns too since this debug output is disposable and small.
-    debug_halo_ids = unique_ids.to_pylist()[:10]
-    print(f"Restricting to halo_ids={debug_halo_ids}")
+    #
+    # IMPORTANT: debug ids are drawn from HaloContext.halo_id, not from
+    # subhalo_context's 'id_parents' column. The halo and subhalo catalogs
+    # apply INDEPENDENT filters (halo_conditions vs subhalo_conditions),
+    # so an id_parents value from the subhalo table is not guaranteed to
+    # exist in HaloContext -- and "first N unique id_parents" from a
+    # bucket-partitioned parquet scan isn't a meaningful "first 10 halos"
+    # selection anyway (it reflects ingestion/partition order, not any
+    # sorted id). Also intersect with subhalo_context's id_parents so the
+    # selected halos are guaranteed to actually have subhalos to process
+    # -- otherwise a valid-but-subhalo-less halo could again produce zero
+    # output rows.
+    halo_context = fetcher_magneticum.get_halos()
+    valid_halo_ids = set(halo_context.halo_id)
+    subhalo_ids_present = set(unique_ids.to_pylist())
+    candidate_ids = sorted(valid_halo_ids & subhalo_ids_present)
+
+    if not candidate_ids:
+        raise RuntimeError(
+            "No halo_id is present in BOTH HaloContext and the subhalo catalog's "
+            "id_parents -- halo_conditions and subhalo_conditions filters may be "
+            "fully disjoint for this catalog. Check the catalog config."
+        )
+
+    debug_halo_ids = candidate_ids[:10]
+    print(f"Restricting to halo_ids={debug_halo_ids} "
+          f"(drawn from {len(candidate_ids)} ids valid in both halo and subhalo catalogs)")
 
     compute_features_stage(
         fetcher=fetcher_magneticum,
@@ -70,6 +99,14 @@ def magneticum_compute_features_test():
     dataset_dir = cfg_magneticum.paths.datasets_dir
     catalog_name = cfg_magneticum.catalog.path.replace(dataset_dir, '').replace('/', '_')
     features_root = f'{dataset_dir}/../features/{catalog_name}_subhalo_features_new'
+
+    if not os.path.exists(features_root):
+        raise RuntimeError(
+            f"{features_root} was never created -- compute_features_stage produced "
+            f"zero output rows for halo_ids={debug_halo_ids}. Check the WARNING/ERROR "
+            f"lines above (e.g. 'Halo ID ... not found', fetch failures, or every "
+            f"subhalo coming back with zero star particles)."
+        )
 
     features_ds = ds.dataset(features_root, format="parquet")
     features_table = features_ds.to_table()

@@ -88,6 +88,10 @@ def compute_features_stage(fetcher, feature_names, cfg, force_recompute=False, h
         real feature catalog at all.
     """
     lbox = cfg.catalog.get('Lbox', None)
+    if lbox is None:
+        logger.warning("cfg.catalog.get('Lbox') returned None -- PBC/minimum-image "
+                        "correction will be a no-op for both particle and subhalo "
+                        "positions. If the catalog has a periodic box, this is a bug.")
 
     dataset_dir = cfg.paths.datasets_dir
     catalog_name = cfg.catalog.path.replace(dataset_dir, '').replace('/', '_')
@@ -115,6 +119,9 @@ def compute_features_stage(fetcher, feature_names, cfg, force_recompute=False, h
                     f"{len(buckets)} bucket(s) to process.")
     else:
         logger.info(f"Compute-features stage: {len(buckets)} buckets to process.")
+
+    total_rows_written = 0
+    total_halos_not_found = 0
 
     for bucket in buckets:
         # NOTE: deliberately NOT named "parent_bucket={bucket}" (Hive-style
@@ -174,6 +181,7 @@ def compute_features_stage(fetcher, feature_names, cfg, force_recompute=False, h
             except Exception as e:
                 logger.warning(f"Bucket {bucket}, halo {id_parents}: {e}, "
                                 f"skipping subhalo-position preprocessing for this halo.")
+                total_halos_not_found += 1
                 continue
             halos_by_id[id_parents] = halo
             bucket_subhalo_ctx.preprocess(halo, lbox)
@@ -225,7 +233,20 @@ def compute_features_stage(fetcher, feature_names, cfg, force_recompute=False, h
             continue
 
         _write_bucket_atomic(bucket_dir, rows)
+        total_rows_written += len(rows)
         logger.info(f"Bucket {bucket}: wrote {len(rows)} rows.")
+
+    if total_rows_written == 0:
+        logger.warning(
+            f"Compute-features stage produced ZERO output rows across "
+            f"{len(buckets)} bucket(s) processed"
+            f"{f' (halo_ids={sorted(halo_ids_set)})' if halo_ids_set is not None else ''}. "
+            f"{total_halos_not_found} halo lookup(s) failed with 'not found' -- "
+            f"if that number is high, the requested halo_ids likely don't exist in "
+            f"HaloContext (e.g. filtered out by halo_conditions, or drawn from an id "
+            f"range that doesn't overlap between the halo and subhalo catalogs). "
+            f"No output directory will exist for this run."
+        )
 
     logger.info("Compute-features stage complete.")
 
