@@ -176,6 +176,78 @@ class TestComputeFeaturesStage:
         assert table.loc[100, "stellar_half_mass_radius"] == 1.0
         assert table.loc[101, "stellar_half_mass_radius"] == 2.0
 
+    def test_mstar_and_n_star_particles_are_recorded_alongside_feature(self, catalog_dir, cfg, features_root):
+        """mstar/n_star_particles should let results be cross-checked
+        against the underlying data (e.g. a tiny SHMR next to a single
+        particle vs. hundreds of particles)."""
+        # build_catalog's make_particles fixture gives every star mass=1.0.
+        fetcher = build_catalog(catalog_dir, {0: {100: 1, 101: 3}})
+
+        compute_features_stage(fetcher, ["stellar_half_mass_radius"], cfg)
+
+        table = read_bucket(features_root, 0).set_index("subhalo_id")
+        assert table.loc[100, "n_star_particles"] == 1
+        assert table.loc[100, "mstar_particles"] == 1.0
+        assert table.loc[101, "n_star_particles"] == 3
+        assert table.loc[101, "mstar_particles"] == 3.0
+
+    def test_mstar_and_n_star_particles_are_zero_for_empty_subhalo(self, catalog_dir, cfg, features_root):
+        fetcher = build_catalog(catalog_dir, {0: {100: 1, 101: 0}})
+
+        compute_features_stage(fetcher, ["stellar_half_mass_radius"], cfg)
+
+        table = read_bucket(features_root, 0).set_index("subhalo_id")
+        assert table.loc[101, "n_star_particles"] == 0
+        assert table.loc[101, "mstar_particles"] == 0.0
+        assert pd.isna(table.loc[101, "stellar_half_mass_radius"])
+
+    def test_mstar_catalog_is_pulled_through_when_present(self, catalog_dir, cfg, features_root):
+        """
+        mstar_catalog is a halo-finder-provided property (like spos), NOT
+        computed here -- it should be carried straight through from the
+        subhalo catalog schema, independent of and comparable against
+        mstar_particles (summed from the fetched star particles).
+        """
+        halo_id, subhalo_id = 0, 100
+        catalog_mstar_value = 42.0  # deliberately different from the
+                                     # particle-summed mass (3 particles * 1.0 = 3.0)
+                                     # to prove these are genuinely two
+                                     # separate values, not aliases.
+
+        subhalo_df = pd.DataFrame([{
+            "id_parents": halo_id, "subhalo_id": subhalo_id, "mstar": catalog_mstar_value,
+        }])
+        subhalo_context = FakeSubhaloContext(subhalo_df)
+        halo_context = FakeHaloContext({halo_id: FakeHalo(halo_id=halo_id)})
+
+        write_particles_parquet(catalog_dir, [
+            {"POS ": [float(i), 0.0, 0.0], "MASS": 1.0, "VEL ": [0.0, 0.0, 0.0],
+             "parent_id": halo_id, "subhalo_id": subhalo_id,
+             "parent_bucket": 0, "parent_bucket_data": 0}
+            for i in range(3)
+        ])
+
+        fetcher = FakeFetcher(catalog_dir, subhalo_context, halo_context)
+
+        compute_features_stage(fetcher, ["stellar_half_mass_radius"], cfg)
+
+        table = read_bucket(features_root, 0).set_index("subhalo_id")
+        assert table.loc[subhalo_id, "mstar_catalog"] == catalog_mstar_value
+        assert table.loc[subhalo_id, "mstar_particles"] == 3.0
+        assert table.loc[subhalo_id, "mstar_catalog"] != table.loc[subhalo_id, "mstar_particles"]
+
+    def test_mstar_catalog_is_nan_when_column_absent(self, catalog_dir, cfg, features_root):
+        """No 'mstar' column in the catalog schema at all -> mstar_catalog
+        is NaN, not silently 0 or missing -- distinguishes "we don't have
+        this value" from "the catalog says it's zero"."""
+        fetcher = build_catalog(catalog_dir, {0: {100: 1}})  # no 'mstar' column
+
+        compute_features_stage(fetcher, ["stellar_half_mass_radius"], cfg)
+
+        table = read_bucket(features_root, 0).set_index("subhalo_id")
+        assert pd.isna(table.loc[100, "mstar_catalog"])
+        assert table.loc[100, "mstar_particles"] == 1.0  # this one's still computed fine
+
     def test_second_run_skips_already_materialized_bucket(self, catalog_dir, cfg, features_root):
         fetcher = build_catalog(catalog_dir, {0: {100: 1}})
 

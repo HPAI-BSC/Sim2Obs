@@ -162,6 +162,7 @@ def compute_features_stage(fetcher, feature_names, cfg, force_recompute=False, h
         bucket_subhalo_ctx = SubhaloContext.from_dataframe(bucket_subhalos.reset_index(drop=True))
 
         has_spos = 'spos' in bucket_subhalo_ctx.data.columns
+        has_catalog_mstar = 'mstar' in bucket_subhalo_ctx.data.columns
         if bucket == buckets[0]:
             # Logged once, not per-bucket -- this is a schema property of
             # the whole catalog, not something that varies bucket to
@@ -171,6 +172,10 @@ def compute_features_stage(fetcher, feature_names, cfg, force_recompute=False, h
             # further warning. Check the catalog's column_map if so.
             logger.info(f"Subhalo catalog has 'spos' column: {has_spos} "
                         f"(subhalo-position preprocessing is a no-op if False)")
+            logger.info(f"Subhalo catalog has 'mstar' column: {has_catalog_mstar} "
+                        f"(mstar_catalog will be NaN for every row if False -- "
+                        f"only mstar_particles, summed from fetched star particles, "
+                        f"will be available)")
 
         # Halo lookups cached here and reused in the feature loop below --
         # avoids resolving the same halo_id twice per subhalo.
@@ -202,8 +207,24 @@ def compute_features_stage(fetcher, feature_names, cfg, force_recompute=False, h
             result_row = {'id_parents': id_parents, 'subhalo_id': subhalo_id}
             sub_particles = particle_groups.get(int(subhalo_id))
 
-            if sub_particles is None or not hasattr(sub_particles, 'star_m') \
-                    or len(sub_particles.star_m) == 0 or sub_particles.star_m.sum() <= 0:
+            # Two independently-derived mass values, kept separate so they
+            # can be cross-checked against each other:
+            #   mstar_catalog   -- the halo finder's own precomputed value,
+            #                      pulled straight from the subhalo catalog
+            #                      (same category as spos), NaN if that
+            #                      column isn't present in this catalog.
+            #   mstar_particles -- summed directly from the star particles
+            #                      we actually fetched for this subhalo.
+            # A meaningful disagreement between the two points at a
+            # particle-to-subhalo matching bug, not just a display nicety.
+            result_row['mstar_catalog'] = float(row['mstar']) if has_catalog_mstar else float('nan')
+
+            has_particles = sub_particles is not None and hasattr(sub_particles, 'star_m') \
+                and len(sub_particles.star_m) > 0
+            result_row['n_star_particles'] = int(len(sub_particles.star_m)) if has_particles else 0
+            result_row['mstar_particles'] = float(sub_particles.star_m.sum()) if has_particles else 0.0
+
+            if not has_particles or sub_particles.star_m.sum() <= 0:
                 for feature_name in feature_names:
                     result_row[feature_name] = float('nan')
                 rows.append(result_row)
@@ -368,14 +389,15 @@ def _get_buckets(subhalo_context):
 
 def _get_bucket_subhalos(subhalo_context, bucket):
     """
-    Pulls id_parents/subhalo_id plus 'spos' (and 'group_number' if
-    present) when available in the catalog schema -- these are what
-    SubhaloContext.preprocess() needs to PBC-correct subhalo positions
-    relative to their halo. Columns are selected conditionally so this
-    still works against catalogs/fixtures that don't have 'spos' at all;
-    preprocess() itself is a no-op in that case.
+    Pulls id_parents/subhalo_id plus 'spos', 'mstar' (and 'group_number'
+    if present) when available in the catalog schema. 'mstar' is a
+    catalog-provided property (like spos), not something computed here --
+    it's carried through so it can be cross-checked against the
+    independently particle-summed mass in compute_features_stage.
+    Columns are selected conditionally so this still works against
+    catalogs/fixtures that don't have these fields at all.
     """
-    optional_cols = ['spos', 'group_number']
+    optional_cols = ['spos', 'mstar', 'group_number']
 
     if hasattr(subhalo_context, 'dataset'):
         schema_names = set(subhalo_context.dataset.schema.names)

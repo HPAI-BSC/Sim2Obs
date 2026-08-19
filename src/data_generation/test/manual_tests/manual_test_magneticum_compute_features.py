@@ -1,7 +1,6 @@
 import os
 import tracemalloc
 
-import numpy as np
 import pandas as pd
 import pyarrow.compute as pc
 from src.data_generation.src.data_fetcher import DataFetcherFactory
@@ -12,7 +11,6 @@ import pyarrow.dataset as ds
 
 from src.data_generation.src.features_dataset.compute_features import _load_bucket_particle_groups, \
     compute_features_stage
-from src.data_generation.src.subhalo import SubhaloContext
 
 
 def magneticum_compute_features_test():
@@ -103,6 +101,9 @@ def magneticum_compute_features_test():
     # Note: this preprocessing is never persisted (matches
     # compute_features_stage's in-memory-only preprocessing) -- this block
     # only verifies it happens, it does not write anything new.
+    from src.data_generation.src.subhalo import SubhaloContext
+    import numpy as np
+
     lbox = cfg_magneticum.catalog.get('Lbox', None)
     if lbox is None:
         print("WARNING: cfg.catalog.get('Lbox') is None -- PBC bound checks below will be skipped "
@@ -122,13 +123,12 @@ def magneticum_compute_features_test():
         bucket = hid % 128
 
         subhalo_rows = subhalo_context.dataset.to_table(
-            columns=['id_parents', 'subhalo_id', 'spos', 'mstr'],
+            columns=['id_parents', 'subhalo_id', 'spos'],
             filter=ds.field('id_parents') == hid
         ).to_pandas()
         if subhalo_rows.empty:
             continue
 
-        print(subhalo_rows.columns.tolist())
         particle_groups = _load_bucket_particle_groups(fetcher_magneticum, bucket)
 
         # Find a subhalo of this halo that actually has star particles --
@@ -261,14 +261,14 @@ def magneticum_compute_features_test():
     if missing:
         print(f"WARNING: no output rows for halo_ids={missing} -- check logs for errors on these halos.")
 
-    print('-------- Verify: read back new bucket, inspect first 5 subhalos --------')
+    print('-------- Verify: read back new bucket, inspect first 10 subhalos --------')
     # Re-open the new bucket tree fresh (not reusing features_table above)
     # so this check reflects exactly what's actually on disk, independent
     # of anything still held in memory from the run itself.
     verify_ds = ds.dataset(features_root, format="parquet")
     verify_df = verify_ds.to_table().to_pandas().sort_values(['id_parents', 'subhalo_id']).reset_index(drop=True)
 
-    n_check = 5
+    n_check = 10
     sample = verify_df.head(n_check)
     print(f"Columns present: {list(verify_df.columns)}")
 
@@ -276,8 +276,31 @@ def magneticum_compute_features_test():
         print("WARNING: 'stellar_half_mass_radius' column is missing entirely from the written bucket.")
     else:
         for _, row in sample.iterrows():
+            mstar_catalog = row.get('mstar_catalog', float('nan'))
+            mstar_particles = row.get('mstar_particles', float('nan'))
+            n_particles = row.get('n_star_particles', 'n/a')
             print(f"id_parents={row['id_parents']}, subhalo_id={row['subhalo_id']}, "
-                  f"stellar_half_mass_radius={row['stellar_half_mass_radius']}")
+                  f"stellar_half_mass_radius={row['stellar_half_mass_radius']}, "
+                  f"n_star_particles={n_particles}, "
+                  f"mstar_catalog={mstar_catalog}, mstar_particles={mstar_particles}")
+
+        # A meaningful mismatch here (beyond expected float/precision
+        # noise) between the halo finder's own stellar mass and the mass
+        # summed from the star particles we actually fetched points at a
+        # particle-to-subhalo matching bug -- not just cosmetic.
+        if 'mstar_catalog' in sample.columns and sample['mstar_catalog'].notna().any():
+            rel_diff = (
+                (sample['mstar_particles'] - sample['mstar_catalog']).abs()
+                / sample['mstar_catalog'].abs().clip(lower=1e-30)
+            )
+            large_mismatch = sample[rel_diff > 0.05]
+            if not large_mismatch.empty:
+                print(f"WARNING: {len(large_mismatch)}/{len(sample)} sampled subhalo(s) have "
+                      f">5% relative difference between mstar_catalog and mstar_particles -- "
+                      f"worth checking whether particle-to-subhalo assignment is correct.")
+        else:
+            print("Note: 'mstar_catalog' not available (column absent from this catalog's schema) -- "
+                  "cannot cross-check mstar_particles against a catalog-provided value.")
 
         n_nan = sample['stellar_half_mass_radius'].isna().sum()
         if n_nan == n_check:
