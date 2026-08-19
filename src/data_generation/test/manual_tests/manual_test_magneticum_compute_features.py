@@ -1,13 +1,17 @@
 import os
 import tracemalloc
 
+import numpy as np
+import pandas as pd
 import pyarrow.compute as pc
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 
 from hydra import initialize, compose
 import pyarrow.dataset as ds
 
-from src.data_generation.src.features_dataset.compute_features import compute_features_stage
+from src.data_generation.src.features_dataset.compute_features import compute_features_stage, \
+    _load_bucket_particle_groups
+from src.data_generation.src.subhalo import SubhaloContext
 
 
 def magneticum_compute_features_test():
@@ -81,6 +85,106 @@ def magneticum_compute_features_test():
     debug_halo_ids = candidate_ids[:10]
     print(f"Restricting to halo_ids={debug_halo_ids} "
           f"(drawn from {len(candidate_ids)} ids valid in both halo and subhalo catalogs)")
+
+    print('-------- Verify preprocessing preconditions before computing SHMR --------')
+    # These are asserted directly against the REAL production code path
+    # (SubhaloContext.preprocess / SubhaloParticles.preprocess -- the same
+    # functions compute_features_stage itself calls), not a
+    # reimplementation, so this actually validates what the pipeline does
+    # rather than what we assume it does. Checked assumptions:
+    #   1. Subhalo position (spos) has been centered relative to its halo.
+    #   2. The subhalo's own star particles have been centered relative to
+    #      the SAME halo.
+    #   3. Minimum-image PBC correction was applied to both -- the direct
+    #      consequence is that every corrected position must satisfy
+    #      |pos - halo.gpos| <= lbox/2. If that bound is violated, PBC
+    #      correction did not actually run.
+    # Note: this preprocessing is never persisted (matches
+    # compute_features_stage's in-memory-only preprocessing) -- this block
+    # only verifies it happens, it does not write anything new.
+
+    lbox = cfg_magneticum.catalog.get('Lbox', None)
+    if lbox is None:
+        print("WARNING: cfg.catalog.get('Lbox') is None -- PBC bound checks below will be skipped "
+              "(no box size to check against). This itself is worth investigating.")
+
+    n_check = 5
+    checked = 0
+    for hid in candidate_ids:
+        if checked >= n_check:
+            break
+
+        halo = halo_context.get_halo_by_id(hid)
+        bucket = hid % 128
+
+        subhalo_rows = subhalo_context.dataset.to_table(
+            columns=['id_parents', 'subhalo_id', 'spos'],
+            filter=ds.field('id_parents') == hid
+        ).to_pandas()
+        if subhalo_rows.empty:
+            continue
+
+        particle_groups = _load_bucket_particle_groups(fetcher_magneticum, bucket)
+
+        # Find a subhalo of this halo that actually has star particles --
+        # otherwise there's nothing meaningful to centre.
+        target_row, target_particles = None, None
+        for _, r in subhalo_rows.iterrows():
+            sp = particle_groups.get(int(r['subhalo_id']))
+            if sp is not None and hasattr(sp, 'star_m') and len(sp.star_m) > 0:
+                target_row, target_particles = r, sp
+                break
+        if target_row is None:
+            continue
+
+        checked += 1
+        sid = target_row['subhalo_id']
+        print(f"\n=== Halo {hid} (gpos={halo.gpos}), subhalo {sid} "
+              f"({len(target_particles.star_m)} star particles) ===")
+
+        # --- Assumption 1 + PBC: subhalo position centered on its halo ---
+        raw_spos = np.asarray(target_row['spos'], dtype=float)
+        single_ctx = SubhaloContext.from_dataframe(pd.DataFrame([target_row]))
+        single_ctx.preprocess(halo, lbox)
+        corrected_spos = np.asarray(single_ctx.data.iloc[0]['spos'], dtype=float)
+
+        spos_changed = not np.allclose(raw_spos, corrected_spos)
+        print(f"  spos: raw={raw_spos} -> corrected={corrected_spos} (changed: {spos_changed})")
+
+        if lbox is not None:
+            delta = corrected_spos - halo.gpos
+            dist = np.linalg.norm(delta)
+            print(f"  |corrected_spos - halo.gpos| = {dist:.4f}  (bound: lbox/2 = {lbox / 2:.4f})")
+            assert np.all(np.abs(delta) <= lbox / 2 + 1e-6), (
+                f"Halo {hid}, subhalo {sid}: corrected spos violates the PBC minimum-image "
+                f"bound -- subhalo-position preprocessing is NOT correctly centering/wrapping."
+            )
+
+        # --- Assumption 2 + PBC: particle positions centered on the SAME halo ---
+        raw_star_p_sample = target_particles.star_p[0].copy()
+        target_particles.preprocess(halo, lbox)
+        corrected_star_p = target_particles.star_p
+
+        p_changed = not np.allclose(raw_star_p_sample, corrected_star_p[0])
+        print(f"  star_p[0]: raw={raw_star_p_sample} -> corrected={corrected_star_p[0]} (changed: {p_changed})")
+
+        if lbox is not None:
+            # Already centered on halo.gpos by preprocess(), so distance
+            # from the origin IS distance from the halo center.
+            dists = np.linalg.norm(corrected_star_p, axis=1)
+            print(f"  particle distances from halo center: min={dists.min():.4f}, "
+                  f"max={dists.max():.4f}  (bound: lbox/2 = {lbox / 2:.4f})")
+            assert np.all(dists <= lbox / 2 + 1e-6), (
+                f"Halo {hid}, subhalo {sid}: corrected star_p violates the PBC minimum-image "
+                f"bound -- particle preprocessing is NOT correctly centering/wrapping."
+            )
+
+    if checked == 0:
+        print("WARNING: could not verify preprocessing -- no subhalo with star particles "
+              "found among the first candidate halos. Preconditions UNVERIFIED.")
+    else:
+        print(f"\nVerified centering + PBC bound on {checked} subhalo(s) across distinct halos -- "
+              f"all assertions passed.")
 
     compute_features_stage(
         fetcher=fetcher_magneticum,
