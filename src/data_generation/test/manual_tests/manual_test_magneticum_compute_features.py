@@ -1,16 +1,13 @@
 import os
 import tracemalloc
-import gc
 
-import pandas as pd
 import pyarrow.compute as pc
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 
 from hydra import initialize, compose
-import pyarrow.parquet as pq
 import pyarrow.dataset as ds
 
-from src.data_generation.src.compute_features_stage import compute_features_stage
+from src.data_generation.src.features_dataset.compute_features import compute_features_stage
 
 
 def magneticum_compute_features_test():
