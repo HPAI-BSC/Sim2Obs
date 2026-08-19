@@ -276,30 +276,30 @@ def magneticum_compute_features_test():
         print("WARNING: 'stellar_half_mass_radius' column is missing entirely from the written bucket.")
     else:
         for _, row in sample.iterrows():
-            mstar_catalog = row.get('mstar_catalog', float('nan'))
-            mstar_particles = row.get('mstar_particles', float('nan'))
+            mstr_catalog = row.get('mstr_catalog', float('nan'))
+            mstr_particles = row.get('mstr_particles', float('nan'))
             n_particles = row.get('n_star_particles', 'n/a')
             print(f"id_parents={row['id_parents']}, subhalo_id={row['subhalo_id']}, "
                   f"stellar_half_mass_radius={row['stellar_half_mass_radius']}, "
                   f"n_star_particles={n_particles}, "
-                  f"mstar_catalog={mstar_catalog}, mstar_particles={mstar_particles}")
+                  f"mstr_catalog={mstr_catalog}, mstr_particles={mstr_particles}")
 
         # A meaningful mismatch here (beyond expected float/precision
         # noise) between the halo finder's own stellar mass and the mass
         # summed from the star particles we actually fetched points at a
         # particle-to-subhalo matching bug -- not just cosmetic.
-        if 'mstar_catalog' in sample.columns and sample['mstar_catalog'].notna().any():
+        if 'mstr_catalog' in sample.columns and sample['mstr_catalog'].notna().any():
             rel_diff = (
-                (sample['mstar_particles'] - sample['mstar_catalog']).abs()
-                / sample['mstar_catalog'].abs().clip(lower=1e-30)
+                (sample['mstr_particles'] - sample['mstr_catalog']).abs()
+                / sample['mstr_catalog'].abs().clip(lower=1e-30)
             )
             large_mismatch = sample[rel_diff > 0.05]
             if not large_mismatch.empty:
                 print(f"WARNING: {len(large_mismatch)}/{len(sample)} sampled subhalo(s) have "
-                      f">5% relative difference between mstar_catalog and mstar_particles -- "
+                      f">5% relative difference between mstr_catalog and mstar_particles -- "
                       f"worth checking whether particle-to-subhalo assignment is correct.")
         else:
-            print("Note: 'mstar_catalog' not available (column absent from this catalog's schema) -- "
+            print("Note: 'mstr_catalog' not available (column absent from this catalog's schema) -- "
                   "cannot cross-check mstar_particles against a catalog-provided value.")
 
         n_nan = sample['stellar_half_mass_radius'].isna().sum()
