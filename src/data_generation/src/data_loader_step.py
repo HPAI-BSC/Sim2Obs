@@ -255,6 +255,8 @@ class DataLoader(PipelineStep):
             logger.info(f"Processing halo {halo.halo_id} with {len(subhalo_ctx.data)} subhalos")
             logger.info('-------------------------------------------------------------------------------------')
 
+            halo_particles_overlapping = None
+
             try:
                 feature_input_name, feature_output_name = self.cfg.feature_names
                 input_feature = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg)
@@ -263,9 +265,6 @@ class DataLoader(PipelineStep):
 
                 # Load particles for all the subhalos in that halo
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
-                # Reset overlapping particles id
-                halo_particles_no_overlapping.overlapping_particles_id = len(halo_particles_no_overlapping.star_m)
-                logger.debug(halo_particles_no_overlapping.overlapping_particles_id)
 
                 # Preprocessed all particles for current halo
                 halo_particles_no_overlapping.preprocess(halo, lbox)
@@ -276,24 +275,24 @@ class DataLoader(PipelineStep):
 
                 # Group all the particles together
                 if overlapping_subhalo_particles is not None:
-                    logger.debug(f'halo_particles_no_overlapping: {len(halo_particles_no_overlapping.star_m)}')
-                    logger.debug(f'overlapping_subhalo_particles: {len(overlapping_subhalo_particles.star_m)}')
                     halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
-                    logger.debug(f'halo_particles_overlapping: {len(halo_particles_overlapping.star_m)}')
                 else:
                     halo_particles_overlapping = halo_particles_no_overlapping
 
                 # Compute features with preprocessed and non-overlapping particles
-                # TODO check if we need to take overlapping here
                 input_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
-                # Consider overlapping
-                output_feature.process(halo=halo, subhalo_particles=halo_particles_overlapping)
+                print('halo_particles_overlapping', halo_particles_overlapping)
+                output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 subhalo_ctx.preprocess(halo, lbox)
+
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
-                self.errors.append((halo.halo_id, str(e), self.name))
+                if halo_particles_overlapping is not None:
+                    self.errors.append((halo.halo_id, str(e), len(halo_particles_overlapping.star_p), self.name))
+                else:
+                    self.errors.append((halo.halo_id, str(e), None, self.name))
                 continue
 
             # Update cosmos instance

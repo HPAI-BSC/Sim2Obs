@@ -54,13 +54,14 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(all(np.array_equal(a, b) for a, b in zip(converted, converted_ii)))
 
     def test_find_values(self):
-        comoving_resolution = 22.3 # for flamingo
-        scale_factor = 0.8333333333333335
+        comoving_resolution = 2.5 # for millenim
+        scale_factor = 0.8
         spatial_resolution = comoving_resolution / scale_factor # Convert to physical kpc
         print(spatial_resolution)
 
         # bin calculation
-        fov = 429352.020 * 2
+        TR = 703.578
+        fov = TR * 2
         r = fov / 2  # Radius of the field of view
 
         bin_size = spatial_resolution * 3
