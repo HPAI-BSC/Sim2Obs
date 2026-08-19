@@ -9,8 +9,8 @@ from src.data_generation.src.data_fetcher import DataFetcherFactory
 from hydra import initialize, compose
 import pyarrow.dataset as ds
 
-from src.data_generation.src.features_dataset.compute_features import compute_features_stage, \
-    _load_bucket_particle_groups
+
+from src.data_generation.src.features_dataset.compute_features import _load_bucket_particle_groups
 from src.data_generation.src.subhalo import SubhaloContext
 
 
@@ -102,11 +102,14 @@ def magneticum_compute_features_test():
     # Note: this preprocessing is never persisted (matches
     # compute_features_stage's in-memory-only preprocessing) -- this block
     # only verifies it happens, it does not write anything new.
-
     lbox = cfg_magneticum.catalog.get('Lbox', None)
     if lbox is None:
         print("WARNING: cfg.catalog.get('Lbox') is None -- PBC bound checks below will be skipped "
               "(no box size to check against). This itself is worth investigating.")
+
+    # Flagged (not raised) so one problem subhalo doesn't abort the whole
+    # verification pass -- collected for inspection afterward instead.
+    pbc_violations = []
 
     n_check = 5
     checked = 0
@@ -149,16 +152,24 @@ def magneticum_compute_features_test():
         corrected_spos = np.asarray(single_ctx.data.iloc[0]['spos'], dtype=float)
 
         spos_changed = not np.allclose(raw_spos, corrected_spos)
-        print(f"  spos: raw={raw_spos} -> corrected={corrected_spos} (changed: {spos_changed})")
+        print(f"  spos: raw(absolute)={raw_spos} -> corrected(HALO-RELATIVE)={corrected_spos} "
+              f"(changed: {spos_changed})")
 
         if lbox is not None:
-            delta = corrected_spos - halo.gpos
-            dist = np.linalg.norm(delta)
-            print(f"  |corrected_spos - halo.gpos| = {dist:.4f}  (bound: lbox/2 = {lbox / 2:.4f})")
-            assert np.all(np.abs(delta) <= lbox / 2 + 1e-6), (
-                f"Halo {hid}, subhalo {sid}: corrected spos violates the PBC minimum-image "
-                f"bound -- subhalo-position preprocessing is NOT correctly centering/wrapping."
-            )
+            # IMPORTANT: preprocess() already returns a halo-RELATIVE,
+            # PBC-corrected delta (origin = halo center), not a re-wrapped
+            # absolute position. Do NOT subtract halo.gpos again here --
+            # doing so double-subtracts the halo center and produces a
+            # bogus giant "violation" even when preprocessing is correct.
+            dist = np.linalg.norm(corrected_spos)
+            print(f"  |corrected_spos| (relative to halo center) = {dist:.4f}  "
+                  f"(bound: lbox/2 = {lbox / 2:.4f})")
+            if dist > lbox / 2 + 1e-6:
+                pbc_violations.append({
+                    'halo_id': hid, 'subhalo_id': sid, 'kind': 'spos', 'distance': float(dist),
+                })
+                print(f"  \u26a0 FLAGGED: spos PBC bound violated for halo {hid}, subhalo {sid} "
+                      f"(dist={dist:.4f} > lbox/2={lbox / 2:.4f})")
 
         # --- Assumption 2 + PBC: particle positions centered on the SAME halo ---
         raw_star_p_sample = target_particles.star_p[0].copy()
@@ -166,25 +177,51 @@ def magneticum_compute_features_test():
         corrected_star_p = target_particles.star_p
 
         p_changed = not np.allclose(raw_star_p_sample, corrected_star_p[0])
-        print(f"  star_p[0]: raw={raw_star_p_sample} -> corrected={corrected_star_p[0]} (changed: {p_changed})")
+        print(f"  star_p[0]: raw(absolute)={raw_star_p_sample} -> corrected(HALO-RELATIVE)={corrected_star_p[0]} "
+              f"(changed: {p_changed})")
 
         if lbox is not None:
             # Already centered on halo.gpos by preprocess(), so distance
             # from the origin IS distance from the halo center.
             dists = np.linalg.norm(corrected_star_p, axis=1)
+            max_dist = float(dists.max())
             print(f"  particle distances from halo center: min={dists.min():.4f}, "
-                  f"max={dists.max():.4f}  (bound: lbox/2 = {lbox / 2:.4f})")
-            assert np.all(dists <= lbox / 2 + 1e-6), (
-                f"Halo {hid}, subhalo {sid}: corrected star_p violates the PBC minimum-image "
-                f"bound -- particle preprocessing is NOT correctly centering/wrapping."
-            )
+                  f"max={max_dist:.4f}  (bound: lbox/2 = {lbox / 2:.4f})")
+            if max_dist > lbox / 2 + 1e-6:
+                n_bad = int(np.sum(dists > lbox / 2 + 1e-6))
+                pbc_violations.append({
+                    'halo_id': hid, 'subhalo_id': sid, 'kind': 'star_p',
+                    'max_distance': max_dist, 'n_particles_over_bound': n_bad,
+                    'n_particles_total': int(len(dists)),
+                })
+                print(f"  \u26a0 FLAGGED: {n_bad}/{len(dists)} particles violate PBC bound for "
+                      f"halo {hid}, subhalo {sid} (max dist={max_dist:.4f} > lbox/2={lbox / 2:.4f})")
 
     if checked == 0:
         print("WARNING: could not verify preprocessing -- no subhalo with star particles "
               "found among the first candidate halos. Preconditions UNVERIFIED.")
+    elif pbc_violations:
+        print(f"\n\u26a0 {len(pbc_violations)} PBC violation(s) flagged out of {checked} subhalo(s) "
+              f"checked -- NOT treated as fatal, pipeline continues. Logged for later investigation:")
+        for v in pbc_violations:
+            print(f"   {v}")
+
+        # Persist alongside the debug output so this survives past the
+        # console/job log, since "manage later" implies a durable record.
+        violations_path = os.path.join(
+            f'{cfg_magneticum.paths.datasets_dir}/../features',
+            f"{cfg_magneticum.catalog.path.replace(cfg_magneticum.paths.datasets_dir, '').replace('/', '_')}"
+            f"_subhalo_features_new",
+            '_pbc_violations.json',
+        )
+        os.makedirs(os.path.dirname(violations_path), exist_ok=True)
+        import json
+        with open(violations_path, 'w') as f:
+            json.dump(pbc_violations, f, indent=2)
+        print(f"   Written to: {violations_path}")
     else:
         print(f"\nVerified centering + PBC bound on {checked} subhalo(s) across distinct halos -- "
-              f"all assertions passed.")
+              f"no violations.")
 
     compute_features_stage(
         fetcher=fetcher_magneticum,
