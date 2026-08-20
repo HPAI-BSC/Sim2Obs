@@ -141,7 +141,8 @@ class MapStep(PipelineStep):
         # Considering as interloper any subhalo contained in a box defined by [-r, r] in the x and y directions and
         # inside [-R_200, R_200] along the z axis
         subhalos: SubhaloContext = cosmos_data.subhalos
-        spos = np.array(subhalos.data['spos'].tolist())
+        # todo reshape if needed
+        spos = np.array(subhalos.data['spos'].tolist(), dtype=float)
         r = self.transition_radius
         mask = (
                 (spos[:, 0] < r) &  # x condition

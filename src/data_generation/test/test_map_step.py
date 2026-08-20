@@ -1,5 +1,6 @@
 import os
 import pickle
+import re
 import shutil
 import unittest
 from typing import Generator
@@ -29,6 +30,7 @@ class TestMapStep(unittest.TestCase):
         # Illustris objs
         with open("data/illustris/subhalo_particles_0.pkl", "rb") as file:
             self.subhalo_particles_illustris = pickle.load(file)
+            self.subhalo_particles_illustris.overlapping_particles_id = None
 
         with open("data/illustris/subhalo_0.pkl", "rb") as file:
             self.subhalo_illustris = pickle.load(file)
@@ -42,6 +44,7 @@ class TestMapStep(unittest.TestCase):
         # Eagle objs
         with open("data/eagle/subhalo_particles_0.pkl", "rb") as file:
             self.subhalo_particles_eagle = pickle.load(file)
+            self.subhalo_particles_eagle.overlapping_particles_id = None
 
         with open("data/eagle/halo_0.pkl", "rb") as file:
             self.halo_eagle = pickle.load(file)
@@ -51,6 +54,16 @@ class TestMapStep(unittest.TestCase):
 
         with open("data/eagle/subhalo_0.pkl", "rb") as file:
             self.subhalo_eagle = pickle.load(file)
+
+        with open("data/millenium/subhalo_particles_illustris-300_MTNG-L500-4320-A_34993.pkl", "rb") as file:
+            self.subhalo_particles_millenium = pickle.load(file)
+            self.subhalo_particles_millenium.overlapping_particles_id = None
+
+        with open("data/millenium/halo_illustris-300_MTNG-L500-4320-A_34993.pkl", "rb") as file:
+            self.halo_millenium = pickle.load(file)
+
+        df_ = pd.read_csv("data/millenium/millenium_subhalo_context.csv")
+        self.subhalo_context_millenium = SubhaloContext(df_, column_map=None)
 
         with initialize(config_path="'../../../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
@@ -94,11 +107,27 @@ class TestMapStep(unittest.TestCase):
         output_feature_illustris.process(self.halo_illustris, self.subhalo_particles_illustris)
 
         cosmos_data = CosmosData(self.halo_illustris, self.subhalo_context_illustris, self.subhalo_illustris,
-                                 self.subhalo_particles_illustris)
+                                 self.subhalo_particles_illustris, self.subhalo_particles_illustris)
         cosmos_data.input_feature = input_feature_illustris
         cosmos_data.output_feature = output_feature_illustris
 
         yield self.halo_illustris, self.subhalo_illustris, cosmos_data
+
+    def mock_generator_millenium(self) -> Generator:
+        """Mock generator to simulate data_loader.process."""
+        feature_input_name, feature_output_name = self.cfg_millenium.feature_names
+        input_feature_millenium = FeatureProcessorFactory.get_feature(feature_input_name, cfg=self.cfg_millenium)
+        input_feature_millenium.process(self.halo_millenium, self.subhalo_particles_millenium)
+        output_feature_millenium = FeatureProcessorFactory.get_feature(feature_output_name, cfg=self.cfg_millenium)
+        output_feature_millenium.model = joblib.load(os.path.join(self.project_root, self.model_path))
+        output_feature_millenium.process(self.halo_millenium, self.subhalo_particles_millenium)
+
+        cosmos_data = CosmosData(self.halo_millenium, self.subhalo_context_millenium, None,
+                                 self.subhalo_particles_millenium, self.subhalo_particles_millenium)
+        cosmos_data.input_feature = input_feature_millenium
+        cosmos_data.output_feature = output_feature_millenium
+
+        yield self.halo_millenium, None, cosmos_data
 
     def mock_generator_eagle(self) -> Generator:
         """Mock generator to simulate data_loader.process."""
@@ -110,6 +139,7 @@ class TestMapStep(unittest.TestCase):
         output_feature_eagle.process(self.halo_eagle, self.subhalo_particles_eagle)
 
         cosmos_data = CosmosData(self.halo_eagle, self.subhalo_context_eagle, self.subhalo_eagle,
+                                 self.subhalo_particles_eagle,
                                  self.subhalo_particles_eagle)
         cosmos_data.input_feature = input_feature_eagle
         cosmos_data.output_feature = output_feature_eagle
@@ -119,6 +149,7 @@ class TestMapStep(unittest.TestCase):
         self.map_step = MapStep(self.cfg_illustris)
         self.map_step.map_configuration['root_path'] = '../test/data/illustris'
         kwargs = {'rotation_axis': 0, 'rotation_iteration': 0, 'dim': 2}
+        dtypes = self.subhalo_context_illustris.data.dtypes
         generator = self.map_step.process(
             g=self.mock_generator_illustris(),
             **kwargs,
@@ -137,6 +168,27 @@ class TestMapStep(unittest.TestCase):
         kwargs = {'rotation_axis': 0, 'rotation_iteration': 0, 'dim': 2}
         generator = self.map_step.process(
             g=self.mock_generator_eagle(),
+            **kwargs,
+            next_step=None
+        )
+        results = list(generator)
+        self.assertNotEqual(results, [])
+        self.assertIsInstance(results[0][0], Halo)
+        self.assertIsInstance(results[0][1], VelocityDispersionProcessor)
+        self.assertIsInstance(results[0][2], ICLProcessor)
+
+    def test_map_process_millenium(self):
+        self.map_step = MapStep(self.cfg_millenium)
+        self.map_step.map_configuration['root_path'] = '../test/data/millenium'
+        kwargs = {'rotation_axis': 0, 'rotation_iteration': 0, 'dim': 2}
+        dtypes = self.subhalo_context_millenium.data.dtypes
+        tmp = np.array([
+            [float(x) for x in re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", s)]
+            for s in self.subhalo_context_millenium.data["spos"].tolist()
+        ], dtype=float)
+        self.subhalo_context_millenium.data['spos'] = tmp
+        generator = self.map_step.process(
+            g=self.mock_generator_millenium(),
             **kwargs,
             next_step=None
         )
@@ -174,6 +226,7 @@ class TestMapStep(unittest.TestCase):
         self.mock_cosmos_data = CosmosData(mock_halo.return_value,
                                            mock_subhalo_context.return_value,
                                            self.subhalo_eagle.subhalo_id,
+                                           mock_subhalo_particles.return_value,
                                            mock_subhalo_particles.return_value)
         self.map_step = MapStep(self.cfg_eagle)
         self.map_step.map_configuration['root_path'] = '../test/data/eagle'

@@ -59,7 +59,7 @@ def main(cfg: DictConfig) -> Any:
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
     starting_idx = 0
-    ending_idx = 5
+    ending_idx = 1
 
     ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
     # ignore_halos = [] # just for flamingo
@@ -69,5 +69,5 @@ def main(cfg: DictConfig) -> Any:
 if __name__ == "__main__":
     # TODO DEBUG
     # magneticum_particle_test()
-    magneticum_compute_features_test()
-    # main()
+    # magneticum_compute_features_test()
+    main()
