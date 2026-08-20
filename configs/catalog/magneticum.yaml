@@ -56,13 +56,11 @@ fields:
       name: "mstr"
       # Mass > 1e10 M⊙
       filter: "> 1e10 "
-    stellar_half_mass_radius: # This variable is computed by a function
+    RHMS:
       input: "ckpc/h"
       output: "pkpc/h"
       scaling: "x * a"
-      name: "shmr"
-      needs:
-        star: [POS, MASS] # These attributes should be added below
+      index: 4
     GRNR:
       input: null
       output: null

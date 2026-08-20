@@ -35,6 +35,9 @@ def magneticum_particle_test():
     halo_context = fetcher_magneticum.get_halos()
     subhalo_context = fetcher_magneticum.get_subhalos()
 
+    total_rows = halo_context.dataset.count_rows()
+    print("Total rows:", total_rows)
+
     total_rows = subhalo_context.dataset.count_rows()
     print("Total rows:", total_rows)
 
@@ -57,11 +60,6 @@ def magneticum_particle_test():
     print(subhalo_particles_.star_p.size)
     print(type(subhalo_particles_.star_p))
     print(subhalo_particles_.star_p)
-
-    # TODO replicate this for all the subhalos
-    result = FeatureComputer.compute('stellar_half_mass_radius', particles=subhalo_particles_)
-    print(f'shmr: {result}')
-    tracemalloc.stop()
 
 
 if __name__ == "__main__":
