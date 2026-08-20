@@ -65,6 +65,7 @@ def pipeline_step(func):
 
 @pipeline_step
 def remove_useless_columns(d: dict, fields: list):
+    print('remove_useless_columns')
     diff = set(d.keys()).difference(set(fields))
 
     for key in diff:
@@ -75,6 +76,7 @@ def remove_useless_columns(d: dict, fields: list):
 
 @pipeline_step
 def assign_id(d: dict, id_column: str, offset=0):
+    print('assign_id')
     """
     Assign an ID to each subhalo/halo.
 
@@ -104,6 +106,7 @@ def assign_id(d: dict, id_column: str, offset=0):
 
 @pipeline_step
 def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConfig):
+    print('validate_and_process_fields')
     """
     Validates fields, applies indexing, and converts multi-dimensional arrays.
 
@@ -331,6 +334,7 @@ def apply_filters(d: Any, conditions: dict, config: DictConfig):
 # TO TEST
 @pipeline_step
 def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig, **kwargs):
+    print('apply_unit_conversion')
     """
     Apply filtering conditions to data.
 
