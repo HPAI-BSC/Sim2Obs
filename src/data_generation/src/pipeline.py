@@ -27,7 +27,7 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     # halo_context.data.to_csv(os.path.join(dataset_dir, 'millenium_halo_context.csv'))
     # subhalo_context.data.to_csv(os.path.join(dataset_dir, 'millenium_subhalo_context.csv'))
 
-    with open(os.path.join(dataset_dir, 'millenium_subhalo_context.pkl', "wb")) as f:
+    with open(os.path.join(dataset_dir, 'millenium_subhalo_context.pkl'), 'wb') as f:
         pickle.dump(subhalo_context, f)
 
     if len(ignore_halos) > 0:
