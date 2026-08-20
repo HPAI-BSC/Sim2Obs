@@ -62,8 +62,8 @@ class TestMapStep(unittest.TestCase):
         with open("data/millenium/halo_illustris-300_MTNG-L500-4320-A_34993.pkl", "rb") as file:
             self.halo_millenium = pickle.load(file)
 
-        df_ = pd.read_csv("data/millenium/millenium_subhalo_context.csv")
-        self.subhalo_context_millenium = SubhaloContext(df_, column_map=None)
+        with open("data/millenium/millenium_subhalo_context.pkl", "rb") as file:
+            self.subhalo_context_millenium = pickle.load(file)
 
         with initialize(config_path="'../../../../../configs"):
             self.cfg_illustris = compose(config_name="data_generation.yaml")
@@ -181,12 +181,6 @@ class TestMapStep(unittest.TestCase):
         self.map_step = MapStep(self.cfg_millenium)
         self.map_step.map_configuration['root_path'] = '../test/data/millenium'
         kwargs = {'rotation_axis': 0, 'rotation_iteration': 0, 'dim': 2}
-        dtypes = self.subhalo_context_millenium.data.dtypes
-        tmp = np.array([
-            [float(x) for x in re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", s)]
-            for s in self.subhalo_context_millenium.data["spos"].tolist()
-        ], dtype=float)
-        self.subhalo_context_millenium.data['spos'] = tmp
         generator = self.map_step.process(
             g=self.mock_generator_millenium(),
             **kwargs,

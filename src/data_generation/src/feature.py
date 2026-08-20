@@ -519,8 +519,7 @@ class VelocityDispersionProcessor(FeatureProcessor):
         """
         logger.debug(f'Generating maps for feature: {self.name}')
         pos_rot = subhalo_particles.star_p
-        feature = self.value
-
+        feature = np.asarray(self.value, dtype=np.float64)
         if axis is not None:
             i, j = axis
             if len(self.value) == 0:
@@ -858,8 +857,7 @@ class ICLProcessor(FeatureProcessor):
                 of `self.value` do not match.
         """
         pos_rot = subhalo_particles.star_p
-        feature = self.value
-
+        feature = np.asarray(self.value, dtype=np.float64)
         if axis is not None:
             i, j = axis
             if len(self.value) == 0:
