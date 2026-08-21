@@ -106,7 +106,6 @@ def assign_id(d: dict, id_column: str, offset=0):
 
 @pipeline_step
 def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConfig):
-    print('validate_and_process_fields')
     """
     Validates fields, applies indexing, and converts multi-dimensional arrays.
 
@@ -126,6 +125,12 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
     dict
         Processed dataset with indexed and converted fields.
     """
+    print('validate_and_process_fields')
+    print(fields)
+    print(list(d.keys()))
+    for key, values in d.items():
+        print(key, type(values))
+
     for key in list(d.keys()):
         if key in fields:
             field_info = OmegaConf.select(cfg, f"fields.{table}.{key}")
@@ -151,14 +156,17 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
                 tmp = OmegaConf.select(cfg, f"fields.{table}.{key}")
                 for key_ii in OmegaConf.select(cfg, f"fields.{table}.{key}"):
                     # Rename the column in case the initial config format was not appropiate, ie: POS to 'POS '
+                    print('key_ii', key_ii)
                     field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
                     h = dict_depth(field_info_ii)
+                    print(h)
                     if cfg.name == 'magneticum':
                         key_ii = key_ii.ljust(4)
                     if h == 1:
                         if not getattr(field_info_ii, 'name', None):
                             raise ValueError(f"Error: The field '{key}' must have a name.")
                         index = field_info_ii.get("index", None)
+                        print('index', index)
                         if index is not None:
                             d[key][key_ii] = d[key][key_ii][:, index]
                         if isinstance(d[key][key_ii], np.ndarray) and d[key][key_ii].ndim > 1:
@@ -188,11 +196,6 @@ def convert_to_dataframe(d: dict):
         dictionary of DataFrames if 2 levels deep,
         otherwise raises a ValueError.
     """
-    print('convert_to_dataframe')
-    print(list(d.keys()))
-    for key, values in d.items():
-        print(key, type(values))
-
     if dict_depth(d) == 1:
         return pd.DataFrame.from_dict(d)
     elif dict_depth(d) == 2:
