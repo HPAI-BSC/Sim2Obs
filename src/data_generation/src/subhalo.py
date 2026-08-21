@@ -334,6 +334,10 @@ class SubhaloContext:
         """
         return self.data["subhalo_id"].tolist()
 
+    @property
+    def is_empty(self):
+        return self.data.empty
+
     def __len__(self):
         """
         Return the length of the DataFrame.
