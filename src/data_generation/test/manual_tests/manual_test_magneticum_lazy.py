@@ -33,10 +33,13 @@ def magneticum_particle_test():
     tracemalloc.start()
 
     halo_context = fetcher_magneticum.get_halos()
-    total_rows = halo_context.dataset.count_rows()
-    print("Total rows:", total_rows)
+    print(f'type: {type(halo_context)}')
+
+    # total_rows = halo_context.dataset.count_rows()
+    # print("Total rows:", total_rows)
 
     subhalo_context = fetcher_magneticum.get_subhalos()
+    print(f'type: {type(subhalo_context)}')
 
     total_rows = subhalo_context.dataset.count_rows()
     print("Total rows:", total_rows)
