@@ -12,7 +12,6 @@ logger = setup_logger("Lazy-Subhalo-Particles")
 
 class LazySubhaloContext:
     def __init__(self, path, dataset=None) -> None:
-        # store path so __add__ and other future logic can reference it safely
         self.path = path
 
         if dataset is None:
@@ -24,7 +23,6 @@ class LazySubhaloContext:
         self.filters = []
         self.transforms = []
 
-        # guard flags to prevent double-application of preprocess/rotate
         self._preprocessed = False
         self._rotated = False
 
@@ -52,17 +50,16 @@ class LazySubhaloContext:
         for fn in self.transforms:
             table = fn(table)
 
-        # assign to self.data so properties and __len__ work correctly
         self.data = table
         return table
 
     def get_subhalo_by_id(self, subhalo_id, halo_id=None) -> "SubHalo":
-        # field names unified to "parent_id" / "subhalo_id" (consistent with schema)
-        # pipeline filters and transforms are applied so results are consistent
-        # with what materialize() would return
+        # FIX: subhalo catalog schema field is "id_parents", not "parent_id"
+        # (see MagneticumFetcher._get_subhalos: df["parent_bucket"] =
+        # df["id_parents"] % 128 -- "id_parents" is what's actually written).
         base_filter = ds.field("subhalo_id") == subhalo_id
         if halo_id is not None:
-            base_filter = (ds.field("parent_id") == halo_id) & base_filter
+            base_filter = (ds.field("id_parents") == halo_id) & base_filter
 
         pipeline_filter = self._build_filter()
         combined_filter = (pipeline_filter & base_filter) if pipeline_filter is not None else base_filter
@@ -74,14 +71,15 @@ class LazySubhaloContext:
 
         return table.to_pandas()
 
-    def get_items_by_halo(self, parent_id) -> "pd.DataFrame":
-        bucket = int(parent_id % 128)
+    def get_items_by_halo(self, id_parents) -> "pd.DataFrame":
+        bucket = int(id_parents % 128)
 
         try:
             # parent_bucket_data is the in-file duplicate of the partition column
+            # FIX: "id_parents", not "parent_id" -- see get_subhalo_by_id above.
             base_filter = (
                     (ds.field("parent_bucket_data") == bucket) &
-                    (ds.field("parent_id") == parent_id)
+                    (ds.field("id_parents") == id_parents)
             )
             pipeline_filter = self._build_filter()
             combined_filter = (pipeline_filter & base_filter) if pipeline_filter is not None else base_filter
@@ -94,22 +92,47 @@ class LazySubhaloContext:
             return table.to_pandas()
 
         except Exception as e:
-            logger.error("Failed to fetch items for halo %s (bucket %s): %s", parent_id, bucket, e)
+            logger.error("Failed to fetch items for halo %s (bucket %s): %s", id_parents, bucket, e)
             raise
 
-    def filter_to_valid_halos(self, halo_context: "HaloContext"):
-        halo_ids = halo_context.data["halo_id"].unique()
-        buckets = np.unique(halo_ids % 128)
+    def remove_subhalos_belonging_unvalid_halos(self, halo_context: "HaloContext"):
+        """
+        Lazy equivalent of SubhaloContext.remove_subhalos_belonging_unvalid_halos.
 
-        logger.debug("Adding validity filter (lazy)")
+        LazySubhaloContext doesn't populate self.data until materialize() is
+        called, so this can't eagerly filter a DataFrame the way the eager
+        version does. Instead it registers an 'id_parents in valid halo_ids'
+        filter via add_filter() -- composes with any other filters already
+        registered, and is only actually applied when the dataset is scanned
+        (materialize(), get_items_by_halo, etc.), consistent with the rest of
+        this class's lazy design.
 
-        filter_expr = (
-                ds.field("parent_bucket_data").isin(buckets.astype(int).tolist())
-                &
-                ds.field("parent_id").isin(halo_ids.astype(int).tolist())
+        NOTE: this largely duplicates filter_to_valid_halos() above (same
+        class, same purpose, different name/signature). Kept as a separate
+        method to match SubhaloContext's method name for API parity;
+        consider consolidating the two if that duplication becomes a
+        maintenance issue.
+
+        Before/after counts are logged for diagnostic parity with the eager
+        version, using dataset.count_rows(filter=...) rather than a full
+        materialize() -- counts matching rows via metadata/row-group
+        pruning where possible, without loading actual column data.
+        """
+        halo_ids = list(halo_context.data["halo_id"].unique())
+
+        existing_filter = self._build_filter()
+        count_before = (
+            self.dataset.count_rows(filter=existing_filter)
+            if existing_filter is not None
+            else self.dataset.count_rows()
         )
+        logger.debug(f"Number of subhalos before filtering: {count_before}")
 
-        self.filters.append(filter_expr)
+        # FIX: "id_parents", not "parent_id" -- see get_subhalo_by_id above.
+        self.add_filter(ds.field("id_parents").isin(halo_ids))
+
+        count_after = self.dataset.count_rows(filter=self._build_filter())
+        logger.debug(f"Number of subhalos after filtering: {count_after}")
 
     def __add__(self, other):
         if not isinstance(other, self.__class__):
@@ -119,28 +142,25 @@ class LazySubhaloContext:
             self.dataset.files + other.dataset.files,
             format="parquet"
         )
-        # path=None is still passed but now clearly intentional since dataset is provided
         return self.__class__(path=None, dataset=merged_dataset)
 
     def preprocess(self, halo, lbox=None):
-        # guard against double application
         if self._preprocessed:
             raise RuntimeError("preprocess() has already been called on this context.")
         self._preprocessed = True
 
-        self.add_filter(ds.field("parent_id") == halo.halo_id)
+        # FIX: "id_parents", not "parent_id" -- see get_subhalo_by_id above.
+        self.add_filter(ds.field("id_parents") == halo.halo_id)
 
         if hasattr(halo, "group_number"):
             self.add_filter(ds.field("group_number") == halo.group_number)
 
-        # capture halo values eagerly at registration time, not by reference,
-        # so mutations to `halo` after this call don't affect the transform
         gpos_snapshot = np.asarray(halo.gpos).copy()
         lbox_snapshot = lbox
 
         def pbc_transform(table):
             spos = np.asarray(table["spos"].to_pylist())
-            delta = spos - gpos_snapshot  # use snapshot, not live halo
+            delta = spos - gpos_snapshot
 
             if lbox_snapshot is not None:
                 over = delta > lbox_snapshot / 2
@@ -157,12 +177,10 @@ class LazySubhaloContext:
         self.add_transform(pbc_transform)
 
     def rotate(self, z, degree):
-        # guard against double application
         if self._rotated:
             raise RuntimeError("rotate() has already been called on this context.")
         self._rotated = True
 
-        # capture z and degree eagerly
         z_snapshot = z
         degree_snapshot = degree
 
@@ -180,20 +198,20 @@ class LazySubhaloContext:
 
     @property
     def id_parents(self) -> pa.Array:
-        # guard against uninitialized self.data
         if self.data is None:
             raise RuntimeError("Call materialize() before accessing id_parents.")
-        return self.data["parent_id"]
+        # FIX: was reading self.data["parent_id"], a field that doesn't
+        # exist in this schema -- the property is named id_parents because
+        # that's the actual column name.
+        return self.data["id_parents"]
 
     @property
     def subhalo_id(self) -> pa.Array:
-        # guard against uninitialized self.data
         if self.data is None:
             raise RuntimeError("Call materialize() before accessing subhalo_id.")
         return self.data["subhalo_id"]
 
     def __len__(self):
-        # self.data was always None; now materialize() sets it, so this works
         if self.data is None:
             raise RuntimeError("Call materialize() before calling len().")
         return self.data.num_rows

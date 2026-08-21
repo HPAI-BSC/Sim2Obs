@@ -23,7 +23,11 @@ def make_mock_subhalo_dataset(path: str, n_halos: int = 5, subhalos_per_halo: in
             bucket = halo_id % 128
             records.append({
                 "subhalo_id": subhalo_counter,
-                "parent_id": halo_id,
+                # FIX: real subhalo catalog schema field is "id_parents",
+                # not "parent_id" (see MagneticumFetcher._get_subhalos --
+                # df["parent_bucket"] = df["id_parents"] % 128). Mock data
+                # now mirrors production schema.
+                "id_parents": halo_id,
                 "parent_bucket": bucket,   # partition column — removed from file schema
                 "parent_bucket_data": bucket,   # regular column — stays inside the parquet file
                 "group_number": halo_id * 10,
@@ -75,28 +79,32 @@ class _FakeHalo:
 class TestLazySubhaloContext:
 
     # get_items_by_halo
+    # NOTE: the `id_parents` kwarg name below is the method's external
+    # parameter name -- matches the actual COLUMN name too here (unlike
+    # the confusing parent_id/id_parents split earlier versions of this
+    # class had), so no naming mismatch to keep straight this time.
 
     def test_get_items_by_halo_returns_correct_parent(self, ctx):
-        result = ctx.get_items_by_halo(parent_id=2)
+        result = ctx.get_items_by_halo(id_parents=2)
         assert not result.empty
-        assert (result["parent_id"] == 2).all()
+        assert (result["id_parents"] == 2).all()
 
     def test_get_items_by_halo_row_count(self, ctx):
-        result = ctx.get_items_by_halo(parent_id=2)
+        result = ctx.get_items_by_halo(id_parents=2)
         assert len(result) == 10
 
     def test_get_items_by_halo_has_expected_columns(self, ctx):
-        result = ctx.get_items_by_halo(parent_id=0)
+        result = ctx.get_items_by_halo(id_parents=0)
         # parent_bucket_data is the in-file column; parent_bucket is the partition dir (absent)
-        assert {"subhalo_id", "parent_id", "parent_bucket_data", "spos"}.issubset(result.columns)
+        assert {"subhalo_id", "id_parents", "parent_bucket_data", "spos"}.issubset(result.columns)
 
     def test_get_items_by_halo_unknown_id_returns_empty(self, ctx):
-        result = ctx.get_items_by_halo(parent_id=9999)
+        result = ctx.get_items_by_halo(id_parents=9999)
         assert result.empty
 
     def test_get_items_by_halo_bucket_data_matches_formula(self, ctx):
         # parent_bucket_data is a regular column so it IS readable
-        result = ctx.get_items_by_halo(parent_id=3)
+        result = ctx.get_items_by_halo(id_parents=3)
         assert (result["parent_bucket_data"] == 3 % 128).all()
 
     # get_subhalo_by_id
@@ -105,7 +113,7 @@ class TestLazySubhaloContext:
         result = ctx.get_subhalo_by_id(subhalo_id=0, halo_id=0)
         assert not result.empty
         assert result.iloc[0]["subhalo_id"] == 0
-        assert result.iloc[0]["parent_id"] == 0
+        assert result.iloc[0]["id_parents"] == 0
 
     def test_get_subhalo_by_id_without_halo(self, ctx):
         result = ctx.get_subhalo_by_id(subhalo_id=15)
@@ -117,7 +125,7 @@ class TestLazySubhaloContext:
         assert result.empty
 
     def test_get_subhalo_by_id_respects_pipeline_filters(self, ctx):
-        ctx.add_filter(ds.field("parent_id") != 0)
+        ctx.add_filter(ds.field("id_parents") != 0)
         result = ctx.get_subhalo_by_id(subhalo_id=0, halo_id=0)
         assert result.empty
 
@@ -127,14 +135,14 @@ class TestLazySubhaloContext:
         assert ctx._build_filter() is None
 
     def test_build_filter_single_filter(self, ctx):
-        ctx.add_filter(ds.field("parent_id") == 1)
+        ctx.add_filter(ds.field("id_parents") == 1)
         assert ctx._build_filter() is not None
 
     def test_build_filter_combines_multiple_filters(self, ctx):
-        ctx.add_filter(ds.field("parent_id") == 1)
+        ctx.add_filter(ds.field("id_parents") == 1)
         ctx.add_filter(ds.field("subhalo_id") > 5)
         result = ctx.dataset.to_table(filter=ctx._build_filter()).to_pandas()
-        assert (result["parent_id"] == 1).all()
+        assert (result["id_parents"] == 1).all()
         assert (result["subhalo_id"] > 5).all()
 
     # ── materialize ────────────────────────────────────────────────────────────
@@ -143,10 +151,10 @@ class TestLazySubhaloContext:
         assert ctx.materialize().num_rows == 50
 
     def test_materialize_applies_registered_filters(self, ctx):
-        ctx.add_filter(ds.field("parent_id") == 0)
+        ctx.add_filter(ds.field("id_parents") == 0)
         table = ctx.materialize()
         assert table.num_rows == 10
-        assert all(v == 0 for v in table["parent_id"].to_pylist())
+        assert all(v == 0 for v in table["id_parents"].to_pylist())
 
     def test_materialize_sets_self_data(self, ctx):
         assert ctx.data is None
@@ -165,32 +173,38 @@ class TestLazySubhaloContext:
         table = ctx.materialize()
         assert table["spos"].to_pylist()[0] == [2.0, 2.0, 2.0]
 
-    # ── filter_to_valid_halos ──────────────────────────────────────────────────
+    # ── remove_subhalos_belonging_unvalid_halos ─────────────────────────────────
+    # Functionally identical to filter_to_valid_halos (same purpose, no
+    # bucket pre-filter) -- mirrored test coverage for parity, since this
+    # method previously had none at all.
 
-    def test_filter_to_valid_halos_removes_invalid_halo_rows(self, ctx):
-        ctx.filter_to_valid_halos(_FakeHaloContext(halo_ids=[0, 1]))
-        parent_ids = set(ctx.materialize()["parent_id"].to_pylist())
+    def test_remove_subhalos_belonging_unvalid_halos_removes_invalid_rows(self, ctx):
+        ctx.remove_subhalos_belonging_unvalid_halos(_FakeHaloContext(halo_ids=[0, 1]))
+        parent_ids = set(ctx.materialize()["id_parents"].to_pylist())
         assert parent_ids == {0, 1}
 
-    def test_filter_to_valid_halos_keeps_all_rows_when_all_valid(self, ctx):
-        ctx.filter_to_valid_halos(_FakeHaloContext(halo_ids=[0, 1, 2, 3, 4]))
+    def test_remove_subhalos_belonging_unvalid_halos_keeps_all_rows_when_all_valid(self, ctx):
+        ctx.remove_subhalos_belonging_unvalid_halos(_FakeHaloContext(halo_ids=[0, 1, 2, 3, 4]))
         assert ctx.materialize().num_rows == 50
 
-    def test_filter_to_valid_halos_empty_halo_context_gives_empty(self, ctx):
-        ctx.filter_to_valid_halos(_FakeHaloContext(halo_ids=[]))
+    def test_remove_subhalos_belonging_unvalid_halos_empty_halo_context_gives_empty(self, ctx):
+        ctx.remove_subhalos_belonging_unvalid_halos(_FakeHaloContext(halo_ids=[]))
         assert ctx.materialize().num_rows == 0
 
-    def test_filter_to_valid_halos_uses_bucket_data_column(self, ctx):
-        # Confirm parent_bucket_data is what's being filtered (it exists in schema)
-        ctx.filter_to_valid_halos(_FakeHaloContext(halo_ids=[2]))
+    def test_remove_subhalos_belonging_unvalid_halos_composes_with_other_filters(self, ctx):
+        # Registering this alongside another filter should AND them
+        # together, same as any other add_filter() call.
+        ctx.add_filter(ds.field("subhalo_id") >= 5)
+        ctx.remove_subhalos_belonging_unvalid_halos(_FakeHaloContext(halo_ids=[0]))
         table = ctx.materialize()
-        assert all(v == 2 % 128 for v in table["parent_bucket_data"].to_pylist())
+        assert all(v == 0 for v in table["id_parents"].to_pylist())
+        assert all(v >= 5 for v in table["subhalo_id"].to_pylist())
 
     # preprocess
 
     def test_preprocess_filters_to_single_halo(self, ctx):
         ctx.preprocess(_FakeHalo(halo_id=2, gpos=[0.0, 0.0, 0.0]))
-        unique_parents = set(ctx.materialize()["parent_id"].to_pylist())
+        unique_parents = set(ctx.materialize()["id_parents"].to_pylist())
         assert unique_parents == {2}
 
     def test_preprocess_filters_by_group_number_when_present(self, ctx):
@@ -226,7 +240,7 @@ class TestLazySubhaloContext:
     # rotate
 
     def test_rotate_transforms_spos(self, ctx):
-        ctx.add_filter(ds.field("parent_id") == 0)
+        ctx.add_filter(ds.field("id_parents") == 0)
         ctx.rotate(z=np.array([0, 0, 1]), degree=90)
         spos = np.array(ctx.materialize()["spos"].to_pylist())
         assert spos.shape == (10, 3)
@@ -238,7 +252,7 @@ class TestLazySubhaloContext:
             ctx.rotate(z=np.array([0, 0, 1]), degree=45)
 
     def test_rotate_snapshot_isolates_mutation(self, ctx):
-        ctx.add_filter(ds.field("parent_id") == 0)
+        ctx.add_filter(ds.field("id_parents") == 0)
         ctx.rotate(z=np.array([0.0, 0.0, 1.0]), degree=90)
         ctx.materialize()  # must not raise
 
@@ -266,7 +280,7 @@ class TestLazySubhaloContext:
         assert len(ctx) == 50
 
     def test_len_after_filtered_materialize(self, ctx):
-        ctx.add_filter(ds.field("parent_id") == 1)
+        ctx.add_filter(ds.field("id_parents") == 1)
         ctx.materialize()
         assert len(ctx) == 10
 
