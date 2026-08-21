@@ -37,7 +37,7 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
 
     # Compute overlapping matrix with the whole sample size
     overlapping_matrix = None
-    if not subhalo_context.empty:
+    if not subhalo_context.is_empty:
         overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
 
     if len(debug_halo_ids) > 0:
@@ -45,7 +45,7 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
         halo_context = halo_context.filter_by_ids(debug_halo_ids)
         print(f'Halo context size: {len(halo_context.data)}')
 
-    if not subhalo_context.data.empty:
+    if not subhalo_context.data.is_empty:
         halo_subhalo_list = data_loader.load_halo_subhalo_data(subhalo_context, halo_context, overlapping_matrix)
         halo_subhalo_list = halo_subhalo_list[starting_idx:ending_idx]
 
