@@ -188,6 +188,11 @@ def convert_to_dataframe(d: dict):
         dictionary of DataFrames if 2 levels deep,
         otherwise raises a ValueError.
     """
+    print('convert_to_dataframe')
+    print(list(d.keys()))
+    for key, values in d.items():
+        print(key, type(values))
+
     if dict_depth(d) == 1:
         return pd.DataFrame.from_dict(d)
     elif dict_depth(d) == 2:
@@ -196,6 +201,7 @@ def convert_to_dataframe(d: dict):
         return d
     else:
         raise ValueError(f'The format of the data is not correct, {dict_depth(d)} levels of data detected.')
+
 
 # TODO TEST
 def apply_filter_arrow(table: pa.Table, conditions: dict, config):
