@@ -173,6 +173,27 @@ class TestLazySubhaloContext:
         table = ctx.materialize()
         assert table["spos"].to_pylist()[0] == [2.0, 2.0, 2.0]
 
+    # ── filter_to_valid_halos ──────────────────────────────────────────────────
+
+    def test_filter_to_valid_halos_removes_invalid_halo_rows(self, ctx):
+        ctx.filter_to_valid_halos(_FakeHaloContext(halo_ids=[0, 1]))
+        parent_ids = set(ctx.materialize()["id_parents"].to_pylist())
+        assert parent_ids == {0, 1}
+
+    def test_filter_to_valid_halos_keeps_all_rows_when_all_valid(self, ctx):
+        ctx.filter_to_valid_halos(_FakeHaloContext(halo_ids=[0, 1, 2, 3, 4]))
+        assert ctx.materialize().num_rows == 50
+
+    def test_filter_to_valid_halos_empty_halo_context_gives_empty(self, ctx):
+        ctx.filter_to_valid_halos(_FakeHaloContext(halo_ids=[]))
+        assert ctx.materialize().num_rows == 0
+
+    def test_filter_to_valid_halos_uses_bucket_data_column(self, ctx):
+        # Confirm parent_bucket_data is what's being filtered (it exists in schema)
+        ctx.filter_to_valid_halos(_FakeHaloContext(halo_ids=[2]))
+        table = ctx.materialize()
+        assert all(v == 2 % 128 for v in table["parent_bucket_data"].to_pylist())
+
     # ── remove_subhalos_belonging_unvalid_halos ─────────────────────────────────
     # Functionally identical to filter_to_valid_halos (same purpose, no
     # bucket pre-filter) -- mirrored test coverage for parity, since this
@@ -271,9 +292,21 @@ class TestLazySubhaloContext:
 
     # __len__
 
-    def test_len_raises_before_materialize(self, ctx):
-        with pytest.raises(RuntimeError, match="materialize"):
-            len(ctx)
+    def test_len_works_before_materialize(self, ctx):
+        # __len__ no longer requires materialize() -- count_rows(filter=...)
+        # gives the correct count via metadata/row-group pruning without
+        # loading actual column data. This matters because code written
+        # generically against both SubhaloContext (always has self.data)
+        # and this lazy class -- e.g. get_generator calling
+        # len(subhalo_context) right after registering a filter, with no
+        # materialize() call in between -- needs len() to just work.
+        assert ctx.data is None
+        assert len(ctx) == 50
+
+    def test_len_before_materialize_respects_registered_filters(self, ctx):
+        ctx.add_filter(ds.field("id_parents") == 1)
+        assert ctx.data is None
+        assert len(ctx) == 10
 
     def test_len_after_materialize(self, ctx):
         ctx.materialize()

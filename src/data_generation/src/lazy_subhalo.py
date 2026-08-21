@@ -95,6 +95,21 @@ class LazySubhaloContext:
             logger.error("Failed to fetch items for halo %s (bucket %s): %s", id_parents, bucket, e)
             raise
 
+    def filter_to_valid_halos(self, halo_context: "HaloContext"):
+        halo_ids = halo_context.data["halo_id"].unique()
+        buckets = np.unique(halo_ids % 128)
+
+        logger.debug("Adding validity filter (lazy)")
+
+        # FIX: "id_parents", not "parent_id" -- see get_subhalo_by_id above.
+        filter_expr = (
+                ds.field("parent_bucket_data").isin(buckets.astype(int).tolist())
+                &
+                ds.field("id_parents").isin(halo_ids.astype(int).tolist())
+        )
+
+        self.filters.append(filter_expr)
+
     def remove_subhalos_belonging_unvalid_halos(self, halo_context: "HaloContext"):
         """
         Lazy equivalent of SubhaloContext.remove_subhalos_belonging_unvalid_halos.
@@ -212,9 +227,21 @@ class LazySubhaloContext:
         return self.data["subhalo_id"]
 
     def __len__(self):
-        if self.data is None:
-            raise RuntimeError("Call materialize() before calling len().")
-        return self.data.num_rows
+        # Doesn't require materialize() -- count_rows(filter=...) uses
+        # dataset metadata/row-group pruning, so it's cheaper than forcing
+        # a full materialize() just to get a count, AND it means len()
+        # works the same way on both SubhaloContext (always has self.data)
+        # and this lazy class, for code written generically against
+        # either (e.g. get_generator calling len(subhalo_context) right
+        # after registering a filter, with no materialize() in between).
+        #
+        # Safe because none of this class's registered transforms
+        # (pbc_transform, rotate_fn) change row count -- they only
+        # rewrite the 'spos' column's values -- so count_rows(filter=...)
+        # gives exactly the same count materialize() would produce.
+        if self.data is not None:
+            return self.data.num_rows
+        return self.dataset.count_rows(filter=self._build_filter())
 
 
 class LazySubhaloParticles:
