@@ -129,7 +129,7 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
     print(fields)
     print(list(d.keys()))
     for key, values in d.items():
-        print(key, type(values))
+        print(key, type(values), values.shape)
 
     for key in list(d.keys()):
         if key in fields:
