@@ -134,11 +134,13 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
     for key in list(d.keys()):
         if key in fields:
             field_info = OmegaConf.select(cfg, f"fields.{table}.{key}")
+            print('dict_depth', dict_depth(field_info))
             # Halo / subhalos case
             if dict_depth(field_info) == 1:
                 if not getattr(field_info, 'name', None):
                     raise ValueError(f"Error: The field '{key}' must have a name.")
                 index = field_info.get("index", None)
+                print('index', index)
                 if index is not None:
                     if isinstance(index, (int, list, ListConfig)):
                         d[key] = d[key][:, index]
@@ -146,8 +148,10 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
                 if isinstance(d[key], np.ndarray) and d[key].ndim > 1:
                     agg_func = field_info.get("agg", None)
                     if agg_func is None:
+                        print('Converting to list')
                         d[key] = to_list(d, key)
                     else:
+                        print('Agg')
                         result = getattr(np, agg_func)(d[key], axis=1)
                         d[key] = result
 
