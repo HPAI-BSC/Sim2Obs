@@ -74,7 +74,7 @@ class LazySubhaloContext:
     @property
     def is_empty(self):
         print(type(self.dataset))
-        return len(self.dataset) == 0
+        return self.dataset.count_rows() == 0
 
     def get_items_by_halo(self, id_parents) -> "pd.DataFrame":
         bucket = int(id_parents % 128)
