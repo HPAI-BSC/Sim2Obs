@@ -3,9 +3,9 @@ defaults:
   - paths: gpfs
 #  - catalog: tngcluster
 #  - catalog: illustris300
-#  - catalog: magneticum
+  - catalog: magneticum
 # - catalog: flamingo
-  - catalog: millenium
+#  - catalog: millenium
   - extras: default
   - hydra: default
 
@@ -17,7 +17,7 @@ feature_names:
   - name: VelocityDispersion
     simulate_muse: false
   - name: IntraClusterLight
-    transition_radius_compute: false
+    transition_radius_compute: true
 
 # [angle, z axis, [rotation_axis]]
 #rotation_45: [ 45, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]
@@ -25,14 +25,14 @@ feature_names:
 #rotation_120: [ 120, [0, 0, 1], [ [1, 0, 0], [0, 1, 0], [0, 0, 1] ] ]
 
 # This affects the entire pipeline when computing maps
-skip_existing_halos: true
+skip_existing_halos: false
 
 pipeline:
   - name: data_loader
     G: 4.30091e-6              # Gravitational constant in units of kpc Msun^-1 (km/s)^2
-  - name: map_step
-    dim: 2 # new
-    n_zooms: 1
+  #- name: map_step
+  #  dim: 2 # new
+  #  n_zooms: 1
 
 
 
