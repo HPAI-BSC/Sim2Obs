@@ -71,6 +71,13 @@ class LazySubhaloContext:
 
         return table.to_pandas()
 
+    @property
+    def is_empty(self):
+        print(type(self.data))
+        if self.data is None:
+            return True
+        return self.data.num_rows == 0
+
     def get_items_by_halo(self, id_parents) -> "pd.DataFrame":
         bucket = int(id_parents % 128)
 
@@ -395,12 +402,6 @@ class LazySubhaloParticles:
         self.add_transform(rotate_fn)
 
     # mirror SubhaloParticles properties / dunder
-
-    @property
-    def is_empty(self):
-        if self.data is None:
-            return True
-        return self.data.num_rows == 0
 
     def __len__(self):
         if self.data is None:
