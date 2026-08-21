@@ -60,7 +60,6 @@ fields:
       input: "ckpc/h"
       output: "pkpc/h"
       scaling: "x * a"
-      index: 4
       name: "shmr"
     GRNR:
       input: null

@@ -65,7 +65,6 @@ def pipeline_step(func):
 
 @pipeline_step
 def remove_useless_columns(d: dict, fields: list):
-    print('remove_useless_columns')
     diff = set(d.keys()).difference(set(fields))
 
     for key in diff:
@@ -76,7 +75,6 @@ def remove_useless_columns(d: dict, fields: list):
 
 @pipeline_step
 def assign_id(d: dict, id_column: str, offset=0):
-    print('assign_id')
     """
     Assign an ID to each subhalo/halo.
 
@@ -125,22 +123,14 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
     dict
         Processed dataset with indexed and converted fields.
     """
-    print('validate_and_process_fields')
-    print(fields)
-    print(list(d.keys()))
-    for key, values in d.items():
-        print(key, type(values), values.shape)
-
     for key in list(d.keys()):
         if key in fields:
             field_info = OmegaConf.select(cfg, f"fields.{table}.{key}")
-            print('dict_depth', dict_depth(field_info))
             # Halo / subhalos case
             if dict_depth(field_info) == 1:
                 if not getattr(field_info, 'name', None):
                     raise ValueError(f"Error: The field '{key}' must have a name.")
                 index = field_info.get("index", None)
-                print('index', index)
                 if index is not None:
                     if isinstance(index, (int, list, ListConfig)):
                         d[key] = d[key][:, index]
@@ -148,10 +138,8 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
                 if isinstance(d[key], np.ndarray) and d[key].ndim > 1:
                     agg_func = field_info.get("agg", None)
                     if agg_func is None:
-                        print('Converting to list')
                         d[key] = to_list(d, key)
                     else:
-                        print('Agg')
                         result = getattr(np, agg_func)(d[key], axis=1)
                         d[key] = result
 
@@ -160,17 +148,14 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
                 tmp = OmegaConf.select(cfg, f"fields.{table}.{key}")
                 for key_ii in OmegaConf.select(cfg, f"fields.{table}.{key}"):
                     # Rename the column in case the initial config format was not appropiate, ie: POS to 'POS '
-                    print('key_ii', key_ii)
                     field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
                     h = dict_depth(field_info_ii)
-                    print(h)
                     if cfg.name == 'magneticum':
                         key_ii = key_ii.ljust(4)
                     if h == 1:
                         if not getattr(field_info_ii, 'name', None):
                             raise ValueError(f"Error: The field '{key}' must have a name.")
                         index = field_info_ii.get("index", None)
-                        print('index', index)
                         if index is not None:
                             d[key][key_ii] = d[key][key_ii][:, index]
                         if isinstance(d[key][key_ii], np.ndarray) and d[key][key_ii].ndim > 1:
@@ -347,7 +332,6 @@ def apply_filters(d: Any, conditions: dict, config: DictConfig):
 # TO TEST
 @pipeline_step
 def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig, **kwargs):
-    print('apply_unit_conversion')
     """
     Apply filtering conditions to data.
 

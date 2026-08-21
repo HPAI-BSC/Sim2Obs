@@ -35,8 +35,8 @@ def magneticum_particle_test():
     halo_context = fetcher_magneticum.get_halos()
     print(f'type: {type(halo_context)}')
 
-    # total_rows = halo_context.dataset.count_rows()
-    # print("Total rows:", total_rows)
+    total_rows = len(halo_context.data)
+    print("Total rows:", total_rows)
 
     subhalo_context = fetcher_magneticum.get_subhalos()
     print(f'type: {type(subhalo_context)}')
