@@ -372,11 +372,15 @@ class DataLoader(PipelineStep):
             - `SubhaloContext`: the context object containing the main and overlapping subhalos for the halo.
         """
         logger.debug('Add subhalo data of overlapping halos to each subhalo context ...')
+        logger.debug(f'subhalo_context: {type(subhalo_context)}')
+        logger.debug(f'halo_context: {type(halo_context)}')
         result = []
         for id_halo in halo_context.halo_id:
+            logger.debug(f'loading info: {id_halo}')
             try:
                 halo = halo_context.get_halo_by_id(id_halo)
                 subhalo_ctx = subhalo_context.get_items_by_halo(id_halo)
+                logger.debug(f'subhalo_ctx: {type(subhalo_ctx)}')
 
                 # Prepare a default cosmos_data placeholder to pass during pipeline build (adjust if needed)
                 subhalo_particles = SubhaloParticles({}, None)
@@ -388,6 +392,7 @@ class DataLoader(PipelineStep):
                 overlapping_halo_subhalo_ids = overlapping_matrix.get(id_halo, {})
 
                 if overlapping_halo_subhalo_ids:
+                    logger.debug('Adding overlapping subhalos ...')
                     overlapping_subhalos_df = subhalo_context.data.loc[overlapping_halo_subhalo_ids]
                     overlapping_subhalo_ctx = SubhaloContext.from_dataframe(overlapping_subhalos_df)
                     subhalo_ctx += overlapping_subhalo_ctx
