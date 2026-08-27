@@ -545,7 +545,7 @@ class DataLoader(PipelineStep):
             # Get the radius (2 * r200 for the current halo)
             r = halo_r200[i]
             halo_id = halo_ids[i]
-
+            logger.debug(f'Checking overlapping for halo_id: {halo_id}')
             # Query the subhalo tree for nearby subhalos within the radius
             nearby_sub_idxs = subhalo_tree.query_ball_point(halo_position, r)
             if nearby_sub_idxs:
@@ -554,10 +554,11 @@ class DataLoader(PipelineStep):
                 if valid_subhalo_idxs:
                     overlapping_matrix[halo_id] = list(
                         zip(id_parents[valid_subhalo_idxs], subhalo_ids[valid_subhalo_idxs]))
-                    #logger.debug(f'Halo {halo_id} has {len(valid_subhalo_idxs)} overlapping subhalos:')
+                    logger.debug(f'Halo {halo_id} has {len(valid_subhalo_idxs)} overlapping subhalos:')
                     #logger.debug(f'------> {overlapping_matrix[halo_id]}')
                 else:
                     overlapping_matrix[halo_id] = []
             else:
                 overlapping_matrix[halo_id] = []
+        logger.debug(f'overlapping matrix: {len(overlapping_matrix)}')
         return overlapping_matrix
