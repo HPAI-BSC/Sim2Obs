@@ -515,14 +515,29 @@ class DataLoader(PipelineStep):
         """
         logger.debug('Getting overlapping halos ...')
         positions = as_subhalo_dataframe(subhalo_context)['spos']
+        logger.debug(f'positions type: {positions}')
+
         subhalo_positions = np.vstack(positions)
+        logger.debug(f'subhalo_positions: {subhalo_positions.shape}')
+
         subhalo_tree = cKDTree(subhalo_positions)
 
         halo_positions = np.vstack(halo_context.data['gpos'])
         halo_r200 = halo_context.data['r200'].values * 2  # Precompute r200 * 2
         halo_ids = halo_context.data['halo_id'].values
-        id_parents = subhalo_context.data['id_parents'].values
-        subhalo_ids = subhalo_context.data['subhalo_id'].values
+
+        # TODO PRINT TYPES
+        id_parents = as_subhalo_dataframe(subhalo_context)['id_parents']
+        logger.debug(f'ID_PARENTS type: {type(id_parents)}')
+
+        # TODO DEAL WITH THIS
+        # id_parents = subhalo_context.data['id_parents'].values
+
+        # TODO use property ?
+        subhalo_ids = as_subhalo_dataframe(subhalo_context)['subhalo_id']
+        logger.debug(f'subhalo_ids type: {type(subhalo_ids)}')
+
+        # subhalo_ids = subhalo_context.data['subhalo_id'].values
 
         overlapping_matrix = {}
 
