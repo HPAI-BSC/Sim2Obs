@@ -3,6 +3,8 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
+from src.data_generation.src.subhalo import SubhaloContext
+
 
 class Halo:
     """
@@ -53,14 +55,23 @@ class Halo:
         return cls(halo_id=None, fsub=None)  # You can adjust these default values as needed
 
     def add_children(self, subhalo_context):
-        if not hasattr(self, 'subhalos_ids'):
+        subhalo_ids = []
+        if isinstance(subhalo_context, SubhaloContext):
             filtered_subhalo_context = subhalo_context.data[subhalo_context.data['id_parents'] == self.halo_id]
             if 'group_number' in subhalo_context.data:
                 group_number = filtered_subhalo_context['group_number']
                 subhalo_id = filtered_subhalo_context['subhalo_id']
-                self.subhalo_ids = list(zip(group_number, subhalo_id))
+                subhalo_ids = list(zip(group_number, subhalo_id))
             else:
-                self.subhalo_ids = filtered_subhalo_context['subhalo_id'].tolist()
+                subhalo_ids = filtered_subhalo_context['subhalo_id'].tolist()
+        elif isinstance(subhalo_context, pd.DataFrame):
+            subhalo_ids = subhalo_context['subhalo_id'].tolist()
+
+        # TODO create the attr in the init
+        if not hasattr(self, 'subhalos_ids'):
+            self.subhalos_ids = subhalo_ids
+        else:
+            self.subhalos_ids.extend(subhalo_ids)
 
 
 class HaloContext:

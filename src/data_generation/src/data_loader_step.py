@@ -387,6 +387,7 @@ class DataLoader(PipelineStep):
                 cosmos_data = CosmosData(halo=halo, subhalo_id=halo.fsub, subhalos=subhalo_ctx,
                                          subhalo_particles=subhalo_particles, non_overlapping=subhalo_particles)
                 halo.add_children(subhalo_ctx)
+                logger.debug(f'halo with overlapping subhalo_ids: {len(halo.subhalos_ids)}')
 
                 # Find subhalo neighbours
                 overlapping_halo_subhalo_ids = overlapping_matrix.get(id_halo, {})
