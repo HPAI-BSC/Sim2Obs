@@ -18,7 +18,7 @@ from src.data_generation.src.feature import FeatureProcessorFactory, attach_mode
 from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
-from src.data_generation.src.utils import setup_logger, store_obj
+from src.data_generation.src.utils import setup_logger, store_obj, as_subhalo_dataframe
 
 logger = setup_logger("DataLoader-step")
 
@@ -514,7 +514,8 @@ class DataLoader(PipelineStep):
             }
         """
         logger.debug('Getting overlapping halos ...')
-        subhalo_positions = np.vstack(subhalo_context.data['spos'])
+        positions = as_subhalo_dataframe(subhalo_context)['spos']
+        subhalo_positions = np.vstack(positions)
         subhalo_tree = cKDTree(subhalo_positions)
 
         halo_positions = np.vstack(halo_context.data['gpos'])

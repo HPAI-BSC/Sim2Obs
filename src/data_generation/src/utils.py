@@ -1534,3 +1534,36 @@ def convolve_and_pixelize_from_bins_1d(
         F_pix = rebin_1d(F_conv, bin_factor, agg=agg_pixel)
 
     return F_intr, F_conv, F_pix
+
+
+# Relevant for magneticum
+def as_subhalo_dataframe(subhalo_context):
+    """
+    Returns subhalo_context.data as a pandas DataFrame, regardless of
+    whether subhalo_context is a SubhaloContext (eager -- .data is
+    already a DataFrame) or a LazySubhaloContext (.data is a pyarrow
+    Table, populated only after materialize(), None before that).
+
+    Use this instead of accessing `.data` directly wherever code needs to
+    work against either type without knowing which one it has -- e.g.
+    replace `subhalo_context.data['spos']` with
+    `as_subhalo_dataframe(subhalo_context)['spos']`.
+
+    Materializes the lazy context on demand if it hasn't been already
+    (calls materialize(), which applies every filter/transform registered
+    so far). Does NOT cache the result -- if you need the same dataframe
+    repeatedly (e.g. inside a loop), call this once and reuse the
+    returned DataFrame rather than calling it again each time, to avoid
+    re-materializing on every call.
+
+    Does not mutate subhalo_context in any other way, and does not
+    require modifying SubhaloContext or LazySubhaloContext themselves.
+    """
+    if hasattr(subhalo_context, 'dataset'):
+        # LazySubhaloContext
+        if subhalo_context.data is None:
+            subhalo_context.materialize()
+        return subhalo_context.data.to_pandas()
+
+    # SubhaloContext (eager) -- .data is already a DataFrame
+    return subhalo_context.data
