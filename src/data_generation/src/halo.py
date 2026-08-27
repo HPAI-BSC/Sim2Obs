@@ -3,8 +3,6 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
-from src.data_generation.src.subhalo import SubhaloContext
-
 
 class Halo:
     """
@@ -56,7 +54,7 @@ class Halo:
 
     def add_children(self, subhalo_context):
         subhalo_ids = []
-        if isinstance(subhalo_context, SubhaloContext):
+        if hasattr(subhalo_context, 'data'):
             filtered_subhalo_context = subhalo_context.data[subhalo_context.data['id_parents'] == self.halo_id]
             if 'group_number' in subhalo_context.data:
                 group_number = filtered_subhalo_context['group_number']
