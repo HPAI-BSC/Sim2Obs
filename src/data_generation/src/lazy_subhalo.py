@@ -200,14 +200,16 @@ class LazySubhaloContext:
             context, and calling materialize() afterward is unaffected by
             having called this.
         """
+        logger.debug('Calling get_items_by_subhalo_ids')
         subhalo_ids = list(subhalo_ids)
 
         base_filter = ds.field("subhalo_id").isin(subhalo_ids)
+        logger.debug(base_filter)
         pipeline_filter = self._build_filter()
         combined_filter = (pipeline_filter & base_filter) if pipeline_filter is not None else base_filter
-        print(combined_filter)
+        logger.debug(combined_filter)
         table = self.dataset.to_table(filter=combined_filter)
-
+        logger.debug(f'Table: {type(table)}')
         for fn in self.transforms:
             table = fn(table)
 
