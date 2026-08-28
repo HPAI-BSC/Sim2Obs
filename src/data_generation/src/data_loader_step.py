@@ -546,7 +546,7 @@ class DataLoader(PipelineStep):
         # TODO use property ?
         subhalo_ids = as_subhalo_dataframe(subhalo_context)['subhalo_id']
         logger.debug(f'subhalo_ids type: {type(subhalo_ids)}')
-
+        logger.debug(subhalo_ids.head(1))
         # subhalo_ids = subhalo_context.data['subhalo_id'].values
 
         overlapping_matrix = {}
