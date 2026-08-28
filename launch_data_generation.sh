@@ -7,9 +7,9 @@
 #SBATCH -e slurm_output/err.txt       # Name of stderr output file(%j expands to jobId)
 #SBATCH -n 1
 #SBATCH -c 32               # Cores per task requested
-#SBATCH -t 00:30:00         # Run time (hh:mm:ss)
+#SBATCH -t 04:00:00         # Run time (hh:mm:ss)
 #SBATCH --account bsc70
-#SBATCH --qos=gp_debug
+#SBATCH --qos=gp_bsccs
 
 CURRENT_DIR=$(pwd)
 echo "Current directory: '$CURRENT_DIR'"
