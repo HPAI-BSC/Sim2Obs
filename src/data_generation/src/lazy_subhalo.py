@@ -3,7 +3,7 @@ import pyarrow.dataset as ds
 import pyarrow as pa
 
 from src.data_generation.src.halo import HaloContext
-from src.data_generation.src.subhalo import SubHalo
+from src.data_generation.src.subhalo import SubHalo, SubhaloContext
 from src.data_generation.src.utils import setup_logger, rotate
 
 
@@ -76,7 +76,7 @@ class LazySubhaloContext:
         print(type(self.dataset))
         return self.dataset.count_rows() == 0
 
-    def get_items_by_halo(self, id_parents) -> "pd.DataFrame":
+    def get_items_by_halo(self, id_parents) -> "SubHaloContext":
         bucket = int(id_parents % 128)
 
         try:
@@ -94,7 +94,8 @@ class LazySubhaloContext:
             for fn in self.transforms:
                 table = fn(table)
 
-            return table.to_pandas()
+            df = table.to_pandas()
+            return SubhaloContext.from_dataframe(df)
 
         except Exception as e:
             logger.error("Failed to fetch items for halo %s (bucket %s): %s", id_parents, bucket, e)
