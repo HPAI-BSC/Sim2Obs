@@ -288,6 +288,7 @@ class SubhaloContext:
             raise Exception(f"No subhalos found for halo_id={halo_id}, ignoring halo.")
 
     def get_items_by_subhalo_ids(self, subhalo_ids):
+        # TODO THIS IS WORKING ?
         overlapping_subhalos_df = self.data.loc[subhalo_ids]
         return overlapping_subhalos_df
 

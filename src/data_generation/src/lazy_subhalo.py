@@ -201,8 +201,10 @@ class LazySubhaloContext:
             having called this.
         """
         logger.debug('Calling get_items_by_subhalo_ids')
-        subhalo_ids = list(subhalo_ids)
+        if all(isinstance(x, tuple) for x in subhalo_ids):
+            subhalo_ids = [pair[1] for pair in subhalo_ids]
 
+        subhalo_ids = list(subhalo_ids)
         base_filter = ds.field("subhalo_id").isin(subhalo_ids)
         logger.debug(base_filter)
         pipeline_filter = self._build_filter()
