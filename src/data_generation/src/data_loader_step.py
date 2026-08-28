@@ -399,6 +399,9 @@ class DataLoader(PipelineStep):
                     logger.debug(f'overlapping subhalos df: {len(overlapping_subhalos_df)}')
                     overlapping_subhalo_ctx = SubhaloContext.from_dataframe(overlapping_subhalos_df)
                     logger.debug(f'Type overlapping subhalos ctx: {type(overlapping_subhalo_ctx)}')
+                    logger.debug(f'Head overlapping subhalos ctx: {overlapping_subhalo_ctx.head(1)}')
+                    logger.debug(f'Type subhalo ctx: {type(subhalo_ctx)}')
+                    logger.debug(f'Head subhalo ctx: {subhalo_ctx.head(1)}')
                     subhalo_ctx += overlapping_subhalo_ctx
                     logger.debug(f'final size of subhalo_ctx: {len(subhalo_ctx)}')
             except Exception as e:
