@@ -154,6 +154,65 @@ class LazySubhaloContext:
         count_after = self.dataset.count_rows(filter=self._build_filter())
         logger.debug(f"Number of subhalos after filtering: {count_after}")
 
+    def get_items_by_subhalo_ids(self, subhalo_ids) -> "pd.DataFrame":
+        """
+        Lazy equivalent of `subhalo_context.data.loc[subhalo_ids]` on the
+        eager SubhaloContext -- returns only the rows whose subhalo_id is
+        in the given list, as a FRESH, STANDALONE pandas DataFrame.
+
+        IMPORTANT: this does NOT materialize into this context -- self.data
+        is left completely untouched (still None if it was None before this
+        call). The returned DataFrame is built from a local pyarrow Table
+        that is never assigned to self.data anywhere in this method. Call
+        this as many times as needed without it ever changing what
+        self.materialize()/self.data would later return.
+
+        Like get_items_by_halo, this is a ONE-SHOT read: it respects any
+        filters/transforms already registered on self, but does NOT
+        register anything new on self.filters either. It mirrors the eager
+        `.loc[...]` call's semantics (an immediate, side-effect-free read),
+        not the deferred-filter semantics of
+        remove_subhalos_belonging_unvalid_halos / filter_to_valid_halos.
+
+        NOTE on efficiency: unlike get_items_by_halo, this can't use the
+        parent_bucket_data partition column to prune buckets up front --
+        bucket is derived from id_parents (id_parents % 128), not
+        subhalo_id, and a list of subhalo_ids can span arbitrarily many
+        different parent halos/buckets. This scans the full dataset
+        (filtered via subhalo_id predicate pushdown at the row-group
+        level, but not partition-pruned). If the subhalo_ids all share a
+        known parent halo, get_items_by_halo (or preprocess()) will be
+        cheaper.
+
+        Parameters
+        ----------
+        subhalo_ids : list | array-like
+            The subhalo_id values to select.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per matching subhalo_id found in the dataset. Missing
+            ids are silently absent from the result (same as pandas'
+            `.loc[]` behavior for an Index -- no explicit KeyError raised
+            here, unlike get_items_by_halo which raises). This DataFrame
+            is independent of self -- mutating it has no effect on this
+            context, and calling materialize() afterward is unaffected by
+            having called this.
+        """
+        subhalo_ids = list(subhalo_ids)
+
+        base_filter = ds.field("subhalo_id").isin(subhalo_ids)
+        pipeline_filter = self._build_filter()
+        combined_filter = (pipeline_filter & base_filter) if pipeline_filter is not None else base_filter
+        print(combined_filter)
+        table = self.dataset.to_table(filter=combined_filter)
+
+        for fn in self.transforms:
+            table = fn(table)
+
+        return table.to_pandas()
+
     def __add__(self, other):
         if not isinstance(other, self.__class__):
             return NotImplemented

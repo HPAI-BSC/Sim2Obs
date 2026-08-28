@@ -287,6 +287,10 @@ class SubhaloContext:
         except KeyError:
             raise Exception(f"No subhalos found for halo_id={halo_id}, ignoring halo.")
 
+    def get_items_by_subhalo_ids(self, subhalo_ids):
+        overlapping_subhalos_df = self.data.loc[subhalo_ids]
+        return overlapping_subhalos_df
+
     def remove_subhalos_belonging_unvalid_halos(self, halo_context: HaloContext):
         halo_ids = halo_context.data['halo_id'].unique()
         logger.debug(f"Number of subhalos before filtering: {len(self.data)}")

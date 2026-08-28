@@ -391,12 +391,15 @@ class DataLoader(PipelineStep):
 
                 # Find subhalo neighbours
                 overlapping_halo_subhalo_ids = overlapping_matrix.get(id_halo, {})
+                logger.debug(f'overlapping_halo_subhalo_ids (len): {len(overlapping_halo_subhalo_ids)}')
 
                 if overlapping_halo_subhalo_ids:
                     logger.debug('Adding overlapping subhalos ...')
-                    overlapping_subhalos_df = subhalo_context.data.loc[overlapping_halo_subhalo_ids]
+                    overlapping_subhalos_df = subhalo_context.get_items_by_subhalo_ids(overlapping_halo_subhalo_ids)
+                    logger.debug(f'overlapping subhalos df: {len(overlapping_subhalos_df)}')
                     overlapping_subhalo_ctx = SubhaloContext.from_dataframe(overlapping_subhalos_df)
                     subhalo_ctx += overlapping_subhalo_ctx
+                    logger.debug(f'final size of subhalo_ctx: {len(subhalo_ctx)}')
             except Exception as e:
                 logger.error(f"Error with {id_halo}: {e}")
                 self.errors.append(f'Error with {id_halo}: {e} in class {self.name}')
