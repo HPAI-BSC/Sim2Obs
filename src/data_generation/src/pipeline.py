@@ -1,6 +1,7 @@
 import logging
 import os.path
 import pickle
+import pyarrow.parquet as pq
 from typing import Any
 
 import pandas as pd
@@ -41,7 +42,8 @@ def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, 
         dataset_dir = cfg.paths.datasets_dir
         path = dataset_dir + '/overlapping_matrix.parquet'
         if os.path.exists(path):
-            overlapping_matrix = pd.read_parquet(path)
+            table = pq.read_table(path)
+            overlapping_matrix = table.to_pandas()
         else:
             overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
 

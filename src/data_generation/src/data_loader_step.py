@@ -4,7 +4,8 @@ import traceback
 import tracemalloc
 from typing import Tuple, List, Optional, Callable, Any
 import os
-
+import pyarrow as pa
+import pyarrow.parquet as pq
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -568,9 +569,13 @@ class DataLoader(PipelineStep):
         # Persisting overlapping matrix
         dataset_dir = self.cfg.paths.datasets_dir
         path = dataset_dir + '/overlapping_matrix.parquet'
-        df = pd.DataFrame(overlapping_matrix)
-        df.to_parquet(path)
-        logger.debug(df.head())
         logger.debug(path)
+
+        table = pa.table({
+            "halo_id": list(overlapping_matrix.keys()),
+            "overlapping_ids": list(overlapping_matrix.values()),
+        })
+
+        pq.write_table(table, path, compression="zstd",)
 
         return overlapping_matrix
