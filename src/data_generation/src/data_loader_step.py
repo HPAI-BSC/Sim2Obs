@@ -568,7 +568,9 @@ class DataLoader(PipelineStep):
 
         # Persisting overlapping matrix
         dataset_dir = self.cfg.paths.datasets_dir
-        path = dataset_dir + '/overlapping_matrix.parquet'
+        name = self.cfg.catalog.path.replace(dataset_dir, '')
+        name = name.replace('/', '_')
+        path = dataset_dir + f'/{name}_overlapping_matrix.parquet'
         logger.debug(path)
 
         table = pa.table({

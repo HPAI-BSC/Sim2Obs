@@ -40,8 +40,12 @@ def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, 
     overlapping_matrix = None
     if not subhalo_context.is_empty:
         dataset_dir = cfg.paths.datasets_dir
-        path = dataset_dir + '/overlapping_matrix.parquet'
+        name = cfg.catalog.path.replace(dataset_dir, '')
+        name = name.replace('/', '_')
+        path = dataset_dir + f'/{name}_overlapping_matrix.parquet'
+        logger.debug(path)
         if os.path.exists(path):
+            logger.debug(f'Loading overlapping matrix from: {path}')
             table = pq.read_table(path)
             overlapping_matrix = table.to_pandas()
         else:
