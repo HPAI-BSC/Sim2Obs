@@ -170,6 +170,7 @@ class DataLoader(PipelineStep):
 
                 # Load particles for all the subhalos in that halo
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
+                logger.debug(list(vars(halo_particles_no_overlapping).keys()))
 
                 # Preprocessed all particles for current halo
                 halo_particles_no_overlapping.preprocess(halo, lbox)
@@ -491,8 +492,7 @@ class DataLoader(PipelineStep):
         logger.debug(f'Subhalos with accessing errors: {subhalos_with_errors}')
         return subhalo_particles, subhalos_with_errors
 
-    @staticmethod
-    def get_overlapping_halos(subhalo_context: SubhaloContext, halo_context: HaloContext):
+    def get_overlapping_halos(self, subhalo_context: SubhaloContext, halo_context: HaloContext):
         """
         Identifies overlapping halos based on spatial proximity of subhalos to halos.
 
@@ -529,28 +529,18 @@ class DataLoader(PipelineStep):
         """
         logger.debug('Getting overlapping halos ...')
         positions = as_subhalo_dataframe(subhalo_context)['spos']
-        logger.debug(f'positions type: {positions}')
-
         subhalo_positions = np.vstack(positions)
-        logger.debug(f'subhalo_positions: {subhalo_positions.shape}')
-
         subhalo_tree = cKDTree(subhalo_positions)
 
         halo_positions = np.vstack(halo_context.data['gpos'])
         halo_r200 = halo_context.data['r200'].values * 2  # Precompute r200 * 2
         halo_ids = halo_context.data['halo_id'].values
 
-        # TODO PRINT TYPES
         id_parents = as_subhalo_dataframe(subhalo_context)['id_parents']
-        logger.debug(f'ID_PARENTS type: {type(id_parents)}')
-
         # TODO DEAL WITH THIS
         # id_parents = subhalo_context.data['id_parents'].values
 
-        # TODO use property ?
         subhalo_ids = as_subhalo_dataframe(subhalo_context)['subhalo_id']
-        logger.debug(f'subhalo_ids type: {type(subhalo_ids)}')
-        logger.debug(subhalo_ids.head(1))
         # subhalo_ids = subhalo_context.data['subhalo_id'].values
 
         overlapping_matrix = {}
@@ -569,10 +559,18 @@ class DataLoader(PipelineStep):
                     overlapping_matrix[halo_id] = list(
                         zip(id_parents[valid_subhalo_idxs], subhalo_ids[valid_subhalo_idxs]))
                     logger.debug(f'Halo {halo_id} has {len(valid_subhalo_idxs)} overlapping subhalos:')
-                    #logger.debug(f'------> {overlapping_matrix[halo_id]}')
                 else:
                     overlapping_matrix[halo_id] = []
             else:
                 overlapping_matrix[halo_id] = []
         logger.debug(f'overlapping matrix: {len(overlapping_matrix)}')
+
+        # Persisting overlapping matrix
+        dataset_dir = self.cfg.paths.datasets_dir
+        path = dataset_dir + '/overlapping_matrix.parquet'
+        df = pd.DataFrame(overlapping_matrix)
+        df.to_parquet(path)
+        logger.debug(df.head())
+        logger.debug(path)
+
         return overlapping_matrix

@@ -2876,7 +2876,8 @@ class MagneticumFetcher(DataFetcher):
                 continue
             data[col] = df[col].to_numpy()
 
-        return SubhaloParticles(data=data, column_map={'star': {'POS': 'p', 'MASS': 'm', 'VEL': 'v'}})
+        # TODO using part type 4
+        return SubhaloParticles(data=data, column_map={'star': {'POS': 'star_p', 'MASS': 'star_m', 'VEL': 'star_v'}})
 
     def _get_p_halo(self, halo) -> SubhaloParticles | LazySubhaloParticles:
         if not getattr(self, "_cache_loaded", False):

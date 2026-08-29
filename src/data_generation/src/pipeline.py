@@ -16,7 +16,7 @@ logger = setup_logger("Pipeline")
 
 
 # TODO propagate errors (no subhalos found) to the last step
-def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[], ignore_halos=[]):
+def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[], ignore_halos=[]):
     print(f'debug_halo_ids={debug_halo_ids}')
     halo_context = data_loader.fetcher.get_halos()
     subhalo_context = data_loader.fetcher.get_subhalos()
@@ -38,7 +38,12 @@ def get_generator(data_loader, n=None, starting_idx=None, ending_idx=None, debug
     # Compute overlapping matrix with the whole sample size
     overlapping_matrix = None
     if not subhalo_context.is_empty:
-        overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
+        dataset_dir = cfg.paths.datasets_dir
+        path = dataset_dir + '/overlapping_matrix.parquet'
+        if os.path.exists(path):
+            overlapping_matrix = pd.read_parquet(path)
+        else:
+            overlapping_matrix = data_loader.get_overlapping_halos(subhalo_context, halo_context)
 
     if len(debug_halo_ids) > 0:
         print(f'Filtering halo context by the following halo ids: {debug_halo_ids}')
@@ -122,7 +127,7 @@ class Pipeline:
 
         if len(step_list) > 0:
             data_loader = step_list[0]
-            input_gen = get_generator(data_loader, n, starting_idx, ending_idx, debug_halo_ids, ignore_halos)
+            input_gen = get_generator(self.cfg, data_loader, n, starting_idx, ending_idx, debug_halo_ids, ignore_halos)
         else:
             raise Exception()
 
