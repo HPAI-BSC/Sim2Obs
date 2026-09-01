@@ -2875,7 +2875,9 @@ class MagneticumFetcher(DataFetcher):
             if col in ('parent_id', 'subhalo_id', 'parent_bucket', 'parent_bucket_data'):
                 continue
             data[col] = df[col].to_numpy()
-        # TODO using part type 4
+
+        data = {key.rstrip(): value for key, value in data.items()}
+        # Using part type 4
         return SubhaloParticles(data=data, column_map={'POS': 'p', 'MASS': 'm', 'VEL': 'v'})
 
     def _get_p_halo(self, halo) -> SubhaloParticles | LazySubhaloParticles:

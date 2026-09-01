@@ -397,13 +397,6 @@ class SubhaloParticles:
             Mapping of column names for each particle type.
         """
         self.overlapping_particles_id = None
-
-        # TODO debug
-        path = f'/gpfs/scratch/bsc70/hpai/storage/projects/space/logs_magneticum_particles.pkl'
-        print(path)
-        with open(path, 'wb') as f:
-            pickle.dump(data, f)
-
         # TODO complete
         fix_names = {'stars': 'star', 'dark_matter': 'dm'}
 
