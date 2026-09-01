@@ -2875,9 +2875,6 @@ class MagneticumFetcher(DataFetcher):
             if col in ('parent_id', 'subhalo_id', 'parent_bucket', 'parent_bucket_data'):
                 continue
             data[col] = df[col].to_numpy()
-
-        logger.debug()
-
         # TODO using part type 4
         return SubhaloParticles(data=data, column_map={'POS': 'p', 'MASS': 'm', 'VEL': 'v'})
 
