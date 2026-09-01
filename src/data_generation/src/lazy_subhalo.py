@@ -232,10 +232,7 @@ class LazySubhaloContext:
         if self._preprocessed:
             raise RuntimeError("preprocess() has already been called on this context.")
         self._preprocessed = True
-
-        # FIX: "id_parents", not "parent_id" -- see get_subhalo_by_id above.
         self.add_filter(ds.field("id_parents") == halo.halo_id)
-
         if hasattr(halo, "group_number"):
             self.add_filter(ds.field("group_number") == halo.group_number)
 
@@ -243,7 +240,11 @@ class LazySubhaloContext:
         lbox_snapshot = lbox
 
         def pbc_transform(table):
+            logger.debug('Executing pbc transform')
             spos = np.asarray(table["spos"].to_pylist())
+            logger.debug(f'spos: {type(spos)} {spos.shape}')
+            logger.debug(f'gpos: {type(gpos_snapshot)} {gpos_snapshot.shape}')
+
             delta = spos - gpos_snapshot
 
             if lbox_snapshot is not None:
@@ -257,7 +258,6 @@ class LazySubhaloContext:
                 "spos",
                 pa.array(delta.tolist())
             )
-
         self.add_transform(pbc_transform)
 
     def rotate(self, z, degree):
