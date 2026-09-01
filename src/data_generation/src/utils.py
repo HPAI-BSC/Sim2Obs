@@ -1047,7 +1047,7 @@ def merge_json_files_to_csv(input_dir, output_file, simulation, chunk_size=1000,
     total = len(json_files)
     if total == 0:
         print("No JSON files found.")
-        return
+        return Exception("No JSON files found.")
 
     print(f"Found {total} JSON files. Merging in chunks of {chunk_size}...")
 

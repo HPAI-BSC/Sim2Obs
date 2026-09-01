@@ -64,13 +64,14 @@ class LastStep:
             output_file = dataset_dir + f'/../logs/transition_radius/{name}_transition_radius.csv'
             name = self.cfg.catalog.path.replace(dataset_dir, '')
             name = name.replace('/', '_')
-            print(f'simulation: {name}')
-            merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None, simulation=name)
-
-            df = pd.read_csv(output_file)
-            df['transition_radius/R200'] = df['transition_radius'] / df['R200']
-            print(f'n = {len(df)}')
-            print(df.describe())
+            try:
+                merge_json_files_to_csv(path, output_file, chunk_size=1000, length=None, simulation=name)
+                df = pd.read_csv(output_file)
+                df['transition_radius/R200'] = df['transition_radius'] / df['R200']
+                print(f'n = {len(df)}')
+                print(df.describe())
+            except BaseException as e:
+                print(e)
 
     def _check_maps(self):
         print('_check_maps')
