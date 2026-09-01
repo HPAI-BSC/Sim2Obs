@@ -546,6 +546,7 @@ class SubhaloParticles:
         # Normalize positions respect to the center of its halo
         print(len(self.star_p))
         if hasattr(self, 'star_p') and self.star_p is not None:
+            logger.debug(f'halo gpos: {halo.gpos.shape}')
             delta = self.star_p - halo.gpos
 
             # Calculate the distance from the particle to the halo cente

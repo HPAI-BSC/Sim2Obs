@@ -173,6 +173,8 @@ class DataLoader(PipelineStep):
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
                 logger.debug(list(vars(halo_particles_no_overlapping).keys()))
                 logger.debug(type(halo_particles_no_overlapping))
+                logger.debug(f'star_p: {halo_particles_no_overlapping.star_p.shape}')
+                logger.debug(f'star_v: {halo_particles_no_overlapping.star_v.shape}')
 
                 # Preprocessed all particles for current halo
                 halo_particles_no_overlapping.preprocess(halo, lbox)
