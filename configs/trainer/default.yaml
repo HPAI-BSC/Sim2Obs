@@ -6,7 +6,7 @@ min_epochs: 1 # prevents early stopping
 max_epochs: 50
 #max_steps: 1000  # For Stochastic Interpolation Models
 
-gradient_clip_val: 0.5
+gradient_clip_val: 1.0
 
 accelerator: gpu
 devices: 1
@@ -24,7 +24,7 @@ accumulate_grad_batches: 4
 #precision: "bf16-mixed"
 
 # perform a validation loop every N training epochs
-check_val_every_n_epoch: 1
+check_val_every_n_epoch: 10
 
 # set True to to ensure deterministic results
 # makes training slower but gives more reproducibility than just setting seeds
