@@ -11,6 +11,7 @@ from __future__ import print_function
 import time
 import math
 import copy
+from torch.utils.checkpoint import checkpoint
 from builtins import int
 from functools import partial
 from typing import Optional, Callable
@@ -689,7 +690,8 @@ class SS2D(nn.Module):
 
         x = x.permute(0, 3, 1, 2).contiguous()
         x = self.act(self.conv2d(x))  # (b, d, h, w)
-        y = self.forward_core(x)
+        #y = self.forward_core(x)
+        y = checkpoint(self.forward_core, x, use_reentrant=False)
         y = y * F.silu(z)
         out = self.out_proj(y)
         if self.dropout is not None:
