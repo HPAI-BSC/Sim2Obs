@@ -675,6 +675,11 @@ class ICLProcessor(FeatureProcessor):
     def _compute_icl_mask(self, halo: Halo, subhalo_particles: SubhaloParticles):
         logger.debug(f'vel subhalo particles: {type(subhalo_particles.star_v)}, {subhalo_particles.star_v.shape}')
 
+        if (isinstance(subhalo_particles.star_v, np.ndarray) and subhalo_particles.star_v.dtype == object and
+                len(subhalo_particles.star_v) > 0 and isinstance(subhalo_particles.star_v[0], (list, np.ndarray))):
+            subhalo_particles.star_v = np.stack(subhalo_particles.star_v)
+            logger.debug(f'star_v: {subhalo_particles.star_v.shape}')
+
         particle_velocity = np.asarray(subhalo_particles.star_v, dtype=np.float64)
         logger.debug(f'pos subhalo particles: {type(subhalo_particles.star_p)}, {subhalo_particles.star_p.shape}')
 
