@@ -8,7 +8,7 @@ defaults:
   - data: combined_dataset
   #- data: galaxy_illustris300
   #- model: gaussian_interp
-  - model: unet
+  - model: mamba_unet
   - callbacks: default
   - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
