@@ -547,6 +547,12 @@ class SubhaloParticles:
         print(len(self.star_p))
         if hasattr(self, 'star_p') and self.star_p is not None:
             logger.debug(f'halo gpos: {halo.gpos.shape}')
+            if isinstance(self.star_p, np.ndarray) and self.star_p.dtype == object and len(self.star_p) > 0 \
+                    and isinstance(self.star_p[0], (list, np.ndarray)):
+                star_p = np.stack(self.star_p)
+                self.star_p = star_p
+                logger.debug(f'star_p: {self.star_p.shape}')
+
             delta = self.star_p - halo.gpos
 
             # Calculate the distance from the particle to the halo cente
