@@ -24,6 +24,7 @@ def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, 
 
     logger.debug(f'halo context: {type(halo_context)}')
     subhalo_context.materialize()
+    subhalo_context = subhalo_context.data
     logger.debug(f'subhalo context: {type(subhalo_context)}')
 
     # TODO DEBUG
