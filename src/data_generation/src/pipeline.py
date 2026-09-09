@@ -30,7 +30,8 @@ def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, 
     # TODO DEBUG
     dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
     halo_context.data.to_csv(os.path.join(dataset_dir, 'magneticum_halo_context.csv'))
-    subhalo_context.data.to_csv(os.path.join(dataset_dir, 'magneticum_subhalo_context.csv'))
+    import pyarrow.csv as pv
+    pv.write_csv(subhalo_context, os.path.join(dataset_dir, 'magneticum_subhalo_context.csv'))
 
     if len(ignore_halos) > 0:
         print(f'Filtering ignore halos: {ignore_halos}')
