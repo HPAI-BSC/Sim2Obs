@@ -22,6 +22,11 @@ def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, 
     halo_context = data_loader.fetcher.get_halos()
     subhalo_context = data_loader.fetcher.get_subhalos()
 
+    logger.debug(f'halo context: {type(halo_context)}')
+    subhalo_context.materialize()
+    subhalo_context = subhalo_context.data.to_pandas()
+    logger.debug(f'subhalo context: {type(subhalo_context)}')
+
     # TODO DEBUG
     dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
     halo_context.data.to_csv(os.path.join(dataset_dir, 'magneticum_halo_context.csv'))
