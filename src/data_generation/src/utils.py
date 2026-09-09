@@ -1567,3 +1567,15 @@ def as_subhalo_dataframe(subhalo_context):
 
     # SubhaloContext (eager) -- .data is already a DataFrame
     return subhalo_context.data
+
+
+def flatten_vector_column(df, col, names=("x", "y", "z")):
+    """Expand a column of 3-vectors into three separate numeric columns
+    (e.g. 'spos' -> 'spos_x', 'spos_y', 'spos_z'), so the result is a
+    genuine, re-readable numeric CSV instead of a stringified list."""
+    arr = np.stack(df[col].to_numpy())  # same stacking fix as before --
+                                         # guards against the object-array-
+                                         # of-lists shape we've hit repeatedly
+    for i, suffix in enumerate(names):
+        df[f"{col}_{suffix}"] = arr[:, i]
+    return df.drop(columns=[col])

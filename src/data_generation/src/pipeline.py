@@ -11,7 +11,7 @@ from src.data_generation.src.data_loader_step import DataLoader
 from src.data_generation.src.feature import load_models
 from src.data_generation.src.last_step import LastStep
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.utils import setup_logger, plot_hist
+from src.data_generation.src.utils import setup_logger, plot_hist, flatten_vector_column
 
 logger = setup_logger("Pipeline")
 
@@ -23,15 +23,18 @@ def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, 
     subhalo_context = data_loader.fetcher.get_subhalos()
 
     logger.debug(f'halo context: {type(halo_context)}')
-    subhalo_context.materialize()
-    subhalo_context = subhalo_context.data
     logger.debug(f'subhalo context: {type(subhalo_context)}')
+
+    table = subhalo_context.materialize()
+    df = table.to_pandas()
+
+    if 'spos' in df.columns:
+        df = flatten_vector_column(df, 'spos')
 
     # TODO DEBUG
     dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
     halo_context.data.to_csv(os.path.join(dataset_dir, 'magneticum_halo_context.csv'))
-    import pyarrow.csv as pv
-    pv.write_csv(subhalo_context, os.path.join(dataset_dir, 'magneticum_subhalo_context.csv'))
+    df.data.to_csv(os.path.join(dataset_dir, 'magneticum_subhalo_context.csv'))
 
     if len(ignore_halos) > 0:
         print(f'Filtering ignore halos: {ignore_halos}')
