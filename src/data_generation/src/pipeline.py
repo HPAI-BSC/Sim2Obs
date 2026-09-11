@@ -25,16 +25,16 @@ def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, 
     logger.debug(f'halo context: {type(halo_context)}')
     logger.debug(f'subhalo context: {type(subhalo_context)}')
 
-    table = subhalo_context.materialize()
-    df = table.to_pandas()
+    #table = subhalo_context.materialize()
+    #df = table.to_pandas()
 
-    if 'spos' in df.columns:
-        df = flatten_vector_column(df, 'spos')
+    #if 'spos' in df.columns:
+    #    df = flatten_vector_column(df, 'spos')
 
     # TODO DEBUG
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
-    halo_context.data.to_csv(os.path.join(dataset_dir, 'magneticum_halo_context.csv'))
-    df.to_csv(os.path.join(dataset_dir, 'magneticum_subhalo_context.csv'))
+    # dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
+    # halo_context.data.to_csv(os.path.join(dataset_dir, 'magneticum_halo_context.csv'))
+    # df.to_csv(os.path.join(dataset_dir, 'magneticum_subhalo_context.csv'))
 
     if len(ignore_halos) > 0:
         print(f'Filtering ignore halos: {ignore_halos}')
