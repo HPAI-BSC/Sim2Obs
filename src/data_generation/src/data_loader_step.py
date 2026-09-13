@@ -554,7 +554,9 @@ class DataLoader(PipelineStep):
             nearby_sub_idxs = subhalo_tree.query_ball_point(halo_position, r)
             logger.debug(f'nearby_sub_idxs: {nearby_sub_idxs}')
             if nearby_sub_idxs:
-                valid_subhalo_idxs = [subhalo_idx for subhalo_idx in nearby_sub_idxs if id_parents[subhalo_idx] != halo_id]
+                valid_subhalo_idxs = [subhalo_idx for subhalo_idx in nearby_sub_idxs
+                                      if subhalo_idx in id_parents and
+                                      id_parents[subhalo_idx] != halo_id]
                 logger.debug(f'valid subhalos idx: {len(valid_subhalo_idxs)}')
                 # Only keep valid subhalos
                 if valid_subhalo_idxs:
