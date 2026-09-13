@@ -134,7 +134,7 @@ class SubhaloContext:
         """
         def apply_pbc_correction(subhalo_pos, halo_center, lbox):
             # NEW => see if magneticum positions change
-            subhalo_pos = np.asarray(subhalo_pos, dtype=np.float64)
+            # subhalo_pos = np.asarray(subhalo_pos, dtype=np.float64)
             delta = subhalo_pos - halo_center  # Compute the relative position
 
             if lbox is not None:
@@ -553,7 +553,7 @@ class SubhaloParticles:
                     and isinstance(self.star_p[0], (list, np.ndarray)):
                 star_p = np.stack(self.star_p)
                 # NEW => see if magneticum positions change
-                star_p = np.asarray(star_p, dtype=np.float64)
+                # star_p = np.asarray(star_p, dtype=np.float64)
                 self.star_p = star_p
                 logger.debug(f'star_p: {self.star_p.shape}')
 
