@@ -188,12 +188,12 @@ class DataLoader(PipelineStep):
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 logger.debug('4.  Center subhalos positions respect to current halo, including overlapping subhalos ...')
                 logger.debug(type(subhalo_ctx))
-                path = dataset_dir + f'/../logs/transition_radius/subhalo_ctx_{name}_{halo.halo_id}.pkl'
-                with open(path, 'wb') as f:
+                path_1 = dataset_dir + f'/../logs/transition_radius/subhalo_ctx_{name}_{halo.halo_id}.pkl'
+                with open(path_1, 'wb') as f:
                     pickle.dump(subhalo_ctx, f)
                 subhalo_ctx.preprocess(halo, lbox)
-                path = dataset_dir + f'/../logs/transition_radius/subhalo_ctx_{name}_{halo.halo_id}_preprocessed.pkl'
-                with open(path, 'wb') as f:
+                path_2 = dataset_dir + f'/../logs/transition_radius/subhalo_ctx_{name}_{halo.halo_id}_preprocessed.pkl'
+                with open(path_2, 'wb') as f:
                     pickle.dump(subhalo_ctx, f)
 
                 # Store info for log purposes
@@ -203,17 +203,6 @@ class DataLoader(PipelineStep):
 
                 with open(path, "w") as f:
                     json.dump(halo_dict, f, indent=4)
-
-                # TODO debugging
-                '''
-                halo_particles = halo_particles_no_overlapping.star_p
-                path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_p_{halo.halo_id}'
-                np.save(path_, halo_particles)
-
-                halo_particles = halo_particles_no_overlapping.star_m
-                path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_m_{halo.halo_id}'
-                np.save(path_, halo_particles)
-                '''
 
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
