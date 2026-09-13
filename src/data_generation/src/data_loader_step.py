@@ -552,6 +552,7 @@ class DataLoader(PipelineStep):
             logger.debug(f'Checking overlapping for halo_id: {halo_id}')
             # Query the subhalo tree for nearby subhalos within the radius
             nearby_sub_idxs = subhalo_tree.query_ball_point(halo_position, r)
+            logger.debug(f'nearby_sub_idxs: {nearby_sub_idxs}')
             if nearby_sub_idxs:
                 valid_subhalo_idxs = [subhalo_idx for subhalo_idx in nearby_sub_idxs if id_parents[subhalo_idx] != halo_id]
                 logger.debug(f'valid subhalos idx: {len(valid_subhalo_idxs)}')
