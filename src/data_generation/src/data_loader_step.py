@@ -535,9 +535,13 @@ class DataLoader(PipelineStep):
         id_parents = as_subhalo_dataframe(subhalo_context)['id_parents']
         # TODO DEAL WITH THIS
         # id_parents = subhalo_context.data['id_parents'].values
+        logger.debug(f'id_parents: {type(id_parents)}, {len(id_parents)}')
+        logger.debug(id_parents)
 
         subhalo_ids = as_subhalo_dataframe(subhalo_context)['subhalo_id']
         # subhalo_ids = subhalo_context.data['subhalo_id'].values
+        logger.debug(f'subhalo_ids: {type(subhalo_ids)}, {len(subhalo_ids)}')
+        logger.debug(subhalo_ids)
 
         overlapping_matrix = {}
 
@@ -550,6 +554,7 @@ class DataLoader(PipelineStep):
             nearby_sub_idxs = subhalo_tree.query_ball_point(halo_position, r)
             if nearby_sub_idxs:
                 valid_subhalo_idxs = [subhalo_idx for subhalo_idx in nearby_sub_idxs if id_parents[subhalo_idx] != halo_id]
+                logger.debug(f'valid subhalos idx: {len(valid_subhalo_idxs)}')
                 # Only keep valid subhalos
                 if valid_subhalo_idxs:
                     overlapping_matrix[halo_id] = list(
