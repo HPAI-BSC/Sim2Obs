@@ -1579,3 +1579,17 @@ def flatten_vector_column(df, col, names=("x", "y", "z")):
     for i, suffix in enumerate(names):
         df[f"{col}_{suffix}"] = arr[:, i]
     return df.drop(columns=[col])
+
+
+def store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name, suffix=''):
+    halo_particles = halo_particles_no_overlapping.star_p
+    path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_p_{halo.halo_id}_{suffix}'
+    np.save(path_, halo_particles)
+
+    halo_particles = halo_particles_no_overlapping.star_m
+    path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_m_{halo.halo_id}_{suffix}'
+    np.save(path_, halo_particles)
+
+    halo_particles = halo_particles_no_overlapping.star_v
+    path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_v_{halo.halo_id}_{suffix}'
+    np.save(path_, halo_particles)

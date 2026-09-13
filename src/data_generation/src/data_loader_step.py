@@ -1,5 +1,6 @@
 import gc
 import json
+import pickle
 import traceback
 import tracemalloc
 from typing import Tuple, List, Optional, Callable, Any
@@ -19,30 +20,12 @@ from src.data_generation.src.feature import FeatureProcessorFactory, attach_mode
 from src.data_generation.src.halo import Halo, HaloContext
 from src.data_generation.src.pipeline_step import PipelineStep
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
-from src.data_generation.src.utils import setup_logger, store_obj, as_subhalo_dataframe
+from src.data_generation.src.utils import setup_logger, store_obj, as_subhalo_dataframe, \
+    store_subhalo_particles_as_numpy
 
 logger = setup_logger("DataLoader-step")
 
 os.environ['PYTHONIOENCODING'] = 'utf-8'
-
-
-def magneticum_test(halo_context, fetcher):
-    tracemalloc.start()
-
-    halo_ids = [0, 1, 2, 3, 4]  # your test halo ids
-
-    for halo_id in halo_ids:
-        halo = halo_context.get_halo_by_id(halo_id)
-
-        particles = fetcher.get_p_halo(halo=halo)
-
-        current, peak = tracemalloc.get_traced_memory()
-        print(f"halo_id={halo_id} | stars={len(particles)} | "
-              f"mem current={current / 1e6:.1f} MB | peak={peak / 1e6:.1f} MB")
-
-        del particles
-        gc.collect()
-    tracemalloc.stop()
 
 
 def filter_outliers_transition_radius(transition_radius_path):
@@ -171,13 +154,17 @@ class DataLoader(PipelineStep):
 
                 # Load particles for all the subhalos in that halo
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
+                logger.debug('1. Loading halo particles ...')
                 logger.debug(list(vars(halo_particles_no_overlapping).keys()))
                 logger.debug(type(halo_particles_no_overlapping))
                 logger.debug(f'star_p: {halo_particles_no_overlapping.star_p.shape}')
                 logger.debug(f'star_v: {halo_particles_no_overlapping.star_v.shape}')
+                store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name)
 
                 # Preprocessed all particles for current halo
+                logger.debug('2. Preprocessed all particles for current halo ...')
                 halo_particles_no_overlapping.preprocess(halo, lbox)
+                store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name, suffix='preprocessed')
 
                 # Load preprocessed particles for overlapping halos
                 overlapping_subhalo_particles, subhalos_with_errors = \
@@ -186,6 +173,10 @@ class DataLoader(PipelineStep):
                 # Group all the particles together
                 if overlapping_subhalo_particles is not None:
                     halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
+                    logger.debug('3. Group all the particles together ...')
+                    logger.debug(f'star_p: {halo_particles_no_overlapping.star_p.shape}')
+                    logger.debug(f'star_v: {halo_particles_no_overlapping.star_v.shape}')
+                    store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name, suffix='overlapping')
                 else:
                     halo_particles_overlapping = halo_particles_no_overlapping
 
@@ -195,7 +186,15 @@ class DataLoader(PipelineStep):
                 output_feature.process(halo=halo, subhalo_particles=halo_particles_no_overlapping)
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
+                logger.debug('4.  Center subhalos positions respect to current halo, including overlapping subhalos ...')
+                logger.debug(type(subhalo_ctx))
+                path = dataset_dir + f'/../logs/transition_radius/subhalo_ctx_{name}_{halo.halo_id}.pkl'
+                with open(path, 'wb') as f:
+                    pickle.dump(subhalo_ctx, f)
                 subhalo_ctx.preprocess(halo, lbox)
+                path = dataset_dir + f'/../logs/transition_radius/subhalo_ctx_{name}_{halo.halo_id}_preprocessed.pkl'
+                with open(path, 'wb') as f:
+                    pickle.dump(subhalo_ctx, f)
 
                 # Store info for log purposes
                 halo_dict = {'halo_id': halo.halo_id, 'R200': halo.r200,
