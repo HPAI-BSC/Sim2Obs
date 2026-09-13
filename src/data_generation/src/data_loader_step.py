@@ -558,7 +558,7 @@ class DataLoader(PipelineStep):
                 for subhalo_idx in nearby_sub_idxs:
                     if subhalo_idx in id_parents:
                         logger.debug(f'subhalo_idx: {subhalo_idx}')
-                        logger.debug(f'id_parents[subhalo_idx]: {id_parents[subhalo_idx]}, halo: {halo_id}')
+                        logger.debug(f'id_parents[subhalo_idx]: {id_parents[subhalo_idx]} {type(id_parents[subhalo_idx])}, halo: {halo_id}')
                 # --------------
                 valid_subhalo_idxs = [subhalo_idx for subhalo_idx in nearby_sub_idxs
                                       if subhalo_idx in id_parents and
