@@ -154,6 +154,9 @@ class DataLoader(PipelineStep):
 
                 # Load particles for all the subhalos in that halo
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
+
+                # Fix precision
+
                 logger.debug('1. Loading halo particles ...')
                 logger.debug(list(vars(halo_particles_no_overlapping).keys()))
                 logger.debug(type(halo_particles_no_overlapping))
@@ -172,6 +175,7 @@ class DataLoader(PipelineStep):
 
                 # Group all the particles together
                 if overlapping_subhalo_particles is not None:
+                    # TODO fix precision
                     halo_particles_overlapping = halo_particles_no_overlapping + overlapping_subhalo_particles
                     logger.debug('3. Group all the particles together ...')
                     logger.debug(f'star_p: {halo_particles_no_overlapping.star_p.shape}')
