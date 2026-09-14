@@ -557,9 +557,10 @@ class DataLoader(PipelineStep):
                 valid_subhalo_idxs = []
                 for subhalo_idx in nearby_sub_idxs:
                     logger.debug(f'subhalo_idx: {subhalo_idx}')
-                    logger.debug(id_parents[subhalo_idx])
-                    if subhalo_idx in id_parents and (id_parents[subhalo_idx] != halo_id).all():
-                        valid_subhalo_idxs.append(subhalo_idx)
+                    if subhalo_idx in id_parents:
+                        logger.debug(id_parents[subhalo_idx])
+                        if (id_parents[subhalo_idx] != halo_id).all():
+                            valid_subhalo_idxs.append(subhalo_idx)
 
                 logger.debug(f'valid subhalos idx: {len(valid_subhalo_idxs)}')
                 # Only keep valid subhalos
