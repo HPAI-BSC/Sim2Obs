@@ -633,6 +633,8 @@ class DataFetcherFactory:
             return FlamingoFetcher(catalog, **kwargs)
         elif catalog.name == "magneticum":
             return MagneticumFetcher(catalog, **kwargs)
+        elif catalog.name == "magneticum_v2":
+            return MagneticumFetcherV2(catalog, **kwargs)
         else:
             raise ValueError(f"Unsupported catalog={catalog.name} type")
 
@@ -2894,6 +2896,184 @@ class MagneticumFetcher(DataFetcher):
         return self._load_halo_particles(halo.halo_id, particles_parquet)
 
 
+class MagneticumFetcherV2(MagneticumFetcher):
+    """
+    Fixes MagneticumFetcher's star-particle -> halo assignment bug.
+
+    V1 (MagneticumFetcher) approximates "does particle X belong to halo H?"
+    with a [min(PID of H), max(PID of H)] range test (_build_halo_intervals /
+    _assign_halo_ids). That is invalid: particle IDs are not ordered by
+    spatial/halo membership, so a halo's interval ends up spanning almost the
+    entire ID space. Measured on real Magneticum group-catalog data: 17x-103x
+    over-inclusion (a halo with e.g. 900K true member particles matches
+    ~90M IDs against its own interval). V1 also rebuilds each halo's/subhalo's
+    interval via a per-entity call (_get_pid_for_entity /
+    _get_subhalo_pid_for_entity) that reopens and re-reads the relevant group
+    file's "PID " block from disk on every single call, with no caching —
+    for millions of halos/subhalos this reads multi-GB blocks off disk
+    repeatedly.
+
+    V2 replaces both:
+      - Correctness: exact particle-ID membership (verified against
+        manual_test_magneticum.py's get_halo_particles_strict reference,
+        which uses np.isin on raw PIDs and returns physically sane results
+        — all matched particles within ~2x R200 of the halo center).
+      - Efficiency: each group file's "PID " block is read exactly once
+        (_build_pid_index), and halo/subhalo ownership for every position in
+        that block is derived vectorised (np.repeat over GOFF/GLEN for halos,
+        which partition the block with no gaps; a vectorised interval search
+        over SOFF/SLEN for subhalos, which nest within their parent halo's
+        range but don't fully cover it — diffuse/unbound particles get -1).
+        One sort by PID value then supports O(log n) exact-match lookups via
+        np.searchsorted, identical in spirit to V1's (already-correct)
+        _assign_subhalo_ids, just built without the redundant re-reads.
+
+    _store_particles() (inherited, unmodified) already calls
+    _build_halo_intervals() / _build_subhalo_index() / _build_subhalo_pid_arrays()
+    as a fixed sequence; here all three simply delegate to the single shared
+    _build_pid_index() pass, which is idempotent so calling it three times
+    costs the same as calling it once.
+    """
+
+    def _build_pid_file_boundaries(self) -> list:
+        """
+        V2 has no per-entity lazy PID readers to index (see _build_pid_index),
+        so there is nothing to build here. Overridden (rather than left as
+        V1's real implementation) purely so the inherited _load_catalog_cache()
+        does not perform a wasted boundary-only scan of the PID block before
+        _build_pid_index() reads it for real.
+        """
+        return []
+
+    def _build_subhalo_pid_file_boundaries(self) -> list:
+        """See _build_pid_file_boundaries."""
+        return []
+
+    def _build_pid_index(self) -> None:
+        """
+        Single-pass, vectorised replacement for V1's _build_halo_intervals()
+        and _build_subhalo_pid_arrays(). Idempotent: safe to call multiple
+        times (only the first call does real work), since _store_particles()
+        calls the three delegating methods below in sequence.
+
+        Reads every group file's "PID " block exactly once, then derives, for
+        every position in the resulting flat array:
+          - its owning halo_id, vectorised via GOFF/GLEN (these partition the
+            PID block exactly, confirmed on real data: sum(GLEN) == len(PID
+            block), so a plain run-length expansion is exact and needs no
+            search)
+          - its owning subhalo_id, vectorised via SOFF/SLEN (these nest inside
+            their parent halo's GOFF/GLEN range but can leave gaps — diffuse
+            halo particles not bound to any subhalo — so a vectorised
+            interval search with a -1 "unowned" fallback is used instead of a
+            plain run-length expansion)
+
+        Both owner arrays are then sorted once by PID value, giving exact
+        O(log n) membership lookups via np.searchsorted at query time
+        (_assign_halo_ids below; _assign_subhalo_ids is inherited unchanged
+        since it already does exactly this against self._subhalo_sorted_pids
+        / self._subhalo_sorted_ids, which this method now populates).
+        """
+        if getattr(self, "_pid_index_built", False):
+            return
+
+        empty_i64 = np.array([], dtype=np.int64)
+        empty_i32 = np.array([], dtype=np.int32)
+
+        pid_chunks = []
+        for group_file in g3read.yield_all_files(self._group_base):
+            f = g3read.GadgetFile(group_file, is_snap=False)
+            pid_in_file = f.read("PID ", 2)
+            if pid_in_file is None or len(pid_in_file) == 0:
+                continue
+            pid_chunks.append(np.asarray(pid_in_file, dtype=np.int64))
+            del pid_in_file
+
+        if not pid_chunks:
+            self._halo_sorted_pids = empty_i64
+            self._halo_sorted_ids = empty_i32
+            self._subhalo_sorted_pids = empty_i64
+            self._subhalo_sorted_ids = empty_i32
+            self._pid_index_built = True
+            return
+
+        pid_values = np.concatenate(pid_chunks)
+        del pid_chunks
+        n_positions = len(pid_values)
+
+        # ── halo ownership: GOFF/GLEN exactly partitions the PID block ──
+        glen = np.asarray(self._glen, dtype=np.int64)
+        halo_id_per_position = np.repeat(np.arange(len(glen), dtype=np.int32), glen)
+        if len(halo_id_per_position) != n_positions:
+            raise ValueError(
+                f"sum(GLEN)={len(halo_id_per_position)} does not match PID "
+                f"block length={n_positions}; the halo/PID contiguous-layout "
+                f"assumption this method relies on no longer holds."
+            )
+
+        # ── subhalo ownership: SOFF/SLEN nest within their parent halo's
+        #    range but may leave gaps (diffuse, unbound halo particles) ──
+        soff = np.asarray(self._soff, dtype=np.int64)
+        slen = np.asarray(self._slen, dtype=np.int64)
+        subhalo_id_per_position = np.full(n_positions, -1, dtype=np.int32)
+        if len(soff) > 0:
+            positions = np.arange(n_positions)
+            order = np.argsort(soff, kind="stable")
+            soff_sorted = soff[order]
+            send_sorted = soff_sorted + slen[order]
+            subhalo_id_sorted = order.astype(np.int32)
+
+            idx = np.searchsorted(soff_sorted, positions, side="right") - 1
+            idx = np.clip(idx, 0, len(soff_sorted) - 1)
+            in_range = (positions >= soff_sorted[idx]) & (positions < send_sorted[idx])
+            subhalo_id_per_position = np.where(in_range, subhalo_id_sorted[idx], -1).astype(np.int32)
+
+        # ── one sort by PID value, shared by both levels ──
+        value_order = np.argsort(pid_values, kind="stable")
+        self._halo_sorted_pids = pid_values[value_order]
+        self._halo_sorted_ids = halo_id_per_position[value_order]
+        self._subhalo_sorted_pids = self._halo_sorted_pids
+        self._subhalo_sorted_ids = subhalo_id_per_position[value_order]
+
+        self._pid_index_built = True
+
+    def _build_halo_intervals(self) -> None:
+        """V2: delegates to the shared single-pass index (_build_pid_index)."""
+        self._build_pid_index()
+
+    def _build_subhalo_index(self) -> None:
+        """V2: subhalo ownership is derived directly from SOFF/SLEN inside
+        _build_pid_index(); no separate (start, end) index is needed."""
+        self._build_pid_index()
+
+    def _build_subhalo_pid_arrays(self) -> None:
+        """V2: delegates to the shared single-pass index (_build_pid_index)."""
+        self._build_pid_index()
+
+    def _assign_halo_ids(self, ids: np.ndarray) -> np.ndarray:
+        """
+        Exact-match halo assignment via np.searchsorted on the sorted PID
+        index built by _build_pid_index() — replaces V1's
+        [min(PID), max(PID)] interval approximation.
+        Returns array of halo_ids, -1 where unassigned. Mirrors the
+        (already-correct) pattern used by _assign_subhalo_ids.
+        """
+        if not getattr(self, "_pid_index_built", False):
+            self._build_pid_index()
+
+        if len(ids) == 0:
+            return np.array([], dtype=np.int32)
+
+        if len(self._halo_sorted_pids) == 0:
+            return np.full(len(ids), -1, dtype=np.int32)
+
+        idx = np.searchsorted(self._halo_sorted_pids, ids)
+        idx = np.clip(idx, 0, len(self._halo_sorted_pids) - 1)
+
+        result = np.full(len(ids), -1, dtype=np.int32)
+        matched = self._halo_sorted_pids[idx] == ids
+        result[matched] = self._halo_sorted_ids[idx[matched]]
+        return result
 
 
 

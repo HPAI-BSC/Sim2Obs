@@ -1,6 +1,6 @@
 # More details in src/data_generation/test/manual_tests/manual_test_magneticum.py
 
-name: magneticum
+name: magneticum_v2
 snapnum: 120       # redshift 0.2125
 a: 0.8247          # from print(snap.header.__dict__)
 H: 0.704
