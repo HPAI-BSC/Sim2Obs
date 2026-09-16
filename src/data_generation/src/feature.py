@@ -734,7 +734,7 @@ class ICLProcessor(FeatureProcessor):
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
         logger.debug(f'Computing transition radius for: {halo.halo_id}')
-        store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
+        # store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
 
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle

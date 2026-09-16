@@ -3,7 +3,7 @@ defaults:
   - paths: gpfs
 #  - catalog: tngcluster
 #  - catalog: illustris300
-  - catalog: magneticum_v2
+  - catalog: magneticum
 #  - catalog: flamingo
 #  - catalog: millenium
   - extras: default

@@ -162,12 +162,12 @@ class DataLoader(PipelineStep):
                 logger.debug(type(halo_particles_no_overlapping))
                 logger.debug(f'star_p: {halo_particles_no_overlapping.star_p.shape}')
                 logger.debug(f'star_v: {halo_particles_no_overlapping.star_v.shape}')
-                store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name)
+                # store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name)
 
                 # Preprocessed all particles for current halo
                 logger.debug('2. Preprocessed all particles for current halo ...')
                 halo_particles_no_overlapping.preprocess(halo, lbox)
-                store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name, suffix='preprocessed')
+                # store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name, suffix='preprocessed')
 
                 # Load preprocessed particles for overlapping halos
                 overlapping_subhalo_particles, subhalos_with_errors = \
@@ -180,7 +180,7 @@ class DataLoader(PipelineStep):
                     logger.debug('3. Group all the particles together ...')
                     logger.debug(f'star_p: {halo_particles_no_overlapping.star_p.shape}')
                     logger.debug(f'star_v: {halo_particles_no_overlapping.star_v.shape}')
-                    store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name, suffix='overlapping')
+                    # store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name, suffix='overlapping')
                 else:
                     halo_particles_overlapping = halo_particles_no_overlapping
 
@@ -191,22 +191,15 @@ class DataLoader(PipelineStep):
 
                 # Center subhalos positions respect to current halo, including overlapping subhalos
                 logger.debug('4.  Center subhalos positions respect to current halo, including overlapping subhalos ...')
-                logger.debug(type(subhalo_ctx))
-                path_1 = dataset_dir + f'/../logs/transition_radius/subhalo_ctx_{name}_{halo.halo_id}.pkl'
-                with open(path_1, 'wb') as f:
-                    pickle.dump(subhalo_ctx, f)
                 subhalo_ctx.preprocess(halo, lbox)
-                path_2 = dataset_dir + f'/../logs/transition_radius/subhalo_ctx_{name}_{halo.halo_id}_preprocessed.pkl'
-                with open(path_2, 'wb') as f:
-                    pickle.dump(subhalo_ctx, f)
 
                 # Store info for log purposes
                 halo_dict = {'halo_id': halo.halo_id, 'R200': halo.r200,
                              'number_particles': len(halo_particles_overlapping.star_p),
                              'transition_radius': float(output_feature.transition_radius)}
 
-                with open(path, "w") as f:
-                    json.dump(halo_dict, f, indent=4)
+                # with open(path, "w") as f:
+                #    json.dump(halo_dict, f, indent=4)
 
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
