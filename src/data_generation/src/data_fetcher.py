@@ -2405,6 +2405,7 @@ class MagneticumFetcher(DataFetcher):
 
         # FIX: removed dead first assignment that was immediately overwritten
         self._particle_conditions = {}
+        self._particle_cache_loaded = True
 
     # ── PID helpers (halos) ────────────────────────────────────────────────────
 
@@ -2884,6 +2885,7 @@ class MagneticumFetcher(DataFetcher):
     def _store_particles(self) -> LazySubhaloParticles:
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
+        if not getattr(self, "_particle_cache_loaded", False):
             self._load_particle_cache()
 
         logger.info("Starting star particle ingestion pipeline")
@@ -2994,6 +2996,7 @@ class MagneticumFetcher(DataFetcher):
         print('_get_p_subhalo')
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
+        if not getattr(self, "_particle_cache_loaded", False):
             self._load_particle_cache()
 
         path = self.catalog.path
@@ -3113,6 +3116,7 @@ class MagneticumFetcher(DataFetcher):
     def _get_p_halo(self, halo) -> SubhaloParticles | LazySubhaloParticles:
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
+        if not getattr(self, "_particle_cache_loaded", False):
             self._load_particle_cache()
 
         path = self.catalog.path

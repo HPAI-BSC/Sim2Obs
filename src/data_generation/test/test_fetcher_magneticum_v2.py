@@ -319,6 +319,10 @@ class TestMagneticumFetcherV2:
         fetcher._snap_cache_config = {
             "stars": {"fields_padded": ["ID  ", "POS ", "MASS"], "ptype_int": 4}
         }
+        # _cache_loaded and _particle_cache_loaded are independent flags —
+        # set both so _store_particles() doesn't rebuild the pre-seeded
+        # _snap_cache_config above via the real _load_particle_cache().
+        fetcher._particle_cache_loaded = True
 
         # halo0 true pids = {100, 5, 50} -> V1 interval [5, 100]
         # halo1 true pids = {200, 250}   -> V1 interval [200, 250] (no overlap)

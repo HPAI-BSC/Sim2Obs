@@ -555,6 +555,56 @@ class TestMagneticumFetcher:
         # — that type is only produced by _store_particles() on a fresh build.
         assert isinstance(result, SubhaloParticles)
 
+    def test_store_particles_loads_particle_cache_even_if_catalog_cache_already_loaded(
+        self, fetcher, mock_catalog
+    ):
+        """
+        Regression: _get_halos()/_get_subhalos() call _load_catalog_cache()
+        alone and set _cache_loaded=True without touching the particle
+        cache. _store_particles() must not gate _load_particle_cache()
+        behind that same flag — doing so previously meant _snap_cache_config
+        was never built whenever halos/subhalos were fetched before
+        particles (production traceback: "'MagneticumFetcherV2' object has
+        no attribute '_snap_cache_config'").
+        """
+        OmegaConf.set_struct(mock_catalog, False)
+        mock_catalog.fields.particles = OmegaConf.create({
+            "stars": {"POS": {}, "MASS": {}}
+        })
+        fetcher.catalog = mock_catalog
+        # Simulates a fetcher that already had _get_halos()/_get_subhalos()
+        # called on it: catalog cache loaded, particle cache not.
+        fetcher._cache_loaded = True
+        assert not hasattr(fetcher, "_particle_cache_loaded")
+
+        fetcher._halo_intervals    = [(0, 4, 0)]
+        fetcher._subhalo_index     = [(0, 5)]
+        fetcher._subhalo_sorted_pids = np.arange(5, dtype=np.int64)
+        fetcher._subhalo_sorted_ids  = np.zeros(5, dtype=np.int32)
+
+        snap_data = make_fake_snap_data(5)
+
+        def fake_read_new(path, fields, ptype, **kwargs):
+            return {4: snap_data}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            OmegaConf.set_struct(fetcher.catalog, False)
+            fetcher.catalog.path = tmpdir
+            with patch("src.data_generation.src.data_fetcher.MAGNETICUM_PART_TYPES",
+                       {"stars": 4}), \
+                 patch("g3read.yield_all_files", return_value=["snap.hdf5"]), \
+                 patch("g3read.read_new", side_effect=fake_read_new), \
+                 patch("pyarrow.parquet.write_to_dataset"), \
+                 patch("src.data_generation.src.data_fetcher.LazySubhaloParticles"), \
+                 patch.object(fetcher, "_run_particle_pipeline", side_effect=lambda d: d), \
+                 patch.object(fetcher, "_build_halo_intervals"), \
+                 patch.object(fetcher, "_build_subhalo_index"), \
+                 patch.object(fetcher, "_build_subhalo_pid_arrays"):
+                fetcher._store_particles()
+
+        assert fetcher._particle_cache_loaded is True
+        assert "stars" in fetcher._snap_cache_config
+
     def test_store_particles_includes_subhalo_id_column(self, fetcher):
         """Regression: subhalo_id must be written into the parquet output."""
         snap_data = make_fake_snap_data(20)
@@ -567,6 +617,10 @@ class TestMagneticumFetcher:
         fetcher._snap_cache_config = {
             "stars": {"fields_padded": ["ID  ", "POS ", "MASS"], "ptype_int": 4}
         }
+        # _cache_loaded and _particle_cache_loaded are independent flags —
+        # set both so _store_particles() doesn't rebuild the pre-seeded
+        # _snap_cache_config above via the real _load_particle_cache().
+        fetcher._particle_cache_loaded = True
 
         written = {}
 
@@ -609,6 +663,10 @@ class TestMagneticumFetcher:
         fetcher._snap_cache_config = {
             "stars": {"fields_padded": ["ID  ", "POS ", "MASS"], "ptype_int": 4}
         }
+        # See test_store_particles_includes_subhalo_id_column: both cache
+        # flags must be set so _store_particles() doesn't overwrite the
+        # pre-seeded _snap_cache_config above via the real _load_particle_cache().
+        fetcher._particle_cache_loaded = True
 
         written = {}
 
