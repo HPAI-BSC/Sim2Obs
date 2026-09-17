@@ -631,6 +631,8 @@ class DataFetcherFactory:
             return EagleFetcher(catalog, **kwargs)
         elif catalog.name == "flamingo":
             return FlamingoFetcher(catalog, **kwargs)
+        elif catalog.name == "flamingo_v2":
+            return FlamingoFetcherV2(catalog, **kwargs)
         elif catalog.name == "magneticum":
             return MagneticumFetcher(catalog, **kwargs)
         elif catalog.name == "magneticum_v2":
@@ -2099,6 +2101,232 @@ class FlamingoFetcher(DataFetcher):
         return particle_data
 
 
+class FlamingoFetcherV2(FlamingoFetcher):
+    """
+    Fixes FlamingoFetcher's star-particle -> halo/subhalo assignment bug.
+
+    The SOAP catalogue exposes two coexisting, non-interchangeable ID spaces
+    for the SAME row-space (self.fof_subhalos, loaded from
+    halo_properties_<redshift>.hdf5 — halos and subhalos are literally the
+    same rows, just filtered differently by soap.host_halo_index):
+
+      - row-position space: the index of a row within self.fof_subhalos, as
+        it was loaded. V1's assign_id() assigns exactly this (np.arange(N))
+        as `halo_id` / `subhalo_id`. soap.host_halo_index (used for
+        satellite<->parent linkage) is ALSO expressed in this space —
+        verified on real data: interpreting HostHaloIndex as a direct row
+        index gives physically sane satellite-to-parent distances
+        (sub-Mpc); any other interpretation gives distances of hundreds of
+        Mpc. So host/satellite linkage under V1's row-position halo_id is
+        already correct.
+      - true catalogue-index space: input_halos.halo_catalogue_index (halo
+        table) and the per-particle halo_catalogue_index fields
+        (PartType4/HaloCatalogueIndex, etc. in flamingo_<redshift>.hdf5) use
+        a separate, shuffled numbering that has nothing to do with row
+        position — confirmed on real data: HaloCatalogueIndex is not
+        np.arange(N), and a halo's row-position id (e.g. 639531) generally
+        refers to an entirely different physical halo than the one whose
+        TRUE catalogue index happens to equal 639531.
+
+    V1's bug: _get_p_halo's primary-particle mask
+    (particles_of_type.halo_catalogue_index == halo.halo_id) compares a
+    row-position halo_id directly against a true-catalogue-index particle
+    field, with no conversion — matching star particles to an essentially
+    unrelated halo elsewhere in the box. The satellite-gathering code three
+    lines below it in the SAME method already performs the correct
+    conversion (self.fof_subhalos.input_halos.halo_catalogue_index[mask]),
+    it's just never applied to the primary-particle line.
+
+    V2 fix (surgical, not a rewrite): convert the row-position id to its
+    true catalogue index — via self.fof_subhalos.input_halos.halo_catalogue_index,
+    the same SOAP field the satellite-gathering code already uses correctly
+    — at exactly the two points that compare against particle data:
+      - _get_p_halo: convert halo.halo_id before building the primary mask.
+      - _get_p_subhalo: convert the incoming subhalo_id argument once, up
+        front, since the rest of the method already treats it as if it were
+        a true catalogue index (its own lookup at
+        np.where(halo_catalogue_index == subhalo_id) already only makes
+        sense in that space).
+
+    Everything else — assign_id, _get_halos(), _get_subhalos(),
+    __reindexing_satellites, and the satellite-gathering lines themselves —
+    is left untouched (inherited unmodified): it is internally consistent
+    under the row-position convention today, and rewriting it would be a
+    larger change that risks breaking the currently-correct host/satellite
+    linkage for no benefit.
+    """
+
+    def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
+        """
+        Same as FlamingoFetcher._get_p_subhalo, with one addition: the
+        incoming `subhalo_id` is the row-position index produced by
+        _get_subhalos() (same convention as halo.halo_id). V1's version
+        instead searched for a row whose TRUE catalogue index equals
+        `subhalo_id` (`np.where(halo_catalogue_index == subhalo_id)`) — a
+        lookup that only makes sense if `subhalo_id` were already a true
+        catalogue index, which it isn't. Since `subhalo_id` is a row
+        position, the row IS `self.fof_subhalos[subhalo_id]` directly; no
+        search is needed, just a bounds check and a direct read of that
+        row's true catalogue index (for comparing against particle data,
+        which is keyed by true catalogue index, not row position).
+        """
+        catalogue_index_field = self.fof_subhalos.input_halos.halo_catalogue_index
+
+        if not (0 <= subhalo_id < len(catalogue_index_field)):
+            raise ValueError(f'Subhalo: {subhalo_id} is not a primary subhalo')
+
+        subhalo_catalogue_id = catalogue_index_field[subhalo_id]
+        host_halo_index = self.fof_subhalos.soap.host_halo_index[subhalo_id]
+
+        if host_halo_index != -1:
+            # Not a primary index
+            raise ValueError(f'Subhalo: {subhalo_id} is not a primary subhalo')
+
+        # Add halo_catalogue_index for all the particle types
+        for part_type in self.particle_fields:
+            OmegaConf.set_struct(self.catalog, False)
+            if 'halo_catalogue_index' not in self.catalog.fields.particles[part_type]:
+                self.catalog.fields.particles[part_type]['halo_catalogue_index'] = {
+                    "input": None,
+                    "output": None,
+                    "scaling": None,
+                    "name": "parent_id"
+                }
+            OmegaConf.set_struct(self.catalog, True)
+
+        part_types = self.particle_fields
+        data = {}
+
+        type_mask = {}
+        # Build particles mask
+        for part_type in part_types:
+            particles_of_type = getattr(self.particles, part_type)
+            # Mask to get particles belonging to the primary subhalo — compared
+            # in true-catalogue-index space, matching the SOAP lookup above.
+            particles_mask_primary = particles_of_type.halo_catalogue_index == subhalo_catalogue_id
+            type_mask[part_type] = particles_mask_primary
+
+            if np.all(particles_mask_primary == False):
+                logger.warning(f'Subhalo {subhalo_id} has no particles associated.')
+
+        particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
+        filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
+        particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
+        data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
+                                                 mask=type_mask)
+        table = 'particles'
+        steps = [
+            lambda particles: convert_to_dataframe(data),
+            lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+            lambda particles: apply_filters(particles, filtered_conditions, self.catalog.fields.particles)
+        ]
+
+        processed_particles = run_pipeline(data, steps)
+        logger.debug("Particles data fetched successfully.")
+
+        # SubhaloParticles is expecting a dict with part_types - df
+        d = {}
+        columns = list(processed_particles.columns)
+        for part_type in part_types:
+            filtered_columns = [column for column in columns if part_type in column]
+            renamed_columns = [column.replace(f'{part_type}.', '') for column in filtered_columns]
+            rename_dict = dict(zip(filtered_columns, renamed_columns))
+            tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
+            d[part_type] = tmp
+
+        particle_data = SubhaloParticles(d, self.catalog.fields.particles)
+        return particle_data
+
+    def _get_p_halo(self, halo: Halo) -> SubhaloParticles:
+        """
+        Same as FlamingoFetcher._get_p_halo, with one addition: halo.halo_id
+        (row-position) is converted to its true SOAP catalogue index, via
+        self.fof_subhalos.input_halos.halo_catalogue_index, before it is
+        compared against the particle data's halo_catalogue_index field.
+        This is the exact conversion the satellite-gathering code below
+        already performs (self.fof_subhalos.input_halos.halo_catalogue_index
+        [satellites_mask]) — it was just never applied to the primary mask.
+        """
+        if halo.is_primary != -1:
+            # Not a primary index
+            raise ValueError(f'Subhalo: {halo.halo_id} is not a primary subhalo')
+
+        # Add halo_catalogue_index for all the particle types
+        for part_type in self.particle_fields:
+            OmegaConf.set_struct(self.catalog, False)
+            if 'halo_catalogue_index' not in self.catalog.fields.particles[part_type]:
+                self.catalog.fields.particles[part_type]['halo_catalogue_index'] = {
+                    "input": None,
+                    "output": None,
+                    "scaling": None,
+                    "name": "parent_id"
+                }
+            OmegaConf.set_struct(self.catalog, True)
+
+        # halo.halo_id is a row-position index into self.fof_subhalos; convert
+        # it to the true SOAP catalogue index before comparing against
+        # particle data, which is keyed by true catalogue index.
+        halo_catalogue_id = self.fof_subhalos.input_halos.halo_catalogue_index[halo.halo_id]
+
+        part_types = self.particle_fields
+        data = {}
+
+        type_mask = {}
+        # Build particles mask
+        for part_type in part_types:
+            particles_of_type = getattr(self.particles, part_type)
+            # Mask to get particles belonging to the primary subhalo
+            particles_mask_primary = particles_of_type.halo_catalogue_index == halo_catalogue_id
+            is_full_false = np.sum(particles_mask_primary)
+
+            # Get satellite subhalos — host_halo_index is row-position, same
+            # space as halo.halo_id, so this comparison is already correct.
+            satellites_mask = self.fof_subhalos.soap.host_halo_index == halo.halo_id
+
+            # Loop over the halo_catalogue_index of the satellites to get all bound particles
+            satellites_idx_array = self.fof_subhalos.input_halos.halo_catalogue_index[satellites_mask]
+            particles_mask_satellites = np.isin(particles_of_type.halo_catalogue_index, satellites_idx_array)
+            particles_mask = particles_mask_primary | particles_mask_satellites
+
+            type_mask[part_type] = particles_mask
+
+            if np.all(particles_mask_satellites == False):
+                logger.warning(f'Halo {halo.halo_id} has no satellites.')
+
+            if np.all(particles_mask_primary == False):
+                logger.warning(f'Halo {halo.halo_id} has no particles (all particles_mask_primary are false).')
+                raise ValueError(f'Halo {halo.halo_id} has no particles (all particles_mask_primary are false).')
+
+        particle_conditions = self._get_attr(self.catalog.fields.particles, attr_name='filter', parent_key="")
+        filtered_conditions = {k: v for k, v in particle_conditions.items() if v is not None}
+        particle_full_names = self._get_nested_keys(self.catalog.fields.particles)
+        data = self._validate_and_process_fields(self.particles, particle_full_names, super_key='particles',
+                                                 mask=type_mask)
+        table = 'particles'
+        steps = [
+            lambda particles: convert_to_dataframe(data),
+            lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+            lambda particles: apply_filters(particles, filtered_conditions, self.catalog.fields.particles)
+        ]
+
+        processed_particles = run_pipeline(data, steps)
+
+        # SubhaloParticles is expecting a dict with part_types - df
+        d = {}
+        columns = list(processed_particles.columns)
+        for part_type in part_types:
+            logger.debug(f'part type:{part_type}')
+            filtered_columns = [column for column in columns if part_type in column]
+            renamed_columns = [column.replace(f'{part_type}.', '') for column in filtered_columns]
+            rename_dict = dict(zip(filtered_columns, renamed_columns))
+            tmp = processed_particles[filtered_columns].rename(mapper=rename_dict, axis='columns')
+            d[part_type] = tmp
+
+        particle_data = SubhaloParticles(d, self.catalog.fields.particles)
+        logger.debug(f'Stellar particle size: {len(particle_data.star_p)}')
+        return particle_data
+
+
 class MagneticumFetcher(DataFetcher):
     def __init__(self, catalog: DictConfig, **kwargs):
         super().__init__(catalog, **kwargs)
@@ -2898,7 +3126,8 @@ class MagneticumFetcher(DataFetcher):
 
 class MagneticumFetcherV2(MagneticumFetcher):
     """
-    Fixes MagneticumFetcher's star-particle -> halo assignment bug.
+    Fixes MagneticumFetcher's star-particle -> halo assignment bug, under a
+    hard memory ceiling (no swap, no bigger --mem available on the cluster).
 
     V1 (MagneticumFetcher) approximates "does particle X belong to halo H?"
     with a [min(PID of H), max(PID of H)] range test (_build_halo_intervals /
@@ -2913,35 +3142,48 @@ class MagneticumFetcherV2(MagneticumFetcher):
     for millions of halos/subhalos this reads multi-GB blocks off disk
     repeatedly.
 
-    V2 replaces both:
-      - Correctness: exact particle-ID membership (verified against
-        manual_test_magneticum.py's get_halo_particles_strict reference,
-        which uses np.isin on raw PIDs and returns physically sane results
-        — all matched particles within ~2x R200 of the halo center).
-      - Efficiency: each group file's "PID " block is read exactly once
-        (_build_pid_index), and halo/subhalo ownership for every position in
-        that block is derived vectorised (np.repeat over GOFF/GLEN for halos,
-        which partition the block with no gaps; a vectorised interval search
-        over SOFF/SLEN for subhalos, which nest within their parent halo's
-        range but don't fully cover it — diffuse/unbound particles get -1).
-        One sort by PID value then supports O(log n) exact-match lookups via
-        np.searchsorted, identical in spirit to V1's (already-correct)
-        _assign_subhalo_ids, just built without the redundant re-reads.
+    An earlier version of this class fixed correctness and the redundant
+    re-reads by building ONE global sorted (PID -> halo_id, subhalo_id)
+    index across the whole group catalogue, held in RAM. That is correct and
+    reads each group file only once, but its peak memory is O(N) in the
+    TOTAL group-catalogue particle count — it OOM-killed a real production
+    run, and this cluster's queue cannot grant more memory. A smaller
+    constant factor (dropping a stable sort, freeing intermediates eagerly)
+    only bought ~13% (measured: 2.80 GB -> 2.44 GB on a 90M-entry local
+    fixture) — nowhere near enough headroom for a production box, since the
+    approach still scales with total N regardless of tuning.
 
-    _store_particles() (inherited, unmodified) already calls
-    _build_halo_intervals() / _build_subhalo_index() / _build_subhalo_pid_arrays()
-    as a fixed sequence; here all three simply delegate to the single shared
-    _build_pid_index() pass, which is idempotent so calling it three times
-    costs the same as calling it once.
+    This version restructures the algorithm instead of tuning it: rather
+    than building one global index, _assign_halo_ids/_assign_subhalo_ids
+    stream the group catalogue's "PID " block once PER CALL (i.e. once per
+    snapshot-file chunk from _store_particles()'s existing loop), holding
+    only one group file's chunk in memory at a time, and match it directly
+    against that chunk's (much smaller) particle IDs via a sorted search.
+    Peak memory is now bounded by max(one group file's chunk, one snapshot
+    file's particle count) — independent of the total group-catalogue size —
+    at the cost of re-reading the group catalogue once per snapshot file
+    instead of once total. Since snapshot files are typically far fewer than
+    halos (tens, not millions), this trade is favourable under a hard memory
+    cap: it fully fixes the O(N) memory scaling that the global-index
+    version could not escape, in exchange for a bounded, small multiple of
+    extra disk I/O.
+
+    _store_particles() (inherited, unmodified) calls
+    self._assign_halo_ids(ids) then self._assign_subhalo_ids(ids) with the
+    SAME `ids` array back to back, once per snapshot file. Streaming the
+    group catalogue separately for each of those two calls would double the
+    re-read cost for no reason, so the first call does the full streaming
+    pass and computes both results, caching them (keyed by identity of the
+    `ids` array) for the second call to reuse.
     """
 
     def _build_pid_file_boundaries(self) -> list:
         """
-        V2 has no per-entity lazy PID readers to index (see _build_pid_index),
-        so there is nothing to build here. Overridden (rather than left as
-        V1's real implementation) purely so the inherited _load_catalog_cache()
-        does not perform a wasted boundary-only scan of the PID block before
-        _build_pid_index() reads it for real.
+        V2 has no per-entity lazy PID readers to index (see
+        _assign_halo_ids), so there is nothing to build here. Overridden
+        (rather than left as V1's real implementation) purely so the
+        inherited _load_catalog_cache() does not perform a wasted
+        boundary-only scan of the PID block.
         """
         return []
 
@@ -2949,131 +3191,197 @@ class MagneticumFetcherV2(MagneticumFetcher):
         """See _build_pid_file_boundaries."""
         return []
 
-    def _build_pid_index(self) -> None:
-        """
-        Single-pass, vectorised replacement for V1's _build_halo_intervals()
-        and _build_subhalo_pid_arrays(). Idempotent: safe to call multiple
-        times (only the first call does real work), since _store_particles()
-        calls the three delegating methods below in sequence.
-
-        Reads every group file's "PID " block exactly once, then derives, for
-        every position in the resulting flat array:
-          - its owning halo_id, vectorised via GOFF/GLEN (these partition the
-            PID block exactly, confirmed on real data: sum(GLEN) == len(PID
-            block), so a plain run-length expansion is exact and needs no
-            search)
-          - its owning subhalo_id, vectorised via SOFF/SLEN (these nest inside
-            their parent halo's GOFF/GLEN range but can leave gaps — diffuse
-            halo particles not bound to any subhalo — so a vectorised
-            interval search with a -1 "unowned" fallback is used instead of a
-            plain run-length expansion)
-
-        Both owner arrays are then sorted once by PID value, giving exact
-        O(log n) membership lookups via np.searchsorted at query time
-        (_assign_halo_ids below; _assign_subhalo_ids is inherited unchanged
-        since it already does exactly this against self._subhalo_sorted_pids
-        / self._subhalo_sorted_ids, which this method now populates).
-        """
-        if getattr(self, "_pid_index_built", False):
-            return
-
-        empty_i64 = np.array([], dtype=np.int64)
-        empty_i32 = np.array([], dtype=np.int32)
-
-        pid_chunks = []
-        for group_file in g3read.yield_all_files(self._group_base):
-            f = g3read.GadgetFile(group_file, is_snap=False)
-            pid_in_file = f.read("PID ", 2)
-            if pid_in_file is None or len(pid_in_file) == 0:
-                continue
-            pid_chunks.append(np.asarray(pid_in_file, dtype=np.int64))
-            del pid_in_file
-
-        if not pid_chunks:
-            self._halo_sorted_pids = empty_i64
-            self._halo_sorted_ids = empty_i32
-            self._subhalo_sorted_pids = empty_i64
-            self._subhalo_sorted_ids = empty_i32
-            self._pid_index_built = True
-            return
-
-        pid_values = np.concatenate(pid_chunks)
-        del pid_chunks
-        n_positions = len(pid_values)
-
-        # ── halo ownership: GOFF/GLEN exactly partitions the PID block ──
-        glen = np.asarray(self._glen, dtype=np.int64)
-        halo_id_per_position = np.repeat(np.arange(len(glen), dtype=np.int32), glen)
-        if len(halo_id_per_position) != n_positions:
-            raise ValueError(
-                f"sum(GLEN)={len(halo_id_per_position)} does not match PID "
-                f"block length={n_positions}; the halo/PID contiguous-layout "
-                f"assumption this method relies on no longer holds."
-            )
-
-        # ── subhalo ownership: SOFF/SLEN nest within their parent halo's
-        #    range but may leave gaps (diffuse, unbound halo particles) ──
-        soff = np.asarray(self._soff, dtype=np.int64)
-        slen = np.asarray(self._slen, dtype=np.int64)
-        subhalo_id_per_position = np.full(n_positions, -1, dtype=np.int32)
-        if len(soff) > 0:
-            positions = np.arange(n_positions)
-            order = np.argsort(soff, kind="stable")
-            soff_sorted = soff[order]
-            send_sorted = soff_sorted + slen[order]
-            subhalo_id_sorted = order.astype(np.int32)
-
-            idx = np.searchsorted(soff_sorted, positions, side="right") - 1
-            idx = np.clip(idx, 0, len(soff_sorted) - 1)
-            in_range = (positions >= soff_sorted[idx]) & (positions < send_sorted[idx])
-            subhalo_id_per_position = np.where(in_range, subhalo_id_sorted[idx], -1).astype(np.int32)
-
-        # ── one sort by PID value, shared by both levels ──
-        value_order = np.argsort(pid_values, kind="stable")
-        self._halo_sorted_pids = pid_values[value_order]
-        self._halo_sorted_ids = halo_id_per_position[value_order]
-        self._subhalo_sorted_pids = self._halo_sorted_pids
-        self._subhalo_sorted_ids = subhalo_id_per_position[value_order]
-
-        self._pid_index_built = True
-
     def _build_halo_intervals(self) -> None:
-        """V2: delegates to the shared single-pass index (_build_pid_index)."""
-        self._build_pid_index()
+        """V2 builds no upfront index at all — ownership is streamed and
+        matched per snapshot-file chunk inside _assign_halo_ids/
+        _assign_subhalo_ids, to keep peak memory bounded by one group file's
+        chunk rather than the total group-catalogue size."""
+        pass
 
     def _build_subhalo_index(self) -> None:
-        """V2: subhalo ownership is derived directly from SOFF/SLEN inside
-        _build_pid_index(); no separate (start, end) index is needed."""
-        self._build_pid_index()
+        """See _build_halo_intervals."""
+        pass
 
     def _build_subhalo_pid_arrays(self) -> None:
-        """V2: delegates to the shared single-pass index (_build_pid_index)."""
-        self._build_pid_index()
+        """See _build_halo_intervals."""
+        pass
+
+    def _load_group_offsets(self) -> None:
+        """
+        Cheap, small-memory setup (O(n_halos) + O(n_subhalos), not O(N)):
+        cumulative halo end-positions and subhalo start-positions sorted for
+        binary search. Used by _owners_for_chunk to derive, for one group
+        file's chunk at a time, which halo/subhalo owns each position in it
+        — without ever materialising a per-position array across the WHOLE
+        group catalogue.
+
+        Relies on GOFF being monotonically non-decreasing (confirmed on real
+        Magneticum group-catalogue data: it's a cumulative offset assigned
+        in on-disk row order), so a binary search over it correctly finds
+        the halos overlapping an arbitrary [chunk_start, chunk_end) range.
+        """
+        if getattr(self, "_group_offsets_loaded", False):
+            return
+
+        self._halo_goff = np.asarray(self._goff, dtype=np.int64)
+        self._halo_gend = self._halo_goff + np.asarray(self._glen, dtype=np.int64)
+
+        order = np.argsort(self._soff, kind="stable")  # tiny: n_subhalos-sized
+        self._sub_soff_sorted = np.asarray(self._soff, dtype=np.int64)[order]
+        self._sub_send_sorted = self._sub_soff_sorted + np.asarray(self._slen, dtype=np.int64)[order]
+        self._sub_id_sorted = order.astype(np.int32)
+
+        self._group_offsets_loaded = True
+
+    def _owners_for_chunk(self, chunk_start: int, chunk_end: int):
+        """
+        halo_id_per_position, subhalo_id_per_position for the global PID
+        position range [chunk_start, chunk_end) — i.e. for exactly one group
+        file's chunk. Memory scales with the number of halos/subhalos
+        overlapping this chunk (found via binary search, cheap) plus the
+        chunk's own length for the two output arrays — never with the total
+        group-catalogue size.
+        """
+        n = chunk_end - chunk_start
+
+        # halos: GOFF/GLEN partitions the whole catalogue with no gaps, so
+        # every position in this chunk is covered by exactly one halo.
+        lo = np.searchsorted(self._halo_gend, chunk_start, side='right')
+        hi = np.searchsorted(self._halo_goff, chunk_end, side='left')
+        halo_ids = np.arange(lo, hi, dtype=np.int32)
+        starts = np.clip(self._halo_goff[lo:hi] - chunk_start, 0, n)
+        ends = np.clip(self._halo_gend[lo:hi] - chunk_start, 0, n)
+        halo_id_per_position = np.repeat(halo_ids, ends - starts)
+        if len(halo_id_per_position) != n:
+            raise ValueError(
+                f"halo ownership for chunk [{chunk_start},{chunk_end}) covers "
+                f"{len(halo_id_per_position)} positions, expected {n}; the "
+                f"GOFF/GLEN contiguous-layout assumption no longer holds."
+            )
+
+        # subhalos: SOFF/SLEN nest within their parent halo's range but may
+        # leave gaps (diffuse, unbound halo particles) — vectorised
+        # run-length expansion over just the overlapping subhalos, with -1
+        # filling any gaps.
+        lo_s = np.searchsorted(self._sub_send_sorted, chunk_start, side='right')
+        hi_s = np.searchsorted(self._sub_soff_sorted, chunk_end, side='left')
+        if hi_s > lo_s:
+            s_ids = self._sub_id_sorted[lo_s:hi_s]
+            s_starts = np.clip(self._sub_soff_sorted[lo_s:hi_s] - chunk_start, 0, n)
+            s_ends = np.clip(self._sub_send_sorted[lo_s:hi_s] - chunk_start, 0, n)
+            s_lengths = s_ends - s_starts
+
+            gap_before = np.empty(len(s_starts), dtype=np.int64)
+            gap_before[0] = s_starts[0]
+            gap_before[1:] = s_starts[1:] - s_ends[:-1]
+            gap_before = np.clip(gap_before, 0, None)
+
+            ids_interleaved = np.empty(2 * len(s_ids), dtype=np.int32)
+            lens_interleaved = np.empty(2 * len(s_ids), dtype=np.int64)
+            ids_interleaved[0::2] = -1
+            ids_interleaved[1::2] = s_ids
+            lens_interleaved[0::2] = gap_before
+            lens_interleaved[1::2] = s_lengths
+
+            trailing_gap = n - int(s_ends[-1])
+            if trailing_gap > 0:
+                ids_interleaved = np.concatenate((ids_interleaved, [-1]))
+                lens_interleaved = np.concatenate((lens_interleaved, [trailing_gap]))
+
+            subhalo_id_per_position = np.repeat(ids_interleaved, lens_interleaved)
+        else:
+            subhalo_id_per_position = np.full(n, -1, dtype=np.int32)
+
+        return halo_id_per_position, subhalo_id_per_position
+
+    def _stream_match(self, ids: np.ndarray):
+        """
+        Bounded-memory halo_id/subhalo_id assignment for one batch of
+        particle IDs (in practice: one snapshot file's worth of star
+        particles). Streams the group catalogue's "PID " block one group
+        file at a time — never holding more than one file's chunk plus the
+        (much smaller) `ids` array in memory — matching each chunk against
+        `ids` via a sorted search, and filling in owners only for positions
+        that match.
+
+        Returns (halo_ids, subhalo_ids), both shaped like `ids`, -1 where
+        a particle ID has no match in the group catalogue at all (e.g. an
+        unbound particle).
+        """
+        self._load_group_offsets()
+
+        halo_result = np.full(len(ids), -1, dtype=np.int32)
+        subhalo_result = np.full(len(ids), -1, dtype=np.int32)
+
+        id_sorter = np.argsort(ids)  # small: bounded by this chunk's size
+        ids_sorted = ids[id_sorter]
+
+        cumulative_offset = 0
+        for group_file in g3read.yield_all_files(self._group_base):
+            f = g3read.GadgetFile(group_file, is_snap=False)
+            pid_chunk = f.read("PID ", 2)
+            if pid_chunk is None or len(pid_chunk) == 0:
+                continue
+            pid_chunk = np.asarray(pid_chunk, dtype=np.int64)
+            chunk_start = cumulative_offset
+            chunk_end = cumulative_offset + len(pid_chunk)
+            cumulative_offset = chunk_end
+
+            probe = np.searchsorted(ids_sorted, pid_chunk)
+            probe = np.clip(probe, 0, len(ids_sorted) - 1)
+            is_match = ids_sorted[probe] == pid_chunk
+            if not np.any(is_match):
+                del pid_chunk, probe, is_match
+                continue
+
+            halo_owner, sub_owner = self._owners_for_chunk(chunk_start, chunk_end)
+
+            matched_ids_sorted_pos = probe[is_match]
+            matched_original_pos = id_sorter[matched_ids_sorted_pos]
+            halo_result[matched_original_pos] = halo_owner[is_match]
+            subhalo_result[matched_original_pos] = sub_owner[is_match]
+
+            del pid_chunk, probe, is_match, halo_owner, sub_owner
+
+        return halo_result, subhalo_result
 
     def _assign_halo_ids(self, ids: np.ndarray) -> np.ndarray:
         """
-        Exact-match halo assignment via np.searchsorted on the sorted PID
-        index built by _build_pid_index() — replaces V1's
-        [min(PID), max(PID)] interval approximation.
-        Returns array of halo_ids, -1 where unassigned. Mirrors the
-        (already-correct) pattern used by _assign_subhalo_ids.
+        Exact-match halo assignment, streamed (see _stream_match) instead of
+        looked up in a prebuilt global index. Caches its result (alongside
+        the matching subhalo_ids) keyed by the identity of `ids`, since
+        _store_particles() calls this and _assign_subhalo_ids back to back
+        with the same array — avoids streaming the group catalogue twice per
+        snapshot-file chunk.
         """
-        if not getattr(self, "_pid_index_built", False):
-            self._build_pid_index()
-
         if len(ids) == 0:
             return np.array([], dtype=np.int32)
 
-        if len(self._halo_sorted_pids) == 0:
-            return np.full(len(ids), -1, dtype=np.int32)
+        if getattr(self, "_stream_cache_key", None) != id(ids):
+            halo_ids, subhalo_ids = self._stream_match(ids)
+            self._stream_cache_key = id(ids)
+            self._stream_cache_halo_ids = halo_ids
+            self._stream_cache_subhalo_ids = subhalo_ids
 
-        idx = np.searchsorted(self._halo_sorted_pids, ids)
-        idx = np.clip(idx, 0, len(self._halo_sorted_pids) - 1)
+        return self._stream_cache_halo_ids
 
-        result = np.full(len(ids), -1, dtype=np.int32)
-        matched = self._halo_sorted_pids[idx] == ids
-        result[matched] = self._halo_sorted_ids[idx[matched]]
-        return result
+    def _assign_subhalo_ids(self, ids: np.ndarray) -> np.ndarray:
+        """
+        Exact-match subhalo assignment, streamed the same way as
+        _assign_halo_ids (and sharing its cache — see there). Overridden
+        because V1's version depends on self._subhalo_sorted_pids /
+        self._subhalo_sorted_ids, which this class never builds.
+        """
+        if len(ids) == 0:
+            return np.array([], dtype=np.int32)
+
+        if getattr(self, "_stream_cache_key", None) != id(ids):
+            halo_ids, subhalo_ids = self._stream_match(ids)
+            self._stream_cache_key = id(ids)
+            self._stream_cache_halo_ids = halo_ids
+            self._stream_cache_subhalo_ids = subhalo_ids
+
+        return self._stream_cache_subhalo_ids
 
 
 

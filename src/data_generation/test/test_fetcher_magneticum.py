@@ -16,7 +16,7 @@ rootutils.setup_root(__file__, pythonpath=True)
 from src.data_generation.src.data_fetcher import MagneticumFetcher
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.lazy_subhalo import LazySubhaloContext, LazySubhaloParticles
-from src.data_generation.src.subhalo import SubhaloContext
+from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -51,7 +51,16 @@ def make_fake_snap_data(n_particles: int = 20) -> dict:
 
 
 def write_fake_parquet(path: str, n_halos: int = 3, rows_per_halo: int = 5) -> None:
-    """Write a minimal partitioned parquet dataset to path."""
+    """
+    Write a minimal partitioned parquet dataset to path.
+
+    Column names (POS/MASS/VEL) match what _store_particles() actually
+    writes in production: g3read field names ("POS ", "MASS", "VEL ",
+    padded to 4 chars) with trailing whitespace, which _load_halo_particles
+    / _load_subhalo_particles strip back off (`key.rstrip()`) before
+    applying their column_map={'POS': 'p', 'MASS': 'm', 'VEL': 'v'} —
+    that column_map only matches these names, not arbitrary ones.
+    """
     records = []
     for halo_id in range(n_halos):
         bucket = halo_id % 128
@@ -61,9 +70,9 @@ def write_fake_parquet(path: str, n_halos: int = 3, rows_per_halo: int = 5) -> N
                 "subhalo_id":         halo_id * rows_per_halo + i,
                 "parent_bucket_data": bucket,
                 "parent_bucket":      bucket,
-                "star_p": np.random.uniform(-1, 1, 3).tolist(),
-                "star_m": float(np.random.uniform(1e8, 1e12)),
-                "star_v": np.random.uniform(-500, 500, 3).tolist(),
+                "POS": np.random.uniform(-1, 1, 3).tolist(),
+                "MASS": float(np.random.uniform(1e8, 1e12)),
+                "VEL": np.random.uniform(-500, 500, 3).tolist(),
             })
     table = pa.Table.from_pandas(pd.DataFrame(records), preserve_index=False)
     pq.write_to_dataset(table, root_path=path, partition_cols=["parent_bucket"])
@@ -537,8 +546,14 @@ class TestMagneticumFetcher:
             write_fake_parquet(particles_path)
             OmegaConf.set_struct(fetcher.catalog, False)
             fetcher.catalog.path = tmpdir
-            result = fetcher._get_p_halo(halo=MagicMock())
-        assert isinstance(result, LazySubhaloParticles)
+            halo = MagicMock()
+            halo.halo_id = 0  # concrete int: bucket = halo_id % 128 needs a real value,
+                              # not a MagicMock, to be usable as a parquet filter
+            result = fetcher._get_p_halo(halo=halo)
+        # _load_halo_particles (the path taken when particles_parquet already
+        # exists) always returns SubhaloParticles, never LazySubhaloParticles
+        # — that type is only produced by _store_particles() on a fresh build.
+        assert isinstance(result, SubhaloParticles)
 
     def test_store_particles_includes_subhalo_id_column(self, fetcher):
         """Regression: subhalo_id must be written into the parquet output."""
@@ -568,7 +583,16 @@ class TestMagneticumFetcher:
                  patch("g3read.read_new", side_effect=fake_read_new), \
                  patch("pyarrow.parquet.write_to_dataset", side_effect=capture_write), \
                  patch("src.data_generation.src.data_fetcher.LazySubhaloParticles"), \
-                 patch.object(fetcher, "_run_particle_pipeline", side_effect=lambda d: d):
+                 patch.object(fetcher, "_run_particle_pipeline", side_effect=lambda d: d), \
+                 patch.object(fetcher, "_build_halo_intervals"), \
+                 patch.object(fetcher, "_build_subhalo_index"), \
+                 patch.object(fetcher, "_build_subhalo_pid_arrays"):
+                # _store_particles() unconditionally rebuilds these three via
+                # the calls above; patch them out so the pre-seeded
+                # _halo_intervals / _subhalo_index / _subhalo_sorted_pids
+                # above are what's actually exercised, instead of being
+                # silently overwritten by an empty rebuild (no PID boundary
+                # files exist in this mock setup).
                 fetcher._store_particles()
 
         assert "table" in written, "write_to_dataset was never called"
@@ -601,7 +625,14 @@ class TestMagneticumFetcher:
                  patch("g3read.read_new", side_effect=fake_read_new), \
                  patch("pyarrow.parquet.write_to_dataset", side_effect=capture_write), \
                  patch("src.data_generation.src.data_fetcher.LazySubhaloParticles"), \
-                 patch.object(fetcher, "_run_particle_pipeline", side_effect=lambda d: d):
+                 patch.object(fetcher, "_run_particle_pipeline", side_effect=lambda d: d), \
+                 patch.object(fetcher, "_build_halo_intervals"), \
+                 patch.object(fetcher, "_build_subhalo_index"), \
+                 patch.object(fetcher, "_build_subhalo_pid_arrays"):
+                # See test_store_particles_includes_subhalo_id_column: these
+                # three are unconditionally rebuilt by _store_particles() and
+                # would otherwise overwrite the pre-seeded state above with
+                # an empty rebuild.
                 fetcher._store_particles()
 
         assert "table" in written, "write_to_dataset was never called"
@@ -623,8 +654,14 @@ class TestMagneticumFetcher:
             write_fake_parquet(particles_path)
             OmegaConf.set_struct(fetcher.catalog, False)
             fetcher.catalog.path = tmpdir
-            result = fetcher.get_p_halo(halo=MagicMock())
-        assert isinstance(result, LazySubhaloParticles)
+            halo = MagicMock()
+            halo.halo_id = 0  # concrete int: bucket = halo_id % 128 needs a real value,
+                              # not a MagicMock, to be usable as a parquet filter
+            result = fetcher.get_p_halo(halo=halo)
+        # See test_store_particles_loads_from_existing_parquet: the
+        # existing-parquet path returns SubhaloParticles, not
+        # LazySubhaloParticles.
+        assert isinstance(result, SubhaloParticles)
 
     def test_get_p_halo_triggers_store_particles_when_no_parquet(self, fetcher):
         with tempfile.TemporaryDirectory() as tmpdir:
