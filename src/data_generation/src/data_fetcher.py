@@ -2251,6 +2251,14 @@ class FlamingoFetcherV2(FlamingoFetcher):
             # Not a primary index
             raise ValueError(f'Subhalo: {halo.halo_id} is not a primary subhalo')
 
+        # halo.halo_id is a row-position index into self.fof_subhalos — bounds
+        # check it before indexing, same as _get_p_subhalo does for
+        # subhalo_id, instead of letting an out-of-range id raise a raw
+        # IndexError a few lines below.
+        catalogue_index_field = self.fof_subhalos.input_halos.halo_catalogue_index
+        if not (0 <= halo.halo_id < len(catalogue_index_field)):
+            raise ValueError(f'Subhalo: {halo.halo_id} is not a primary subhalo')
+
         # Add halo_catalogue_index for all the particle types
         for part_type in self.particle_fields:
             OmegaConf.set_struct(self.catalog, False)
@@ -2266,7 +2274,7 @@ class FlamingoFetcherV2(FlamingoFetcher):
         # halo.halo_id is a row-position index into self.fof_subhalos; convert
         # it to the true SOAP catalogue index before comparing against
         # particle data, which is keyed by true catalogue index.
-        halo_catalogue_id = self.fof_subhalos.input_halos.halo_catalogue_index[halo.halo_id]
+        halo_catalogue_id = catalogue_index_field[halo.halo_id]
 
         part_types = self.particle_fields
         data = {}
