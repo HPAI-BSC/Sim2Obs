@@ -3219,16 +3219,27 @@ class MagneticumFetcherV2(MagneticumFetcher):
         — without ever materialising a per-position array across the WHOLE
         group catalogue.
 
-        Relies on GOFF being monotonically non-decreasing (confirmed on real
-        Magneticum group-catalogue data: it's a cumulative offset assigned
-        in on-disk row order), so a binary search over it correctly finds
-        the halos overlapping an arbitrary [chunk_start, chunk_end) range.
+        np.searchsorted (used by _owners_for_chunk) requires its input
+        sorted by GOFF — GOFF is NOT guaranteed to already be in that order:
+        multi-file group catalogues concatenate halos in on-disk/file order
+        (see g3read.read_new(..., multiple_files=True)), which only matches
+        ascending GOFF for a catalogue where per-file halo numbering lines
+        up globally. That doesn't hold for every layout (e.g. a zoom/
+        multi-resolution box, where MAGNETICUM_PART_TYPES's 'boundary'/
+        'tracers' types come from), so halos are explicitly sorted here —
+        exactly like subhalos already are below — rather than trusted as
+        pre-sorted. _halo_id_sorted maps a sorted position back to the real
+        halo_id (positional index into the original, un-sorted GOFF/GLEN/
+        FSUB/NSUB arrays that _get_halos() etc. index by), the same way
+        _sub_id_sorted already does for subhalos.
         """
         if getattr(self, "_group_offsets_loaded", False):
             return
 
-        self._halo_goff = np.asarray(self._goff, dtype=np.int64)
-        self._halo_gend = self._halo_goff + np.asarray(self._glen, dtype=np.int64)
+        order_h = np.argsort(self._goff, kind="stable")  # tiny: n_halos-sized
+        self._halo_goff = np.asarray(self._goff, dtype=np.int64)[order_h]
+        self._halo_gend = self._halo_goff + np.asarray(self._glen, dtype=np.int64)[order_h]
+        self._halo_id_sorted = order_h.astype(np.int32)
 
         order = np.argsort(self._soff, kind="stable")  # tiny: n_subhalos-sized
         self._sub_soff_sorted = np.asarray(self._soff, dtype=np.int64)[order]
@@ -3250,9 +3261,12 @@ class MagneticumFetcherV2(MagneticumFetcher):
 
         # halos: GOFF/GLEN partitions the whole catalogue with no gaps, so
         # every position in this chunk is covered by exactly one halo.
+        # _halo_goff/_halo_gend are sorted by GOFF (see _load_group_offsets),
+        # so lo/hi index into that sorted order — map back to real halo_ids
+        # via _halo_id_sorted, the same way subhalos do below.
         lo = np.searchsorted(self._halo_gend, chunk_start, side='right')
         hi = np.searchsorted(self._halo_goff, chunk_end, side='left')
-        halo_ids = np.arange(lo, hi, dtype=np.int32)
+        halo_ids = self._halo_id_sorted[lo:hi]
         starts = np.clip(self._halo_goff[lo:hi] - chunk_start, 0, n)
         ends = np.clip(self._halo_gend[lo:hi] - chunk_start, 0, n)
         halo_id_per_position = np.repeat(halo_ids, ends - starts)
