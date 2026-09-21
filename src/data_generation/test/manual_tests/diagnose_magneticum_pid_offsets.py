@@ -223,88 +223,169 @@ def check_entity_file_spanning(file_boundaries, offsets, lengths, entity_name, l
     print()
 
 
-def check_soff_reconstruction_via_grnr(group_base, goff, glen, true_goff):
+def sign_unwrap_int32(raw: np.ndarray) -> np.ndarray:
     """
-    SOFF is confirmed 4-byte/truncated on disk too (same as GOFF), but
-    unlike GOFF, subhalo particle ranges have internal gaps (diffuse,
-    unbound halo particles), so a plain cumsum(SLEN) can't reconstruct it.
+    The catalogue's total particle count (~3.36B) is less than 2**32
+    (~4.29B), so a value that overflowed signed int32 wraps exactly once:
+    a true value >= 2**31, truncated to int32 and sign-extended back to
+    int64 by numpy, comes back as `true_value - 2**32` (negative). Undoing
+    that is just: if the raw (int64-cast) value is negative, add 2**32 back.
 
-    Instead: subhalo particles are always a nested subset of their parent
-    halo's particle range — SOFF and GOFF index into the SAME cumulative
-    space (see g3matcha.py: `subhalo['ids'] = halo_ids[SOFF-GOFF : SOFF+SLEN-GOFF]`).
-    That means a subhalo and its parent halo always sit on the SAME side of
-    any int32 wraparound point, so `local_offset = raw_SOFF - raw_GOFF[parent]`
-    is correct even when both are individually wrapped (the wrap cancels in
-    the subtraction), and `true_SOFF = true_GOFF[parent] + local_offset`
-    reconstructs the true global SOFF without needing to unwrap SOFF at all.
+    This works per-element, independently — no row order, no cumulative
+    sums, no parent/child relationship needed. That matters because the
+    naive `local_offset = raw_SOFF - raw_GOFF[parent]` approach (subtracting
+    two raw values assuming they wrap "together") FAILS whenever the 2**31
+    boundary falls in the middle of a halo's particle range: the halo's own
+    GOFF can still be just under 2**31 (unwrapped) while a subhalo sitting
+    further into that same halo's range crosses 2**31 and wraps on its own.
+    """
+    raw = np.asarray(raw, dtype=np.int64)
+    return np.where(raw < 0, raw + (1 << 32), raw)
 
-    Validates this by checking every subhalo nests correctly inside its
-    (already cumsum-validated) parent halo's true range.
+
+def check_sign_unwrap_reconstruction(group_base, goff, glen, true_goff):
+    """
+    Validates sign_unwrap_int32 against both GOFF and SOFF:
+    - GOFF: sign_unwrap_int32(raw_GOFF) must exactly equal the already
+      cumsum(GLEN)-validated true_goff, for every halo.
+    - SOFF: sign_unwrap_int32(raw_SOFF) must nest inside its parent halo's
+      true range, for every subhalo (this is the check the GRNR-subtraction
+      approach failed on one case — see module docstring history).
     """
     print("=" * 78)
-    print("SOFF RECONSTRUCTION CHECK — deriving true SOFF via GRNR + true GOFF")
+    print("SIGN-UNWRAP RECONSTRUCTION CHECK — per-value `if raw<0: raw+2**32`")
     print("=" * 78)
 
-    soff = np.asarray(g3.read_new(group_base, ["SOFF"], 1, is_snap=False, multiple_files=True)["SOFF"], dtype=np.int64)
+    goff_raw = np.asarray(goff, dtype=np.int64)
+    glen = np.asarray(glen, dtype=np.int64)
+    goff_unwrapped = sign_unwrap_int32(goff_raw)
+    n_goff_mismatch = int(np.sum(goff_unwrapped != true_goff))
+    print(f"GOFF: sign-unwrap vs cumsum(GLEN)-validated true_goff — mismatches: {n_goff_mismatch}")
+    if n_goff_mismatch == 0:
+        print("  PASS — sign-unwrap reproduces true_goff exactly for every halo.")
+    else:
+        bad = np.nonzero(goff_unwrapped != true_goff)[0][:5]
+        for h in bad:
+            print(f"  MISMATCH halo[{h}]: raw={goff_raw[h]}, sign_unwrap={goff_unwrapped[h]}, "
+                  f"cumsum_true={true_goff[h]}")
+    print()
+
+    soff_raw = np.asarray(g3.read_new(group_base, ["SOFF"], 1, is_snap=False, multiple_files=True)["SOFF"], dtype=np.int64)
     slen = np.asarray(g3.read_new(group_base, ["SLEN"], 1, is_snap=False, multiple_files=True)["SLEN"], dtype=np.int64)
     grnr = np.asarray(g3.read_new(group_base, ["GRNR"], 1, is_snap=False, multiple_files=True)["GRNR"], dtype=np.int64)
-    goff = np.asarray(goff, dtype=np.int64)
-    glen = np.asarray(glen, dtype=np.int64)
 
-    n = len(soff)
-    valid_grnr = (grnr >= 0) & (grnr < len(goff))
+    n = len(soff_raw)
+    valid_grnr = (grnr >= 0) & (grnr < len(goff_raw))
     n_invalid_grnr = int(np.sum(~valid_grnr))
     print(f"n_subhalos = {n}, invalid GRNR (out of halo-index range): {n_invalid_grnr}")
 
-    true_soff = np.full(n, -1, dtype=np.int64)
-    local_offset = soff[valid_grnr] - goff[grnr[valid_grnr]]
-    true_soff[valid_grnr] = true_goff[grnr[valid_grnr]] + local_offset
-
-    ok_lower = true_soff[valid_grnr] >= true_goff[grnr[valid_grnr]]
-    ok_upper = (true_soff[valid_grnr] + slen[valid_grnr]) <= (true_goff[grnr[valid_grnr]] + glen[grnr[valid_grnr]])
+    soff_unwrapped = sign_unwrap_int32(soff_raw)
+    ok_lower = soff_unwrapped[valid_grnr] >= true_goff[grnr[valid_grnr]]
+    ok_upper = (soff_unwrapped[valid_grnr] + slen[valid_grnr]) <= (true_goff[grnr[valid_grnr]] + glen[grnr[valid_grnr]])
     n_bad_lower = int(np.sum(~ok_lower))
     n_bad_upper = int(np.sum(~ok_upper))
 
-    print(f"subhalos with true_soff < parent true_goff:            {n_bad_lower}")
-    print(f"subhalos with true_soff+SLEN > parent true_goff+GLEN:  {n_bad_upper}")
-    if n_invalid_grnr == 0 and n_bad_lower == 0 and n_bad_upper == 0:
-        print("PASS — every subhalo correctly nests inside its parent halo's true range.")
-        print("       The GRNR-based SOFF reconstruction is validated.")
+    print(f"subhalos with sign-unwrapped SOFF < parent true_goff:           {n_bad_lower}")
+    print(f"subhalos with sign-unwrapped SOFF+SLEN > parent true_goff+GLEN: {n_bad_upper}")
+
+    success = n_invalid_grnr == 0 and n_goff_mismatch == 0 and n_bad_lower == 0 and n_bad_upper == 0
+    if success:
+        print("PASS — sign-unwrap alone (no GRNR needed) correctly reconstructs SOFF for")
+        print("       every subhalo. This is the fix to use for both GOFF and SOFF.")
     else:
-        print("FAIL — some subhalos fall outside their parent's range; this reconstruction")
-        print("       does not fully hold for this catalogue and needs a closer look.")
-        print()
+        print("FAIL — sign-unwrap alone does not fully hold either; needs a closer look.")
         idx_valid = np.nonzero(valid_grnr)[0]
         bad_mask = (~ok_lower) | (~ok_upper)
-        bad_subhalo_idx = idx_valid[bad_mask]
-        print(f"Offending subhalo(s) ({len(bad_subhalo_idx)}):")
+        bad_subhalo_idx = idx_valid[bad_mask][:5]
         for s in bad_subhalo_idx:
             h = int(grnr[s])
-            print(f"  subhalo[{s}]: GRNR={h}, raw_SOFF={soff[s]}, SLEN={slen[s]}")
-            print(f"    parent halo[{h}]: raw_GOFF={goff[h]}, GLEN={glen[h]}, true_GOFF={true_goff[h]}")
-            print(f"    local_offset (raw_SOFF - raw_GOFF[parent]) = {soff[s] - goff[h]}")
-            print(f"    computed true_SOFF = {true_soff[s]}  (true_GOFF[parent] = {true_goff[h]})")
-            if h > 0:
-                print(f"    previous halo[{h - 1}]: raw_GOFF={goff[h - 1]}, GLEN={glen[h - 1]}, "
-                      f"true_GOFF={true_goff[h - 1]}")
-            if h + 1 < len(goff):
-                print(f"    next halo[{h + 1}]: raw_GOFF={goff[h + 1]}, GLEN={glen[h + 1]}, "
-                      f"true_GOFF={true_goff[h + 1]}")
-            # is this subhalo's parent the same halo where the raw-GOFF wrap happens?
-            if h > 0 and goff[h] < goff[h - 1]:
-                print(f"    ^ parent halo[{h}] is exactly the on-disk GOFF wrap-inversion row.")
+            print(f"  subhalo[{s}]: raw_SOFF={soff_raw[s]}, sign_unwrap={soff_unwrapped[s]}, SLEN={slen[s]}")
+            print(f"    parent halo[{h}]: true_GOFF={true_goff[h]}, GLEN={glen[h]}")
 
     print()
     print("=" * 78)
     print()
-    return (true_soff, slen) if (n_invalid_grnr == 0 and n_bad_lower == 0 and n_bad_upper == 0) else (None, None)
+    return (soff_unwrapped, slen) if success else (None, None)
+
+
+def check_pid_and_snapshot_id_dtype(group_base, snap_base):
+    """
+    The int32 overflow found in GOFF/SOFF affects CUMULATIVE OFFSETS, but
+    the actual particle ID VALUES matched against them (the group
+    catalogue's "PID " block, and the snapshot's "ID  " block used by
+    _stream_match / _store_particles) are a separate concern: if either is
+    ALSO genuinely stored as a 4-byte integer on disk while true ID values
+    exceed 2**31, those IDs would be silently truncated at write time too —
+    and unlike GOFF/SOFF, individual particle IDs have no reconstructible
+    structure (no monotonic cumsum, no known parent range) to recover the
+    lost bits from. That would be a more serious, structurally
+    unfixable-from-this-file bug if it exists — this checks whether it does.
+
+    Cheap: dtype/width comes from file metadata (INFO table, block byte
+    length), and value range comes from the group-catalogue PID scan the
+    caller already did (passed in), not a fresh full data read. The
+    snapshot side only reads block metadata, not the (potentially huge)
+    actual particle data.
+    """
+    print("=" * 78)
+    print("PID/ID DTYPE CHECK — group-catalogue PID block and snapshot ID block")
+    print("=" * 78)
+
+    info_pid = None
+    pid_widths = set()
+    for group_file in g3.yield_all_files(group_base):
+        f = g3.GadgetFile(group_file, is_snap=False)
+        n_pid_file = int(f.header.npart[2])
+        if info_pid is None and f.info is not None and "PID " in f.info:
+            info_pid = f.info["PID "]
+        pid_block = f.blocks.get("PID ")
+        if pid_block is not None and n_pid_file > 0:
+            pid_widths.add(pid_block.length / n_pid_file)
+
+    print(f"group catalogue 'PID ' INFO declaration: {info_pid}")
+    print(f"group catalogue 'PID ' bytes/entity seen across all files: {sorted(pid_widths)}")
+    if pid_widths == {4.0}:
+        print("  => 'PID ' is 4-byte on disk. If true particle IDs exceed 2**31, they are")
+        print("     ALREADY truncated in this file — no read-side or reconstruction fix")
+        print("     is possible; see the PID value-range check below for whether that's live.")
+    elif pid_widths == {8.0}:
+        print("  => 'PID ' is 8-byte on disk — safe for IDs beyond 2**31.")
+    else:
+        print(f"  => inconsistent width ({sorted(pid_widths)}) — needs a closer look.")
+    print()
+
+    snap_files = list(g3.yield_all_files(snap_base))
+    if snap_files:
+        f = g3.GadgetFile(snap_files[0], is_snap=True)
+        print(f"snapshot file (metadata only, no particle data read): {snap_files[0]}")
+        for ptype in range(6):
+            npart = int(f.header.npart[ptype])
+            if npart == 0:
+                continue
+            id_block = f.blocks.get("ID  ")
+            if id_block is None:
+                print(f"  ptype {ptype}: npart={npart}, no 'ID  ' block found in this file")
+                continue
+            print(f"  ptype {ptype}: npart={npart}, g3read-detected ID dtype={id_block.data_type}, "
+                  f"{id_block.partlen} bytes/particle")
+    else:
+        print(f"no snapshot files found at {snap_base} — skipping snapshot ID check")
+
+    print()
+    print("=" * 78)
+    print()
 
 
 def main():
     groups_dir = os.path.join(PATH, f"groups_{SNAPNUM}")
     group_base = os.path.join(groups_dir, os.path.basename(groups_dir).replace("groups", "sub"))
+    snapshot_dir = os.path.join(PATH, f"snapdir_{SNAPNUM}")
+    snap_base = os.path.join(snapshot_dir, os.path.basename(snapshot_dir).replace("snapdir", "snap"))
     print(f"group_base = {group_base}")
+    print(f"snap_base = {snap_base}")
     print()
+
+    check_pid_and_snapshot_id_dtype(group_base, snap_base)
 
     # ── catalogue-wide halo/subhalo metadata (same read your fetcher does) ──
     goff = g3.read_new(group_base, ["GOFF"], -1, is_snap=False, multiple_files=True)["GOFF"]
@@ -320,6 +401,22 @@ def main():
     n_halos = len(goff)
     n_subhalos = len(soff)
     print(f"n_halos = {n_halos}, n_subhalos = {n_subhalos}")
+
+    # Cross-check that header.npart[0]/[1] (the per-file entity counts used
+    # as the denominator in the on-disk-width check) actually sum to these
+    # independently-read totals — the "4 bytes/halo" width measurement is
+    # only as trustworthy as this denominator being correct.
+    npart0_sum = 0
+    npart1_sum = 0
+    for group_file in g3.yield_all_files(group_base):
+        f = g3.GadgetFile(group_file, is_snap=False)
+        npart0_sum += int(f.header.npart[0])
+        npart1_sum += int(f.header.npart[1])
+    print(f"sum(header.npart[0] across files) = {npart0_sum}  (vs n_halos = {n_halos}, "
+          f"{'MATCH' if npart0_sum == n_halos else 'MISMATCH'})")
+    print(f"sum(header.npart[1] across files) = {npart1_sum}  (vs n_subhalos = {n_subhalos}, "
+          f"{'MATCH' if npart1_sum == n_subhalos else 'MISMATCH'})")
+    print()
 
     is_sorted = np.all(np.diff(goff) >= 0)
     n_out_of_order = int(np.sum(np.diff(goff) < 0)) if not is_sorted else 0
@@ -348,13 +445,9 @@ def main():
 
     soff_fixed, slen_fixed = (None, None)
     if goff_fixed is not None:
-        # NOTE: pass the RAW goff/glen here (not goff_fixed) — local_offset
-        # must be computed from two raw, possibly-wrapped values so the
-        # wrap cancels in the subtraction; true_goff (4th arg) is the
-        # validated correction, used only for the final addition.
-        soff_fixed, slen_fixed = check_soff_reconstruction_via_grnr(group_base, goff, glen, goff_fixed)
+        soff_fixed, slen_fixed = check_sign_unwrap_reconstruction(group_base, goff, glen, goff_fixed)
     else:
-        print("(no validated GOFF correction available — skipping the SOFF reconstruction check)")
+        print("(no validated GOFF correction available — skipping the sign-unwrap check)")
         print()
 
     # ── walk the PID stream file by file, two ways ──────────────────────────
@@ -367,6 +460,8 @@ def main():
     first_divergence = None
     n_files = 0
     file_boundaries = []
+    pid_value_min = None
+    pid_value_max = None
 
     for group_file in g3.yield_all_files(group_base):
         f = g3.GadgetFile(group_file, is_snap=False)
@@ -381,6 +476,17 @@ def main():
         print(f"{os.path.basename(group_file):>28} | {n_by_len:>13} | {n_by_npart:>16} | "
               f"{'yes' if match else 'NO':>5} | {cumulative_by_len:>12} | {cumulative_by_npart:>12}")
 
+        # Track the actual PID *value* range (as g3read decoded it, cast to
+        # int64) — separate from the cumulative *offset* overflow above.
+        # If PID itself is truncated to 4 bytes on disk and true particle
+        # IDs exceed 2**31, this shows up as spurious negative values here.
+        if n_by_len > 0:
+            chunk_i64 = np.asarray(pid_chunk, dtype=np.int64)
+            cmin, cmax = int(chunk_i64.min()), int(chunk_i64.max())
+            pid_value_min = cmin if pid_value_min is None else min(pid_value_min, cmin)
+            pid_value_max = cmax if pid_value_max is None else max(pid_value_max, cmax)
+            del chunk_i64
+
         file_boundaries.append((cumulative_by_len, cumulative_by_len + n_by_len))
         cumulative_by_len += n_by_len
         cumulative_by_npart += n_by_npart
@@ -391,6 +497,19 @@ def main():
     print(f"n_files = {n_files}")
     print(f"total PID count, summed via len(read):      {cumulative_by_len}")
     print(f"total PID count, summed via header.npart[2]: {cumulative_by_npart}")
+    print()
+    print(f"PID VALUE range across all files (as decoded, cast to int64): "
+          f"min={pid_value_min}, max={pid_value_max}")
+    if pid_value_min is not None and pid_value_min < 0:
+        print("  ^ NEGATIVE PID values found — this is the same int32-wraparound signature")
+        print("    as GOFF/SOFF, but on the actual particle ID VALUES this time. Unlike")
+        print("    GOFF/SOFF, individual IDs have no reconstructible structure — this would")
+        print("    need a different fix (e.g. matching by position instead of ID).")
+    elif pid_value_max is not None and pid_value_max > (1 << 31):
+        print("  ^ max PID exceeds 2**31 but stayed positive — likely genuinely 8-byte, "
+              "consistent with the width check above.")
+    else:
+        print("  All PID values are comfortably within a safe range for this catalogue.")
     print()
 
     if first_divergence is not None:
