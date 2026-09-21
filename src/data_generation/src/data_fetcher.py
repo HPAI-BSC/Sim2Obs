@@ -170,7 +170,7 @@ def validate_and_process_fields(d: dict, fields: list, table: str, cfg: DictConf
                     # Rename the column in case the initial config format was not appropiate, ie: POS to 'POS '
                     field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
                     h = dict_depth(field_info_ii)
-                    if cfg.name == 'magneticum':
+                    if cfg.name.startswith('magneticum'):
                         key_ii = key_ii.ljust(4)
                     if h == 1:
                         if not getattr(field_info_ii, 'name', None):
@@ -385,7 +385,7 @@ def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig, **
                 for key_ii in field_info:
                     field_info_ii = OmegaConf.select(cfg, f"fields.{table}.{key}.{key_ii}")
                     if field_info_ii.scaling is not None:
-                        if cfg.name == 'magneticum':
+                        if cfg.name.startswith('magneticum'):
                             key_ii = key_ii.ljust(4)
                         df[key][key_ii] = apply_conversion(df[key][key_ii], field_info_ii.scaling, cfg.a, cfg.H,
                                                            Lbox=lbox, **kwargs)
@@ -3768,9 +3768,12 @@ class MagneticumFetcherV2(MagneticumFetcher):
                 "n_particles_checked": 0, "n_consistency_failures": 0,
                 "n_halo_bound_failures": 0, "n_subhalo_bound_failures": 0, "ok": True,
             }
-        config = self._snap_cache_config[star_part_type]
-        fields_padded = config["fields_padded"]
-        ptype_int = config["ptype_int"]
+        # Only "ID  " is actually used below — deliberately NOT reusing the
+        # real ingestion config's full fields_padded (POS/VEL/MASS/...),
+        # which would read particle data this method never touches and
+        # needlessly exposes it to any field-naming mismatch in fields it
+        # doesn't need.
+        ptype_int = self._snap_cache_config[star_part_type]["ptype_int"]
 
         grnr = np.asarray(
             g3read.read_new(self._group_base, ["GRNR"], 1, is_snap=False, multiple_files=True)["GRNR"],
@@ -3790,7 +3793,7 @@ class MagneticumFetcherV2(MagneticumFetcher):
             if n_files_done >= max_snap_files:
                 break
             snap_data = g3read.read_new(
-                snap_file, fields_padded, ptype_int, multiple_files=False, do_flatten=False
+                snap_file, ["ID  "], ptype_int, multiple_files=False, do_flatten=False
             )[ptype_int]
             n_files_done += 1
             if snap_data is None or len(snap_data) == 0:

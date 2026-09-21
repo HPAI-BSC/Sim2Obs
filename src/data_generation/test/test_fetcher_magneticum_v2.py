@@ -515,6 +515,10 @@ class TestVerifyAssignmentIntegrity:
         def fake_read_new(path, fields, ptype, **kwargs):
             if fields == ["GRNR"]:
                 return {"GRNR": grnr}
+            # Regression: this method only ever uses "ID  " — it must not
+            # request POS/VEL/MASS (unnecessary I/O, and needlessly exposes
+            # it to any field-naming issue in fields it doesn't use).
+            assert fields == ["ID  "], f"expected snapshot read to request only ID, got {fields}"
             return {ptype: {"ID  ": snap_ids}}
 
         def fake_yield_all_files(base):
