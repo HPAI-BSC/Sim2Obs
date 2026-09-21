@@ -273,6 +273,26 @@ def check_soff_reconstruction_via_grnr(group_base, goff, glen, true_goff):
     else:
         print("FAIL — some subhalos fall outside their parent's range; this reconstruction")
         print("       does not fully hold for this catalogue and needs a closer look.")
+        print()
+        idx_valid = np.nonzero(valid_grnr)[0]
+        bad_mask = (~ok_lower) | (~ok_upper)
+        bad_subhalo_idx = idx_valid[bad_mask]
+        print(f"Offending subhalo(s) ({len(bad_subhalo_idx)}):")
+        for s in bad_subhalo_idx:
+            h = int(grnr[s])
+            print(f"  subhalo[{s}]: GRNR={h}, raw_SOFF={soff[s]}, SLEN={slen[s]}")
+            print(f"    parent halo[{h}]: raw_GOFF={goff[h]}, GLEN={glen[h]}, true_GOFF={true_goff[h]}")
+            print(f"    local_offset (raw_SOFF - raw_GOFF[parent]) = {soff[s] - goff[h]}")
+            print(f"    computed true_SOFF = {true_soff[s]}  (true_GOFF[parent] = {true_goff[h]})")
+            if h > 0:
+                print(f"    previous halo[{h - 1}]: raw_GOFF={goff[h - 1]}, GLEN={glen[h - 1]}, "
+                      f"true_GOFF={true_goff[h - 1]}")
+            if h + 1 < len(goff):
+                print(f"    next halo[{h + 1}]: raw_GOFF={goff[h + 1]}, GLEN={glen[h + 1]}, "
+                      f"true_GOFF={true_goff[h + 1]}")
+            # is this subhalo's parent the same halo where the raw-GOFF wrap happens?
+            if h > 0 and goff[h] < goff[h - 1]:
+                print(f"    ^ parent halo[{h}] is exactly the on-disk GOFF wrap-inversion row.")
 
     print()
     print("=" * 78)
@@ -305,6 +325,11 @@ def main():
     n_out_of_order = int(np.sum(np.diff(goff) < 0)) if not is_sorted else 0
     print(f"GOFF already ascending on-disk? {is_sorted}"
           + ("" if is_sorted else f"  ({n_out_of_order} adjacent-row inversions)"))
+    if not is_sorted:
+        wrap_rows = np.nonzero(np.diff(goff) < 0)[0]
+        for r in wrap_rows:
+            print(f"  inversion at on-disk row {r} -> {r + 1}: "
+                  f"GOFF[{r}]={goff[r]}, GLEN[{r}]={glen[r]}, GOFF[{r + 1}]={goff[r + 1]}, GLEN[{r + 1}]={glen[r + 1]}")
     print()
 
     theoretical_total_from_glen = int(glen.sum())
