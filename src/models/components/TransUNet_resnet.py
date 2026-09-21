@@ -14,8 +14,10 @@ def np2th(weights, conv=False):
 
 
 class StdConv2d(nn.Conv2d):
+    """2D convolution with weight standardization: convolution weights are normalized (per output channel) to zero mean, unit variance before the conv."""
 
     def forward(self, x):
+        """Apply weight-standardized 2D convolution to `x`."""
         w = self.weight
         v, m = torch.var_mean(w, dim=[1, 2, 3], keepdim=True, unbiased=False)
         w = (w - m) / torch.sqrt(v + 1e-5)
@@ -24,11 +26,13 @@ class StdConv2d(nn.Conv2d):
 
 
 def conv3x3(cin, cout, stride=1, groups=1, bias=False):
+    """Build a 3x3 weight-standardized convolution (`StdConv2d`) with padding=1."""
     return StdConv2d(cin, cout, kernel_size=3, stride=stride,
                      padding=1, bias=bias, groups=groups)
 
 
 def conv1x1(cin, cout, stride=1, bias=False):
+    """Build a 1x1 weight-standardized convolution (`StdConv2d`), no padding."""
     return StdConv2d(cin, cout, kernel_size=1, stride=stride,
                      padding=0, bias=bias)
 
@@ -38,6 +42,14 @@ class PreActBottleneck(nn.Module):
     """
 
     def __init__(self, cin, cout=None, cmid=None, stride=1):
+        """
+        Build a pre-activation bottleneck: 1x1 -> 3x3 (stride) -> 1x1 weight-standardized convs, GroupNorm+ReLU before each, with a projection shortcut when shape changes.
+
+        :param cin: Input channel count.
+        :param cout: Output channel count (defaults to `cin`).
+        :param cmid: Bottleneck (mid) channel count (defaults to `cout // 4`).
+        :param stride: Stride of the middle 3x3 convolution.
+        """
         super().__init__()
         cout = cout or cin
         cmid = cmid or cout//4
@@ -56,7 +68,7 @@ class PreActBottleneck(nn.Module):
             self.gn_proj = nn.GroupNorm(cout, cout)
 
     def forward(self, x):
-
+        """Run the pre-activation bottleneck: projected/identity shortcut plus the conv branch, summed and ReLU'd."""
         # Residual branch
         residual = x
         if hasattr(self, 'downsample'):
@@ -72,6 +84,14 @@ class PreActBottleneck(nn.Module):
         return y
 
     def load_from(self, weights, n_block, n_unit):
+        """
+        Load this block's conv/GroupNorm weights from a pretrained (numpy, HWIO-layout) ResNetV2 checkpoint.
+
+        :param weights: A mapping (e.g. an `.npz` archive) of parameter
+            path to numpy array, in the original (TensorFlow-style) layout.
+        :param n_block: Name of the enclosing ResNet block (e.g. `"block1"`).
+        :param n_unit: Name of this unit within the block (e.g. `"unit1"`).
+        """
         conv1_weight = np2th(weights[pjoin(n_block, n_unit, "conv1/kernel")], conv=True)
         conv2_weight = np2th(weights[pjoin(n_block, n_unit, "conv2/kernel")], conv=True)
         conv3_weight = np2th(weights[pjoin(n_block, n_unit, "conv3/kernel")], conv=True)
@@ -112,6 +132,14 @@ class ResNetV2(nn.Module):
     """Implementation of Pre-activation (v2) ResNet mode."""
 
     def __init__(self, block_units, width_factor):
+        """
+        Build the ResNetV2 stem (7x7 stride-2 conv) and 3 stages of `PreActBottleneck` blocks.
+
+        :param block_units: Number of `PreActBottleneck` units in each of
+            the 3 stages (e.g. `(3, 4, 9)`).
+        :param width_factor: Channel-width multiplier applied to the base
+            width of 64.
+        """
         super().__init__()
         width = int(64 * width_factor)
         self.width = width
@@ -139,6 +167,19 @@ class ResNetV2(nn.Module):
         ]))
 
     def forward(self, x):
+        """
+        Run the stem and all-but-last ResNet stages, collecting a skip-connection feature map after each, then the final stage.
+
+        Feature maps are padded with zeros if a stage's spatial size
+        undershoots the expected `in_size / 4 / (stage + 1)` by 1-2 pixels
+        (an off-by-one that can occur for input sizes not divisible by the
+        stage's total stride).
+
+        :param x: Input image tensor, shape `(B, 3, H, W)`.
+        :return: `(x, features)` — the final stage's output, and the
+            collected skip-connection features in reverse order (deepest
+            first), for use by a U-Net-style decoder.
+        """
         features = []
         b, c, in_size, _ = x.size()
         x = self.root(x)

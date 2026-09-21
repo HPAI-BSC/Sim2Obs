@@ -7,6 +7,12 @@ class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 
     def __init__(self, in_channels, out_channels, mid_channels=None):
+        """
+        :param in_channels: Input channel count.
+        :param out_channels: Output channel count.
+        :param mid_channels: Channel count between the two convs
+            (defaults to `out_channels`).
+        """
         super().__init__()
         if not mid_channels:
             mid_channels = out_channels
@@ -20,6 +26,7 @@ class DoubleConv(nn.Module):
         )
 
     def forward(self, x):
+        """Apply the double-conv block to `x`."""
         return self.double_conv(x)
 
 
@@ -27,6 +34,10 @@ class Down(nn.Module):
     """Downscaling with maxpool then double conv"""
 
     def __init__(self, in_channels, out_channels):
+        """
+        :param in_channels: Input channel count.
+        :param out_channels: Output channel count.
+        """
         super().__init__()
         self.maxpool_conv = nn.Sequential(
             nn.MaxPool2d(2),
@@ -34,13 +45,20 @@ class Down(nn.Module):
         )
 
     def forward(self, x):
+        """Halve the spatial resolution (2x2 maxpool) then apply a double-conv block."""
         return self.maxpool_conv(x)
 
 
 class Up(nn.Module):
-    """Upscaling then double conv"""
+    """Upscaling (bilinear or transposed-conv) then double conv, with the corresponding encoder skip connection concatenated in."""
 
     def __init__(self, in_channels, out_channels, bilinear=True):
+        """
+        :param in_channels: Input channel count (of the tensor being upsampled).
+        :param out_channels: Output channel count.
+        :param bilinear: If True, upsample via bilinear interpolation
+            (cheaper); if False, use a learned `ConvTranspose2d`.
+        """
         super().__init__()
 
         # if bilinear, use the normal convolutions to reduce the number of channels
@@ -52,6 +70,13 @@ class Up(nn.Module):
             self.conv = DoubleConv(in_channels, out_channels)
 
     def forward(self, x1, x2):
+        """
+        Upsample `x1`, pad it to match `x2`'s spatial size, concatenate with the `x2` skip connection, and apply the double-conv block.
+
+        :param x1: Decoder feature map to be upsampled.
+        :param x2: Corresponding encoder skip-connection feature map.
+        :return: The convolved, concatenated feature map.
+        """
         x1 = self.up(x1)
         # input is CHW
         diffY = x2.size()[2] - x1.size()[2]
@@ -67,21 +92,40 @@ class Up(nn.Module):
 
 
 class OutConv(nn.Module):
+    """Final 1x1 convolution mapping the decoder's channels to the output class/channel count."""
     def __init__(self, in_channels, out_channels):
+        """
+        :param in_channels: Input channel count.
+        :param out_channels: Output channel count.
+        """
         super(OutConv, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
 
     def forward(self, x):
+        """Apply the 1x1 output convolution to `x`."""
         return self.conv(x)
 
 
 class UNet(nn.Module):
+    """
+    Standard 2D U-Net (milesial/Pytorch-UNet-style): a 5-level encoder
+    (DoubleConv + Down blocks, doubling channels each level) and a
+    4-level decoder (Up blocks with skip connections), ending in a 1x1
+    OutConv.
+    """
     def __init__(
             self,
             n_channels: int = 1,
             n_classes: int = 1,
             bilinear: bool = False
     ) -> None:
+        """
+        :param n_channels: Number of input image channels.
+        :param n_classes: Number of output channels/classes.
+        :param bilinear: If True, decoder upsampling uses bilinear
+            interpolation (and the bottleneck/decoder channel counts are
+            halved accordingly); if False, uses transposed convolutions.
+        """
         super(UNet, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
@@ -100,6 +144,12 @@ class UNet(nn.Module):
         self.outc = OutConv(64, n_classes)
 
     def forward(self, x):
+        """
+        Run the encoder, then the skip-connected decoder, then the output projection.
+
+        :param x: Input tensor, shape `(B, n_channels, H, W)`.
+        :return: Logits, shape `(B, n_classes, H, W)`.
+        """
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)

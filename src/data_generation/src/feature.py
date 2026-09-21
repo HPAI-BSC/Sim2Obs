@@ -36,6 +36,20 @@ MODELS = {
 
 
 def load_model(path):
+    """
+    Load a joblib-pickled model from a path relative to `$PROJECT_ROOT`, suppressing sklearn warnings.
+
+    Parameters:
+    -----------
+    path : str
+        Model path relative to the `PROJECT_ROOT` environment variable
+        (see the `MODELS` dict for the expected form).
+
+    Returns:
+    --------
+    Any
+        The unpickled model object.
+    """
     print(path)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=ConvergenceWarning)
@@ -49,6 +63,22 @@ def load_model(path):
 
 
 def load_models(features):
+    """
+    Load every model referenced by `MODELS` for the given configured features.
+
+    Parameters:
+    -----------
+    features : list
+        Configured feature entries (each a dict/DictConfig with a `name`
+        key), typically `cfg.feature_names`.
+
+    Returns:
+    --------
+    dict
+        Mapping of feature name to loaded model, for features whose name
+        is a key in `MODELS`. Features with no registered model are
+        omitted.
+    """
     models = {}
     for feature in features:
         feature_name = feature['name']
@@ -60,6 +90,17 @@ def load_models(features):
 
 
 def attach_models_to_features(features: list, models: dict):
+    """
+    Set `feature.model` on each FeatureProcessor instance that has a loaded model.
+
+    Parameters:
+    -----------
+    features : list
+        FeatureProcessor instances (or similar objects with a `name`
+        attribute) to attach models to, in place.
+    models : dict
+        Mapping of feature name to model, as returned by `load_models`.
+    """
     for feature in features:
         feature_name = getattr(feature, 'name', None)  # or use feature.__class__.__name__
         if feature_name in models:
@@ -92,6 +133,21 @@ class FeatureProcessor(ABC):
     # TODO update
     #def rotate(self, z, axis, degree):  # Old rotate call
     def rotate(self, z, degree):
+        """
+        Rotate this feature's computed `self.value` in place (see `utils.rotate`).
+
+        Parameters:
+        -----------
+        z : float
+            Z-axis parameter for rotation (forwarded to `utils.rotate`).
+        degree : float
+            Rotation angle in degrees.
+
+        Raises:
+        -------
+        Exception
+            If `self.value` is empty (i.e. `process` hasn't been called yet).
+        """
         if len(self.value) == 0:
             logger.error('FeatureProcessor value is empty, call first process method.')
             raise Exception('FeatureProcessor value is empty, call first process method.')
@@ -117,6 +173,28 @@ class FeatureProcessor(ABC):
 
     @staticmethod
     def _build_configuration(cfg: DictConfig, required_keys: list) -> dict:
+        """
+        Extract a subset of the `data_loader` pipeline step's config, validating every requested key is present.
+
+        Parameters:
+        -----------
+        cfg : DictConfig
+            Full pipeline configuration, with a `pipeline` list containing
+            a step named `'data_loader'`.
+        required_keys : list
+            Keys that must be present in the `data_loader` step config.
+
+        Returns:
+        --------
+        dict
+            The `data_loader` step config restricted to `required_keys`.
+
+        Raises:
+        -------
+        ValueError
+            If no `data_loader` step is configured, or a required key is
+            missing from it.
+        """
         if 'data_loader' not in [e['name'] for e in cfg.pipeline]:
             raise ValueError('Error, To execute a data_loader you must specify the map step in the pipeline of'
                              ' the configuration.')
@@ -140,6 +218,24 @@ class FeatureProcessor(ABC):
 
     @staticmethod
     def _neighbors(i, j, shape):
+        """
+        Yield the up-to-8 in-bounds 2D grid neighbours of cell `(i, j)`.
+
+        Parameters:
+        -----------
+        i : int
+            Row index.
+        j : int
+            Column index.
+        shape : tuple
+            `(n_rows, n_cols)` of the grid, used to clip out-of-bounds
+            neighbours.
+
+        Yields:
+        -------
+        tuple
+            `(ni, nj)` for each in-bounds neighbouring cell.
+        """
         for di in (-1, 0, 1):
             for dj in (-1, 0, 1):
                 if di == 0 and dj == 0:
@@ -194,6 +290,23 @@ class FeatureProcessor(ABC):
 
     @staticmethod
     def gaussian_moments_from_hist(counts, vel_edges):
+        """
+        Compute the (weighted) mean and standard deviation of a histogram.
+
+        Parameters:
+        -----------
+        counts : np.ndarray
+            Bin counts/weights.
+        vel_edges : np.ndarray
+            Bin edges (length `len(counts) + 1`); bin centres are used as
+            the sample values.
+
+        Returns:
+        --------
+        tuple
+            `(mean, std)`, the counts-weighted mean and standard deviation
+            of the bin-centre values.
+        """
         v = 0.5 * (vel_edges[:-1] + vel_edges[1:])
         w = counts
 
@@ -460,6 +573,16 @@ class VelocityDispersionProcessor(FeatureProcessor):
         value ([]): Placeholder for storing computed value.
     """
     def __init__(self, kwargs):
+        """
+        Initialize the processor's name, empty map, and empty value placeholder.
+
+        Parameters:
+        -----------
+        kwargs : dict
+            Feature configuration entry (e.g. `simulate_muse`); unused by
+            this processor beyond being accepted for a consistent
+            constructor signature across FeatureProcessor subclasses.
+        """
         self.name = 'VelocityDispersion'
         self.map = []
         self.value = []
@@ -597,6 +720,20 @@ class ICLProcessor(FeatureProcessor):
         value (None): Placeholder for storing computed value.
     """
     def __init__(self, cfg: DictConfig, kwargs):
+        """
+        Initialize the ICL processor, pulling `G` from the pipeline config and applying feature-specific overrides.
+
+        Parameters:
+        -----------
+        cfg : DictConfig
+            Full pipeline configuration; must have a `data_loader`
+            pipeline step declaring `G` (the gravitational constant used
+            in `_predict`'s velocity scaling).
+        kwargs : dict
+            Feature configuration entry (e.g. `transition_radius_compute`);
+            each key/value is set as an attribute on this instance,
+            overriding any same-named attribute set above.
+        """
         # TODO init with the cfg if exists
         self.transition_radius = None
         self.name = 'IntraClusterLight'
@@ -673,6 +810,35 @@ class ICLProcessor(FeatureProcessor):
         return final_predictions
 
     def _compute_icl_mask(self, halo: Halo, subhalo_particles: SubhaloParticles):
+        """
+        Classify each star particle as ICL or BCG and return a per-particle boolean-like mask.
+
+        Computes the centre-of-mass velocity, then each particle's
+        distance from the halo centre and velocity offset from the
+        centre-of-mass velocity, and feeds those into `_predict` (the
+        trained ICL/BCG classifier). Particles predicted as ICL (class 0)
+        get a `1` in the returned mask, BCG particles get `0`.
+
+        Parameters:
+        -----------
+        halo : Halo
+            The halo whose particles are being classified (forwarded to
+            `_predict` for its `m200`/`r200`).
+        subhalo_particles : SubhaloParticles
+            Must have `star_v` (velocities) and `star_p` (positions,
+            already centred on the halo).
+
+        Returns:
+        --------
+        np.ndarray
+            Array of shape `(n_particles,)`, `1` where a particle is
+            predicted as ICL, `0` where predicted as BCG.
+
+        Raises:
+        -------
+        ValueError
+            If no particle is predicted as ICL.
+        """
         logger.debug(f'vel subhalo particles: {type(subhalo_particles.star_v)}, {subhalo_particles.star_v.shape}')
 
         if (isinstance(subhalo_particles.star_v, np.ndarray) and subhalo_particles.star_v.dtype == object and
@@ -913,6 +1079,16 @@ class StellarMassDensityProcessor(FeatureProcessor):
         value ([]): Placeholder for storing computed value.
     """
     def __init__(self, kwargs):
+        """
+        Initialize the processor's name, empty map, and empty value placeholder.
+
+        Parameters:
+        -----------
+        kwargs : dict
+            Feature configuration entry; unused by this processor beyond
+            being accepted for a consistent constructor signature across
+            FeatureProcessor subclasses.
+        """
         self.name = 'StellarMassDensity'
         self.map = []
         self.value = []
@@ -1019,6 +1195,16 @@ class DMMassDensityProcessor(FeatureProcessor):
         value ([]): Placeholder for storing computed value.
     """
     def __init__(self, kwargs):
+        """
+        Initialize the processor's name, empty map, and empty value placeholder.
+
+        Parameters:
+        -----------
+        kwargs : dict
+            Feature configuration entry; unused by this processor beyond
+            being accepted for a consistent constructor signature across
+            FeatureProcessor subclasses.
+        """
         self.name = 'DMMassDensity'
         self.map = []
         self.value = []

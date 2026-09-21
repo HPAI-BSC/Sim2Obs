@@ -19,7 +19,7 @@ class Halo:
 
     Methods:
     --------
-    __init__(**kwargs):
+    ``__init__(**kwargs)``
         Initializes a Halo object by dynamically setting attributes from keyword arguments.
     """
     def __init__(self, **kwargs):
@@ -50,9 +50,28 @@ class Halo:
 
     @classmethod
     def empty_instance(cls):
+        """Return a placeholder Halo with `halo_id` and `fsub` set to None, for call sites that need a Halo-shaped stand-in."""
         return cls(halo_id=None, fsub=None)  # You can adjust these default values as needed
 
     def add_children(self, subhalo_context):
+        """
+        Populate/extend `self.subhalos_ids` with the IDs of subhalos belonging to this halo.
+
+        Looks up subhalos whose `id_parents` equals `self.halo_id` in
+        `subhalo_context` (a SubhaloContext, or a plain DataFrame already
+        filtered to this halo's subhalos). If a `group_number` column is
+        present (Eagle-style catalogues), each entry is a
+        `(group_number, subhalo_id)` tuple instead of a bare subhalo_id, to
+        disambiguate subhalo IDs that are only unique within a group.
+
+        Parameters:
+        -----------
+        subhalo_context : SubhaloContext or pd.DataFrame
+            Subhalo data to search for this halo's children. A
+            SubhaloContext is queried via `.data['id_parents']`; a
+            DataFrame is assumed to already contain only this halo's
+            subhalos.
+        """
         subhalo_ids = []
         if hasattr(subhalo_context, 'data'):
             filtered_subhalo_context = subhalo_context.data[subhalo_context.data['id_parents'] == self.halo_id]
@@ -146,9 +165,38 @@ class HaloContext:
 
     @classmethod
     def from_dataframe(cls, df: pd.DataFrame):
+        """
+        Build a HaloContext directly from an already-prepared DataFrame, with no column renaming/filtering.
+
+        Parameters:
+        -----------
+        df : pd.DataFrame
+            DataFrame already in the expected shape (columns named
+            `halo_id`, `fsub`, etc.), such as a previously-built
+            HaloContext's `.data` after slicing.
+
+        Returns:
+        --------
+        HaloContext
+            A HaloContext wrapping `df` as-is (`column_map=None`).
+        """
         return HaloContext(df, None)
 
     def __getitem__(self, index):
+        """
+        Slice the underlying DataFrame and wrap the result in a new HaloContext.
+
+        Parameters:
+        -----------
+        index : slice or list
+            Any indexer valid for `self.data[index]` (e.g. a boolean mask
+            or a list of column names).
+
+        Returns:
+        --------
+        HaloContext
+            A new HaloContext wrapping the sliced data.
+        """
         return HaloContext.from_dataframe(self.data[index])  # Return a new instance with sliced data
 
     def get_halo_by_id(self, halo_id) -> Halo:

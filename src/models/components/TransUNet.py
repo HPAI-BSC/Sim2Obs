@@ -64,6 +64,7 @@ class Embeddings(nn.Module):
 
     def __init__(self, hidden_dim, img_size=256, in_channels=3, patch_size=16, patch_grid=None,
                  resnet_n_layers=None, resnet_width_factor=None, dropout_rate=0.1):
+        """See class docstring for parameters. If `patch_grid` is given, a `ResNetV2` hybrid backbone is used and the effective patch size is derived from it; otherwise plain conv patchification is used."""
         super(Embeddings, self).__init__()
         self.hybrid = None
         img_size = _pair(img_size)
@@ -89,6 +90,13 @@ class Embeddings(nn.Module):
         self.dropout = Dropout(dropout_rate)
 
     def forward(self, x):
+        """Patchify `x` (via the hybrid ResNet backbone if enabled, else a strided conv) and add positional embeddings.
+
+        :param x: Input image tensor.
+        :return: `(embeddings, features)` — patch embeddings of shape
+            `(B, n_patches, hidden_dim)`, and the hybrid backbone's
+            skip-connection features (None if not hybrid).
+        """
         if self.hybrid:
             x, features = self.hybrid_model(x)
         else:
@@ -149,6 +157,7 @@ class Attention(nn.Module):
         Attention weights if `vis` is True.
     """
     def __init__(self, hidden_dim, n_heads, vis, attention_dropout_rate):
+        """See class docstring for parameters."""
         super(Attention, self).__init__()
         self.vis = vis
         self.num_attention_heads = n_heads
@@ -169,11 +178,20 @@ class Attention(nn.Module):
         self.softmax = Softmax(dim=-1)
 
     def transpose_for_scores(self, x):
+        """Reshape `(B, seq, all_head_size)` into `(B, n_heads, seq, head_size)` for multi-head attention."""
         new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)  # new_x_shape = [2, 10, 8, 64]
         x = x.view(*new_x_shape)                                                            # from x = [2, 10, 512] to x = [2, 10, 8, 64]
         return x.permute(0, 2, 1, 3)
 
     def forward(self, hidden_states):
+        """
+        Run standard scaled dot-product multi-head self-attention on `hidden_states`.
+
+        :param hidden_states: Input sequence, shape `(B, seq, hidden_dim)`.
+        :return: `(attention_output, weights)` — the attention output
+            (same shape as `hidden_states`), and the attention weights if
+            `self.vis` is True, else None.
+        """
         # Multiply the embedding by the weight matrices to get Q, K, V
         mixed_query_layer = self.query(hidden_states)   # mixed_query_layer = [2, 10, 512]
         mixed_key_layer = self.key(hidden_states)       # mixed_key_layer = [2, 10, 512]
@@ -217,6 +235,7 @@ class Mlp(nn.Module):
         dropout (nn.Dropout): Dropout layer.
     """
     def __init__(self, hidden_dim, mlp_dim, dropout_rate):
+        """See class docstring for parameters."""
         super(Mlp, self).__init__()
         self.fc1 = Linear(hidden_dim, mlp_dim)
         self.fc2 = Linear(mlp_dim, hidden_dim)
@@ -225,12 +244,14 @@ class Mlp(nn.Module):
         self._init_weights()
 
     def _init_weights(self):
+        """Xavier-uniform init for both linear layers' weights, near-zero normal init for their biases."""
         nn.init.xavier_uniform_(self.fc1.weight)
         nn.init.xavier_uniform_(self.fc2.weight)
         nn.init.normal_(self.fc1.bias, std=1e-6)
         nn.init.normal_(self.fc2.bias, std=1e-6)
 
     def forward(self, x):
+        """Apply `fc1 -> GELU -> dropout -> fc2 -> dropout` to `x`."""
         x = self.fc1(x)
         x = self.act_fn(x)
         x = self.dropout(x)
@@ -258,6 +279,7 @@ class Block(nn.Module):
         attn (Attention): Multi-Head Self-Attention module.
     """
     def __init__(self, hidden_dim, n_heads, mlp_dim, dropout_rate, attention_dropout_rate, vis):
+        """See class docstring for parameters."""
         super(Block, self).__init__()
         self.hidden_size = hidden_dim
         self.attention_norm = LayerNorm(hidden_dim, eps=1e-6)
@@ -266,6 +288,12 @@ class Block(nn.Module):
         self.attn = Attention(hidden_dim, n_heads, vis, attention_dropout_rate)
 
     def forward(self, x):
+        """Apply pre-norm self-attention (`x + attn(norm(x))`) then pre-norm MLP (`x + mlp(norm(x))`).
+
+        :param x: Input sequence, shape `(B, seq, hidden_dim)`.
+        :return: `(x, weights)` — the block output (same shape as `x`),
+            and the attention weights (None unless `vis=True`).
+        """
         h = x
         x = self.attention_norm(x)
         x, weights = self.attn(x)
@@ -279,6 +307,14 @@ class Block(nn.Module):
 
     # TODO are we gonna use this ?
     def load_from(self, weights, n_block):
+        """
+        Load this block's attention/MLP/LayerNorm weights from a pretrained (numpy) ViT checkpoint.
+
+        :param weights: A mapping of parameter path to numpy array, in
+            the original (TensorFlow-style) ViT checkpoint layout.
+        :param n_block: Index of this block within the encoder, used to
+            build the checkpoint's parameter path prefix.
+        """
         ROOT = f"Transformer/encoderblock_{n_block}"
         with torch.no_grad():
             query_weight = np2th(weights[pjoin(ROOT, ATTENTION_Q, "kernel")]).view(self.hidden_size, self.hidden_size).t()
@@ -330,6 +366,7 @@ class Encoder(nn.Module):
         vis (bool): Whether to return attention weights for visualization.
     """
     def __init__(self, hidden_dim, n_layers, n_heads, mlp_dim, dropout_rate, attention_dropout_rate, vis):
+        """See class docstring for parameters."""
         super(Encoder, self).__init__()
         self.vis = vis
         self.layer = nn.ModuleList()
@@ -339,6 +376,14 @@ class Encoder(nn.Module):
             self.layer.append(copy.deepcopy(layer))
 
     def forward(self, hidden_states):
+        """
+        Run `hidden_states` through every `Block` in sequence, then a final LayerNorm.
+
+        :param hidden_states: Input sequence, shape `(B, seq, hidden_dim)`.
+        :return: `(encoded, attn_weights)` — the normalized output, and
+            the list of per-block attention weights (empty unless
+            `vis=True`).
+        """
         attn_weights = []
         for layer_block in self.layer:
             hidden_states, weights = layer_block(hidden_states)
@@ -371,12 +416,20 @@ class Transformer(nn.Module):
     """
     def __init__(self, img_size, hidden_dim, n_layers, n_heads, mlp_dim, dropout_rate, attention_dropout_rate, vis,
                  in_channels, patch_size, patch_grid, resnet_n_layers, resnet_width_factor):
+        """See class docstring for parameters."""
         super(Transformer, self).__init__()
         self.embeddings = Embeddings(hidden_dim, img_size, in_channels, patch_size, patch_grid, resnet_n_layers,
                                      resnet_width_factor, dropout_rate)
         self.encoder = Encoder(hidden_dim, n_layers, n_heads, mlp_dim, dropout_rate, attention_dropout_rate, vis)
 
     def forward(self, input_ids):
+        """
+        Embed the input image and run it through the transformer encoder.
+
+        :param input_ids: Input image tensor.
+        :return: `(encoded, attn_weights, features)` from the embedding
+            and encoder stages.
+        """
         embedding_output, features = self.embeddings(input_ids)
         encoded, attn_weights = self.encoder(embedding_output)  # (B, n_patch, hidden)
         return encoded, attn_weights, features
@@ -405,6 +458,7 @@ class Conv2dReLU(nn.Sequential):
             stride=1,
             use_batchnorm=True,
     ):
+        """See class docstring for parameters."""
         conv = nn.Conv2d(
             in_channels,
             out_channels,
@@ -429,6 +483,7 @@ class DecoderBlock(nn.Module):
         use_batchnorm (bool, optional): Whether to use batch normalization. Defaults to True.
     """
     def __init__(self, in_channels, out_channels, skip_channels=0, use_batchnorm=True):
+        """See class docstring for parameters."""
         super().__init__()
         # This forces to consider skip connections always
         self.conv1 = Conv2dReLU(
@@ -448,6 +503,14 @@ class DecoderBlock(nn.Module):
         self.up = nn.UpsamplingBilinear2d(scale_factor=2)
 
     def forward(self, x, skip=None):
+        """
+        Upsample `x` 2x, optionally concatenate a skip connection, and apply two 3x3 conv-BN-ReLU blocks.
+
+        :param x: Input feature map to upsample.
+        :param skip: Optional skip-connection feature map, concatenated
+            along the channel dim after upsampling.
+        :return: The convolved output feature map.
+        """
         x = self.up(x)
         if skip is not None:
             x = torch.cat([x, skip], dim=1)
@@ -475,6 +538,7 @@ class DecoderCup(nn.Module):
         n_skip (int): Stores the number of skip connections used.
     """
     def __init__(self, hidden_dim, head_channels, decoder_channels, skip_channels, n_skip):
+        """See class docstring for parameters."""
         super().__init__()
         # head_channels = 512
         self.conv_more = Conv2dReLU(
@@ -504,6 +568,15 @@ class DecoderCup(nn.Module):
         self.blocks = nn.ModuleList(blocks)
 
     def forward(self, hidden_states, features=None):
+        """
+        Reshape the transformer's patch sequence back into a spatial feature map, then progressively upsample through `DecoderBlock` stages, concatenating the ResNet backbone's skip features where available.
+
+        :param hidden_states: Transformer encoder output, shape
+            `(B, n_patch, hidden_dim)` (`n_patch` must be a perfect square).
+        :param features: Skip-connection features from the hybrid ResNet
+            backbone (deepest first), or None.
+        :return: The final decoded feature map.
+        """
         B, n_patch, hidden = hidden_states.size()  # reshape from (B, n_patch, hidden) to (B, h, w, hidden)
         h, w = int(np.sqrt(n_patch)), int(np.sqrt(n_patch))
         x = hidden_states.permute(0, 2, 1)
@@ -549,6 +622,7 @@ class SegmentationHead(nn.Sequential):
 
     """
     def __init__(self, in_channels, out_channels, kernel_size=3, upsampling=1):
+        """See class docstring for parameters."""
         conv2d = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size // 2)
         upsampling = nn.UpsamplingBilinear2d(scale_factor=upsampling) if upsampling > 1 else nn.Identity()
         super().__init__(conv2d, upsampling)
@@ -591,6 +665,7 @@ class TransUNet(nn.Module):
                  resnet_n_layers=None, resnet_width_factor=None, patch_grid=None, patch_size=16, classifier=None,
                  head_channels=512, decoder_channels=(256, 128, 64, 16), skip_channels=(256, 128, 64, 16), n_skip=0,
                  n_classes=1, segmentation_head_kernel_size=3):
+        """See class docstring for parameters."""
         super().__init__()
         if skip_channels is None:
             skip_channels = [512, 256, 64, 16]
@@ -624,6 +699,16 @@ class TransUNet(nn.Module):
         return logits
 
     def load_from(self, weights):
+        """
+        Load pretrained ViT/hybrid-ResNet weights from a numpy checkpoint into the transformer, encoder blocks, and (if hybrid) the ResNet backbone.
+
+        Handles a position-embedding grid-size mismatch between the
+        checkpoint and this model by bilinear-resampling (via
+        `scipy.ndimage.zoom`) to the new grid size.
+
+        :param weights: A mapping of parameter path to numpy array, in
+            the original (TensorFlow-style) ViT/ResNetV2 checkpoint layout.
+        """
         with torch.no_grad():
             res_weight = weights
             self.transformer.embeddings.patch_embeddings.weight.copy_(np2th(weights["embedding/kernel"], conv=True))

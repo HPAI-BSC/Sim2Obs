@@ -72,6 +72,40 @@ class _FakeGadgetFile:
 
 # ── tests ──────────────────────────────────────────────────────────────────────
 
+class TestUnwrapInt32Overflow:
+    """
+    GOFF/SOFF are stored on disk as signed 4-byte integers — confirmed via
+    the group catalogue's own INFO-table type declaration and by directly
+    measuring the on-disk block byte length, on real production data. For
+    a large box the true cumulative offset for later halos/subhalos
+    exceeds the 4-byte signed limit (2**31 - 1) and g3read reads back a
+    negative number instead. Since the whole catalogue's true offsets stay
+    under 2**32, each value wraps at most once, so it's always recoverable
+    independently by adding 2**32 back whenever the value is negative.
+    """
+
+    def test_positive_values_unchanged(self):
+        raw = np.array([0, 100, 2_147_483_647], dtype=np.int64)
+        result = MagneticumFetcherV2._unwrap_int32_overflow(raw)
+        np.testing.assert_array_equal(result, raw)
+
+    def test_negative_values_get_2_32_added_back(self):
+        wrapped = np.array([-2_147_480_517, -1], dtype=np.int64)
+        result = MagneticumFetcherV2._unwrap_int32_overflow(wrapped)
+        np.testing.assert_array_equal(result, wrapped + (1 << 32))
+
+    def test_matches_real_production_wraparound(self):
+        """
+        Exact values observed on the real cluster (Magneticum snapnum 120):
+        halo row 139521's true GOFF is 2147486779 (= halo 139520's
+        GOFF+GLEN, 2147483622+3157), but reads back as -2147480517 because
+        it exceeds the 4-byte signed limit.
+        """
+        raw = np.array([-2_147_480_517], dtype=np.int64)
+        result = MagneticumFetcherV2._unwrap_int32_overflow(raw)
+        assert result[0] == 2_147_486_779
+
+
 class TestMagneticumFetcherV2:
 
     # ── no-op builders ─────────────────────────────────────────────────────
@@ -142,6 +176,69 @@ class TestMagneticumFetcherV2:
 
         halo_owner, _ = fetcher._owners_for_chunk(0, 10)
         np.testing.assert_array_equal(halo_owner, [1] * 10)
+
+    def test_load_group_offsets_unwraps_int32_overflow_goff(self, fetcher):
+        """
+        Regression for the real production bug: for a box with more than
+        2**31 - 1 particles across all halos, GOFF for halos past that
+        point is stored wrapped (negative) on disk. Sorting/comparing the
+        raw wrapped value instead of the true one is exactly what caused
+        "GOFF/GLEN contiguous-layout assumption no longer holds" to fire —
+        the three earlier fix attempts (sorting by the raw, still-wrapped
+        GOFF) never addressed this. Values below are the exact ones found
+        on the real cluster (snapnum 120): halo 139520 sits just under the
+        2**31 boundary, halo 139521 (GOFF+GLEN of the previous halo) sits
+        just over it and wraps.
+        """
+        true_goff_1 = 2_147_486_779  # halo 139521's true GOFF; exceeds 2**31 - 1
+        wrapped_goff_1 = true_goff_1 - (1 << 32)  # what g3read actually returns
+        assert wrapped_goff_1 < 0
+
+        fetcher._goff = np.array([2_147_483_622, wrapped_goff_1])
+        fetcher._glen = np.array([3157, 3157])
+        fetcher._soff = np.array([])
+        fetcher._slen = np.array([])
+        fetcher._load_group_offsets()
+
+        np.testing.assert_array_equal(fetcher._halo_goff, [2_147_483_622, true_goff_1])
+        np.testing.assert_array_equal(fetcher._halo_gend, [2_147_486_779, true_goff_1 + 3157])
+        np.testing.assert_array_equal(fetcher._halo_id_sorted, [0, 1])
+
+        halo_owner, _ = fetcher._owners_for_chunk(2_147_483_622, 2_147_486_779 + 3157)
+        np.testing.assert_array_equal(halo_owner, [0] * 3157 + [1] * 3157)
+
+    def test_load_group_offsets_unwraps_soff_independently_of_parent_halo(self, fetcher):
+        """
+        Regression for a bug in an EARLIER attempt at this fix (never
+        shipped): computing a subhalo's true offset as
+        (raw SOFF - raw GOFF of its parent halo) assumes both wrap
+        together. That's false whenever the 2**31 boundary falls in the
+        MIDDLE of a halo's particle range — confirmed on real production
+        data: halo 139520's own GOFF (2147483622) is still safely under
+        2**31 and reads correctly, but a subhalo sitting further into that
+        SAME halo's range (true SOFF 2147486277) has already crossed
+        2**31 and wraps on its own, independently of its parent. The
+        current fix (unwrap SOFF directly, with no dependency on the
+        parent's GOFF) must get this right.
+        """
+        parent_true_goff = 2_147_483_622  # NOT wrapped
+        parent_glen = 3157
+        sub_true_soff = 2_147_486_277     # inside the parent's range, but wrapped
+        sub_slen = 346
+        wrapped_sub_soff = sub_true_soff - (1 << 32)
+        assert wrapped_sub_soff < 0
+
+        fetcher._goff = np.array([parent_true_goff])
+        fetcher._glen = np.array([parent_glen])
+        fetcher._soff = np.array([wrapped_sub_soff])
+        fetcher._slen = np.array([sub_slen])
+        fetcher._load_group_offsets()
+
+        np.testing.assert_array_equal(fetcher._halo_goff, [parent_true_goff])
+        np.testing.assert_array_equal(fetcher._sub_soff_sorted, [sub_true_soff])
+        # the unwrapped subhalo must nest correctly inside its parent's range
+        assert fetcher._sub_soff_sorted[0] >= fetcher._halo_goff[0]
+        assert fetcher._sub_soff_sorted[0] + sub_slen <= fetcher._halo_goff[0] + parent_glen
 
     # ── _owners_for_chunk ───────────────────────────────────────────────────
 
@@ -401,3 +498,92 @@ class TestMagneticumFetcherV2:
             f"expected one group-catalogue scan for this snapshot file, "
             f"got {len(_FakeGadgetFile.read_calls)}"
         )
+
+
+class TestVerifyAssignmentIntegrity:
+    """
+    verify_assignment_integrity runs the real _assign_halo_ids/
+    _assign_subhalo_ids path end-to-end and checks its own output for two
+    kinds of provable errors, without needing external ground truth:
+    (1) a subhalo's recorded parent (GRNR) must match the halo_id assigned
+    to the same particle, and (2) no halo/subhalo can be assigned more
+    particles than its own GLEN/SLEN.
+    """
+
+    @staticmethod
+    def _run(fetcher, grnr, group_pid_values, snap_ids):
+        def fake_read_new(path, fields, ptype, **kwargs):
+            if fields == ["GRNR"]:
+                return {"GRNR": grnr}
+            return {ptype: {"ID  ": snap_ids}}
+
+        def fake_yield_all_files(base):
+            return ["group_f1"] if base == fetcher._group_base else ["snap_f1"]
+
+        _FakeGadgetFile.read_calls = []
+        _FakeGadgetFile.pid_by_file = {"group_f1": group_pid_values}
+        fetcher._snap_cache_config = {
+            "stars": {"fields_padded": ["ID  ", "POS ", "MASS"], "ptype_int": 4}
+        }
+        fetcher._particle_cache_loaded = True
+
+        with patch("g3read.yield_all_files", side_effect=fake_yield_all_files), \
+             patch("g3read.GadgetFile", _FakeGadgetFile), \
+             patch("g3read.read_new", side_effect=fake_read_new):
+            return fetcher.verify_assignment_integrity(max_snap_files=1)
+
+    def test_passes_on_consistent_assignment(self, fetcher):
+        # halo0 = positions [0,3), halo1 = positions [3,5)
+        fetcher._goff = np.array([0, 3])
+        fetcher._glen = np.array([3, 2])
+        # subhalo0 covers halo0's full range, subhalo1 covers halo1's —
+        # consistent parentage
+        fetcher._soff = np.array([0, 3])
+        fetcher._slen = np.array([3, 2])
+
+        group_pid_values = np.array([100, 5, 50, 200, 250], dtype=np.int64)
+        snap_ids = np.array([100, 50, 200], dtype=np.int64)  # all 3 are real members
+        grnr = np.array([0, 1], dtype=np.int64)  # subhalo0->halo0, subhalo1->halo1
+
+        result = self._run(fetcher, grnr, group_pid_values, snap_ids)
+
+        assert result["ok"] is True
+        assert result["n_particles_checked"] == 3
+        assert result["n_consistency_failures"] == 0
+        assert result["n_halo_bound_failures"] == 0
+        assert result["n_subhalo_bound_failures"] == 0
+
+    def test_detects_grnr_mismatch(self, fetcher):
+        """
+        Regression target: if _assign_halo_ids and _assign_subhalo_ids ever
+        disagreed about a particle's parentage (e.g. from a bug in the
+        offset arithmetic), a subhalo's real parent (GRNR) would no longer
+        match the halo_id assigned to the same particle. Simulated here by
+        deliberately swapping GRNR so it's wrong for both subhalos — the
+        method must catch and count every such mismatch, not just some.
+        """
+        fetcher._goff = np.array([0, 3])
+        fetcher._glen = np.array([3, 2])
+        fetcher._soff = np.array([0, 3])
+        fetcher._slen = np.array([3, 2])
+
+        group_pid_values = np.array([100, 5, 50, 200, 250], dtype=np.int64)
+        snap_ids = np.array([100, 50, 200], dtype=np.int64)
+        grnr = np.array([1, 0], dtype=np.int64)  # swapped: WRONG parents
+
+        result = self._run(fetcher, grnr, group_pid_values, snap_ids)
+
+        assert result["ok"] is False
+        # 2 particles (100, 50) matched to (halo0, subhalo0): grnr[0]=1 != 0
+        # 1 particle (200) matched to (halo1, subhalo1): grnr[1]=0 != 1
+        assert result["n_consistency_failures"] == 3
+        assert result["n_halo_bound_failures"] == 0
+        assert result["n_subhalo_bound_failures"] == 0
+
+    def test_no_star_particle_type_configured_returns_empty_ok_result(self, fetcher):
+        fetcher.particle_fields = ["gas"]  # no "star"/"stars" entry
+        result = fetcher.verify_assignment_integrity()
+        assert result == {
+            "n_particles_checked": 0, "n_consistency_failures": 0,
+            "n_halo_bound_failures": 0, "n_subhalo_bound_failures": 0, "ok": True,
+        }

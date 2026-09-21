@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pyarrow.dataset as ds
 import pyarrow as pa
 
@@ -11,7 +12,33 @@ logger = setup_logger("Lazy-Subhalo-Particles")
 
 
 class LazySubhaloContext:
+    """
+    Lazy, pyarrow-dataset-backed mirror of SubhaloContext.
+
+    Wraps a parquet dataset of subhalos (as written by
+    `MagneticumFetcherV2._store_particles`-style code) without eagerly
+    loading it into a pandas DataFrame. Filters (`add_filter`) and
+    transforms (`add_transform`) are registered lazily and only actually
+    applied when the dataset is scanned — via `materialize()` (which
+    populates `self.data` as a pyarrow Table) or one of the one-shot query
+    methods (`get_subhalo_by_id`, `get_items_by_halo`,
+    `get_items_by_subhalo_ids`), which scan without ever touching
+    `self.data`. This keeps per-halo/subhalo queries cheap (partition- and
+    predicate-pushdown pruned) without materializing the whole dataset.
+    """
     def __init__(self, path, dataset=None) -> None:
+        """
+        Open (or wrap) a parquet dataset of subhalos.
+
+        Parameters:
+        -----------
+        path : str or None
+            Path to a parquet dataset directory. Ignored if `dataset` is
+            given (may be None in that case, e.g. after `__add__`).
+        dataset : pyarrow.dataset.Dataset, optional
+            An already-open pyarrow dataset to wrap directly, instead of
+            opening `path`.
+        """
         self.path = path
 
         if dataset is None:
@@ -27,12 +54,38 @@ class LazySubhaloContext:
         self._rotated = False
 
     def add_filter(self, expr):
+        """
+        Register a pyarrow dataset filter expression to apply on the next scan.
+
+        Parameters:
+        -----------
+        expr : pyarrow.dataset.Expression
+            Filter expression, combined (AND) with any already registered
+            filters — see `_build_filter`.
+        """
         self.filters.append(expr)
 
     def add_transform(self, fn):
+        """
+        Register a table-transform function to run (in registration order) after each scan.
+
+        Parameters:
+        -----------
+        fn : Callable[[pyarrow.Table], pyarrow.Table]
+            Function applied to the scanned table, e.g. `pbc_transform` or
+            `rotate_fn` as registered by `preprocess`/`rotate`.
+        """
         self.transforms.append(fn)
 
     def _build_filter(self):
+        """
+        Combine all registered filters into a single AND-ed expression.
+
+        Returns:
+        --------
+        pyarrow.dataset.Expression or None
+            The combined filter, or None if no filters are registered.
+        """
         if not self.filters:
             return None
 
@@ -43,6 +96,14 @@ class LazySubhaloContext:
         return expr
 
     def materialize(self):
+        """
+        Scan the dataset with all registered filters/transforms applied, and cache the result on `self.data`.
+
+        Returns:
+        --------
+        pyarrow.Table
+            The materialized table (also stored as `self.data`).
+        """
         table = self.dataset.to_table(
             filter=self._build_filter()
         )
@@ -54,6 +115,22 @@ class LazySubhaloContext:
         return table
 
     def get_subhalo_by_id(self, subhalo_id, halo_id=None) -> "SubHalo":
+        """
+        One-shot scan for a single subhalo by ID, without touching `self.data`.
+
+        Parameters:
+        -----------
+        subhalo_id : int
+            The subhalo_id to look up.
+        halo_id : int, optional
+            If given, also require `id_parents == halo_id`.
+
+        Returns:
+        --------
+        pd.DataFrame
+            The matching row(s), as a pandas DataFrame (any registered
+            filters/transforms are applied first).
+        """
         # FIX: subhalo catalog schema field is "id_parents", not "parent_id"
         # (see MagneticumFetcher._get_subhalos: df["parent_bucket"] =
         # df["id_parents"] % 128 -- "id_parents" is what's actually written).
@@ -73,10 +150,34 @@ class LazySubhaloContext:
 
     @property
     def is_empty(self):
+        """bool: True if the underlying dataset has no rows at all (ignores any registered filters)."""
         print(type(self.dataset))
         return self.dataset.count_rows() == 0
 
-    def get_items_by_halo(self, id_parents) -> "SubHaloContext":
+    def get_items_by_halo(self, id_parents) -> "SubhaloContext":
+        """
+        One-shot scan for all subhalos belonging to one parent halo, without touching `self.data`.
+
+        Prunes by the `parent_bucket_data` partition column
+        (`id_parents % 128`) before filtering on `id_parents` itself, so
+        this only reads the relevant partition(s).
+
+        Parameters:
+        -----------
+        id_parents : int
+            The parent halo ID to fetch subhalos for.
+
+        Returns:
+        --------
+        SubhaloContext
+            An eager SubhaloContext built from the matching rows (any
+            registered filters/transforms are applied first).
+
+        Raises:
+        -------
+        Exception
+            Re-raised if the underlying dataset scan fails.
+        """
         bucket = int(id_parents % 128)
 
         try:
@@ -102,6 +203,20 @@ class LazySubhaloContext:
             raise
 
     def filter_to_valid_halos(self, halo_context: "HaloContext"):
+        """
+        Register a lazy filter restricting future scans to subhalos of the given halos.
+
+        Adds a filter on both the `parent_bucket_data` partition column
+        (for partition pruning) and `id_parents` (for the actual row
+        selection). See also `remove_subhalos_belonging_unvalid_halos`,
+        which does the same thing under a different name/signature for
+        SubhaloContext API parity.
+
+        Parameters:
+        -----------
+        halo_context : HaloContext
+            The halo set whose IDs subhalos must match.
+        """
         halo_ids = halo_context.data["halo_id"].unique()
         buckets = np.unique(halo_ids % 128)
 
@@ -155,7 +270,7 @@ class LazySubhaloContext:
         count_after = self.dataset.count_rows(filter=self._build_filter())
         logger.debug(f"Number of subhalos after filtering: {count_after}")
 
-    def get_items_by_subhalo_ids(self, subhalo_ids) -> "pd.DataFrame":
+    def get_items_by_subhalo_ids(self, subhalo_ids) -> pd.DataFrame:
         """
         Lazy equivalent of `subhalo_context.data.loc[subhalo_ids]` on the
         eager SubhaloContext -- returns only the rows whose subhalo_id is
@@ -219,6 +334,20 @@ class LazySubhaloContext:
         return table.to_pandas()
 
     def __add__(self, other):
+        """
+        Merge two LazySubhaloContext instances into one, by combining their underlying parquet files.
+
+        Parameters:
+        -----------
+        other : LazySubhaloContext
+            Another instance of the same class to merge with.
+
+        Returns:
+        --------
+        LazySubhaloContext
+            A new instance over a dataset spanning both `self`'s and
+            `other`'s files. Filters/transforms are NOT carried over.
+        """
         if not isinstance(other, self.__class__):
             return NotImplemented
 
@@ -229,6 +358,26 @@ class LazySubhaloContext:
         return self.__class__(path=None, dataset=merged_dataset)
 
     def preprocess(self, halo, lbox=None):
+        """
+        Register lazy filters/transforms restricting to `halo`'s subhalos and normalizing their positions.
+
+        Mirrors `SubhaloContext.preprocess`: filters to `id_parents ==
+        halo.halo_id` (and `group_number` if present), and registers a
+        `pbc_transform` that, on scan, recentres the `spos` column on
+        `halo.gpos` with periodic-boundary correction if `lbox` is given.
+
+        Parameters:
+        -----------
+        halo : Halo
+            Halo to filter to and centre positions on.
+        lbox : float, optional
+            Periodic box length, for boundary-wraparound correction.
+
+        Raises:
+        -------
+        RuntimeError
+            If `preprocess()` has already been called on this instance.
+        """
         if self._preprocessed:
             raise RuntimeError("preprocess() has already been called on this context.")
         self._preprocessed = True
@@ -240,6 +389,7 @@ class LazySubhaloContext:
         lbox_snapshot = lbox
 
         def pbc_transform(table):
+            """Recentre `table`'s `spos` column on the enclosing `halo.gpos`, with periodic-boundary correction if `lbox` was given."""
             logger.debug('Executing pbc transform')
             spos = np.asarray(table["spos"].to_pylist())
             logger.debug(f'spos: {type(spos)} {spos.shape}')
@@ -261,6 +411,23 @@ class LazySubhaloContext:
         self.add_transform(pbc_transform)
 
     def rotate(self, z, degree):
+        """
+        Register a lazy transform that rotates the `spos` column on scan.
+
+        Mirrors `SubhaloContext.rotate`.
+
+        Parameters:
+        -----------
+        z : float
+            Z-axis parameter for rotation (forwarded to `utils.rotate`).
+        degree : float
+            Rotation angle in degrees.
+
+        Raises:
+        -------
+        RuntimeError
+            If `rotate()` has already been called on this instance.
+        """
         if self._rotated:
             raise RuntimeError("rotate() has already been called on this context.")
         self._rotated = True
@@ -269,6 +436,7 @@ class LazySubhaloContext:
         degree_snapshot = degree
 
         def rotate_fn(table):
+            """Rotate `table`'s `spos` column by `degree_snapshot` around `z_snapshot`."""
             spos = np.asarray(table["spos"].to_pylist())
             rotated = rotate(z_snapshot, degree_snapshot, spos)
 
@@ -282,6 +450,14 @@ class LazySubhaloContext:
 
     @property
     def id_parents(self) -> pa.Array:
+        """
+        pyarrow.Array: The `id_parents` column of the materialized data.
+
+        Raises:
+        -------
+        RuntimeError
+            If `materialize()` has not been called yet.
+        """
         if self.data is None:
             raise RuntimeError("Call materialize() before accessing id_parents.")
         # FIX: was reading self.data["parent_id"], a field that doesn't
@@ -291,11 +467,32 @@ class LazySubhaloContext:
 
     @property
     def subhalo_id(self) -> pa.Array:
+        """
+        pyarrow.Array: The `subhalo_id` column of the materialized data.
+
+        Raises:
+        -------
+        RuntimeError
+            If `materialize()` has not been called yet.
+        """
         if self.data is None:
             raise RuntimeError("Call materialize() before accessing subhalo_id.")
         return self.data["subhalo_id"]
 
     def __len__(self):
+        """
+        Number of subhalos matching the registered filters.
+
+        Uses `dataset.count_rows(filter=...)` (metadata/row-group pruned)
+        if `materialize()` hasn't been called, so it doesn't force a full
+        scan just to get a count; safe because none of this class's
+        transforms change row count.
+
+        Returns:
+        --------
+        int
+            The row count.
+        """
         # Doesn't require materialize() -- count_rows(filter=...) uses
         # dataset metadata/row-group pruning, so it's cheaper than forcing
         # a full materialize() just to get a count, AND it means len()
@@ -314,7 +511,27 @@ class LazySubhaloContext:
 
 
 class LazySubhaloParticles:
+    """
+    Lazy, pyarrow-dataset-backed mirror of SubhaloParticles.
+
+    Same lazy filter/transform design as LazySubhaloContext, but over a
+    dataset of star particles rather than subhalos: registered filters
+    and transforms (`preprocess`, `rotate`) are only applied on
+    `materialize()`.
+    """
     def __init__(self, path, dataset=None) -> None:
+        """
+        Open (or wrap) a parquet dataset of star particles.
+
+        Parameters:
+        -----------
+        path : str or None
+            Path to a parquet dataset directory. Ignored if `dataset` is
+            given (may be None in that case, e.g. after `__add__`).
+        dataset : pyarrow.dataset.Dataset, optional
+            An already-open pyarrow dataset to wrap directly, instead of
+            opening `path`.
+        """
         self.path = path
         self.dataset = ds.dataset(path, format="parquet") if dataset is None else dataset
 
@@ -327,12 +544,38 @@ class LazySubhaloParticles:
 
     # pipeline primitives
     def add_filter(self, expr):
+        """
+        Register a pyarrow dataset filter expression to apply on the next scan.
+
+        Parameters:
+        -----------
+        expr : pyarrow.dataset.Expression
+            Filter expression, combined (AND) with any already registered
+            filters — see `_build_filter`.
+        """
         self.filters.append(expr)
 
     def add_transform(self, fn):
+        """
+        Register a table-transform function to run (in registration order) after each scan.
+
+        Parameters:
+        -----------
+        fn : Callable[[pyarrow.Table], pyarrow.Table]
+            Function applied to the scanned table, e.g. `pbc_transform` or
+            `rotate_fn` as registered by `preprocess`/`rotate`.
+        """
         self.transforms.append(fn)
 
     def _build_filter(self):
+        """
+        Combine all registered filters into a single AND-ed expression.
+
+        Returns:
+        --------
+        pyarrow.dataset.Expression or None
+            The combined filter, or None if no filters are registered.
+        """
         if not self.filters:
             return None
         expr = self.filters[0]
@@ -341,6 +584,14 @@ class LazySubhaloParticles:
         return expr
 
     def materialize(self):
+        """
+        Scan the dataset with all registered filters/transforms applied, and cache the result on `self.data`.
+
+        Returns:
+        --------
+        pyarrow.Table
+            The materialized table (also stored as `self.data`).
+        """
         table = self.dataset.to_table(filter=self._build_filter())
 
         for fn in self.transforms:
@@ -352,6 +603,24 @@ class LazySubhaloParticles:
     # merge
 
     def __add__(self, other):
+        """
+        Merge two LazySubhaloParticles instances by combining their underlying parquet files.
+
+        Records `overlapping_particles_id` as `self`'s row count (mirroring
+        `SubhaloParticles.__add__`), so `non_overlapping` can later recover
+        just the rows that belonged to `self`.
+
+        Parameters:
+        -----------
+        other : LazySubhaloParticles
+            Another instance of the same class to merge with.
+
+        Returns:
+        --------
+        LazySubhaloParticles
+            A new instance over a dataset spanning both `self`'s and
+            `other`'s files.
+        """
         if not isinstance(other, self.__class__):
             return NotImplemented
 
@@ -412,6 +681,7 @@ class LazySubhaloParticles:
         lbox_snapshot = lbox
 
         def pbc_transform(table):
+            """Recentre `table`'s `star_p` column on the enclosing `halo.gpos`, with periodic-boundary correction if `lbox` was given."""
             star_p = np.array(table["star_p"].to_pylist())   # (N, 3)
             delta = star_p - gpos_snapshot
 
@@ -453,6 +723,7 @@ class LazySubhaloParticles:
         degree_snapshot = degree
 
         def rotate_fn(table):
+            """Rotate `table`'s `star_p` column by `degree_snapshot` around `z_snapshot`."""
             star_p = np.array(table["star_p"].to_pylist())
             rotated = rotate(z_snapshot, degree_snapshot, star_p)
             return table.set_column(
@@ -466,11 +737,20 @@ class LazySubhaloParticles:
     # mirror SubhaloParticles properties / dunder
 
     def __len__(self):
+        """
+        Return the number of materialized particles.
+
+        Raises:
+        -------
+        RuntimeError
+            If `materialize()` has not been called yet.
+        """
         if self.data is None:
             raise RuntimeError("Call materialize() before calling len().")
         return self.data.num_rows
 
     def __repr__(self):
+        """Return a short summary: column shapes if materialized, otherwise the pending filter/transform counts."""
         if self.data is None:
             return f"LazySubhaloParticles(unmaterialized, filters={len(self.filters)}, transforms={len(self.transforms)})"
         lines = [f"{col}: shape=({self.data.num_rows},)" for col in self.data.schema.names]

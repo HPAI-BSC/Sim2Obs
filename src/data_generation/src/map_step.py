@@ -15,9 +15,30 @@ logger = setup_logger("MapStep")
 
 
 class MapStep(PipelineStep):
+    """
+    Pipeline step that projects each halo's particles into 2D (or 3D) maps.
+
+    For every `(halo, _, cosmos_data)` item it receives, generates input-
+    and output-feature projection maps along the xy/yz/xz planes (via
+    `input_feature`/`output_feature`'s `generate_map`), builds an
+    interlopers mask that excludes neighbouring subhalos from each
+    projection, then samples `n_zooms` random zoomed-in crops of each
+    projection (stacked with the interlopers mask as an extra channel) and
+    saves them to disk under `map_configuration['root_path']`.
+    """
     name = 'map_step'
 
     def __init__(self, cfg: DictConfig):
+        """
+        Initialize the map step from the pipeline configuration.
+
+        Parameters:
+        -----------
+        cfg : DictConfig
+            Full pipeline configuration; must contain a `map_step` entry
+            in `cfg.pipeline` (see `_build_map_configuration`) plus
+            `cfg.catalog.transition_radius` and `cfg.feature_names`.
+        """
         self.map_configuration = self._build_map_configuration(cfg)
 
         self.transition_radius = cfg.catalog.get('transition_radius', None)
@@ -291,6 +312,7 @@ class MapStep(PipelineStep):
         # logger.info(f'Generating {self.map_configuration["number_zooms"]} zooms for projection {projection_str}...')
 
         def get_path(feature_name, halo_id_, subhalo_id_, projection_, rotation_axis_, rotation_iteration_, i_):
+            """Build the output .npz path for one zoomed map, branching on simulate_muse and whether a rotation was applied."""
             if self.simulate_muse:
                 if self.map_configuration['rotation_angle'] is not None:
                     path = os.path.join(self.map_configuration['root_path'], 'simulate_muse',
@@ -364,6 +386,29 @@ class MapStep(PipelineStep):
                              interlopers_mask)
 
     def _is_halo_already_processed(self, feature, halo, cosmos_data):
+        """
+        Check whether output files for this halo/subhalo already exist on disk.
+
+        Builds the same output directory `_create_n_zooms`/`get_path` would
+        write to for `feature`, then checks whether any file there starts
+        with `halo_{halo.halo_id}_subhalo_{cosmos_data.subhalo_id}`. Used to
+        support `cfg.skip_existing_halos`, letting a re-run skip halos
+        already processed by a previous run.
+
+        Parameters:
+        -----------
+        feature : FeatureProcessor
+            Feature whose output directory/name to check.
+        halo : Halo
+            Halo being processed.
+        cosmos_data : CosmosData
+            Provides `subhalo_id` for the filename pattern.
+
+        Returns:
+        --------
+        bool
+            True if a matching output file is found, False otherwise.
+        """
         feature_name = feature.name
         file = f'halo_{halo.halo_id}_subhalo_{cosmos_data.subhalo_id}'
 

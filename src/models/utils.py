@@ -10,10 +10,18 @@ class MaskedMAE(nn.Module):
     By measuring ICL diff only on non-zero regions we can compare between datasets.
     """
     def __init__(self):
+        """Set the near-zero threshold `alpha` used to mask out negligible differences."""
         super().__init__()
         self.alpha = 0.005
 
     def forward(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """Compute the mean absolute error between `x` and `y`, over positions where `|x - y| >= alpha` only.
+
+        :param x: Predicted tensor.
+        :param y: Target tensor, same shape as `x`.
+        :return: A scalar tensor with the masked MAE, or 0.0 (with
+            gradient) if every position is masked out.
+        """
         diff = torch.abs(x - y)            # keeps gradients
         mask = (diff >= self.alpha).float()         # 1 where nonzero, 0 where almost zero
         masked_sum = (diff * mask).sum()   # only nonzero positions contribute

@@ -18,6 +18,41 @@ logger = setup_logger("Pipeline")
 
 # TODO propagate errors (no subhalos found) to the last step
 def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[], ignore_halos=[]):
+    """
+    Build the generator of `(halo, subhalo, cosmos_data)` items the pipeline runs over.
+
+    Fetches halos/subhalos from `data_loader.fetcher`, drops `ignore_halos`
+    and any subhalo whose parent halo no longer exists, computes (or loads
+    a cached) overlapping-halos matrix, optionally restricts to
+    `debug_halo_ids`, then delegates to
+    `data_loader.load_halo_subhalo_data` and yields its items — sliced to
+    `[starting_idx:ending_idx]` and capped at `n` items if given.
+
+    Parameters:
+    -----------
+    cfg : DictConfig
+        Full pipeline configuration (used for `cfg.paths.datasets_dir` and
+        `cfg.catalog.path`, to locate/name the cached overlapping matrix).
+    data_loader : DataLoader
+        Provides `.fetcher` (for `get_halos`/`get_subhalos`) and the
+        `get_overlapping_halos`/`load_halo_subhalo_data` methods.
+    n : int, optional
+        Maximum number of items to yield.
+    starting_idx : int, optional
+        Start index into the halo/subhalo list (Python slice semantics).
+    ending_idx : int, optional
+        End index into the halo/subhalo list (Python slice semantics).
+    debug_halo_ids : list, optional
+        If non-empty, restrict processing to only these halo IDs.
+    ignore_halos : list, optional
+        Halo IDs to exclude before any other processing.
+
+    Yields:
+    -------
+    tuple
+        Whatever `data_loader.load_halo_subhalo_data` produces per item
+        (halo, subhalo context, and an initialized CosmosData).
+    """
     print(f'debug_halo_ids={debug_halo_ids}')
     halo_context = data_loader.fetcher.get_halos()
     subhalo_context = data_loader.fetcher.get_subhalos()
@@ -75,7 +110,26 @@ def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, 
 
 
 class Pipeline:
+    """
+    Runs an ordered list of PipelineStep instances over the halo/subhalo
+    data produced by a DataLoader step, from raw catalogue fetch through
+    to the final LastStep.
+    """
     def __init__(self, cfg: DictConfig, steps: [PipelineStep]):
+        """
+        Initialize the pipeline with its configuration and ordered steps.
+
+        Parameters:
+        -----------
+        cfg : DictConfig
+            Full pipeline configuration, forwarded to each step and to
+            `get_generator`/`LastStep`.
+        steps : list of PipelineStep
+            The steps to run, in order. If none of them is named
+            `'data_loader'`, a default `DataLoader(cfg)` is created and
+            used as `self.data_loader` (for fetching halos in `run`), but
+            note it is NOT inserted into `self.steps` in that case.
+        """
         self.cfg = cfg
         self.steps = steps
 
@@ -94,9 +148,28 @@ class Pipeline:
         logger.info('build_pipeline: creating pipeline function')
 
         def pipeline(g, first_step_kwargs=None, **shared_kwargs):
+            """
+            Run `g` through all `steps` in order, starting `apply_steps` at index 0.
+
+            Parameters:
+            -----------
+            g : Generator
+                The initial input generator (e.g. from `get_generator`).
+            first_step_kwargs : dict, optional
+                Keyword arguments passed only to the first step.
+            **shared_kwargs
+                Keyword arguments passed to every step after the first
+                (e.g. `debug_halo_ids`, `models`).
+
+            Returns:
+            --------
+            Generator
+                The generator produced by the last step in `steps`.
+            """
             first_step_kwargs = first_step_kwargs or {}
 
             def apply_steps(i, gen, **kw):
+                """Recursively apply `steps[i:]` to `gen`, passing each step a callback to invoke the next one."""
                 if i == len(steps):
                     return gen
                 current_step = steps[i]
@@ -123,6 +196,38 @@ class Pipeline:
         return pipeline
 
     def run(self, n=None, starting_idx=None, ending_idx=None, debug_halo_ids=[], ignore_halos=[]) -> Any:
+        """
+        Fetch halos/subhalos, run them through every pipeline step, and finalize with LastStep.
+
+        Builds the step chain via `build_pipeline`, drives it with the
+        generator from `get_generator`, materializes the result into a
+        list, then runs `LastStep(self.cfg)` over it (e.g. for aggregate
+        logging/error reporting).
+
+        Parameters:
+        -----------
+        n : int, optional
+            Maximum number of halo/subhalo items to process.
+        starting_idx : int, optional
+            Start index into the halo/subhalo list.
+        ending_idx : int, optional
+            End index into the halo/subhalo list.
+        debug_halo_ids : list, optional
+            If non-empty, restrict processing to only these halo IDs.
+        ignore_halos : list, optional
+            Halo IDs to exclude before processing.
+
+        Returns:
+        --------
+        list or None
+            The materialized pipeline output, or None if `self.steps` is
+            empty.
+
+        Raises:
+        -------
+        Exception
+            If `self.steps` contains no step named `'data_loader'`.
+        """
         if not self.steps:
             logger.error("Error, please provide a non-empty pipeline, steps cannot be an empty list.")
             return None

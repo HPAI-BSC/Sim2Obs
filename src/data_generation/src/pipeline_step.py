@@ -16,8 +16,7 @@ class PipelineStep(ABC):
 
     Methods
     -------
-    process(input_feature: FeatureProcessor, output_feature: FeatureProcessor, cosmos_data: CosmosData,
-            g: Any, next_step: Callable[[Any], 'Any']):
+    ``process(g, next_step, **kwargs)``
         Processes the input and output features and decides whether to call the next step in the pipeline.
         This method should be implemented by subclasses to define specific processing logic.
     """

@@ -27,7 +27,7 @@ class SubHalo:
 
     Methods:
     --------
-    __init__(**kwargs):
+    ``__init__(**kwargs)``
         Initializes a SubHalo object by dynamically setting attributes from keyword arguments.
     """
     def __init__(self, **kwargs):
@@ -126,13 +126,43 @@ class SubhaloContext:
 
     def preprocess(self, halo: Halo, lbox: float = None):
         """
-        ...
+        Recentre this halo's subhalo positions (`spos`) on `halo.gpos`, with periodic-boundary correction if `lbox` is given.
+
+        Only rows matching `halo.halo_id` (and `halo.group_number`, if
+        present) are touched.
+
         Parameters:
         -----------
-        halo_context : HaloContext
-            A HaloContext object providing necessary information for preprocessing.
+        halo : Halo
+            The halo whose subhalos to recentre; provides the centre
+            (`gpos`) positions are made relative to.
+        lbox : float, optional
+            Periodic box length, for boundary-wraparound correction.
         """
         def apply_pbc_correction(subhalo_pos, halo_center, lbox):
+            """
+            Return `subhalo_pos - halo_center`, corrected for periodic boundary wraparound.
+
+            If a coordinate's raw offset is more than half the box length
+            away from the halo centre, the object is assumed to actually be
+            on the opposite side of the (periodic) box, and `lbox` is
+            added/subtracted to bring it to its true nearest-image offset.
+            No-op (plain difference) if `lbox` is None.
+
+            Parameters:
+            -----------
+            subhalo_pos : np.ndarray
+                Raw subhalo position(s).
+            halo_center : np.ndarray
+                Position of the halo's centre, subtracted from `subhalo_pos`.
+            lbox : float or None
+                Periodic box length, in the same units as the positions.
+
+            Returns:
+            --------
+            np.ndarray
+                PBC-corrected relative position(s).
+            """
             # NEW => see if magneticum positions change
             # subhalo_pos = np.asarray(subhalo_pos, dtype=np.float64)
             delta = subhalo_pos - halo_center  # Compute the relative position
@@ -291,17 +321,62 @@ class SubhaloContext:
             raise Exception(f"No subhalos found for halo_id={halo_id}, ignoring halo.")
 
     def get_items_by_subhalo_ids(self, subhalo_ids):
+        """
+        Retrieve subhalo rows matching a collection of subhalo IDs.
+
+        Parameters:
+        -----------
+        subhalo_ids : list or array-like
+            Subhalo IDs to look up (matched against the `subhalo_id` level
+            of `self.data`'s multi-index).
+
+        Returns:
+        --------
+        pd.DataFrame
+            The matching rows.
+        """
         # TODO THIS IS WORKING ?
         overlapping_subhalos_df = self.data.loc[subhalo_ids]
         return overlapping_subhalos_df
 
     def remove_subhalos_belonging_unvalid_halos(self, halo_context: HaloContext):
+        """
+        Drop subhalos whose parent halo is not present in `halo_context`.
+
+        In place: filters `self.data` down to rows whose `id_parents` is
+        one of `halo_context`'s halo IDs. Used to clean up subhalos left
+        over after halos have been filtered out elsewhere in the pipeline
+        (e.g. `ignore_halos`, mass cuts).
+
+        Parameters:
+        -----------
+        halo_context : HaloContext
+            The halo set to validate subhalo parentage against.
+        """
         halo_ids = halo_context.data['halo_id'].unique()
         logger.debug(f"Number of subhalos before filtering: {len(self.data)}")
         self.data = self.data[self.data['id_parents'].isin(halo_ids)]
         logger.debug(f"Number of subhalos after filtering: {len(self.data)}")
 
     def __add__(self, other):
+        """
+        Concatenate two SubhaloContext instances' DataFrame attributes row-wise.
+
+        Parameters:
+        -----------
+        other : SubhaloContext
+            Another instance of the same class to concatenate with.
+
+        Returns:
+        --------
+        SubhaloContext
+            A new instance built from the concatenated `data`.
+
+        Raises:
+        -------
+        TypeError
+            If a same-named attribute on `self`/`other` isn't a DataFrame.
+        """
         if not isinstance(other, self.__class__):
             return NotImplemented
 
@@ -344,6 +419,7 @@ class SubhaloContext:
 
     @property
     def is_empty(self):
+        """bool: True if the underlying DataFrame has no rows."""
         return self.data.empty
 
     def __len__(self):
@@ -359,6 +435,23 @@ class SubhaloContext:
 
 
 def convert_to_dict(obj):
+    """
+    Recursively convert DataFrames nested inside `obj` into plain dicts of lists.
+
+    Parameters:
+    -----------
+    obj : pd.DataFrame or dict or Any
+        A DataFrame, a (possibly nested) dict that may contain DataFrames,
+        or any other value.
+
+    Returns:
+    --------
+    Any
+        `obj` with every DataFrame replaced by
+        `DataFrame.to_dict(orient="list")`; dicts are walked recursively;
+        anything else (including numpy arrays and lists) is returned
+        unchanged.
+    """
     if isinstance(obj, pd.DataFrame):
         return obj.to_dict(orient="list")
 
@@ -463,6 +556,7 @@ class SubhaloParticles:
 
     @property
     def non_overlapping(self):
+        """SubhaloParticles: this subhalo's particles with any appended overlapping-neighbour particles removed (see `_non_overlapping_for`)."""
         return self._non_overlapping_for()
 
     def _non_overlapping_for(self, particle_type: str = None):
@@ -496,6 +590,29 @@ class SubhaloParticles:
         return self.__class__(data=data, column_map=None)
 
     def __add__(self, other):
+        """
+        Concatenate `other`'s particle arrays onto this instance's, recording where the original data ends.
+
+        Every matching `np.ndarray` attribute is concatenated along axis 0.
+        The first time this runs, `self.overlapping_particles_id` (if not
+        already set) is recorded as the length of `self`'s own arrays
+        before concatenation — the boundary `non_overlapping`/
+        `_non_overlapping_for` later slice on to recover just the
+        original subhalo's particles. Used to append neighbouring
+        (overlapping) subhalos' particles for interloper-masking purposes
+        while still being able to recover the non-overlapping subset.
+
+        Parameters:
+        -----------
+        other : SubhaloParticles
+            Another instance of the same class to concatenate with.
+
+        Returns:
+        --------
+        SubhaloParticles
+            A new instance with concatenated particle arrays and
+            `overlapping_particles_id` carried over from `self`.
+        """
         if not isinstance(other, self.__class__):
             return NotImplemented
 
@@ -601,6 +718,7 @@ class SubhaloParticles:
             self.star_p = rotate(z, degree, self.star_p)
 
     def __repr__(self):
+        """Return the shape of every ndarray attribute plus the current overlapping-particles boundary."""
         lines = []
         for attr_name, attr_value in self.__dict__.items():
             if isinstance(attr_value, np.ndarray):
@@ -609,14 +727,15 @@ class SubhaloParticles:
         return " ".join(lines)
 
     def __len__(self):
+        """Return the length of the first ndarray attribute found (particle count), or None if there is none."""
         for key in self.__dict__:
             self_val = getattr(self, key)
             if isinstance(self_val, np.ndarray):
                 return len(self_val)
 
     @property
-    @property
     def is_empty(self):
+        """bool: True if every ndarray attribute (other than `overlapping_particles_id`) is empty or absent."""
         for key, value in self.__dict__.items():
             if key == 'overlapping_particles_id':
                 continue

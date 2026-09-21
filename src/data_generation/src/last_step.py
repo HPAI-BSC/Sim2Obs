@@ -10,6 +10,21 @@ logger = setup_logger("LastStep")
 
 
 def get_pipeline_step(cfg: DictConfig, step_name: str):
+    """
+    Return the pipeline step config entry named `step_name`, or None if absent.
+
+    Parameters:
+    -----------
+    cfg : DictConfig
+        Full pipeline configuration, with a `pipeline` list of step configs.
+    step_name : str
+        The `name` value to look for among `cfg.pipeline` entries.
+
+    Returns:
+    --------
+    DictConfig or None
+        The matching step config, or None if no step is named `step_name`.
+    """
     return next(
         (step for step in cfg.pipeline if step.name == step_name),
         None
@@ -17,13 +32,45 @@ def get_pipeline_step(cfg: DictConfig, step_name: str):
 
 
 class LastStep:
+    """
+    Final pipeline step: aggregates and persists run-level results — error
+    logs, transition-radius analysis, and (for Flamingo) particle data —
+    once every halo/subhalo item has passed through the rest of the
+    pipeline.
+    """
     name = 'LastStep'
 
     def __init__(self, cfg: DictConfig):
+        """
+        Store the pipeline configuration for use by `process` and its helpers.
+
+        Parameters:
+        -----------
+        cfg : DictConfig
+            Full pipeline configuration.
+        """
         self.cfg = cfg
 
     @staticmethod
     def _inform_errors(errors, dataset_dir, name):
+        """
+        Persist per-halo errors collected during the run to a CSV log, merged with any prior run's log.
+
+        Expects `errors[0]` to be a list of `(halo_id, error, number_of_particles, step)`
+        tuples/lists (the shape `DataLoader`/`MapStep` etc. append to their
+        own `errors` accumulator with). Prints a summary and writes/merges
+        into `{dataset_dir}/../logs/errors/errors_{name}.csv`, de-duplicated.
+
+        Parameters:
+        -----------
+        errors : list
+            Errors collected while running the pipeline; only `errors[0]`
+            is used.
+        dataset_dir : str
+            Base dataset directory, used to derive the log output path.
+        name : str
+            Simulation/catalogue name, used in the log filename.
+        """
         if len(errors) > 0:
             print(errors)
             errors_df = pd.DataFrame(columns=['halo_id', 'error', 'number of particles', 'step'])
@@ -53,6 +100,23 @@ class LastStep:
             print(errors_df['error'].value_counts())
 
     def _check_compute_transition_radius_analysis(self, name):
+        """
+        If any configured feature enabled `transition_radius_compute`, merge per-halo transition-radius JSON logs into one CSV and print summary stats.
+
+        Looks up `dataset_dir/../logs/transition_radius`, merges the JSON
+        files written during the run into
+        `{dataset_dir}/../logs/transition_radius/{name}_transition_radius.csv`
+        via `merge_json_files_to_csv`, then loads it back, adds a
+        `transition_radius/R200` column, and prints `describe()`. Any
+        failure during merging/loading is caught and printed, not raised.
+
+        Parameters:
+        -----------
+        name : str
+            Simulation/catalogue name used both as the output filename
+            prefix and as the `simulation` filter passed to
+            `merge_json_files_to_csv`.
+        """
         transition_radius_compute = False
         for feature in self.cfg.feature_names:
             transition_radius_compute = feature.get("transition_radius_compute", False)
@@ -74,6 +138,21 @@ class LastStep:
                 print(e)
 
     def _check_maps(self):
+        """
+        Sanity-check the map_step output: same number of input/output .npz files present on disk.
+
+        Requires `path`/`name`/`spatial_resolution` in `self.cfg` (or
+        `self.cfg.catalog`), reads the `map_step` pipeline config for
+        logging, resolves the rotation/feature output directories the same
+        way `MapStep`/`get_path` build them, and counts `.npz` files in the
+        input- and output-feature directories (the actual pass/fail check
+        beyond the count comparison is still a TODO — see inline comments).
+
+        Raises:
+        -------
+        ValueError
+            If a required configuration key is missing.
+        """
         print('_check_maps')
         required_keys = ['path', 'name', 'spatial_resolution']
         for key in required_keys:
@@ -90,6 +169,7 @@ class LastStep:
                 print("map_step not found")
 
         def get_defined_rotations(cfg):
+            """Return the subset of `cfg` entries whose key starts with `rotation_`."""
             return {
                 k: v
                 for k, v in cfg.items()
@@ -134,6 +214,27 @@ class LastStep:
         # TODO check whether the map exists and save the ones that don't => they 're not in errors not in subhalos error
 
     def process(self, errors):
+        """
+        Finalize the pipeline run: log errors, run transition-radius analysis, and store particle data if applicable.
+
+        Runs, conditionally based on `self.cfg`:
+
+        - if the `IntraClusterLight` feature has `transition_radius_compute`
+          set, `_check_compute_transition_radius_analysis` and
+          `_inform_errors`;
+        - if a `map_step` is configured and `errors` is non-empty, writes a
+          simplified error CSV (`halo_id`/`error`/`step`) merged with any
+          prior run's log;
+        - if the catalogue name contains `'flamingo'`, converts the run's
+          per-halo particle `.npy` files into one parquet file via
+          `particle_numpy_files_to_parquet` and logs the resulting row
+          count.
+
+        Parameters:
+        -----------
+        errors : list
+            Errors collected while running the pipeline (see `Pipeline.run`).
+        """
         logger.info('-------------------------------------------------------------------------------------')
         logger.info(f"Last step")
         logger.info('-------------------------------------------------------------------------------------')

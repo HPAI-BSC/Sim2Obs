@@ -9,17 +9,30 @@ class LayerNorm(nn.LayerNorm):
     """Subclass torch's LayerNorm to handle fp16."""
 
     def forward(self, x: torch.Tensor):
+        """Cast `x` to float32 for the LayerNorm computation, then cast the result back to `x`'s original dtype."""
         orig_type = x.dtype
         ret = super().forward(x.type(torch.float32))
         return ret.type(orig_type)
 
 
 class QuickGELU(nn.Module):
+    """Sigmoid-based GELU approximation (`x * sigmoid(1.702 * x)`), as used in CLIP for speed."""
     def forward(self, x: torch.Tensor):
+        """Apply the QuickGELU approximation to `x`."""
         return x * torch.sigmoid(1.702 * x)
 
 
 class TransEncDec(nn.Module):
+    """
+    ViT-style image transformer: patchify the input via a strided conv,
+    add learned positional embeddings, run a `Transformer` stack (CLIP-style
+    pre-norm residual attention blocks), then decode the pooled
+    (first-token) representation back to an image with a `ViTDecoder`.
+
+    Note: `self.encoder` (`TransformerEncoder`) is constructed but unused
+    by `forward` — the actual encoding path is the `input_proj` +
+    `Transformer` pipeline below it.
+    """
     def __init__(
             self,
             in_channels: int = 1,
@@ -29,6 +42,17 @@ class TransEncDec(nn.Module):
             dim_feedforward: int = 2048,
             patch_size: int = 16,
             dropout: float = 0.1):
+        """
+        :param in_channels: Number of input image channels.
+        :param out_channels: Number of output channels (unused by the
+            current `forward`, which returns the decoder's output as-is).
+        :param n_heads: Number of attention heads.
+        :param n_layers: Number of transformer layers, shared by the
+            (unused) `encoder`, `transformer`, and `decoder`.
+        :param dim_feedforward: Transformer embedding/feedforward width.
+        :param patch_size: Side length of each square image patch.
+        :param dropout: Dropout probability used in the decoder.
+        """
         super(TransEncDec, self).__init__()
 
         input_resolution = 128
@@ -56,6 +80,12 @@ class TransEncDec(nn.Module):
 
 
     def forward(self, x):
+        """
+        Patchify `x`, add positional embeddings, run the transformer, and decode the pooled representation.
+
+        :param x: Input image tensor, shape `(B, in_channels, 128, 128)`.
+        :return: Decoded output from `self.decoder`.
+        """
         # Encode input image
         x = self.input_proj(x)  # shape = [*, width, grid, grid]
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
@@ -81,7 +111,15 @@ class TransEncDec(nn.Module):
 
 
 class TransformerEncoder(nn.Module):
+    """Standard `nn.TransformerEncoder` stack over a flattened `(B, C, H, W)` feature map, reshaping back to the input's spatial shape. Unused by `TransEncDec.forward` (see its docstring)."""
     def __init__(self, in_channels, n_heads, n_layers, dim_feedforward, dropout):
+        """
+        :param in_channels: Unused (the commented-out conv embedding is disabled).
+        :param n_heads: Number of attention heads.
+        :param n_layers: Number of encoder layers.
+        :param dim_feedforward: Model/feedforward width.
+        :param dropout: Dropout probability.
+        """
         super(TransformerEncoder, self).__init__()
 
         # Convolutional embedding
@@ -92,6 +130,7 @@ class TransformerEncoder(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, n_layers)
 
     def forward(self, x):
+        """Flatten `x` to a sequence, run the transformer encoder, and reshape back to `x`'s original `(B, C, H, W)` shape."""
         # Convolutional embedding
         # x = self.embedding(x)
 
@@ -103,7 +142,12 @@ class TransformerEncoder(nn.Module):
 
 
 class CNNDecoder(nn.Module):
+    """MLP-to-feature-map projection followed by a transposed-conv upsampling stack, decoding a flat feature vector into a 128x128 image."""
     def __init__(self, input_dim, output_channels=1):
+        """
+        :param input_dim: Dimension of the flat input feature vector.
+        :param output_channels: Number of output image channels.
+        """
         super(CNNDecoder, self).__init__()
         self.input_dim = input_dim
         self.output_channels = output_channels
@@ -135,6 +179,7 @@ class CNNDecoder(nn.Module):
         )
 
     def forward(self, x):
+        """Map a flat feature vector `x` to a `(B, output_channels, 128, 128)` image via the linear encoder then transposed-conv decoder."""
         batch_size = x.shape[0]
         x = self.encoder(x)
         x = x.view(batch_size, 256, 16, 16)
@@ -143,7 +188,15 @@ class CNNDecoder(nn.Module):
 
 
 class TransformerDecoder(nn.Module):
+    """`nn.TransformerDecoder` stack decoding a zero-initialized target sequence against a memory sequence, reshaping back to the memory's spatial shape."""
     def __init__(self, out_channels, n_heads, n_layers, dim_feedforward, dropout):
+        """
+        :param out_channels: Unused (kept for interface parity with other decoders).
+        :param n_heads: Number of attention heads.
+        :param n_layers: Number of decoder layers.
+        :param dim_feedforward: Model/feedforward width.
+        :param dropout: Dropout probability.
+        """
         super(TransformerDecoder, self).__init__()
         self.dim_feedforward = dim_feedforward
 
@@ -152,6 +205,7 @@ class TransformerDecoder(nn.Module):
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, n_layers)
 
     def forward(self, x):
+        """Decode `x` (used as memory) against a zero-initialized target sequence of the same shape, reshaping the result back to `x`'s shape."""
         tgt = torch.zeros_like(x, device=x.device)
         print(tgt.shape)
 
@@ -167,7 +221,17 @@ import torch.nn as nn
 
 
 class ViTDecoder(nn.Module):
+    """Decodes a single pooled feature vector into a 128x128 image: linear embed, a length-1-sequence transformer decoder (self-attending), then a linear projection reshaped to the output image."""
     def __init__(self, n_features, patch_size=16, embed_dim=768, num_heads=12, num_layers=12, dropout=0.1):
+        """
+        :param n_features: Dimension of the input feature vector.
+        :param patch_size: Used only to size `num_patches` (not otherwise
+            used, since positional embeddings are disabled below).
+        :param embed_dim: Transformer embedding width.
+        :param num_heads: Number of attention heads.
+        :param num_layers: Number of decoder layers.
+        :param dropout: Dropout probability.
+        """
         super(ViTDecoder, self).__init__()
         self.patch_size = patch_size
         self.num_patches = (128 // patch_size) ** 2
@@ -184,6 +248,12 @@ class ViTDecoder(nn.Module):
         self.output = nn.Linear(embed_dim, 128 ** 2)
 
     def forward(self, x):
+        """
+        Embed `x`, self-attend it as a length-1 sequence through the transformer decoder, and project to a 128x128 image.
+
+        :param x: Pooled feature vector, shape `(B, n_features)`.
+        :return: Reconstructed image, shape `(B, 1, 128, 128)`.
+        """
         x = self.embedding(x)
         x = x.view(x.size(0), 1, -1)
 
@@ -236,18 +306,32 @@ class ViTDecoder(nn.Module):
 """
 
 class Transformer(nn.Module):
+    """A stack of `layers` CLIP-style `ResidualAttentionBlock` modules."""
     def __init__(self, width: int, layers: int, heads: int, attn_mask: torch.Tensor = None):
+        """
+        :param width: Model (embedding) dimension.
+        :param layers: Number of residual attention blocks.
+        :param heads: Number of attention heads per block.
+        :param attn_mask: Optional attention mask, shared by every block.
+        """
         super().__init__()
         self.width = width
         self.layers = layers
         self.resblocks = nn.Sequential(*[ResidualAttentionBlock(width, heads, attn_mask) for _ in range(layers)])
 
     def forward(self, x: torch.Tensor):
+        """Run `x` through the stack of residual attention blocks."""
         return self.resblocks(x)
 
 
 class ResidualAttentionBlock(nn.Module):
+    """CLIP-style pre-norm transformer block: `x + attn(ln1(x))` then `x + mlp(ln2(x))`, with a QuickGELU MLP."""
     def __init__(self, d_model: int, n_head: int, attn_mask: torch.Tensor = None):
+        """
+        :param d_model: Model (embedding) dimension.
+        :param n_head: Number of attention heads.
+        :param attn_mask: Optional attention mask applied in `attention`.
+        """
         super().__init__()
 
         self.attn = nn.MultiheadAttention(d_model, n_head)
@@ -261,10 +345,12 @@ class ResidualAttentionBlock(nn.Module):
         self.attn_mask = attn_mask
 
     def attention(self, x: torch.Tensor):
+        """Run masked (if `attn_mask` is set) self-attention on `x`, casting the mask to `x`'s dtype/device first."""
         self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
         return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
 
     def forward(self, x: torch.Tensor):
+        """Apply the pre-norm self-attention and MLP residual sub-blocks to `x`."""
         x = x + self.attention(self.ln_1(x))
         x = x + self.mlp(self.ln_2(x))
         return x

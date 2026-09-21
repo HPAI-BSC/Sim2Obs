@@ -14,31 +14,29 @@ torch.set_float32_matmul_precision('medium')
 
 class BCELitModule(LightningModule):
     """
-    A `LightningModule` implements 8 key methods:
+    A ``LightningModule`` implements 8 key methods::
 
-    ```python
-    def __init__(self):
-    # Define initialization code here.
+        def __init__(self):
+        # Define initialization code here.
 
-    def setup(self, stage):
-    # Things to setup before each stage, 'fit', 'validate', 'test', 'predict'.
-    # This hook is called on every process when using DDP.
+        def setup(self, stage):
+        # Things to setup before each stage, 'fit', 'validate', 'test', 'predict'.
+        # This hook is called on every process when using DDP.
 
-    def training_step(self, batch, batch_idx):
-    # The complete training step.
+        def training_step(self, batch, batch_idx):
+        # The complete training step.
 
-    def validation_step(self, batch, batch_idx):
-    # The complete validation step.
+        def validation_step(self, batch, batch_idx):
+        # The complete validation step.
 
-    def test_step(self, batch, batch_idx):
-    # The complete test step.
+        def test_step(self, batch, batch_idx):
+        # The complete test step.
 
-    def predict_step(self, batch, batch_idx):
-    # The complete predict step.
+        def predict_step(self, batch, batch_idx):
+        # The complete predict step.
 
-    def configure_optimizers(self):
-    # Define and configure optimizers and LR schedulers.
-    ```
+        def configure_optimizers(self):
+        # Define and configure optimizers and LR schedulers.
 
     Docs:
         https://lightning.ai/docs/pytorch/latest/common/lightning_module.html
@@ -106,6 +104,7 @@ class BCELitModule(LightningModule):
 
 
     def _print_cuda_memory(self):
+        """Print allocated/reserved/free CUDA memory (in GB) for the current device, or a message if CUDA is unavailable."""
         if torch.cuda.is_available():
             # Get current GPU device
             device = torch.cuda.current_device()
@@ -128,6 +127,11 @@ class BCELitModule(LightningModule):
             print("CUDA is not available")
 
     def on_load_checkpoint(self, checkpoint: dict) -> None:
+        """Lightning hook: strip a `torch.compile`-added `_orig_mod.` prefix from `net.*` checkpoint keys, if present.
+
+        :param checkpoint: The checkpoint dict about to be loaded; `checkpoint["state_dict"]`
+            is rewritten in place when `self.net` isn't itself a compiled module.
+        """
         state_dict = checkpoint["state_dict"]
         if hasattr(self.net, "_orig_mod"):
             pass
@@ -190,6 +194,12 @@ class BCELitModule(LightningModule):
         """
 
     def _estimate_flops(self):
+        """Profile one forward pass of `self.net` on a dummy (1, 1, 128, 128) CUDA input and print estimated forward/backward GFLOPs.
+
+        Uses `torch.profiler` with `with_flops=True`; the backward-pass
+        estimate is a 2.5x heuristic multiplier on the measured forward
+        FLOPs, not a real backward-pass measurement.
+        """
         """
         print(f"On train init")
         macs, params = get_model_complexity_info(
@@ -346,8 +356,8 @@ class BCELitModule(LightningModule):
 
 
     def on_validation_epoch_end(self) -> None:
+        """Lightning hook that is called when a validation epoch ends."""
         torch.cuda.empty_cache()
-        "Lightning hook that is called when a validation epoch ends."
         rase = self.val_RASE.compute()  # get current val rase
         rmse = self.val_rmse.compute()  # get current val rsme
         mae = self.val_mae.compute()

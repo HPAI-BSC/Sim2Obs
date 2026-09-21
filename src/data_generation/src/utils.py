@@ -34,6 +34,24 @@ from scipy.signal import fftconvolve
 
 
 def setup_logger(name: str) -> logging.Logger:
+    """
+    Get (or create) a DEBUG-level, non-propagating logger with a single console handler.
+
+    Safe to call repeatedly with the same `name`: a console handler is
+    only attached the first time, so repeated calls don't duplicate log
+    lines.
+
+    Parameters:
+    -----------
+    name : str
+        Logger name (as used across this codebase, one per module/class,
+        e.g. "DataFetcher", "MapStep").
+
+    Returns:
+    --------
+    logging.Logger
+        The configured logger.
+    """
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     logger.propagate = False  # don't pass messages up to root logger
@@ -190,7 +208,7 @@ def rotate_vector(v: np.ndarray, axis: np.ndarray, angle_: float) -> np.ndarray:
         The 3D vector to be rotated. Must be a 1D array of length 3.
     axis : np.ndarray
         The 3D vector representing the axis of rotation. Must also be a 1D array of length 3.
-    angle_ : float
+    angle\_ : float
         The angle by which to rotate the vector, in degrees.
 
     Returns:
@@ -427,9 +445,9 @@ def circle(x: float, y: float, h: float, k: float, r: float) -> float:
     return ((x - h) ** 2 + (y - k) ** 2) / r ** 2
 
 
-def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_scale: float) -> tuple[int, float]:
+def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_scale: float) -> int:
     """
-    Calculate the number of spatial bins and the radius for MUSE observations.
+    Calculate the number of spatial bins for MUSE observations.
 
     Parameters:
     -----------
@@ -444,13 +462,10 @@ def muse_bins_r(fov: float, spatial_resolution: float, bin_spatial_resolution_sc
 
     Returns:
     --------
-    tuple[int, float]
-        A tuple containing:
-        - bins : int
-            The number of bins along one axis, calculated as the quotient of
-            the field of view divided by the scaled spatial resolution.
-        - r : float
-            The radius of the field of view, computed as half of the FoV.
+    int
+        The number of bins along one axis, calculated as the quotient of
+        the field of view divided by the scaled spatial resolution
+        (rounded down).
 
     Notes:
     ------
@@ -783,6 +798,34 @@ def apply_conversion(values, scaling_formula, scalefactor, h, **kwargs):
 
 
 def dict_depth(d, level=0):
+    """
+    Return the maximum nesting depth of a dict/DictConfig, recursively.
+
+    A non-dict value (or an empty dict) has depth `level`; a dict has the
+    max depth of its values, each computed with `level + 1`. Used across
+    the field-processing pipeline (`data_fetcher.py`) to distinguish a
+    "simple" field config (depth 1, e.g. `fields.halo.MCRI`) from a
+    "nested" one keyed by sub-type (depth 2, e.g.
+    `fields.particles.star.POS`).
+
+    Side effect: if `d` is a DictConfig containing a `needs` key, that key
+    is deleted from `d` in place before computing depth — `needs` entries
+    (declaring a FeatureComputer dependency) aren't part of the field
+    shape and would otherwise be counted as nesting.
+
+    Parameters:
+    -----------
+    d : dict or DictConfig or Any
+        The value to measure. Any non-dict/DictConfig value is a leaf.
+    level : int, optional
+        The depth to report for `d` itself if it's a leaf (used
+        internally for the recursion; callers should normally omit it).
+
+    Returns:
+    --------
+    int
+        The maximum nesting depth found.
+    """
     # Omit 'needs' attribute, we don't needed to compute the depth of the tree
     if isinstance(d, DictConfig) and 'needs' in d:
         OmegaConf.set_struct(d, False)
@@ -896,6 +939,31 @@ def store_overlapping_matrix_as_df(cfg, overlapping_matrix):
 # TODO
 def store_subhalo_particles(cfg, halo, subhalo_particles, feature: np.ndarray,
                             feature_name: str, ranging: tuple, axis: tuple):
+    """
+    Debug dump: pickle a subhalo's particles and save its feature map, for a hardcoded allowlist of halo IDs.
+
+    No-op for any halo not in the hardcoded `[26, 28, 69, 188, 836, 3147]`
+    list — intended for inspecting a handful of specific halos during
+    debugging, not for general use.
+
+    Parameters:
+    -----------
+    cfg : DictConfig
+        Pipeline configuration, used to derive `dataset_dir`/output paths.
+    halo : Halo
+        Halo being processed; only its `halo_id` is used (for filtering
+        and naming).
+    subhalo_particles : SubhaloParticles
+        Particle data to pickle.
+    feature : np.ndarray
+        Feature map to save as a `.npy` file.
+    feature_name : str
+        Used in the output filename for `feature`.
+    ranging : tuple
+        Unused beyond being printed for debugging context.
+    axis : tuple
+        Unused beyond being printed for debugging context.
+    """
     if halo.halo_id in [26, 28, 69, 188, 836, 3147]:
         print(f'ranging: {ranging}, axis: {axis}')
         sim_code = cfg.catalog.path.split('/')[-1]
@@ -912,6 +980,20 @@ def store_subhalo_particles(cfg, halo, subhalo_particles, feature: np.ndarray,
 
 
 def store_tr_obj(cfg, halo, subhalo_particles, icl_mask):
+    """
+    Debug dump: pickle a halo and its subhalo particles, and save its ICL mask, for transition-radius debugging.
+
+    Parameters:
+    -----------
+    cfg : DictConfig
+        Pipeline configuration, used to derive `dataset_dir`/output paths.
+    halo : Halo
+        Halo to pickle.
+    subhalo_particles : SubhaloParticles
+        Particle data to pickle.
+    icl_mask : np.ndarray
+        Intracluster-light mask to save as a `.npy` file.
+    """
     print(f'Storing oject for transition radius debugging for: {halo.halo_id}')
     sim_code = cfg.catalog.path.split('/')[-1]
     datasets_dir = cfg.paths.datasets_dir
@@ -931,6 +1013,20 @@ def store_tr_obj(cfg, halo, subhalo_particles, icl_mask):
 
 
 def store_obj(cfg, halo, subhalo_ctx, cosmos_data):
+    """
+    Debug dump: pickle a halo, its subhalo context, and its CosmosData to separate files.
+
+    Parameters:
+    -----------
+    cfg : DictConfig
+        Pipeline configuration, used to derive `dataset_dir`/output paths.
+    halo : Halo
+        Halo to pickle.
+    subhalo_ctx : SubhaloContext
+        Subhalo context to pickle.
+    cosmos_data : CosmosData
+        Per-halo working state to pickle.
+    """
     sim_code = cfg.catalog.path.split('/')[-1]
     datasets_dir = cfg.paths.datasets_dir
     name = cfg.catalog.name
@@ -980,6 +1076,25 @@ def find_item(cfg: DictConfig, list_name: str, item_name: str, name_key: str = "
 
 
 def store_RF_input(cfg, halo, icl_mask, v_delta, distance):
+    """
+    Save one halo's ICL-mask/velocity-delta/distance data (plus scaled log/dimensionless features) as a JSON, for use as a Random Forest model's input.
+
+    Parameters:
+    -----------
+    cfg : DictConfig
+        Pipeline configuration, used to derive the output path.
+    halo : Halo
+        Halo whose `halo_id`, `m200`, `r200`, and (if present) `gpos` are
+        recorded.
+    icl_mask : np.ndarray
+        Intracluster-light mask.
+    v_delta : np.ndarray
+        Velocity offsets per sampled point, used both as-is and scaled by
+        the halo's circular velocity `V200`.
+    distance : np.ndarray
+        Distances per sampled point, used both as-is and scaled
+        (log10) by `halo.r200`.
+    """
     # Build dictionary
     data_to_store = {
         "halo_id": halo.halo_id,
@@ -1010,6 +1125,19 @@ def store_RF_input(cfg, halo, icl_mask, v_delta, distance):
 
 
 def check_corrupted_files(hdf5_folder):
+    """
+    Scan a glob of HDF5 files and report which ones fail to open.
+
+    Simply attempts `h5py.File(f, "r")` for each match of `hdf5_folder`
+    (a glob pattern, not a literal directory path) and prints any file
+    that raises, plus a final corrupted-file count.
+
+    Parameters:
+    -----------
+    hdf5_folder : str
+        A glob pattern matching the HDF5 files to check (e.g.
+        ".../snapdir_084/snap_084.*.hdf5").
+    """
     import glob
     import h5py
 
@@ -1380,6 +1508,23 @@ def particle_numpy_files_to_parquet(
     )
 
 def gaussian_kernel_1d(ksize, sigma, normalize=True):
+    """
+    Build a 1D Gaussian kernel of length `ksize`, centered, with standard deviation `sigma`.
+
+    Parameters:
+    -----------
+    ksize : int
+        Kernel length.
+    sigma : float
+        Standard deviation of the Gaussian, in samples.
+    normalize : bool, optional
+        If True (default), scale the kernel to sum to 1.
+
+    Returns:
+    --------
+    np.ndarray
+        The kernel, shape `(ksize,)`.
+    """
     x = np.arange(ksize) - ksize//2
     K = np.exp(-(x**2)/(2*sigma**2))
     if normalize:
@@ -1403,6 +1548,22 @@ def rebin_1d(arr, factor, agg="mean"):
 
 
 def avg_pool_2x2(arr):
+    """
+    Downsample a 2D array by a factor of 2 in each dimension via 2x2 average pooling.
+
+    Any trailing odd row/column is dropped (the input is truncated to an
+    even shape) before pooling.
+
+    Parameters:
+    -----------
+    arr : np.ndarray
+        2D array to pool.
+
+    Returns:
+    --------
+    np.ndarray
+        Pooled array of shape `(rows // 2, cols // 2)`.
+    """
     # truncate to even shape to make divisible by 2
     rows, cols = arr.shape
     arr = arr[:rows - rows % 2, :cols - cols % 2]  # truncate if needed
@@ -1510,6 +1671,33 @@ def convolve_and_pixelize_from_bins_1d(
     bin_factor=1,
     agg_pixel="mean"
 ):
+    """
+    Apply instrument LSF blurring (Gaussian convolution) to a 1D spectrum, then optionally rebin it into pixels.
+
+    Parameters:
+    -----------
+    F_intr : np.ndarray
+        Intrinsic (unblurred) 1D spectrum, in bin units.
+    FWHM : float, optional
+        Line-spread-function full width at half maximum, in bins
+        (default 2.5).
+    ksize : int, optional
+        Gaussian kernel length. If None, computed from `FWHM` as
+        `ceil(6 * sigma)`, rounded up to odd.
+    bin_factor : int, optional
+        Integer factor to rebin the convolved spectrum by (default 1, no
+        rebinning). See `rebin_1d`.
+    agg_pixel : str, optional
+        Aggregation used when rebinning (`"mean"` or `"sum"`, default
+        `"mean"`); ignored if `bin_factor == 1`.
+
+    Returns:
+    --------
+    tuple
+        `(F_intr, F_conv, F_pix)`: the original spectrum, the
+        LSF-convolved spectrum, and the (possibly rebinned) pixelized
+        spectrum.
+    """
     n = F_intr.shape[0]
 
     # FWHM → sigma
@@ -1582,6 +1770,24 @@ def flatten_vector_column(df, col, names=("x", "y", "z")):
 
 
 def store_subhalo_particles_as_numpy(halo_particles_no_overlapping, dataset_dir, halo, name, suffix=''):
+    """
+    Debug dump: save a halo's star particle positions, masses, and velocities as separate .npy files.
+
+    Parameters:
+    -----------
+    halo_particles_no_overlapping : SubhaloParticles
+        Particle data; `star_p`/`star_m`/`star_v` are each saved to their
+        own file.
+    dataset_dir : str
+        Base dataset directory, used to derive the output path (files are
+        written under `{dataset_dir}/../logs/transition_radius/`).
+    halo : Halo
+        Halo whose `halo_id` is used in the output filenames.
+    name : str
+        Simulation/catalogue name, used as a filename prefix.
+    suffix : str, optional
+        Extra suffix appended to each filename (default: none).
+    """
     halo_particles = halo_particles_no_overlapping.star_p
     path_ = dataset_dir + f'/../logs/transition_radius/{name}_particle_p_{halo.halo_id}_{suffix}'
     np.save(path_, halo_particles)

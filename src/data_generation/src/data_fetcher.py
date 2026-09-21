@@ -8,6 +8,7 @@ import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 import g3read
+import h5py
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
@@ -57,6 +58,7 @@ def pipeline_step(func):
         A wrapper function that applies the transformation.
     """
     def wrapper(data, *args, **kwargs):
+        """Call `func(data, *args, **kwargs)`, short-circuiting to None if `data` is None."""
         if data is None:
             return None  # Stop processing if data is None
         return func(data, *args, **kwargs)
@@ -65,6 +67,24 @@ def pipeline_step(func):
 
 @pipeline_step
 def remove_useless_columns(d: dict, fields: list):
+    """
+    Drop every key of `d` not present in `fields`, in place.
+
+    Parameters:
+    -----------
+    d : dict
+        Dictionary of column name to array, as returned by a raw catalogue
+        read.
+    fields : list
+        Column names to keep (typically `self.halo_fields`/
+        `self.subhalo_fields`/`self.particle_fields`, including any
+        dynamically-injected structural fields).
+
+    Returns:
+    --------
+    dict
+        `d`, with unlisted keys removed.
+    """
     diff = set(d.keys()).difference(set(fields))
 
     for key in diff:
@@ -350,6 +370,13 @@ def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig, **
         Filtered data, either as a DataFrame or dictionary of DataFrames.
     """
 
+    # Lbox: box size, needed by any catalogue whose raw positions are in
+    # box units (e.g. Obelisk's x/y/z in [0,1]) rather than physical/comoving
+    # length units already. Exposed unconditionally in the scaling eval
+    # context below; catalogues that don't reference it in their scaling
+    # strings are unaffected.
+    lbox = OmegaConf.select(cfg, "Lbox")
+
     for key in fields:
         if key in df:
             field_info = OmegaConf.select(cfg, f"fields.{table}.{key}")
@@ -361,10 +388,10 @@ def apply_unit_conversion(df: Any, fields: list, table: str, cfg: DictConfig, **
                         if cfg.name == 'magneticum':
                             key_ii = key_ii.ljust(4)
                         df[key][key_ii] = apply_conversion(df[key][key_ii], field_info_ii.scaling, cfg.a, cfg.H,
-                                                           **kwargs)
+                                                           Lbox=lbox, **kwargs)
             else:
                 if field_info.scaling is not None:
-                    df[key] = apply_conversion(df[key], field_info.scaling, cfg.a, cfg.H)
+                    df[key] = apply_conversion(df[key], field_info.scaling, cfg.a, cfg.H, Lbox=lbox, **kwargs)
     return df
 
 
@@ -396,6 +423,18 @@ class DataFetcher(ABC):
     Abstract base class for fetching data from various catalogs.
     """
     def __init__(self, catalog: DictConfig, **kwargs):
+        """
+        Store the catalogue configuration and derive field lists/column mappings from it.
+
+        Parameters:
+        -----------
+        catalog : DictConfig
+            Catalogue configuration (e.g. `configs/catalog/magneticum.yaml`),
+            with a `fields` section (`halo`/`subhalo`/`particles`).
+        **kwargs
+            Extra attributes to set on this instance (see
+            `__build_config`).
+        """
         self.catalog = catalog
         self.__build_config(**kwargs)
 
@@ -427,6 +466,7 @@ class DataFetcher(ABC):
         pass
 
     def _get_fields(self):
+        """No-op default; subclasses may override to report their available halo/subhalo field names."""
         pass
 
     def __get_attr_recursive(self, config, attr_name, parent_key="", branch={}):
@@ -542,6 +582,20 @@ class DataFetcher(ABC):
         return keys_branchs
 
     def __find_keys_with_needs(self) -> dict:
+        """
+        Collect every field's `needs` declaration (a FeatureComputer dependency), grouped by table.
+
+        Scans `self.catalog.fields` (halo/subhalo/particles) for entries
+        with a `needs` key, e.g. `stellar_half_mass_radius: {needs: {star:
+        [POS, MASS]}}`. Used by `__build_config` to validate that every
+        referenced FeatureComputer function is actually registered.
+
+        Returns:
+        --------
+        dict
+            `{table_name: {field_name: needs_value}}` for every field that
+            declares `needs`.
+        """
         result = {}
         for k, v in self.catalog.fields.items():
             if isinstance(v, DictConfig):
@@ -637,6 +691,8 @@ class DataFetcherFactory:
             return MagneticumFetcher(catalog, **kwargs)
         elif catalog.name == "magneticum_v2":
             return MagneticumFetcherV2(catalog, **kwargs)
+        elif catalog.name == "obelisk":
+            return ObeliskFetcher(catalog, **kwargs)
         else:
             raise ValueError(f"Unsupported catalog={catalog.name} type")
 
@@ -732,6 +788,24 @@ class Illustris300Fetcher(DataFetcher):
         return self._get_p_subhalo(subhalo_id)
 
     def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
+        """
+        Fetch particle data for a halo.
+
+        Parameters:
+        -----------
+        halo : Halo
+            Required keyword argument: the halo to fetch particles for.
+
+        Returns:
+        --------
+        SubhaloParticles
+            Particle data for the halo.
+
+        Raises:
+        -------
+        ValueError
+            If `halo` is not provided in kwargs.
+        """
         halo = kwargs.get('halo', None)
         if halo is None:
             logger.error("halo must be provided in kwargs")
@@ -741,6 +815,21 @@ class Illustris300Fetcher(DataFetcher):
         return self._get_p_halo(halo)
 
     def __get_children(self, halo_row, subhalo_df):
+        """
+        Return the subhalo IDs belonging to one halo row.
+
+        Parameters:
+        -----------
+        halo_row : pd.Series
+            A row from the halo DataFrame; only `halo_id` is used.
+        subhalo_df : pd.DataFrame
+            Subhalo DataFrame with an `id_parents` column to match against.
+
+        Returns:
+        --------
+        list
+            `subhalo_id` values whose `id_parents` equals this halo's ID.
+        """
         halo_id = halo_row['halo_id']
         children = subhalo_df[subhalo_df['id_parents'] == halo_id]
         children_ids = list(children['subhalo_id'])
@@ -935,6 +1024,28 @@ class Illustris300Fetcher(DataFetcher):
         return particle_data
 
     def _get_p_halo(self, halo: Halo) -> SubhaloParticles:
+        """
+        Fetch and concatenate particle data for every subhalo of a halo.
+
+        Parameters:
+        -----------
+        halo : Halo
+            Halo whose `subhalo_ids` are fetched and merged via
+            `_get_p_subhalo` + `SubhaloParticles.__add__`.
+
+        Returns:
+        --------
+        SubhaloParticles
+            The combined particle data for all of the halo's subhalos,
+            with `overlapping_particles_id` reset to None (this merge
+            isn't the overlapping-neighbours kind `non_overlapping` slices
+            on).
+
+        Raises:
+        -------
+        Exception
+            If the catalogue's `output` directory does not exist.
+        """
         logger.debug(f"Fetching particle data for halo: {halo.halo_id}")
         path = self.catalog.path + '/output'
 
@@ -1046,6 +1157,7 @@ class EagleFetcher(DataFetcher):
         return self._get_p_halo(group_number_list, subhalo_id_list)
 
     def _get_fields(self):
+        """Not implemented for EagleFetcher; inherits the no-op base behaviour (fields are declared via config, not introspected)."""
         pass
 
     def _build_query(self, table):
@@ -1524,7 +1636,29 @@ class EagleFetcher(DataFetcher):
 
 
 class FlamingoFetcher(DataFetcher):
+    """
+    Data fetcher for the Flamingo SOAP catalogue (SWIFT-based simulation).
+
+    Loads `self.fof_subhalos` (halo/subhalo properties) and `self.particles`
+    (particle data) eagerly, as SWIFTDataset objects, in `__init__` via
+    `load_files()` — unlike Magneticum's lazy, cache-flag-gated loading.
+    Halos and subhalos are the same underlying rows (`self.fof_subhalos`),
+    filtered by `soap.host_halo_index == -1` for primaries (halos) vs. all
+    rows (subhalos). See `FlamingoFetcherV2` for the row-position vs.
+    true-catalogue-index particle-matching fix.
+    """
     def __init__(self, catalog: DictConfig, **kwargs):
+        """
+        Initialize the fetcher and eagerly load the SOAP catalogue and particle files.
+
+        Parameters:
+        -----------
+        catalog : DictConfig
+            Catalogue configuration, with `path` and `snapnum` used by
+            `load_files()` to locate the HDF5 files.
+        **kwargs
+            Forwarded to `DataFetcher.__init__`.
+        """
         super().__init__(catalog, **kwargs)
         logger.info(f"FlamingoFetcher initialized with config: {catalog.path}")
         self.fof_subhalos = None
@@ -2141,6 +2275,7 @@ class FlamingoFetcherV2(FlamingoFetcher):
     true catalogue index — via self.fof_subhalos.input_halos.halo_catalogue_index,
     the same SOAP field the satellite-gathering code already uses correctly
     — at exactly the two points that compare against particle data:
+
       - _get_p_halo: convert halo.halo_id before building the primary mask.
       - _get_p_subhalo: convert the incoming subhalo_id argument once, up
         front, since the rest of the method already treats it as if it were
@@ -2336,7 +2471,32 @@ class FlamingoFetcherV2(FlamingoFetcher):
 
 
 class MagneticumFetcher(DataFetcher):
+    """
+    Data fetcher for the Magneticum simulation (g3read/Gadget-family binary format).
+
+    Unlike FlamingoFetcher, catalogue metadata and particle data are
+    loaded lazily and independently: `_load_catalog_cache()` (halo/subhalo
+    offsets, gated by `self._cache_loaded`) and `_load_particle_cache()`
+    (per-particle-type field config, gated by `self._particle_cache_loaded`)
+    are each triggered on first use by `_get_halos`/`_get_subhalos`/
+    `_store_particles`/`_get_p_subhalo`/`_get_p_halo`, and cached for
+    reuse. Particle data is written to/read from a bucketed parquet
+    dataset (`_store_particles`) rather than kept fully in memory. See
+    `MagneticumFetcherV2` for the corrected (non-interval-based)
+    halo/subhalo particle assignment.
+    """
     def __init__(self, catalog: DictConfig, **kwargs):
+        """
+        Initialize the fetcher; catalogue/particle data is loaded lazily on first use, not here.
+
+        Parameters:
+        -----------
+        catalog : DictConfig
+            Catalogue configuration, with `path` and `snapnum` used by
+            `_load_catalog_cache()`/`_load_particle_cache()` once triggered.
+        **kwargs
+            Forwarded to `DataFetcher.__init__`.
+        """
         super().__init__(catalog, **kwargs)
         logger.info(f"MagneticumFetcher initialized with config: {catalog.path}")
 
@@ -2552,9 +2712,25 @@ class MagneticumFetcher(DataFetcher):
     # ── halo fetching ──────────────────────────────────────────────────────────
 
     def get_halos(self, *args, **kwargs) -> HaloContext:
+        """Fetch halo data from the Magneticum catalogue. See `_get_halos`."""
         return self._get_halos()
 
     def _get_halos(self) -> HaloContext:
+        """
+        Load (if not already cached) the catalogue metadata and fetch all halos.
+
+        Also vectorized-assigns each halo's `subhalo_ids` from the FSUB
+        (first subhalo index)/NSUB (subhalo count) contiguous-block
+        convention, since Magneticum's subhalos are stored as a
+        contiguous per-halo range rather than linked via a parent-id
+        column.
+
+        Returns:
+        --------
+        HaloContext
+            All halos passing the configured filters, or an empty
+            HaloContext if the catalogue has none.
+        """
         logger.debug("Fetching halos from Magneticum...")
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
@@ -2612,9 +2788,34 @@ class MagneticumFetcher(DataFetcher):
     # ── subhalo fetching ───────────────────────────────────────────────────────
 
     def get_subhalos(self, *args, **kwargs) -> SubhaloContext | LazySubhaloContext:
+        """Fetch subhalo data from the Magneticum catalogue. See `_get_subhalos`."""
         return self._get_subhalos()
 
     def _get_subhalos(self, batch_size: int = 10_000) -> SubhaloContext | LazySubhaloContext:
+        """
+        Fetch all subhalos, building (or reusing) a bucketed parquet cache.
+
+        If `{catalog.path}/subhalos_parquet` already exists, returns a
+        `LazySubhaloContext` over it directly (no re-processing). Otherwise
+        streams the group catalogue file by file, processing subhalos in
+        `batch_size`-sized chunks (to bound memory) through the standard
+        field pipeline, writes the result to that parquet dataset
+        (partitioned by `id_parents % 128`, for efficient per-halo lookups
+        — see `LazySubhaloContext.get_items_by_halo`), and returns an
+        eager `SubhaloContext` built from all processed batches.
+
+        Parameters:
+        -----------
+        batch_size : int, optional
+            Number of subhalos to process per chunk within each group
+            file (default 10,000).
+
+        Returns:
+        --------
+        SubhaloContext or LazySubhaloContext
+            An eager SubhaloContext if freshly processed (or empty), or a
+            LazySubhaloContext if an existing parquet cache was found.
+        """
         logger.debug("Fetching subhalos from Magneticum in batches...")
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
@@ -2891,6 +3092,23 @@ class MagneticumFetcher(DataFetcher):
         return run_pipeline(data, steps)
 
     def _store_particles(self) -> LazySubhaloParticles:
+        """
+        Stream star particles from the snapshot, assign each to a halo/subhalo, and write them to a bucketed parquet dataset.
+
+        Resumable: buckets (partitions of `parent_bucket = halo_id % 128`)
+        already present under `{catalog.path}/particles_parquet` are
+        skipped, so a re-run only processes what's missing. For each
+        snapshot file, reads star particles, assigns halo/subhalo
+        ownership via `_assign_halo_ids`/`_assign_subhalo_ids`, drops
+        unowned particles (`halo_ids == -1`) and particles already in a
+        completed bucket, runs the result through the standard particle
+        field pipeline, and appends to the partitioned parquet dataset.
+
+        Returns:
+        --------
+        LazySubhaloParticles
+            A lazy wrapper over the (now complete) parquet dataset.
+        """
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
         if not getattr(self, "_particle_cache_loaded", False):
@@ -2991,6 +3209,24 @@ class MagneticumFetcher(DataFetcher):
         return subhalo_particles
 
     def get_p_subhalo(self, *args, **kwargs):
+        """
+        Fetch particle data for a subhalo.
+
+        Parameters:
+        -----------
+        subhalo_id : int
+            Required keyword argument: the subhalo to fetch particles for.
+
+        Returns:
+        --------
+        SubhaloParticles
+            Particle data for the subhalo.
+
+        Raises:
+        -------
+        ValueError
+            If `subhalo_id` is not provided in kwargs.
+        """
         subhalo_id = kwargs.get('subhalo_id', None)
 
         if subhalo_id is None:
@@ -3001,6 +3237,20 @@ class MagneticumFetcher(DataFetcher):
         return self._get_p_subhalo(subhalo_id)
 
     def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
+        """
+        Load (building the particle parquet cache first, if needed) and return one subhalo's particles.
+
+        Parameters:
+        -----------
+        subhalo_id : int
+            Subhalo to fetch particles for.
+
+        Returns:
+        --------
+        SubhaloParticles
+            Particle data for the subhalo, loaded via
+            `_load_subhalo_particles`.
+        """
         print('_get_p_subhalo')
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
@@ -3077,6 +3327,24 @@ class MagneticumFetcher(DataFetcher):
         return -1
 
     def get_p_halo(self, *args, **kwargs) -> SubhaloParticles | LazySubhaloParticles:
+        """
+        Fetch particle data for a halo.
+
+        Parameters:
+        -----------
+        halo : Halo
+            Required keyword argument: the halo to fetch particles for.
+
+        Returns:
+        --------
+        SubhaloParticles
+            Particle data for the halo.
+
+        Raises:
+        -------
+        ValueError
+            If `halo` is not provided in kwargs.
+        """
         halo = kwargs.get("halo", None)
         if halo is None:
             raise ValueError("halo must be provided in kwargs")
@@ -3122,6 +3390,19 @@ class MagneticumFetcher(DataFetcher):
         return SubhaloParticles(data=data, column_map={'POS': 'p', 'MASS': 'm', 'VEL': 'v'})
 
     def _get_p_halo(self, halo) -> SubhaloParticles | LazySubhaloParticles:
+        """
+        Load (building the particle parquet cache first, if needed) and return one halo's particles.
+
+        Parameters:
+        -----------
+        halo : Halo
+            Halo to fetch particles for.
+
+        Returns:
+        --------
+        SubhaloParticles
+            Particle data for the halo, loaded via `_load_halo_particles`.
+        """
         if not getattr(self, "_cache_loaded", False):
             self._load_catalog_cache()
         if not getattr(self, "_particle_cache_loaded", False):
@@ -3218,6 +3499,34 @@ class MagneticumFetcherV2(MagneticumFetcher):
         """See _build_halo_intervals."""
         pass
 
+    @staticmethod
+    def _unwrap_int32_overflow(raw: np.ndarray) -> np.ndarray:
+        """
+        GOFF/SOFF are stored on disk as signed 4-byte integers (confirmed
+        via the group catalogue's own INFO-table type declaration AND by
+        directly measuring the block's on-disk byte length — this is a
+        genuine on-disk width limit, not a g3read misread). For a large
+        box, the true cumulative particle offset for later halos/subhalos
+        exceeds the 4-byte signed limit (2**31 - 1) and wraps around to a
+        negative number when g3read reads it back (verified in production:
+        halo 139520's GOFF was still valid at 2147483622, and the very next
+        halo's true GOFF, 2147486779, read back as -2147480517).
+
+        This is recoverable, not lost: the whole catalogue's true offsets
+        stay under 2**32, so each value wraps at most once, and a wrapped
+        value read back as int64 always comes back as exactly
+        `true_value - 2**32`. Undoing that is just adding 2**32 back
+        whenever the value is negative — independently per element, with
+        no dependency on row order or on a parent halo's own value (an
+        earlier fix attempt computed a subhalo's offset relative to its
+        parent halo's raw GOFF, which breaks whenever the 2**31 boundary
+        falls in the middle of a halo's particle range: the halo's own
+        GOFF can still be unwrapped while a subhalo sitting further into
+        that same halo has already wrapped on its own).
+        """
+        raw = np.asarray(raw, dtype=np.int64)
+        return np.where(raw < 0, raw + (1 << 32), raw)
+
     def _load_group_offsets(self) -> None:
         """
         Cheap, small-memory setup (O(n_halos) + O(n_subhalos), not O(N)):
@@ -3226,6 +3535,11 @@ class MagneticumFetcherV2(MagneticumFetcher):
         file's chunk at a time, which halo/subhalo owns each position in it
         — without ever materialising a per-position array across the WHOLE
         group catalogue.
+
+        GOFF/SOFF are unwrapped (see _unwrap_int32_overflow) before
+        anything else, since sorting or comparing the raw, possibly
+        negative-from-overflow values would silently produce wrong results
+        rather than an error.
 
         np.searchsorted (used by _owners_for_chunk) requires its input
         sorted by GOFF — GOFF is NOT guaranteed to already be in that order:
@@ -3244,13 +3558,16 @@ class MagneticumFetcherV2(MagneticumFetcher):
         if getattr(self, "_group_offsets_loaded", False):
             return
 
-        order_h = np.argsort(self._goff, kind="stable")  # tiny: n_halos-sized
-        self._halo_goff = np.asarray(self._goff, dtype=np.int64)[order_h]
+        goff = self._unwrap_int32_overflow(self._goff)
+        soff = self._unwrap_int32_overflow(self._soff)
+
+        order_h = np.argsort(goff, kind="stable")  # tiny: n_halos-sized
+        self._halo_goff = goff[order_h]
         self._halo_gend = self._halo_goff + np.asarray(self._glen, dtype=np.int64)[order_h]
         self._halo_id_sorted = order_h.astype(np.int32)
 
-        order = np.argsort(self._soff, kind="stable")  # tiny: n_subhalos-sized
-        self._sub_soff_sorted = np.asarray(self._soff, dtype=np.int64)[order]
+        order = np.argsort(soff, kind="stable")  # tiny: n_subhalos-sized
+        self._sub_soff_sorted = soff[order]
         self._sub_send_sorted = self._sub_soff_sorted + np.asarray(self._slen, dtype=np.int64)[order]
         self._sub_id_sorted = order.astype(np.int32)
 
@@ -3409,9 +3726,365 @@ class MagneticumFetcherV2(MagneticumFetcher):
 
         return self._stream_cache_subhalo_ids
 
+    def verify_assignment_integrity(self, max_snap_files: int = 1, max_report_rows: int = 20) -> dict:
+        """
+        Smoke test for the real halo/subhalo -> star-particle assignment,
+        run against one or a few real snapshot files. Companion to
+        src/data_generation/test/manual_tests/diagnose_magneticum_pid_offsets.py
+        (which validated the GOFF/SOFF offset arithmetic in isolation) —
+        this instead runs the actual assignment path
+        (_assign_halo_ids/_assign_subhalo_ids) end-to-end and checks its
+        output, without needing any external ground truth:
+
+        1. Consistency check: for every particle assigned BOTH a halo_id
+           and a subhalo_id (neither -1), the subhalo's own recorded
+           parent (GRNR) must equal the assigned halo_id. A mismatch is
+           unambiguous proof of a real assignment bug — this needs no
+           external data to know it's wrong, unlike e.g. checking whether
+           a specific particle count "looks right".
+        2. Bound check: a halo/subhalo can never be assigned MORE star
+           particles than its own GLEN/SLEN (star particles are a strict
+           subset of all particle types in a halo/subhalo).
+
+        Prints a per-halo and per-subhalo (id, particle count) table, for
+        eyeballing, similar in spirit to the diagnose script's tables.
+        Meant to be run manually against real cluster data (e.g. from a
+        notebook or a manual_tests script), not part of the automated
+        test suite — see test_fetcher_magneticum_v2.py for the synthetic,
+        fixture-based unit tests covering this same logic.
+
+        Returns a dict summary (n_particles_checked, n_consistency_failures,
+        n_halo_bound_failures, n_subhalo_bound_failures, ok) for scripted use.
+        """
+        if not getattr(self, "_cache_loaded", False):
+            self._load_catalog_cache()
+        if not getattr(self, "_particle_cache_loaded", False):
+            self._load_particle_cache()
+
+        star_part_type = next((pt for pt in self.particle_fields if pt in ("stars", "star")), None)
+        if star_part_type is None:
+            print("No star particle type configured on this catalogue — nothing to verify.")
+            return {
+                "n_particles_checked": 0, "n_consistency_failures": 0,
+                "n_halo_bound_failures": 0, "n_subhalo_bound_failures": 0, "ok": True,
+            }
+        config = self._snap_cache_config[star_part_type]
+        fields_padded = config["fields_padded"]
+        ptype_int = config["ptype_int"]
+
+        grnr = np.asarray(
+            g3read.read_new(self._group_base, ["GRNR"], 1, is_snap=False, multiple_files=True)["GRNR"],
+            dtype=np.int64,
+        )
+        glen = np.asarray(self._glen, dtype=np.int64)
+        slen = np.asarray(self._slen, dtype=np.int64)
+
+        halo_counts = np.zeros(len(glen), dtype=np.int64)
+        subhalo_counts = np.zeros(len(slen), dtype=np.int64)
+        n_particles_checked = 0
+        n_consistency_failures = 0
+        consistency_examples = []
+        n_files_done = 0
+
+        for snap_file in g3read.yield_all_files(self._snap_base):
+            if n_files_done >= max_snap_files:
+                break
+            snap_data = g3read.read_new(
+                snap_file, fields_padded, ptype_int, multiple_files=False, do_flatten=False
+            )[ptype_int]
+            n_files_done += 1
+            if snap_data is None or len(snap_data) == 0:
+                continue
+
+            ids = snap_data["ID  "]
+            halo_ids = self._assign_halo_ids(ids)
+            subhalo_ids = self._assign_subhalo_ids(ids)
+            n_particles_checked += len(ids)
+
+            both_assigned = (halo_ids != -1) & (subhalo_ids != -1)
+            if np.any(both_assigned):
+                expected_parent = grnr[subhalo_ids[both_assigned]]
+                mismatch = expected_parent != halo_ids[both_assigned]
+                n_consistency_failures += int(mismatch.sum())
+                if mismatch.any() and len(consistency_examples) < 10:
+                    bad_idx = np.nonzero(both_assigned)[0][mismatch][:10 - len(consistency_examples)]
+                    for i in bad_idx:
+                        consistency_examples.append((
+                            int(ids[i]), int(halo_ids[i]), int(subhalo_ids[i]), int(grnr[subhalo_ids[i]]),
+                        ))
+
+            valid_h = halo_ids[halo_ids != -1]
+            if len(valid_h) > 0:
+                np.add.at(halo_counts, valid_h, 1)
+            valid_s = subhalo_ids[subhalo_ids != -1]
+            if len(valid_s) > 0:
+                np.add.at(subhalo_counts, valid_s, 1)
+
+        print(f"Checked {n_particles_checked} star particles across {n_files_done} snapshot file(s).")
+        print()
+
+        print(f"Consistency check (subhalo's GRNR must equal assigned halo_id): "
+              f"{n_consistency_failures} mismatches")
+        if consistency_examples:
+            print("  examples (particle_id, assigned_halo_id, assigned_subhalo_id, GRNR[subhalo]):")
+            for pid, h, s, g in consistency_examples:
+                print(f"    id={pid}: halo_id={h}, subhalo_id={s}, GRNR[{s}]={g}")
+        print()
+
+        bound_failures_h = np.nonzero(halo_counts > glen)[0]
+        bound_failures_s = np.nonzero(subhalo_counts > slen)[0]
+        print(f"Bound check (assigned particles must not exceed GLEN/SLEN): "
+              f"{len(bound_failures_h)} halos over, {len(bound_failures_s)} subhalos over")
+        for h in bound_failures_h[:10]:
+            print(f"    halo[{h}]: assigned={halo_counts[h]}, GLEN={glen[h]}")
+        for s in bound_failures_s[:10]:
+            print(f"    subhalo[{s}]: assigned={subhalo_counts[s]}, SLEN={slen[s]}")
+        print()
+
+        nonempty_h = np.nonzero(halo_counts > 0)[0]
+        print(f"Per-halo particle counts (first {max_report_rows} non-empty halos):")
+        print(f"{'halo_id':>10} | {'n_particles':>12} | {'GLEN':>10}")
+        for h in nonempty_h[:max_report_rows]:
+            print(f"{h:>10} | {halo_counts[h]:>12} | {glen[h]:>10}")
+        print()
+
+        nonempty_s = np.nonzero(subhalo_counts > 0)[0]
+        print(f"Per-subhalo particle counts (first {max_report_rows} non-empty subhalos):")
+        print(f"{'subhalo_id':>10} | {'parent(GRNR)':>12} | {'n_particles':>12} | {'SLEN':>10}")
+        for s in nonempty_s[:max_report_rows]:
+            print(f"{s:>10} | {grnr[s]:>12} | {subhalo_counts[s]:>12} | {slen[s]:>10}")
+
+        ok = n_consistency_failures == 0 and len(bound_failures_h) == 0 and len(bound_failures_s) == 0
+        print()
+        print("PASS — assignment integrity checks all hold." if ok else "FAIL — see mismatches above.")
+
+        return {
+            "n_particles_checked": n_particles_checked,
+            "n_consistency_failures": n_consistency_failures,
+            "n_halo_bound_failures": len(bound_failures_h),
+            "n_subhalo_bound_failures": len(bound_failures_s),
+            "ok": ok,
+        }
 
 
+class ObeliskFetcher(DataFetcher):
+    """
+    Data fetcher for the Obelisk main catalogue (AdaptaHOP halo/galaxy
+    properties, post-processed into one flat HDF5 table per snapshot —
+    see src/data_generation/test/data/obelisk/README.md).
 
+    Particle-level access (get_p_halo / get_p_subhalo) is explicitly out of
+    scope: this catalogue has no particle data or particle->halo membership,
+    only aggregate per-object properties. Both are implemented to raise
+    NotImplementedError rather than silently returning wrong/empty data.
+
+    Halo/subhalo split: AdaptaHOP's own `level` field (1 = top-level halo,
+    >1 = substructure) plus `host` (ID of the TOP-level parent, already
+    flattening arbitrary nesting depth) map directly onto this pipeline's
+    2-level halo/subhalo model — the same "halos and subhalos are the same
+    table, filtered differently" shape FlamingoFetcher uses.
+
+    Unlike Flamingo, there is no row-position vs true-catalogue-index split
+    to reconcile: `ID`, `host` and `hostsub` are all expressed in the same
+    namespace (the catalogue's own `ID` column), so `halo_id`/`subhalo_id`
+    are taken directly from `ID` rather than a positional index, and
+    `id_parents` is built directly from `host`/`ID` with no id-space
+    conversion step — avoiding that entire class of bug by construction.
+    """
+
+    def __init__(self, catalog: DictConfig, **kwargs):
+        """
+        Initialize the fetcher and eagerly load the per-snapshot catalogue HDF5 file.
+
+        Parameters:
+        -----------
+        catalog : DictConfig
+            Catalogue configuration, with `path` and `snapnum` used by
+            `load_files()` to locate the HDF5 file.
+        **kwargs
+            Forwarded to `DataFetcher.__init__`.
+        """
+        super().__init__(catalog, **kwargs)
+        logger.info(f"ObeliskFetcher initialized with config: {catalog.path}")
+        self._raw = None
+        self.load_files()
+
+    def load_files(self):
+        """
+        Load the per-snapshot Obelisk catalogue HDF5 file into a flat dict
+        of 1D numpy arrays (one entry per column), exactly as the README's
+        own usage example does. Kept on self as the single source both
+        _get_halos() and _get_subhalos() filter/reshape from — never
+        mutated in place (see _raw_copy()), so both can be called in any
+        order without one call's cleanup affecting the other.
+        """
+        iout = int(self.catalog.snapnum)
+        path = os.path.join(self.catalog.path, f"Obelisk_{iout:05d}_catalogue.h5")
+
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        group_key = f"output_{iout:05d}"
+        with h5py.File(path, "r") as hf:
+            if group_key not in hf:
+                raise Exception(f"Group '{group_key}' not found in {path}.")
+            group = hf[group_key]
+            self._raw = {k: group.get(k)[()] for k in group.keys()}
+
+    def _raw_copy(self) -> dict:
+        """Shallow copy: pipeline steps reassign/delete dict keys but don't
+        mutate the underlying arrays in place, so this is enough to keep
+        _get_halos()/_get_subhalos() from stepping on each other's raw data."""
+        return dict(self._raw)
+
+    def get_halos(self, *args, **kwargs) -> HaloContext:
+        """Fetch halo (level == 1) data from the Obelisk catalogue. See `_get_halos`."""
+        return self._get_halos()
+
+    def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
+        """Fetch subhalo (all levels) data from the Obelisk catalogue. See `_get_subhalos`."""
+        return self._get_subhalos()
+
+    def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
+        """
+        Not supported: the Obelisk main catalogue has no particle-level data.
+
+        Raises:
+        -------
+        NotImplementedError
+            Always.
+        """
+        raise NotImplementedError(
+            "ObeliskFetcher: particle-level access is out of scope — the "
+            "Obelisk main catalogue only contains aggregate per-object "
+            "properties, no particle data or particle->halo membership."
+        )
+
+    def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
+        """
+        Not supported: the Obelisk main catalogue has no particle-level data.
+
+        Raises:
+        -------
+        NotImplementedError
+            Always.
+        """
+        raise NotImplementedError(
+            "ObeliskFetcher: particle-level access is out of scope — the "
+            "Obelisk main catalogue only contains aggregate per-object "
+            "properties, no particle data or particle->halo membership."
+        )
+
+    def _inject_structural_field(self, fields_list: list, key: str, name: str):
+        """Register a catalogue column that's used for structure (linkage,
+        splitting) rather than declared as a science field in the YAML —
+        same pattern as Illustris' GroupFirstSub / Flamingo's
+        soap.host_halo_index dynamic injection."""
+        if key not in fields_list:
+            fields_list.append(key)
+        OmegaConf.set_struct(self.catalog, False)
+        table = 'halo' if fields_list is self.halo_fields else 'subhalo'
+        if key not in self.catalog.fields[table]:
+            self.catalog.fields[table][key] = {
+                "input": None, "output": None, "scaling": None, "name": name
+            }
+        OmegaConf.set_struct(self.catalog, True)
+        self.column_map[key] = name
+
+    @staticmethod
+    def _stack_position(d: dict, out_key: str = 'pos'):
+        """
+        Obelisk stores x/y/z as three separate 1D columns; every other
+        fetcher's position field (Magneticum's GPOS, Flamingo's
+        halo_centre) is already a single packed (N, 3) column by the time
+        it reaches the generic per-field pipeline. Pack them the same way
+        here — x/y/z themselves are then dropped by remove_useless_columns
+        since only `out_key` is declared in the YAML.
+        """
+        d[out_key] = np.stack([d['x'], d['y'], d['z']], axis=1)
+        return d
+
+    def _get_halos(self) -> HaloContext:
+        """
+        Fetch all top-level (`level == 1`) objects from the catalogue as halos.
+
+        Returns:
+        --------
+        HaloContext
+            Halos passing the configured filters, with `halo_id` taken
+            directly from the catalogue's own `ID` column.
+        """
+        logger.debug("Fetching halos from Obelisk...")
+
+        self._inject_structural_field(self.halo_fields, 'ID', 'halo_id')
+        # 'pos' is declared under both fields.halo (-> gpos) and
+        # fields.subhalo (-> spos) with the SAME raw key, so the shared
+        # self.column_map dict built once in __build_config() only holds
+        # whichever of the two was merged in last — same situation
+        # FlamingoFetcher's input_halos.halo_centre is in, fixed the same
+        # way: re-assert the mapping this context needs right before use.
+        self.column_map['pos'] = 'gpos'
+
+        raw = self._raw_copy()
+        level_mask = raw['level'] == 1
+        halos = {k: v[level_mask] for k, v in raw.items()}
+        halos = self._stack_position(halos)
+
+        table = 'halo'
+        halo_conditions = {col: data for col, data in self.catalog.fields.halo.items() if 'filter' in data}
+        steps = [
+            lambda h: remove_useless_columns(h, self.halo_fields),
+            lambda h: assign_id(h, 'fsub'),  # no AdaptaHOP equivalent — placeholder, same as FlamingoFetcher
+            lambda h: validate_and_process_fields(h, self.halo_fields, table, self.catalog),
+            lambda h: convert_to_dataframe(h),
+            lambda h: apply_unit_conversion(h, self.halo_fields, table, self.catalog),
+            lambda h: apply_filters(h, halo_conditions, self.catalog.fields.halo),
+        ]
+        processed_halos = run_pipeline(halos, steps)
+        halo_context = HaloContext(processed_halos, self.column_map)
+        logger.debug(f"Halo data fetched successfully: {halo_context.data['halo_id'].nunique()} halos.")
+        return halo_context
+
+    def _get_subhalos(self) -> SubhaloContext:
+        """
+        Fetch every object in the catalogue (all `level` values) as subhalos.
+
+        Returns:
+        --------
+        SubhaloContext
+            Subhalos passing the configured filters, with `subhalo_id`
+            taken from the catalogue's own `ID` column and `id_parents`
+            set to `ID` (for `level == 1` rows) or `host` (otherwise).
+        """
+        logger.debug("Fetching subhalos from Obelisk...")
+
+        self._inject_structural_field(self.subhalo_fields, 'ID', 'subhalo_id')
+        self._inject_structural_field(self.subhalo_fields, 'id_parents_computed', 'id_parents')
+        self.column_map['pos'] = 'spos'  # see _get_halos() for why this must be re-asserted here
+
+        raw = self._raw_copy()
+        # id_parents: self ID for top-level (central) objects, `host` (already
+        # in ID-space, already flattened to the top-level parent) otherwise —
+        # mirrors FlamingoFetcher.__reindexing_satellites' role, but Obelisk
+        # needs no row-position/true-id conversion since host/ID share a
+        # namespace already.
+        raw['id_parents_computed'] = np.where(raw['level'] == 1, raw['ID'], raw['host'])
+        raw = self._stack_position(raw)
+
+        table = 'subhalo'
+        subhalo_conditions = {col: data for col, data in self.catalog.fields.subhalo.items() if 'filter' in data}
+        steps = [
+            lambda s: remove_useless_columns(s, self.subhalo_fields),
+            lambda s: validate_and_process_fields(s, self.subhalo_fields, table, self.catalog),
+            lambda s: convert_to_dataframe(s),
+            lambda s: apply_unit_conversion(s, self.subhalo_fields, table, self.catalog),
+            lambda s: apply_filters(s, subhalo_conditions, self.catalog.fields.subhalo),
+        ]
+        processed_subhalos = run_pipeline(raw, steps)
+        subhalo_context = SubhaloContext(processed_subhalos, self.column_map)
+        logger.debug(f"Subhalo data fetched successfully: {len(subhalo_context.data)} subhalos.")
+        return subhalo_context
 
 
 

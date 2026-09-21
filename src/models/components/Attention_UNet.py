@@ -2,7 +2,16 @@ import torch
 import torch.nn as nn
 
 class Attention_block(nn.Module):
+    """Attention gate: reweights skip-connection features `x` by a sigmoid attention map computed from the gating signal `g` and `x` (Attention U-Net, Oktay et al. 2018)."""
     def __init__(self, F_g, F_l, F_int):
+        """
+        Build the gating (`W_g`), skip-connection (`W_x`), and attention-coefficient (`psi`) projections.
+
+        :param F_g: Number of channels in the gating signal `g`.
+        :param F_l: Number of channels in the skip-connection input `x`.
+        :param F_int: Number of intermediate channels the gate/skip
+            projections are reduced to before combining.
+        """
         super(Attention_block, self).__init__()
         self.W_g = nn.Sequential(
             nn.Conv2d(F_g, F_int, kernel_size=1, stride=1, padding=0, bias=True),
@@ -23,6 +32,14 @@ class Attention_block(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, g, x):
+        """
+        Compute the attention map from `g`/`x` and apply it to `x`.
+
+        :param g: Gating signal (typically the decoder's upsampled features).
+        :param x: Skip-connection features to be gated.
+        :return: `x` scaled elementwise by the learned attention
+            coefficients (shape unchanged).
+        """
         g1 = self.W_g(g)
         x1 = self.W_x(x)
         psi = self.relu(g1 + x1)
@@ -31,7 +48,12 @@ class Attention_block(nn.Module):
         return x * psi
 
 class conv_block(nn.Module):
+    """Two 3x3 conv + BatchNorm + ReLU layers in sequence (a standard U-Net double-conv block)."""
     def __init__(self,ch_in,ch_out):
+        """
+        :param ch_in: Input channel count.
+        :param ch_out: Output channel count (used for both conv layers).
+        """
         super(conv_block,self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(ch_in, ch_out, kernel_size=3,stride=1,padding=1,bias=True),
@@ -42,11 +64,17 @@ class conv_block(nn.Module):
             nn.ReLU(inplace=True)
         )
     def forward(self,x):
+        """Apply the double-conv block to `x`."""
         x = self.conv(x)
         return x
 
 class up_conv(nn.Module):
+    """2x nearest-neighbour upsample followed by a 3x3 conv + BatchNorm + ReLU."""
     def __init__(self,ch_in,ch_out):
+        """
+        :param ch_in: Input channel count.
+        :param ch_out: Output channel count.
+        """
         super(up_conv,self).__init__()
         self.up = nn.Sequential(
             nn.Upsample(scale_factor=2),
@@ -55,11 +83,23 @@ class up_conv(nn.Module):
 			nn.ReLU(inplace=True)
         )
     def forward(self,x):
+        """Upsample and convolve `x`."""
         x = self.up(x)
         return x
 
 class Attention_UNet(nn.Module):
+    """
+    Attention U-Net: a standard U-Net encoder/decoder where each skip
+    connection is passed through an `Attention_block`, gated by the
+    decoder's upsampled features, before being concatenated.
+    """
     def __init__(self, img_ch=1, output_ch=1):
+        """
+        Build the 5-level encoder, 4-level attention-gated decoder, and final 1x1 output conv.
+
+        :param img_ch: Number of input image channels.
+        :param output_ch: Number of output channels.
+        """
         super(Attention_UNet, self).__init__()
 
         self.Maxpool = nn.MaxPool2d(kernel_size=2, stride=2)
@@ -89,6 +129,12 @@ class Attention_UNet(nn.Module):
         self.Conv_1x1 = nn.Conv2d(64, output_ch, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x):
+        """
+        Run the encoder, attention-gated decoder, and final projection.
+
+        :param x: Input tensor, shape `(B, img_ch, H, W)`.
+        :return: Output tensor, shape `(B, output_ch, H, W)`.
+        """
         # encoding path
         x1 = self.Conv1(x)
         x2 = self.Maxpool(x1)

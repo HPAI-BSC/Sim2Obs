@@ -34,10 +34,26 @@ try:
 except:
     import selective_scan_cuda
     class SelectiveScanFn(torch.autograd.Function):
+        """CUDA-kernel-backed autograd Function for the Mamba selective scan, used as a fallback when `mamba_ssm`'s own implementation isn't importable."""
 
         @staticmethod
         def forward(ctx, u, delta, A, B, C, D=None, z=None, delta_bias=None, delta_softplus=False,
                     return_last_state=False):
+            """Run the selective scan forward pass via `selective_scan_cuda.fwd`, saving tensors needed for backward.
+
+            :param ctx: Autograd context.
+            :param u: Input sequence, shape `(B, D, L)`.
+            :param delta: Per-timestep discretization step, shape `(B, D, L)`.
+            :param A: State transition matrix, shape `(D, N)`.
+            :param B: Input matrix, shape `(B, N, L)` or `(B, G, N, L)`.
+            :param C: Output matrix, shape `(B, N, L)` or `(B, G, N, L)`.
+            :param D: Optional skip-connection term, shape `(D,)`.
+            :param z: Optional gating tensor, shape `(B, D, L)`.
+            :param delta_bias: Optional bias added to `delta`.
+            :param delta_softplus: Whether to apply softplus to `delta` (+bias).
+            :param return_last_state: If True, also return the final SSM state.
+            :return: The scan output (and last state, if requested).
+            """
             if u.stride(-1) != 1:
                 u = u.contiguous()
             if delta.stride(-1) != 1:
@@ -70,6 +86,12 @@ except:
 
         @staticmethod
         def backward(ctx, dout, *args):
+            """Compute gradients for the selective scan via `selective_scan_cuda.bwd`, using the tensors saved in `forward`.
+
+            :param ctx: Autograd context (with saved tensors from `forward`).
+            :param dout: Gradient of the loss w.r.t. the scan output.
+            :return: Gradients for each `forward` input, in order.
+            """
             if not ctx.has_z:
                 u, delta, A, B, C, D, delta_bias, x = ctx.saved_tensors
                 z = None
@@ -133,6 +155,7 @@ def flops_selective_scan_ref(B=1, L=256, D=768, N=16, with_D=True, with_Z=False,
 
     # fvcore.nn.jit_handles
     def get_flops_einsum(input_shapes, equation):
+        """Estimate multiply-add (MAC) FLOPs for an einsum `equation` over zero-filled arrays of `input_shapes`, via numpy's optimal contraction path."""
         np_arrs = [np.zeros(s) for s in input_shapes]
         optim = np.einsum_path(equation, *np_arrs, optimize="optimal")[1]
         for line in optim.split("\n"):
@@ -234,6 +257,14 @@ def flops_selective_scan_ref(B=1, L=256, D=768, N=16, with_D=True, with_Z=False,
 
 
 def selective_scan_flop_jit(inputs, outputs):
+    """
+    `fvcore` JIT flop-count handle for the selective scan op, inferring shapes/flags from tensor positions and sizes (rather than debug names).
+
+    :param inputs: The traced op's input tensors, in
+        `[x, dt, A, B, C, D, dt_bias]` order.
+    :param outputs: Unused; required by the `fvcore` handle signature.
+    :return: Estimated FLOPs, via `flops_selective_scan_ref`.
+    """
     # Inputs are expected in the order: [x, dt, A, B, C, D, dt_bias]
     # Use tensor sizes and positions instead of debug names
     x = inputs[0]  # Should be the main input tensor (B, D, L)
@@ -264,6 +295,15 @@ def selective_scan_flop_jit(inputs, outputs):
 
 
 def selective_scan_flop_jit_og(inputs, outputs):
+    """
+    Original `fvcore` JIT flop-count handle for the selective scan op, relying on each traced tensor's debug name (`xs`, `As`, `Bs`, `Ds`, `z`) rather than position — superseded by `selective_scan_flop_jit`.
+
+    :param inputs: The traced op's input tensors, expected in
+        `xs, dts, As, Bs, Cs, Ds, z, dt_projs_bias` order (with
+        `Ds`/`z` optional, detected by name).
+    :param outputs: Unused; required by the `fvcore` handle signature.
+    :return: Estimated FLOPs, via `flops_selective_scan_ref`.
+    """
     # xs, dts, As, Bs, Cs, Ds (skip), z (skip), dt_projs_bias (skip)
     print(inputs)
     assert inputs[0].debugName().startswith("xs")  # (B, D, L)
@@ -291,6 +331,7 @@ class PatchEmbed2D(nn.Module):
     """
 
     def __init__(self, patch_size=4, in_chans=3, embed_dim=96, norm_layer=None, **kwargs):
+        """See class docstring for parameters."""
         super().__init__()
         if isinstance(patch_size, int):
             patch_size = (patch_size, patch_size)
@@ -301,6 +342,7 @@ class PatchEmbed2D(nn.Module):
             self.norm = None
 
     def forward(self, x):
+        """Patchify `x` via a strided conv, to channels-last `(B, H', W', embed_dim)`, applying normalization if configured."""
         x = self.proj(x).permute(0, 2, 3, 1)
         if self.norm is not None:
             x = self.norm(x)
@@ -316,12 +358,18 @@ class PatchMerging2D(nn.Module):
     """
 
     def __init__(self, dim, norm_layer=nn.LayerNorm):
+        """See class docstring for parameters."""
         super().__init__()
         self.dim = dim
         self.reduction = nn.Linear(4 * dim, 2 * dim, bias=False)
         self.norm = norm_layer(4 * dim)
 
     def forward(self, x):
+        """Halve `x`'s spatial resolution by concatenating each 2x2 block of channels, then a 4C->2C linear reduction.
+
+        :param x: Input tensor, shape `(B, H, W, dim)`.
+        :return: Output tensor, shape `(B, H//2, W//2, 2*dim)`.
+        """
         B, H, W, C = x.shape
 
         SHAPE_FIX = [-1, -1]
@@ -351,7 +399,14 @@ class PatchMerging2D(nn.Module):
 
 
 class PatchExpand(nn.Module):
+    """2D-channels-last (`B,H,W,C`) 2x spatial upsampling: linear expand to `2*dim` channels, then rearrange every 2x2 block into 4 spatial positions at `dim // 2` channels."""
     def __init__(self, dim, dim_scale=2, norm_layer=nn.LayerNorm):
+        """
+        :param dim: Input channel dimension.
+        :param dim_scale: If 2, applies a linear expansion to `2*dim`
+            channels before rearranging; otherwise the identity.
+        :param norm_layer: Normalization layer applied to the output.
+        """
         super().__init__()
         self.dim = dim
         self.expand = nn.Linear(
@@ -359,6 +414,11 @@ class PatchExpand(nn.Module):
         self.norm = norm_layer(dim // dim_scale)
 
     def forward(self, x):
+        """Expand channels then rearrange into a 2x upsampled spatial layout.
+
+        :param x: Input tensor, shape `(B, H, W, dim)`.
+        :return: Output tensor, shape `(B, 2H, 2W, dim // 2)`.
+        """
         x = self.expand(x)
         B, H, W, C = x.shape
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=2, p2=2, c=C // 4)
@@ -368,7 +428,13 @@ class PatchExpand(nn.Module):
 
 
 class FinalPatchExpand_X4(nn.Module):
+    """4x spatial upsampling with a channel compression step: linear expand to `16*dim` channels, rearrange into a 4x-upsampled spatial layout, then a linear `compress` back down to `dim` channels."""
     def __init__(self, dim, dim_scale=4, norm_layer=nn.LayerNorm):
+        """
+        :param dim: Input/output channel dimension.
+        :param dim_scale: Spatial upsampling factor.
+        :param norm_layer: Normalization layer applied to the output.
+        """
         super().__init__()
         self.dim = dim
         self.dim_scale = dim_scale
@@ -380,6 +446,11 @@ class FinalPatchExpand_X4(nn.Module):
         #self.compress = nn.Linear(16 * dim, dim, bias=False)
 
     def forward(self, x):
+        """Expand channels, rearrange into a `dim_scale`x upsampled spatial layout, then compress back to `dim` channels.
+
+        :param x: Input tensor, shape `(B, H, W, dim)`.
+        :return: Output tensor, shape `(B, dim_scale*H, dim_scale*W, dim)`.
+        """
         x = self.expand(x)
         B, H, W, C = x.shape
         x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
@@ -390,7 +461,13 @@ class FinalPatchExpand_X4(nn.Module):
 
 
 class FinalPatchExpand_X1(nn.Module):
+    """Variant of `FinalPatchExpand_X4` with `dim_scale=1` by default (no actual spatial upsampling; still expands then compresses channels, since `dim_scale=1` still needs the compress step to undo the 16x channel expansion)."""
     def __init__(self, dim, dim_scale=1, norm_layer=nn.LayerNorm):
+        """
+        :param dim: Input/output channel dimension.
+        :param dim_scale: Spatial upsampling factor (rearrange block size).
+        :param norm_layer: Normalization layer applied to the output.
+        """
         super().__init__()
         self.dim = dim
         self.dim_scale = dim_scale
@@ -400,6 +477,11 @@ class FinalPatchExpand_X1(nn.Module):
         self.compress = nn.Linear(16 * dim, dim, bias=False)
 
     def forward(self, x):
+        """Expand channels, rearrange into a `dim_scale`x upsampled spatial layout, compress back to `dim` channels if `dim_scale == 1`, then normalize.
+
+        :param x: Input tensor, shape `(B, H, W, dim)`.
+        :return: Output tensor, shape `(B, dim_scale*H, dim_scale*W, dim)`.
+        """
         print(f"FinalPatchExpand X1: {x.shape}")
         x = self.expand(x)
         B, H, W, C = x.shape
@@ -414,6 +496,17 @@ class FinalPatchExpand_X1(nn.Module):
 
 
 class SS2D(nn.Module):
+    """
+    2D Selective Scan (SS2D) block — the core VMamba operator behind
+    `VSSBlock`. Runs 4 directional 1D selective scans over the flattened
+    `(B, d_inner, H, W)` feature map (row-major, column-major, and both
+    reversed — see `forward_corev0`), lets each direction/channel have
+    its own learned SSM parameters (`A_logs`/`Ds`/`dt_projs_*`, `K=4`
+    copies), and sums the 4 scan outputs back into one spatial feature
+    map. Wrapped by an input projection + depthwise conv + SiLU on the
+    way in, and a SiLU-gated output projection on the way out (a
+    Mamba-style gated block).
+    """
     def __init__(
             self,
             d_model,
@@ -434,6 +527,25 @@ class SS2D(nn.Module):
             dtype=None,
             **kwargs,
     ):
+        """
+        :param d_model: Input/output feature dimension.
+        :param d_state: SSM state dimension.
+        :param d_conv: Depthwise conv kernel size applied before the scan.
+        :param expand: Expansion factor for the inner (scan) dimension
+            (`d_inner = expand * d_model`).
+        :param dt_rank: Rank of the low-rank `dt` projection ("auto" ->
+            `ceil(d_model / 16)`).
+        :param dt_min: Minimum initial `dt` value (after softplus).
+        :param dt_max: Maximum initial `dt` value (after softplus).
+        :param dt_init: `dt` projection weight init mode, `"constant"` or `"random"`.
+        :param dt_scale: Scale applied to the `dt` projection's init std.
+        :param dt_init_floor: Minimum clamp on initial `dt` (pre-inverse-softplus).
+        :param dropout: Output dropout probability (disabled if 0).
+        :param conv_bias: Whether the depthwise conv has a bias.
+        :param bias: Whether the in/out linear projections have a bias.
+        :param device: Device for newly created parameters.
+        :param dtype: Dtype for newly created parameters.
+        """
         factory_kwargs = {"device": device, "dtype": dtype}
         super().__init__()
         self.d_model = d_model
@@ -493,6 +605,24 @@ class SS2D(nn.Module):
     @staticmethod
     def dt_init(dt_rank, d_inner, dt_scale=1.0, dt_init="random", dt_min=0.001, dt_max=0.1, dt_init_floor=1e-4,
                 **factory_kwargs):
+        """
+        Build and initialize the `dt` (discretization step) linear projection.
+
+        Weight init keeps activation variance controlled at
+        initialization; bias is set (via inverse-softplus) so that
+        `softplus(bias)` starts within `[dt_min, dt_max]`, and is marked
+        `_no_reinit` so a later global reinit pass doesn't zero it out.
+
+        :param dt_rank: Input (rank) dimension of the projection.
+        :param d_inner: Output dimension of the projection.
+        :param dt_scale: Scale applied to the weight init std.
+        :param dt_init: `"constant"` or `"random"` weight init mode.
+        :param dt_min: Minimum initial `softplus(dt)` value.
+        :param dt_max: Maximum initial `softplus(dt)` value.
+        :param dt_init_floor: Minimum clamp on the pre-inverse-softplus `dt`.
+        :param factory_kwargs: `device`/`dtype` forwarded to `nn.Linear`.
+        :return: The initialized `nn.Linear(dt_rank, d_inner)`.
+        """
         dt_proj = nn.Linear(dt_rank, d_inner, bias=True, **factory_kwargs)
 
         # Initialize special dt projection to preserve variance at initialization
@@ -520,6 +650,20 @@ class SS2D(nn.Module):
 
     @staticmethod
     def A_log_init(d_state, d_inner, copies=1, device=None, merge=True):
+        """
+        Build the learned `log(A)` state-transition parameter, S4D-real initialized (`A[d, n] = n`, for `n` in `[1, d_state]`).
+
+        :param d_state: SSM state dimension.
+        :param d_inner: Inner (scan) feature dimension.
+        :param copies: Number of independent copies to create (one per
+            scan direction, `K=4` in `SS2D`).
+        :param device: Device for the created parameter.
+        :param merge: If True and `copies > 1`, flatten the copies into
+            the leading dimension rather than keeping them separate.
+        :return: An `nn.Parameter` of shape `(d_inner, d_state)`, or
+            `(copies * d_inner, d_state)`/`(copies, d_inner, d_state)`
+            depending on `copies`/`merge`.
+        """
         # S4D real initialization
         A = repeat(
             torch.arange(1, d_state + 1, dtype=torch.float32, device=device),
@@ -537,6 +681,19 @@ class SS2D(nn.Module):
 
     @staticmethod
     def D_init(d_inner, copies=1, device=None, merge=True):
+        """
+        Build the learned `D` skip-connection parameter, initialized to all ones.
+
+        :param d_inner: Inner (scan) feature dimension.
+        :param copies: Number of independent copies to create (one per
+            scan direction, `K=4` in `SS2D`).
+        :param device: Device for the created parameter.
+        :param merge: If True and `copies > 1`, flatten the copies into
+            the leading dimension rather than keeping them separate.
+        :return: An `nn.Parameter` of shape `(d_inner,)`, or
+            `(copies * d_inner,)`/`(copies, d_inner)` depending on
+            `copies`/`merge`.
+        """
         # D "skip" parameter
         D = torch.ones(d_inner, device=device)
         if copies > 1:
@@ -548,6 +705,17 @@ class SS2D(nn.Module):
         return D
 
     def forward_corev0(self, x: torch.Tensor):
+        """
+        Run the 4-directional selective scan core: flatten `x` in row-major and column-major order (plus their reversals, `K=4` total), run one batched selective scan over all 4, then sum the (un-reversed) results back into a single spatial feature map.
+
+        This is the default `forward_core` implementation (set in
+        `__init__`); `forward_corev0_seq` and `forward_corev1` are
+        alternative (looped, or fp16-oriented) implementations of the
+        same computation.
+
+        :param x: Input feature map, shape `(B, d_inner, H, W)`.
+        :return: Output feature map, shape `(B, H, W, d_inner)`.
+        """
         self.selective_scan = selective_scan_fn
 
         B, C, H, W = x.shape
@@ -591,6 +759,12 @@ class SS2D(nn.Module):
         return y
 
     def forward_corev0_seq(self, x: torch.Tensor):
+        """
+        Same computation as `forward_corev0`, but running the selective scan once per direction (a Python loop over `K=4`) instead of one batched call — an alternative core implementation, not used by default.
+
+        :param x: Input feature map, shape `(B, d_inner, H, W)`.
+        :return: Output feature map, shape `(B, H, W, d_inner)`.
+        """
         self.selective_scan = selective_scan_fn
 
         B, C, H, W = x.shape
@@ -637,6 +811,12 @@ class SS2D(nn.Module):
         return y
 
     def forward_corev1(self, x: torch.Tensor):
+        """
+        Same computation as `forward_corev0`, but keeping tensors in their native (e.g. fp16) dtype rather than casting to float32 before the scan — an alternative core implementation, not used by default (expects the scan output in float16).
+
+        :param x: Input feature map, shape `(B, d_inner, H, W)`.
+        :return: Output feature map, shape `(B, H, W, d_inner)`.
+        """
         #self.selective_scan = selective_scan_fn_v1
         self.selective_scan = selective_scan_fn
 
@@ -683,6 +863,12 @@ class SS2D(nn.Module):
         return y
 
     def forward(self, x: torch.Tensor, **kwargs):
+        """
+        Run the gated SS2D block: input projection + split into (scan input, gate), depthwise conv + SiLU, the 4-directional selective scan (`forward_core`), SiLU-gating, then output projection.
+
+        :param x: Input tensor, shape `(B, H, W, d_model)`.
+        :return: Output tensor, shape `(B, H, W, d_model)`.
+        """
         B, H, W, C = x.shape
 
         xz = self.in_proj(x)
@@ -700,6 +886,7 @@ class SS2D(nn.Module):
 
 
 class VSSBlock(nn.Module):
+    """Vision-State-Space block: pre-norm residual `SS2D` self-attention (`x + drop_path(SS2D(norm(x)))`) — the Mamba-based analogue of a Swin transformer block."""
     def __init__(
             self,
             hidden_dim: int = 0,
@@ -709,12 +896,21 @@ class VSSBlock(nn.Module):
             d_state: int = 16,
             **kwargs,
     ):
+        """
+        :param hidden_dim: Input/output feature dimension.
+        :param drop_path: Stochastic depth drop probability.
+        :param norm_layer: Normalization layer constructor.
+        :param attn_drop_rate: Dropout probability inside `SS2D`.
+        :param d_state: SSM state dimension for `SS2D`.
+        :param kwargs: Forwarded to `SS2D`.
+        """
         super().__init__()
         self.ln_1 = norm_layer(hidden_dim)
         self.self_attention = SS2D(d_model=hidden_dim, dropout=attn_drop_rate, d_state=d_state, **kwargs)
         self.drop_path = DropPath(drop_path)
 
     def forward(self, input: torch.Tensor):
+        """Apply pre-norm residual SS2D self-attention to `input`."""
         x = input + self.drop_path(self.self_attention(self.ln_1(input)))
         return x
 
@@ -744,6 +940,7 @@ class VSSLayer(nn.Module):
             d_state=16,
             **kwargs,
     ):
+        """See class docstring for parameters. Builds `depth` `VSSBlock` instances, re-initializes each block's `SS2D.out_proj.weight` (kaiming-uniform), and adds an optional `downsample` at the end."""
         super().__init__()
         self.dim = dim
         self.use_checkpoint = use_checkpoint
@@ -760,6 +957,7 @@ class VSSLayer(nn.Module):
 
         if True:  # is this really applied? Yes, but been overriden later in VSSM!
             def _init_weights(module: nn.Module):
+                """Re-apply kaiming-uniform init to any `out_proj.weight` parameter found in `module` (fake-clone-then-init, to keep the RNG state consistent with the reference implementation)."""
                 for name, p in module.named_parameters():
                     if name in ["out_proj.weight"]:
                         p = p.clone().detach_()  # fake init, just to keep the seed ....
@@ -773,6 +971,7 @@ class VSSLayer(nn.Module):
             self.downsample = None
 
     def forward(self, x):
+        """Run `x` through all `VSSBlock` instances (optionally with gradient checkpointing) then the downsample layer, if any."""
         for blk in self.blocks:
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x)
@@ -810,6 +1009,7 @@ class VSSLayer_up(nn.Module):
             d_state=16,
             **kwargs,
     ):
+        """See class docstring for parameters. Builds `depth` `VSSBlock` instances, re-initializes each block's `SS2D.out_proj.weight` (kaiming-uniform), and adds an optional `PatchExpand` upsample at the end."""
         super().__init__()
         self.dim = dim
         self.use_checkpoint = use_checkpoint
@@ -826,6 +1026,7 @@ class VSSLayer_up(nn.Module):
 
         if True:  # is this really applied? Yes, but been overriden later in VSSM!
             def _init_weights(module: nn.Module):
+                """Re-apply kaiming-uniform init to any `out_proj.weight` parameter found in `module` (fake-clone-then-init, to keep the RNG state consistent with the reference implementation)."""
                 for name, p in module.named_parameters():
                     if name in ["out_proj.weight"]:
                         p = p.clone().detach_()  # fake init, just to keep the seed ....
@@ -839,6 +1040,7 @@ class VSSLayer_up(nn.Module):
             self.upsample = None
 
     def forward(self, x):
+        """Run `x` through all `VSSBlock` instances (optionally with gradient checkpointing) then the upsample layer, if any."""
         for blk in self.blocks:
             if self.use_checkpoint:
                 x = checkpoint.checkpoint(blk, x)
@@ -852,10 +1054,39 @@ class VSSLayer_up(nn.Module):
 
 
 class VSSM(nn.Module):
+    """
+    Visual State Space Model: a Swin-U-Net-shaped hierarchical
+    architecture (`PatchEmbed2D` -> `VSSLayer`/`PatchMerging2D` encoder
+    stages -> mirrored `VSSLayer_up`/`PatchExpand` decoder stages with
+    skip connections -> `FinalPatchExpand_X4` + output conv) but with
+    `VSSBlock` (Mamba selective-scan) attention in place of Swin's
+    windowed self-attention.
+    """
     def __init__(self, patch_size=4, in_chans=1, num_classes=4, depths=[2, 2, 9, 2],
                  dims=[96, 192, 384, 768], d_state=16, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, patch_norm=True,
                  use_checkpoint=False, final_upsample="expand_first", **kwargs):
+        """
+        :param patch_size: Patch token size.
+        :param in_chans: Number of input image channels.
+        :param num_classes: Number of output classes/channels.
+        :param depths: Per-stage `VSSBlock` counts (encoder; mirrored for
+            the decoder).
+        :param dims: Per-stage embedding dimensions (or a single int, in
+            which case dims double at each stage).
+        :param d_state: SSM state dimension for every `SS2D` block
+            (`ceil(dims[0] / 6)` if None).
+        :param drop_rate: Dropout rate.
+        :param attn_drop_rate: Dropout rate inside `SS2D`.
+        :param drop_path_rate: Stochastic depth rate (linearly scaled
+            across all blocks).
+        :param norm_layer: Normalization layer constructor.
+        :param patch_norm: Whether to normalize after patch embedding.
+        :param use_checkpoint: Whether to use gradient checkpointing.
+        :param final_upsample: If `"expand_first"`, use
+            `FinalPatchExpand_X4` + a conv for the final upsample;
+            otherwise the identity.
+        """
         super().__init__()
         self.num_classes = num_classes
         self.num_layers = len(depths)
@@ -953,6 +1184,14 @@ class VSSM(nn.Module):
 
     # Encoder and Bottleneck
     def forward_features(self, x):
+        """
+        Run the patch embedding and encoder (`VSSLayer`) stages, collecting a skip-connection feature map before each stage.
+
+        :param x: Input image tensor.
+        :return: `(x, x_downsample)` — the final (bottleneck) encoded
+            features, and the list of per-stage skip-connection features
+            (shallowest first).
+        """
         x = self.patch_embed(x)
 
         x_downsample = []
@@ -971,6 +1210,14 @@ class VSSM(nn.Module):
 
     # Dencoder and Skip connection
     def forward_up_features(self, x, x_downsample):
+        """
+        Run the decoder (`VSSLayer_up`) stages, concatenating each stage's matching encoder skip connection before processing (except the first stage, which only upsamples).
+
+        :param x: Bottleneck features from `forward_features`.
+        :param x_downsample: Per-encoder-stage skip features from
+            `forward_features`.
+        :return: The decoded features, normalized.
+        """
         for inx, layer_up in enumerate(self.layers_up):
             if inx == 0:
                 x = layer_up(x)
@@ -984,6 +1231,14 @@ class VSSM(nn.Module):
         return x
 
     def up_x4(self, x):
+        """
+        Apply the final upsample and output projection, converting decoded features back to a spatial image.
+
+        :param x: Decoded features from `forward_up_features`, shape
+            `(B, H, W, C)`.
+        :return: Output image tensor, shape `(B, num_classes, H', W')`
+            (unchanged if `final_upsample != "expand_first"`).
+        """
         if self.final_upsample == "expand_first":
             B, H, W, C = x.shape
             x = self.up(x)
@@ -999,12 +1254,19 @@ class VSSM(nn.Module):
         return x
 
     def forward(self, x):
+        """
+        Run the full encoder-decoder VSSM: features, decoded skip-connected features, then the final upsample.
+
+        :param x: Input image tensor.
+        :return: Output logits, shape `(B, num_classes, H, W)`.
+        """
         x, x_downsample = self.forward_features(x)
         x = self.forward_up_features(x, x_downsample)
         x = self.up_x4(x)
         return x
 
     def flops(self, shape=(3, 224, 224)):
+        """Estimate total FLOPs for a forward pass at the given input `shape`, via `fvcore`'s `FlopCountAnalysis` (with custom handles for the selective-scan op)."""
         # shape = self.__input_shape__[1:]
         supported_ops = {
             "aten::silu": None,  # as relu is in _IGNORED_OPS
@@ -1075,7 +1337,27 @@ if __name__ == "__main__":
 
 
 class MambaUNet(nn.Module):
+    """Thin wrapper around `VSSM`, built from a config object (mirroring `SwinUnet`'s wrapper pattern)."""
     def __init__(self, config, img_size=224, num_classes=21843, zero_head=False, vis=False):
+        """
+        Build the underlying `VSSM` from `config`.
+
+        Note: passes `embed_dim=`/`mlp_ratio=` to `VSSM`, which doesn't
+        declare either as a named parameter (it uses `dims=` instead, and
+        has no `mlp_ratio`) — both are silently absorbed by `VSSM`'s
+        `**kwargs` rather than raising, so `dims` ends up at its default
+        rather than `config.embed_dim`.
+
+        :param config: Config object with `patch_size`, `in_chains`,
+            `embed_dim`, `depths`, `mlp_ratio`, `drop_rate`,
+            `drop_path_rate`, `patch_norm`, `use_checkpoint`,
+            `final_upsample`.
+        :param img_size: Unused (kept for interface parity with
+            `SwinUnet`).
+        :param num_classes: Number of output classes/channels.
+        :param zero_head: Stored but not otherwise used here.
+        :param vis: Unused (kept for interface parity with `SwinUnet`).
+        """
         super(MambaUNet, self).__init__()
         self.num_classes = num_classes
         self.zero_head = zero_head
@@ -1095,15 +1377,29 @@ class MambaUNet(nn.Module):
                                 final_upsample=config.final_upsample)
 
     def forward(self, x):
+        """Run the underlying `VSSM`. Unlike `SwinUnet.forward`, does not repeat a single-channel input to 3 channels (see the dead code below, left disabled: "we don't use 3 channels").
+
+        :param x: Input image tensor.
+        :return: Output logits, shape `(B, num_classes, H, W)`.
         """
         # Remove this, we don't use 3 channels
-        if x.size()[1] == 1:
-            x = x.repeat(1,3,1,1)
-        """
+        # if x.size()[1] == 1:
+        #     x = x.repeat(1,3,1,1)
         logits = self.mamba_unet(x)
         return logits
 
     def load_from(self, config):
+        """
+        Load a pretrained checkpoint into the encoder, and mirror encoder weights into the decoder (`layers.` -> `layers_up.`) for stages with matching shapes.
+
+        Skips (deletes) any checkpoint key whose shape doesn't match this
+        model's corresponding parameter, and loads the rest with
+        `strict=False`. No-ops (prints a message) if
+        `config.MODEL.PRETRAIN_CKPT` is None.
+
+        :param config: Config object with `MODEL.PRETRAIN_CKPT`, the
+            checkpoint path to load.
+        """
         pretrained_path = config.MODEL.PRETRAIN_CKPT
         if pretrained_path is not None:
             print("pretrained_path:{}".format(pretrained_path))

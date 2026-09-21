@@ -29,6 +29,23 @@ os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 
 def filter_outliers_transition_radius(transition_radius_path):
+    """
+    Exploratory helper: print and plot how filtering transition-radius
+    outliers by percentile affects the resulting halo sample.
+
+    Reads a CSV of per-halo transition radii, then for each percentile in
+    [99, 98, 97, 96, 95] keeps only halos whose transition radius falls
+    within [100-percentile, percentile], prints the resulting sample size
+    and number of halos dropped, and plots a histogram of
+    transition_radius/R200 for the kept halos. Not part of the pipeline
+    proper — a standalone diagnostic for tuning the outlier cut.
+
+    Parameters:
+    -----------
+    transition_radius_path : str
+        Path to a CSV file with `transition_radius`, `R200`, and `halo_id`
+        columns.
+    """
     df = pd.read_csv(transition_radius_path)
     transition_radius = df['transition_radius']
     print(transition_radius.describe())
@@ -493,12 +510,14 @@ class DataLoader(PipelineStep):
         ----------
         subhalo_context : SubhaloContext
             Context object containing subhalo data, including:
+
             - 'spos': 3D positions of subhalos
             - 'id_parents': Parent halo IDs of subhalos
             - 'subhalo_id': Unique subhalo identifiers
 
         halo_context : HaloContext
             Context object containing halo data, including:
+
             - 'gpos': 3D positions of halos
             - 'r200': R200 radius values of halos
             - 'halo_id': Unique halo identifiers
@@ -510,11 +529,12 @@ class DataLoader(PipelineStep):
             (parent_halo_id, subhalo_id) representing overlapping subhalos that
             fall within 2 × R200 of the halo and do not belong to it.
 
-            Example:
-            {
-                101: [(99, 3001), (102, 3002)],
-                102: []
-            }
+            Example::
+
+                {
+                    101: [(99, 3001), (102, 3002)],
+                    102: []
+                }
         """
         logger.debug('Getting overlapping halos ...')
         positions = as_subhalo_dataframe(subhalo_context)['spos']

@@ -15,6 +15,18 @@ BCE_loss = nn.BCELoss()
 
 
 def vae_loss_function(x, x_hat, mean, log_var):
+    """VAE loss: binary cross-entropy reconstruction term plus KL divergence against a unit Gaussian prior.
+
+    `x`/`x_hat` are passed through a sigmoid (and NaNs zeroed) before the
+    BCE reconstruction term; `mean`/`log_var` parametrize the approximate
+    posterior for the KL term.
+
+    :param x: Target tensor.
+    :param x_hat: Reconstructed tensor, same shape as `x`.
+    :param mean: Latent mean.
+    :param log_var: Latent log-variance.
+    :return: A scalar tensor: reconstruction loss + KL divergence.
+    """
     x, x_hat = torch.sigmoid(x), torch.sigmoid(x_hat)
     x, x_hat = torch.nan_to_num(x, nan=0.0), torch.nan_to_num(x_hat, nan=0.0),
     reproduction_loss = nn.functional.binary_cross_entropy(x_hat, x, reduction='mean')
@@ -24,31 +36,29 @@ def vae_loss_function(x, x_hat, mean, log_var):
 
 class VAELitModule(LightningModule):
     """
-    A `LightningModule` implements 8 key methods:
+    A ``LightningModule`` implements 8 key methods::
 
-    ```python
-    def __init__(self):
-    # Define initialization code here.
+        def __init__(self):
+        # Define initialization code here.
 
-    def setup(self, stage):
-    # Things to setup before each stage, 'fit', 'validate', 'test', 'predict'.
-    # This hook is called on every process when using DDP.
+        def setup(self, stage):
+        # Things to setup before each stage, 'fit', 'validate', 'test', 'predict'.
+        # This hook is called on every process when using DDP.
 
-    def training_step(self, batch, batch_idx):
-    # The complete training step.
+        def training_step(self, batch, batch_idx):
+        # The complete training step.
 
-    def validation_step(self, batch, batch_idx):
-    # The complete validation step.
+        def validation_step(self, batch, batch_idx):
+        # The complete validation step.
 
-    def test_step(self, batch, batch_idx):
-    # The complete test step.
+        def test_step(self, batch, batch_idx):
+        # The complete test step.
 
-    def predict_step(self, batch, batch_idx):
-    # The complete predict step.
+        def predict_step(self, batch, batch_idx):
+        # The complete predict step.
 
-    def configure_optimizers(self):
-    # Define and configure optimizers and LR schedulers.
-    ```
+        def configure_optimizers(self):
+        # Define and configure optimizers and LR schedulers.
 
     Docs:
         https://lightning.ai/docs/pytorch/latest/common/lightning_module.html

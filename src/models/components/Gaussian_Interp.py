@@ -3,7 +3,19 @@ import torch.nn as nn
 
 # Define the Conditional UNet for velocity prediction
 class BasicConditionalUNet(nn.Module):
+    """
+    Small 3-level conditional U-Net predicting a velocity field: takes the
+    current interpolant `x`, a scalar time `t`, and the conditioning
+    input `x0` (concatenated with `x`), and outputs a velocity map of the
+    same shape as `x`.
+    """
     def __init__(self, input_channels, hidden_channels=64):
+        """
+        :param input_channels: Number of channels of `x`/`x0` (each);
+            the encoder's first conv takes `2 * input_channels`.
+        :param hidden_channels: Base channel width, doubled at each
+            encoder level.
+        """
         super().__init__()
         self.time_embed = nn.Sequential(
             nn.Linear(1, hidden_channels * 4),
@@ -39,6 +51,14 @@ class BasicConditionalUNet(nn.Module):
         self.dec3 = nn.Sequential(nn.Conv2d(hidden_channels, input_channels, 3, padding=1))
 
     def forward(self, x, t, x0):
+        """
+        Predict the velocity field at `(x, t)` conditioned on `x0`.
+
+        :param x: Current interpolant tensor, shape `(B, input_channels, H, W)`.
+        :param t: Time embedding input, shape `(B, 1)`.
+        :param x0: Conditioning tensor, same shape as `x`.
+        :return: Predicted velocity, same shape as `x`.
+        """
         # Embed time
         t_embed = self.time_embed(t).unsqueeze(-1).unsqueeze(-1)
 
@@ -67,7 +87,15 @@ import torch.nn.functional as F
 
 
 class ResidualBlock(nn.Module):
+    """GroupNorm-SiLU-Conv residual block with an optional time-embedding injection added between the two conv sub-blocks; projects the residual path with a 1x1 conv when channel counts differ."""
     def __init__(self, in_channels, out_channels, time_emb_dim=None, norm_groups=8):
+        """
+        :param in_channels: Input channel count.
+        :param out_channels: Output channel count.
+        :param time_emb_dim: Dimension of the time embedding to project
+            and add in; if None, no time conditioning is applied.
+        :param norm_groups: Number of GroupNorm groups.
+        """
         super().__init__()
         self.norm_groups = norm_groups
         self.in_channels = in_channels
@@ -91,6 +119,13 @@ class ResidualBlock(nn.Module):
         self.residual_conv = nn.Conv2d(in_channels, out_channels, 1) if in_channels != out_channels else nn.Identity()
 
     def forward(self, x, time_emb=None):
+        """
+        Apply the residual block, optionally injecting a time embedding between the two conv sub-blocks.
+
+        :param x: Input feature map.
+        :param time_emb: Optional time-embedding tensor.
+        :return: Output feature map (same spatial size, `out_channels` channels).
+        """
         h = self.block1(x)
 
         if self.mlp is not None and time_emb is not None:
@@ -104,12 +139,23 @@ class ResidualBlock(nn.Module):
 
 
 class AttentionBlock(nn.Module):
+    """Spatial self-attention block: GroupNorm, flatten to a sequence of pixels, multi-head self-attention, reshape back, residual add."""
     def __init__(self, channels, num_heads=4, norm_groups=8):
+        """
+        :param channels: Number of input/output channels.
+        :param num_heads: Number of attention heads.
+        :param norm_groups: Number of GroupNorm groups.
+        """
         super().__init__()
         self.norm = nn.GroupNorm(norm_groups, channels)
         self.attention = nn.MultiheadAttention(channels, num_heads, batch_first=True)
 
     def forward(self, x):
+        """Apply spatial self-attention to `x`, added residually.
+
+        :param x: Input feature map, shape `(B, C, H, W)`.
+        :return: Output feature map, same shape as `x`.
+        """
         batch, channels, height, width = x.shape
         h = self.norm(x)
         h = h.view(batch, channels, height * width).transpose(1, 2)
@@ -119,25 +165,39 @@ class AttentionBlock(nn.Module):
 
 
 class Downsample(nn.Module):
+    """Stride-2 3x3 convolution halving spatial resolution."""
     def __init__(self, channels):
+        """:param channels: Input and output channel count."""
         super().__init__()
         self.conv = nn.Conv2d(channels, channels, 3, stride=2, padding=1)
 
     def forward(self, x):
+        """Downsample `x` by 2x."""
         return self.conv(x)
 
 
 class Upsample(nn.Module):
+    """Nearest-neighbour 2x upsample followed by a 3x3 convolution."""
     def __init__(self, channels):
+        """:param channels: Input and output channel count."""
         super().__init__()
         self.conv = nn.Conv2d(channels, channels, 3, padding=1)
 
     def forward(self, x):
+        """Upsample `x` by 2x then convolve."""
         x = F.interpolate(x, scale_factor=2, mode="nearest")
         return self.conv(x)
 
 
 class ConditionalUNetOld(nn.Module):
+    """
+    Earlier, superseded conditional diffusion/flow U-Net (time-embedded
+    ResidualBlock + AttentionBlock stages, Downsample/Upsample between
+    levels). Superseded by `ConditionalUNet` — kept for reference; note
+    the up-path's skip-connection channel counts (`skips_n_outs_channels`)
+    are hardcoded rather than derived, and `forward` returns None rather
+    than the final tensor (a bug, presumably why this class was replaced).
+    """
     def __init__(
             self,
             input_channels,
@@ -148,6 +208,17 @@ class ConditionalUNetOld(nn.Module):
             norm_groups=8,
             time_emb_dim=128
     ):
+        """
+        :param input_channels: Number of channels of `x`/`x0` (each);
+            the initial conv takes `2 * input_channels`.
+        :param base_channels: Base channel width.
+        :param channel_mults: Per-level channel multipliers on `base_channels`.
+        :param num_res_blocks: Number of residual blocks per resolution level.
+        :param attention_resolutions: Downsample factors at which an
+            `AttentionBlock` is inserted after each residual block.
+        :param norm_groups: Number of GroupNorm groups.
+        :param time_emb_dim: Time-embedding dimension.
+        """
         super().__init__()
         #norm_groups = input_channels
         self.time_emb_dim = time_emb_dim
@@ -263,6 +334,15 @@ class ConditionalUNetOld(nn.Module):
         self.final_conv = nn.Conv2d(base_channels, input_channels, 3, padding=1)
 
     def forward(self, x, t, x0):
+        """
+        Run the (superseded) conditional U-Net forward pass.
+
+        :param x: Current interpolant tensor.
+        :param t: Time scalar per batch element, shape `(B,)`.
+        :param x0: Conditioning tensor, concatenated with `x`.
+        :return: None — see class docstring; this method never returns
+            the computed `x`.
+        """
         # Time embedding
         t_emb = self.time_embed(t.unsqueeze(-1))
 
@@ -332,6 +412,12 @@ class ConditionalUNetOld(nn.Module):
         return
 
 class ConditionalUNet(nn.Module):
+    """
+    Conditional diffusion/flow-matching U-Net used by `GaussianInterpolationFlow`:
+    time-embedded `ResidualBlock` + `AttentionBlock` stages at each
+    resolution level, with `Downsample`/`Upsample` between levels and
+    skip connections concatenated in the decoder path.
+    """
     def __init__(
             self,
             input_channels,
@@ -342,6 +428,17 @@ class ConditionalUNet(nn.Module):
             norm_groups=8,
             time_emb_dim=128
     ):
+        """
+        :param input_channels: Number of channels of `x`/`x0` (each);
+            the initial conv takes `2 * input_channels`.
+        :param base_channels: Base channel width.
+        :param channel_mults: Per-level channel multipliers on `base_channels`.
+        :param num_res_blocks: Number of residual blocks per resolution level.
+        :param attention_resolutions: Downsample factors at which an
+            `AttentionBlock` is inserted after each residual block.
+        :param norm_groups: Number of GroupNorm groups.
+        :param time_emb_dim: Time-embedding dimension.
+        """
         super().__init__()
         # norm_groups = input_channels
         self.time_emb_dim = time_emb_dim
@@ -423,6 +520,14 @@ class ConditionalUNet(nn.Module):
         self.final_conv2 = nn.Conv2d(base_channels, input_channels, 3, padding=1)
 
     def forward(self, x, t, x0):
+        """
+        Predict the velocity field at `(x, t)` conditioned on `x0`.
+
+        :param x: Current interpolant tensor, shape `(B, input_channels, H, W)`.
+        :param t: Time scalar per batch element, shape `(B,)`.
+        :param x0: Conditioning tensor, same shape as `x`.
+        :return: Predicted velocity, same shape as `x`.
+        """
         # Time embedding
         t_emb = self.time_embed(t.unsqueeze(-1))
 
@@ -491,8 +596,25 @@ class ConditionalUNet(nn.Module):
 
 # Gaussian Interpolation Flow Model
 class GaussianInterpolationFlow(nn.Module):
+    """
+    Stochastic-interpolant / flow-matching model. Learns a `ConditionalUNet`
+    velocity field for the probability path `I_t = (1-t)x + t*y +
+    t(1-t)*epsilon` between a source distribution `x` and target `y`
+    (see the module's module-level docstring), and integrates it via
+    Euler steps (`sample`) to transport `x` towards `y`.
+    """
     def __init__(self, input_channels, base_channels, channel_mults, num_res_blocks,
                  attention_resolutions, norm_groups, time_emb_dim, device='cuda'):
+        """
+        :param input_channels: Number of channels of the interpolant/condition.
+        :param base_channels: Base channel width of the underlying `ConditionalUNet`.
+        :param channel_mults: Per-level channel multipliers.
+        :param num_res_blocks: Number of residual blocks per resolution level.
+        :param attention_resolutions: Downsample factors with attention.
+        :param norm_groups: Number of GroupNorm groups.
+        :param time_emb_dim: Time-embedding dimension.
+        :param device: Device the velocity network is placed on.
+        """
         super().__init__()
         self.v_net = ConditionalUNet(input_channels,
                                      base_channels,
@@ -504,11 +626,30 @@ class GaussianInterpolationFlow(nn.Module):
         self.device = device
 
     def forward(self, x, t=None, x0=None):
+        """
+        Predict the velocity field via the underlying `ConditionalUNet`.
+
+        :param x: Current interpolant tensor.
+        :param t: Time scalar per batch element.
+        :param x0: Conditioning tensor.
+        :return: Predicted velocity, same shape as `x`.
+
+        :raises NotImplementedError: If `t` or `x0` is None.
+        """
         if t is None or x0 is None:
             raise NotImplementedError('t and/or x0 are None.')
         return self.v_net(x, t, x0)
 
     def compute_interpolant(self, x, y, t, epsilon):
+        """
+        Compute the stochastic interpolant `I_t = (1-t)x + t*y + t(1-t)*epsilon`.
+
+        :param x: Source sample.
+        :param y: Target sample, same shape as `x`.
+        :param t: Time per batch element, shape `(B,)`.
+        :param epsilon: Noise tensor, same shape as `x`.
+        :return: The interpolant `I_t`, same shape as `x`.
+        """
         alpha_t = (1 - t).view(-1, 1, 1, 1)
         beta_t = t.view(-1, 1, 1, 1)
         sigma_t = (t * (1 - t)).view(-1, 1, 1, 1)
@@ -516,6 +657,15 @@ class GaussianInterpolationFlow(nn.Module):
         return alpha_t * x + beta_t * y + sigma_t * epsilon
 
     def compute_velocity(self, x, y, epsilon, t):
+        """
+        Compute the ground-truth velocity `dI_t/dt` of the interpolant path.
+
+        :param x: Source sample.
+        :param y: Target sample, same shape as `x`.
+        :param epsilon: Noise tensor used in the interpolant.
+        :param t: Time per batch element, shape `(B,)`.
+        :return: The velocity `d(I_t)/dt`, same shape as `x`.
+        """
         # Here we just compute the derivative of the interp path: I_t = (1-t) x + (t) y + t(1-t) ε
         d_alpha = -1
         d_beta = 1
@@ -564,6 +714,14 @@ class GaussianInterpolationFlow(nn.Module):
             return loss
 
     def sample(self, x, num_steps=100):
+        """
+        Integrate the learned velocity field from `t=0` to `t=1` via forward Euler steps, starting from `x`.
+
+        :param x: Initial (source) sample, used both as the starting
+            point and as the conditioning input at every step.
+        :param num_steps: Number of Euler integration steps.
+        :return: The transported sample at `t=1`, same shape as `x`.
+        """
         self.v_net.eval()
         with torch.no_grad():
             I = x.clone()
