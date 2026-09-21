@@ -463,6 +463,18 @@ def main():
     pid_value_min = None
     pid_value_max = None
 
+    # "Reasonable" here means: could plausibly be a sequential particle
+    # index for a box this size (total grouped particles ~3.36e9, so even a
+    # generous full-box upper bound stays well under 2**40 ~ 1.1e12).
+    # Anything outside that — especially near the int64 min/max boundaries —
+    # is almost certainly a bit-flag/encoding scheme, not a truncation bug,
+    # and needs to be understood on its own terms before assuming any fix.
+    REASONABLE_ABS_BOUND = 1 << 40
+    n_pid_negative = 0
+    n_pid_extreme = 0
+    n_pid_normal = 0
+    extreme_examples = []
+
     for group_file in g3.yield_all_files(group_base):
         f = g3.GadgetFile(group_file, is_snap=False)
         pid_chunk = f.read("PID ", 2)
@@ -476,15 +488,32 @@ def main():
         print(f"{os.path.basename(group_file):>28} | {n_by_len:>13} | {n_by_npart:>16} | "
               f"{'yes' if match else 'NO':>5} | {cumulative_by_len:>12} | {cumulative_by_npart:>12}")
 
-        # Track the actual PID *value* range (as g3read decoded it, cast to
-        # int64) — separate from the cumulative *offset* overflow above.
-        # If PID itself is truncated to 4 bytes on disk and true particle
-        # IDs exceed 2**31, this shows up as spurious negative values here.
+        # Track the actual PID *value* distribution (as g3read decoded it,
+        # cast to int64) — separate from the cumulative *offset* overflow
+        # checked above. Bucket into negative / extreme-magnitude / normal
+        # rather than just min/max, since min/max alone can't distinguish
+        # "int32 wraparound noise" (mildly negative, near -2**31) from
+        # "deliberate bit-flag encoding" (near the int64 min/max boundary).
         if n_by_len > 0:
             chunk_i64 = np.asarray(pid_chunk, dtype=np.int64)
             cmin, cmax = int(chunk_i64.min()), int(chunk_i64.max())
             pid_value_min = cmin if pid_value_min is None else min(pid_value_min, cmin)
             pid_value_max = cmax if pid_value_max is None else max(pid_value_max, cmax)
+
+            neg_mask = chunk_i64 < 0
+            # (chunk_i64 > B) | (chunk_i64 < -B) instead of np.abs(...) > B —
+            # np.abs overflows silently on the minimum representable int64
+            # value, and we're already right at that boundary in this data.
+            extreme_mask = (chunk_i64 > REASONABLE_ABS_BOUND) | (chunk_i64 < -REASONABLE_ABS_BOUND)
+            n_pid_negative += int(neg_mask.sum())
+            n_pid_extreme += int(extreme_mask.sum())
+            n_pid_normal += int((~extreme_mask).sum())
+
+            if len(extreme_examples) < 10:
+                idx = np.nonzero(extreme_mask)[0][:10 - len(extreme_examples)]
+                for i in idx:
+                    v = int(chunk_i64[i])
+                    extreme_examples.append((os.path.basename(group_file), int(i), v, hex(v & 0xFFFFFFFFFFFFFFFF)))
             del chunk_i64
 
         file_boundaries.append((cumulative_by_len, cumulative_by_len + n_by_len))
@@ -500,16 +529,22 @@ def main():
     print()
     print(f"PID VALUE range across all files (as decoded, cast to int64): "
           f"min={pid_value_min}, max={pid_value_max}")
-    if pid_value_min is not None and pid_value_min < 0:
-        print("  ^ NEGATIVE PID values found — this is the same int32-wraparound signature")
-        print("    as GOFF/SOFF, but on the actual particle ID VALUES this time. Unlike")
-        print("    GOFF/SOFF, individual IDs have no reconstructible structure — this would")
-        print("    need a different fix (e.g. matching by position instead of ID).")
-    elif pid_value_max is not None and pid_value_max > (1 << 31):
-        print("  ^ max PID exceeds 2**31 but stayed positive — likely genuinely 8-byte, "
-              "consistent with the width check above.")
+    print(f"PID value buckets: normal (abs<=2**40)={n_pid_normal}, "
+          f"extreme (abs>2**40)={n_pid_extreme}, of which negative={n_pid_negative}")
+    print(f"  extreme fraction: {100.0 * n_pid_extreme / max(1, cumulative_by_len):.6f}%")
+    if extreme_examples:
+        print("  examples of extreme PID values (file, index-in-file, value, hex):")
+        for gf, i, v, h in extreme_examples:
+            print(f"    {gf}[{i}]: {v}  ({h})")
+    if n_pid_extreme == 0:
+        print("  All PID values are comfortably within a plausible sequential-ID range.")
     else:
-        print("  All PID values are comfortably within a safe range for this catalogue.")
+        print("  These are NOT int32-wraparound noise (that would be mildly negative, near")
+        print("  -2**31) — the magnitudes here sit near the int64 min/max boundary, which")
+        print("  looks like a deliberate bit-flag/encoding scheme rather than corruption.")
+        print("  Needs to be understood (e.g. what fraction of particles this affects, and")
+        print("  whether it correlates with a known boundary/tracer particle type) before")
+        print("  assuming any fix — do NOT treat this the same as the GOFF/SOFF bug.")
     print()
 
     if first_divergence is not None:
