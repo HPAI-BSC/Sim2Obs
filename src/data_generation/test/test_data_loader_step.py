@@ -1,5 +1,6 @@
 import pickle
 import unittest
+from unittest.mock import MagicMock, patch
 
 from rootutils import rootutils
 
@@ -7,6 +8,7 @@ rootutils.setup_root(__file__, pythonpath=True)
 
 import pandas as pd
 from dotenv import load_dotenv
+from omegaconf import OmegaConf
 
 from hydra import initialize, compose
 
@@ -15,7 +17,7 @@ from src.data_generation.src.data_fetcher import DataFetcherFactory
 from src.data_generation.src.data_loader_step import DataLoader
 from src.data_generation.src.feature import VelocityDispersionProcessor, ICLProcessor, load_models
 from src.data_generation.src.halo import Halo, HaloContext
-from src.data_generation.src.subhalo import SubhaloContext
+from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
 
 load_dotenv('../.env')
 
@@ -201,6 +203,72 @@ class TestDataLoaderStep(unittest.TestCase):
             data_loader._load_particles_overlapping_subhalos(halo, subhalo_ctx, halo_context, lbox)
 
 
+class TestEmptyHaloParticlesSkipped(unittest.TestCase):
+    """
+    Regression for a real production crash: a halo can legitimately have
+    zero matched star particles (e.g. no star formation), in which case
+    SubhaloParticles has NO per-field arrays set at all (only
+    overlapping_particles_id) — accessing .star_p then raises
+    AttributeError, which compute_transition_radius/execute_process's
+    broad `except Exception` swallows and reports as an opaque
+    "'SubhaloParticles' object has no attribute 'star_p'" with no
+    indication the real cause was simply "this halo has no particles".
 
+    These tests build a minimal DataLoader (bypassing __init__, which
+    needs a real catalogue) and drive compute_transition_radius/
+    execute_process directly with a mocked fetcher returning an empty
+    SubhaloParticles, to confirm the halo is now skipped cleanly instead
+    of crashing.
+    """
+
+    def _make_data_loader(self, transition_radius_compute):
+        data_loader = DataLoader.__new__(DataLoader)
+        data_loader.errors = []
+        data_loader.fetcher = MagicMock()
+        data_loader.fetcher.get_p_halo.return_value = SubhaloParticles({}, {'POS': 'p'})
+        data_loader.cfg = OmegaConf.create({
+            "skip_existing_halos": False,
+            "feature_names": [
+                {"name": "VelocityDispersion"},
+                {"name": "IntraClusterLight", "transition_radius_compute": transition_radius_compute},
+            ],
+            "catalog": {"path": "/fake/catalog/path", "Lbox": None},
+            "paths": {"datasets_dir": "/fake/catalog"},
+        })
+        return data_loader
+
+    def _make_graph_entry(self):
+        halo = MagicMock()
+        halo.halo_id = 1937
+        subhalo_ctx = MagicMock()
+        subhalo_ctx.data = []
+        cosmos_data = MagicMock()
+        return [(halo, subhalo_ctx, cosmos_data)]
+
+    def test_compute_transition_radius_skips_halo_with_no_particles(self):
+        data_loader = self._make_data_loader(transition_radius_compute=True)
+        g = self._make_graph_entry()
+
+        with patch("src.data_generation.src.data_loader_step.FeatureProcessorFactory"), \
+             patch("src.data_generation.src.data_loader_step.attach_models_to_features"):
+            results = list(data_loader.compute_transition_radius(g))
+
+        # The halo was skipped (not crashed): no error recorded, and the
+        # generator's final yield (self.errors) reflects that.
+        self.assertEqual(data_loader.errors, [])
+        self.assertEqual(results, [[]])
+
+    def test_execute_process_skips_halo_with_no_particles(self):
+        data_loader = self._make_data_loader(transition_radius_compute=False)
+        g = self._make_graph_entry()
+
+        with patch("src.data_generation.src.data_loader_step.FeatureProcessorFactory"), \
+             patch("src.data_generation.src.data_loader_step.attach_models_to_features"):
+            results = list(data_loader.execute_process(g, next_step=None))
+
+        # Like compute_transition_radius, execute_process also does an
+        # unconditional `yield self.errors` after the loop.
+        self.assertEqual(data_loader.errors, [])
+        self.assertEqual(results, [[]])
 
 

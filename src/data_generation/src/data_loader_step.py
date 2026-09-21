@@ -172,6 +172,17 @@ class DataLoader(PipelineStep):
                 # Load particles for all the subhalos in that halo
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
 
+                # A halo can legitimately have zero matched star particles
+                # (e.g. no star formation) — SubhaloParticles then has no
+                # per-field arrays set at all (only overlapping_particles_id),
+                # so .star_p etc. don't exist. Skip rather than let the
+                # debug logging / preprocessing below raise an unguarded
+                # AttributeError that gets swallowed by the except below as
+                # an opaque "'SubhaloParticles' object has no attribute 'star_p'".
+                if halo_particles_no_overlapping.is_empty:
+                    logger.warning(f"Halo {halo.halo_id} has no star particles — skipping.")
+                    continue
+
                 # Fix precision
 
                 logger.debug('1. Loading halo particles ...')
@@ -272,6 +283,15 @@ class DataLoader(PipelineStep):
 
                 # Load particles for all the subhalos in that halo
                 halo_particles_no_overlapping = self.fetcher.get_p_halo(halo=halo)
+
+                # See the identical check in compute_transition_radius for why:
+                # a halo can legitimately have zero matched star particles,
+                # in which case SubhaloParticles has no per-field arrays set
+                # (only overlapping_particles_id) and .preprocess() below
+                # would raise an unguarded AttributeError.
+                if halo_particles_no_overlapping.is_empty:
+                    logger.warning(f"Halo {halo.halo_id} has no star particles — skipping.")
+                    continue
 
                 # Preprocessed all particles for current halo
                 halo_particles_no_overlapping.preprocess(halo, lbox)
