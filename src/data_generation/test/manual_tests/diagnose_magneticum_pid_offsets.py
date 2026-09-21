@@ -223,6 +223,63 @@ def check_entity_file_spanning(file_boundaries, offsets, lengths, entity_name, l
     print()
 
 
+def check_soff_reconstruction_via_grnr(group_base, goff, glen, true_goff):
+    """
+    SOFF is confirmed 4-byte/truncated on disk too (same as GOFF), but
+    unlike GOFF, subhalo particle ranges have internal gaps (diffuse,
+    unbound halo particles), so a plain cumsum(SLEN) can't reconstruct it.
+
+    Instead: subhalo particles are always a nested subset of their parent
+    halo's particle range — SOFF and GOFF index into the SAME cumulative
+    space (see g3matcha.py: `subhalo['ids'] = halo_ids[SOFF-GOFF : SOFF+SLEN-GOFF]`).
+    That means a subhalo and its parent halo always sit on the SAME side of
+    any int32 wraparound point, so `local_offset = raw_SOFF - raw_GOFF[parent]`
+    is correct even when both are individually wrapped (the wrap cancels in
+    the subtraction), and `true_SOFF = true_GOFF[parent] + local_offset`
+    reconstructs the true global SOFF without needing to unwrap SOFF at all.
+
+    Validates this by checking every subhalo nests correctly inside its
+    (already cumsum-validated) parent halo's true range.
+    """
+    print("=" * 78)
+    print("SOFF RECONSTRUCTION CHECK — deriving true SOFF via GRNR + true GOFF")
+    print("=" * 78)
+
+    soff = np.asarray(g3.read_new(group_base, ["SOFF"], 1, is_snap=False, multiple_files=True)["SOFF"], dtype=np.int64)
+    slen = np.asarray(g3.read_new(group_base, ["SLEN"], 1, is_snap=False, multiple_files=True)["SLEN"], dtype=np.int64)
+    grnr = np.asarray(g3.read_new(group_base, ["GRNR"], 1, is_snap=False, multiple_files=True)["GRNR"], dtype=np.int64)
+    goff = np.asarray(goff, dtype=np.int64)
+    glen = np.asarray(glen, dtype=np.int64)
+
+    n = len(soff)
+    valid_grnr = (grnr >= 0) & (grnr < len(goff))
+    n_invalid_grnr = int(np.sum(~valid_grnr))
+    print(f"n_subhalos = {n}, invalid GRNR (out of halo-index range): {n_invalid_grnr}")
+
+    true_soff = np.full(n, -1, dtype=np.int64)
+    local_offset = soff[valid_grnr] - goff[grnr[valid_grnr]]
+    true_soff[valid_grnr] = true_goff[grnr[valid_grnr]] + local_offset
+
+    ok_lower = true_soff[valid_grnr] >= true_goff[grnr[valid_grnr]]
+    ok_upper = (true_soff[valid_grnr] + slen[valid_grnr]) <= (true_goff[grnr[valid_grnr]] + glen[grnr[valid_grnr]])
+    n_bad_lower = int(np.sum(~ok_lower))
+    n_bad_upper = int(np.sum(~ok_upper))
+
+    print(f"subhalos with true_soff < parent true_goff:            {n_bad_lower}")
+    print(f"subhalos with true_soff+SLEN > parent true_goff+GLEN:  {n_bad_upper}")
+    if n_invalid_grnr == 0 and n_bad_lower == 0 and n_bad_upper == 0:
+        print("PASS — every subhalo correctly nests inside its parent halo's true range.")
+        print("       The GRNR-based SOFF reconstruction is validated.")
+    else:
+        print("FAIL — some subhalos fall outside their parent's range; this reconstruction")
+        print("       does not fully hold for this catalogue and needs a closer look.")
+
+    print()
+    print("=" * 78)
+    print()
+    return (true_soff, slen) if (n_invalid_grnr == 0 and n_bad_lower == 0 and n_bad_upper == 0) else (None, None)
+
+
 def main():
     groups_dir = os.path.join(PATH, f"groups_{SNAPNUM}")
     group_base = os.path.join(groups_dir, os.path.basename(groups_dir).replace("groups", "sub"))
@@ -263,6 +320,17 @@ def main():
     print()
 
     goff_fixed, glen_fixed = check_ondisk_width_and_test_int64_fix(group_base, theoretical_total_from_glen)
+
+    soff_fixed, slen_fixed = (None, None)
+    if goff_fixed is not None:
+        # NOTE: pass the RAW goff/glen here (not goff_fixed) — local_offset
+        # must be computed from two raw, possibly-wrapped values so the
+        # wrap cancels in the subtraction; true_goff (4th arg) is the
+        # validated correction, used only for the final addition.
+        soff_fixed, slen_fixed = check_soff_reconstruction_via_grnr(group_base, goff, glen, goff_fixed)
+    else:
+        print("(no validated GOFF correction available — skipping the SOFF reconstruction check)")
+        print()
 
     # ── walk the PID stream file by file, two ways ──────────────────────────
     print(f"{'file':>28} | {'len(read PID)':>13} | {'header.npart[2]':>16} | {'match':>5} | "
@@ -337,8 +405,15 @@ def main():
 
     check_entity_file_spanning(
         file_boundaries, soff, slen, "subhalo",
-        label="raw SOFF/SLEN (only valid below the overflow point; no validated correction yet)", max_end=2 ** 31,
+        label="raw SOFF/SLEN (only valid below the overflow point)", max_end=2 ** 31,
     )
+    if soff_fixed is not None:
+        check_entity_file_spanning(
+            file_boundaries, soff_fixed, slen_fixed, "subhalo", label="corrected SOFF/SLEN (valid catalogue-wide)"
+        )
+    else:
+        print("(no validated SOFF correction available — skipping the catalogue-wide subhalo check)")
+        print()
 
 
 if __name__ == "__main__":
