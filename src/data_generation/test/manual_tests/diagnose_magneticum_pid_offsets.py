@@ -368,6 +368,33 @@ def check_pid_and_snapshot_id_dtype(group_base, snap_base):
                 continue
             print(f"  ptype {ptype}: npart={npart}, g3read-detected ID dtype={id_block.data_type}, "
                   f"{id_block.partlen} bytes/particle")
+        print()
+
+        # _store_particles() only ever processes STAR particles (ptype 4).
+        # The group-catalogue PID scan found ~23% of entries with a
+        # structured bit-flag pattern (extreme magnitude, near int64
+        # min/max) — likely a boundary/tracer/other-species ID convention.
+        # If that pattern never shows up among actual star IDs, it's inert
+        # for the code path we care about. This reads ONE snapshot file's
+        # ptype=4 "ID  " data (bounded size — this file has ~6M stars) to
+        # check directly, rather than assume.
+        REASONABLE_ABS_BOUND = 1 << 40
+        if int(f.header.npart[4]) > 0:
+            star_ids = g3.read_new(snap_files[0], ["ID  "], 4, multiple_files=False, do_flatten=False)[4]["ID  "]
+            star_ids = np.asarray(star_ids, dtype=np.int64)
+            n_star_extreme = int(np.sum((star_ids > REASONABLE_ABS_BOUND) | (star_ids < -REASONABLE_ABS_BOUND)))
+            print(f"star (ptype=4) IDs in {os.path.basename(snap_files[0])}: {len(star_ids)}, "
+                  f"min={int(star_ids.min())}, max={int(star_ids.max())}")
+            print(f"  of which extreme (abs>2**40, same bucket as the group-catalogue finding): {n_star_extreme}")
+            if n_star_extreme == 0:
+                print("  => star IDs are all 'normal' — the extreme PID pattern found in the group")
+                print("     catalogue does not affect star particles, which is what the pipeline")
+                print("     actually matches against (_store_particles only processes stars).")
+            else:
+                print("  => star IDs ALSO show the extreme pattern — this DOES affect the pipeline,")
+                print("     needs further investigation before assuming it's benign.")
+        else:
+            print(f"no star particles (ptype=4) in {snap_files[0]} — cannot check directly")
     else:
         print(f"no snapshot files found at {snap_base} — skipping snapshot ID check")
 
