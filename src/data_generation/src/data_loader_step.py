@@ -226,8 +226,8 @@ class DataLoader(PipelineStep):
                              'number_particles': len(halo_particles_overlapping.star_p),
                              'transition_radius': float(output_feature.transition_radius)}
 
-                # with open(path, "w") as f:
-                #    json.dump(halo_dict, f, indent=4)
+                with open(path, "w") as f:
+                    json.dump(halo_dict, f, indent=4)
 
             except Exception as e:
                 logger.error(f"Error with {halo.halo_id}: {e}")
