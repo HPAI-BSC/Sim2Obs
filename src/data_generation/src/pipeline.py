@@ -11,7 +11,7 @@ from src.data_generation.src.data_loader_step import DataLoader
 from src.data_generation.src.feature import load_models
 from src.data_generation.src.last_step import LastStep
 from src.data_generation.src.pipeline_step import PipelineStep
-from src.data_generation.src.utils import setup_logger, plot_hist, flatten_vector_column
+from src.data_generation.src.utils import setup_logger, plot_hist, flatten_vector_column, as_subhalo_dataframe
 
 logger = setup_logger("Pipeline")
 
@@ -61,9 +61,9 @@ def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, 
     logger.debug(f'subhalo context: {type(subhalo_context)}')
 
     # TODO DEBUG
-    # dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
-    # halo_context.data.to_csv(os.path.join(dataset_dir, 'magneticum_halo_context.csv'))
-    # df.to_csv(os.path.join(dataset_dir, 'magneticum_subhalo_context.csv'))
+    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
+    halo_context.data.to_csv(os.path.join(dataset_dir, 'magneticum_halo_context.csv'))
+    as_subhalo_dataframe(subhalo_context).to_csv(os.path.join(dataset_dir, 'magneticum_subhalo_context.csv'))
 
     if len(ignore_halos) > 0:
         print(f'Filtering ignore halos: {ignore_halos}')
