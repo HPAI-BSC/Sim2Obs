@@ -83,7 +83,7 @@ fields:
       output: "Msun"
       scaling: "x"
       name: "mstr"
-      filter: "> 1e10"
+      filter: "> 1e9"
     r50_kpc:
       input: "kpc"
       output: "kpc/h"

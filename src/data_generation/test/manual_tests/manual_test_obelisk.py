@@ -99,8 +99,9 @@ def main():
         print(halo_context.data.head())
     except Exception as e:
         print(f"get_halos() FAILED: {type(e).__name__}: {e}")
-        print("(continuing to TEST 2 anyway — get_subhalos() has no mass filter, so it should still work "
-              "even if get_halos() legitimately found zero halos above the mass cut)")
+        print("(continuing to TEST 2 anyway — get_subhalos() has its own independent mstar filter, "
+              "so it can still return results even if get_halos() legitimately found zero halos "
+              "above the mvir cut)")
 
     print()
     print("=" * 60)
