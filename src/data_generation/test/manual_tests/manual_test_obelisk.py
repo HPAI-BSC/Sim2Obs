@@ -155,24 +155,23 @@ def main():
             print(f"halo {hid}: central galaxy has {n_star} star particles "
                   f"(star_m dtype={particles.star_m.dtype}, star_p shape={particles.star_p.shape})")
 
-            # UNITS CROSS-CHECK: configs/catalog/obelisk.yaml flags
-            # fields.particles.stars.position's units as unconfirmed. Compare
-            # the mean of this galaxy's raw star positions (before any
-            # scaling, since scaling is currently null/pass-through) against
-            # the main catalogue's own xstar/ystar/zstar for the same ID —
-            # both should be the same order of magnitude if the assumed
-            # units (matching the catalogue's own centre fields) are right.
-            raw_star_position_mean = np.mean(
-                fetcher._read_gal_stars_file(hid)['position'], axis=0
-            )
+            # UNITS CROSS-CHECK: configs/catalog/obelisk.yaml's
+            # fields.particles.stars.position scaling ("Lbox/2 + (x/a) *
+            # h * 1000") was derived and verified (~1e-6 relative
+            # precision) against ID 256 locally — confirm it holds for
+            # these real halos too, by comparing the SCALED star_p mean
+            # (particles.star_p, already run through the full pipeline)
+            # against the catalogue's own xstar/ystar/zstar * Lbox for the
+            # same ID, in the same kpc/h frame.
+            scaled_star_position_mean = np.mean(particles.star_p, axis=0)
             row_mask = fetcher._raw['ID'] == hid
-            catalogue_star_centre = np.array([
+            catalogue_star_centre_kpc_h = np.array([
                 fetcher._raw['xstar'][row_mask][0],
                 fetcher._raw['ystar'][row_mask][0],
                 fetcher._raw['zstar'][row_mask][0],
-            ])
-            print(f"  mean(gal_stars position) = {raw_star_position_mean}")
-            print(f"  catalogue xstar/ystar/zstar = {catalogue_star_centre}")
+            ]) * float(fetcher.catalog.Lbox)
+            print(f"  mean(star_p), scaled (kpc/h)   = {scaled_star_position_mean}")
+            print(f"  catalogue xstar/ystar/zstar*Lbox = {catalogue_star_centre_kpc_h}")
         except Exception as e:
             print(f"halo {hid}: get_p_subhalo() FAILED: {type(e).__name__}: {e}")
 
