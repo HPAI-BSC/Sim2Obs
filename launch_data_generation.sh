@@ -6,6 +6,9 @@
 #SBATCH -o slurm_output/out.txt       # Name of stdout output file(%j expands to jobId)
 #SBATCH -e slurm_output/err.txt       # Name of stderr output file(%j expands to jobId)
 #SBATCH -n 1
+#SBATCH -c 64               # Cores per task requested — MN5 has no --mem flag; memory is
+                             # auto-set per core (GPP: 2G/core), so 64 cores -> 128G total.
+                             # Obelisk halos can have tens of millions of star particles.
 
 #SBATCH -t 10:00:00         # Run time (hh:mm:ss)
 #SBATCH --account bsc70
