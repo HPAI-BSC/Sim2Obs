@@ -742,6 +742,15 @@ class ICLProcessor(FeatureProcessor):
         self.value = []
         self.model = None
 
+        # Above this many particles, _compute_icl_mask runs the classifier in
+        # batches of icl_batch_size instead of one pass over the whole halo —
+        # some Obelisk halos have tens of millions of star particles, which
+        # OOM'd a single _predict() call (89M particles exceeded a 128G job)
+        # even though the same code runs fine in one pass for smaller halos.
+        # Both are overridable via the feature config, same as G below.
+        self.icl_batch_threshold = 5_000_000
+        self.icl_batch_size = 2_000_000
+
         attr_list = self._build_configuration(cfg, ['G'])
         for key, value in attr_list.items():
             setattr(self, key, value)
@@ -809,15 +818,60 @@ class ICLProcessor(FeatureProcessor):
         final_predictions = self.model.predict(Data.to_numpy())
         return final_predictions
 
+    def _icl_mask_for_slice(self, particle_position: np.ndarray, particle_velocity: np.ndarray,
+                             v_cm: np.ndarray, halo: Halo):
+        """
+        Classify one slice of particles (a whole halo's worth, or one batch
+        of a huge halo — see `_compute_icl_mask`) as ICL or BCG.
+
+        Parameters:
+        -----------
+        particle_position : np.ndarray
+            `(n, 3)` positions, already centred on the halo.
+        particle_velocity : np.ndarray
+            `(n, 3)` velocities.
+        v_cm : np.ndarray
+            Centre-of-mass velocity (computed once, over the full halo, by
+            the caller — not per-slice — so batching doesn't change it).
+        halo : Halo
+            Forwarded to `_predict` for its `m200`/`r200`.
+
+        Returns:
+        --------
+        tuple[np.ndarray, int]
+            `(mask, n_icl)`: a `(n,)` array with `1` where a particle is
+            predicted as ICL, `0` where predicted as BCG; and the count of
+            ICL particles found (`mask.sum()`, returned separately so
+            callers can accumulate it across batches without re-summing).
+        """
+        # Computing the Euclidean distance from the new origin to each particle,
+        # this value will be normalized inside predict method
+        distance = np.sqrt((particle_position ** 2).sum(axis=1))
+        # Computing the delta vel. from each particle in comparison to the mean-vel.
+        v_delta = np.sqrt(((particle_velocity - v_cm) ** 2).sum(axis=1))
+        final_predictions = self._predict(v_delta, distance, halo)
+        # Extract indices of particles predicted to be part of the ICL
+        ids = np.where(final_predictions == 0)[0]
+        mask = np.zeros((particle_position.shape[0],))
+        if ids.size > 0:
+            # if particle belongs to ICL=1, otherwise BCG=0
+            mask[ids] = 1
+        return mask, int(ids.size)
+
     def _compute_icl_mask(self, halo: Halo, subhalo_particles: SubhaloParticles):
         """
         Classify each star particle as ICL or BCG and return a per-particle boolean-like mask.
 
-        Computes the centre-of-mass velocity, then each particle's
-        distance from the halo centre and velocity offset from the
-        centre-of-mass velocity, and feeds those into `_predict` (the
-        trained ICL/BCG classifier). Particles predicted as ICL (class 0)
-        get a `1` in the returned mask, BCG particles get `0`.
+        Computes the centre-of-mass velocity once over all particles, then
+        delegates the actual distance/velocity-delta/classifier work to
+        `_icl_mask_for_slice` — either in one pass, or (above
+        `self.icl_batch_threshold` particles) in batches of
+        `self.icl_batch_size`, to bound peak memory. Some Obelisk halos have
+        tens of millions of star particles; running the classifier's
+        DataFrame + RandomForest `.predict()` over all of them in one call
+        OOM'd even at 128G, while the same code on a few-million-particle
+        slice does not — batching trades a bit of wall time for a bounded
+        memory footprint, with no change in what gets computed.
 
         Parameters:
         -----------
@@ -853,20 +907,24 @@ class ICLProcessor(FeatureProcessor):
 
         v_cm = np.average(particle_velocity, axis=0)  # calculate the center-of-mass velocity (avg velocity)
         v_cm = np.asarray(v_cm, dtype=np.float64)
-        # Computing the Euclidean distance from the new origin to each particle,
-        # this value will be normalized inside predict method
-        distance = np.sqrt((particle_position ** 2).sum(axis=1))
-        # Computing the delta vel. from each particle in comparison to the mean-vel.
-        v_delta = np.sqrt(((particle_velocity - v_cm) ** 2).sum(axis=1))
-        final_predictions = self._predict(v_delta, distance, halo)
-        # Extract indices of particles predicted to be part of the ICL
-        ids = np.where(final_predictions == 0)[0]
-        rows, _ = particle_velocity.shape
-        icl_mask = np.zeros((rows,))
-        if ids.size > 0:
-            # if particle belongs to ICL=1, otherwise BCG=0
-            icl_mask[ids] = 1
+
+        n_particles = particle_position.shape[0]
+        if n_particles > self.icl_batch_threshold:
+            logger.info(f'Halo {halo.halo_id} has {n_particles} particles (> {self.icl_batch_threshold}); '
+                        f'running ICL/BCG prediction in batches of {self.icl_batch_size} to bound peak memory.')
+            icl_mask = np.zeros((n_particles,))
+            n_icl_total = 0
+            for start in range(0, n_particles, self.icl_batch_size):
+                end = min(start + self.icl_batch_size, n_particles)
+                batch_mask, n_icl = self._icl_mask_for_slice(
+                    particle_position[start:end], particle_velocity[start:end], v_cm, halo
+                )
+                icl_mask[start:end] = batch_mask
+                n_icl_total += n_icl
         else:
+            icl_mask, n_icl_total = self._icl_mask_for_slice(particle_position, particle_velocity, v_cm, halo)
+
+        if n_icl_total == 0:
             logger.warning('No particles predicted as ICL.')
             # store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
             raise ValueError("icl_mask is empty; no masking applied.")
