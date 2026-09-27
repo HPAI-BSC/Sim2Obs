@@ -7,6 +7,7 @@
 #SBATCH -e slurm_output/err.txt       # Name of stderr output file(%j expands to jobId)
 #SBATCH -n 1
 #SBATCH -c 32               # Cores per task requested
+#SBATCH --mem=128G          # Obelisk halos can have tens of millions of star particles
 #SBATCH -t 02:00:00         # Run time (hh:mm:ss)
 #SBATCH --account bsc70
 #SBATCH --qos=gp_debug
