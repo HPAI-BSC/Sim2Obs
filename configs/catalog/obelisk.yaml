@@ -53,7 +53,7 @@ fields:
       output: "Msun/h"
       scaling: "x * h"
       name: "m200"
-      filter: [ "> 1e13 * 0.704" ]
+      filter: [ "> 1e12 * 0.704" ]
     rvir:
       input: "kpc"
       output: "kpc/h"
