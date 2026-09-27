@@ -12,6 +12,8 @@ ObeliskFetcher, see its docstring).
 Edit the constants below to point at real data, then run directly:
     python src/data_generation/test/manual_tests/manual_test_obelisk.py
 """
+import os
+
 from hydra import compose, initialize_config_dir
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 
@@ -28,7 +30,11 @@ def load_obelisk_config():
     default (see configs/data_generation.yaml's `defaults` list), then apply
     the CATALOG_PATH/SNAPNUM/LBOX overrides above.
     """
-    configs_dir = "../../../../configs"
+    # initialize_config_dir() requires an ABSOLUTE path (unlike initialize(),
+    # it does no relative-path resolution itself) — resolve relative to this
+    # file's own location rather than the process's cwd, so it works no
+    # matter where this script is invoked from.
+    configs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "configs"))
     with initialize_config_dir(config_dir=configs_dir, version_base=None):
         cfg = compose(config_name="data_generation.yaml")
         cfg.catalog = compose(config_name="catalog/obelisk.yaml")["catalog"]
