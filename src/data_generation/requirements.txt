@@ -66,3 +66,4 @@ python-dotenv
 eagleSqlTools
 #pip install git+https://github.com/illustristng/illustris_python
 hydra_colorlog
+cython_fortran_file

@@ -5,6 +5,7 @@ snapnum: 120       # redshift 0.2125
 a: 0.8247          # from print(snap.header.__dict__)
 H: 0.704
 
+# TODO review params
 Lbox: 290294.4   # box size in kpc/h, box_size_raw = snap.header.BoxSize  # 352000.0 ckpc/h
 
 # TODO recompute it

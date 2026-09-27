@@ -9,6 +9,7 @@ import pyarrow.parquet as pq
 
 import g3read
 import h5py
+from cython_fortran_file import FortranFile
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
@@ -3876,10 +3877,13 @@ class ObeliskFetcher(DataFetcher):
     properties, post-processed into one flat HDF5 table per snapshot —
     see src/data_generation/test/data/obelisk/README.md).
 
-    Particle-level access (get_p_halo / get_p_subhalo) is explicitly out of
-    scope: this catalogue has no particle data or particle->halo membership,
-    only aggregate per-object properties. Both are implemented to raise
-    NotImplementedError rather than silently returning wrong/empty data.
+    Particle-level access (get_p_halo / get_p_subhalo) reads star particles
+    from the per-galaxy `GAL_{iout:05d}/gal_stars_{ID:07d}` Fortran binary
+    files that sit alongside the main catalogue HDF5 (see
+    src/data_generation/test/data/obelisk/galstars.py for the reference
+    reader this was ported from). There is no DM or gas particle data in
+    Obelisk's particle dumps — only stars, unlike the DM+gas+stars
+    catalogues the generic particles pipeline was originally built for.
 
     Halo/subhalo split: AdaptaHOP's own `level` field (1 = top-level halo,
     >1 = substructure) plus `host` (ID of the TOP-level parent, already
@@ -3951,33 +3955,44 @@ class ObeliskFetcher(DataFetcher):
 
     def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
         """
-        Not supported: the Obelisk main catalogue has no particle-level data.
+        Fetch star-particle data for a single subhalo/galaxy. See `_get_p_subhalo`.
+
+        Parameters:
+        -----------
+        subhalo_id : int
+            ID of the subhalo (catalogue `ID`) to fetch star particles for.
 
         Raises:
         -------
-        NotImplementedError
-            Always.
+        ValueError
+            If `subhalo_id` is not provided in kwargs.
         """
-        raise NotImplementedError(
-            "ObeliskFetcher: particle-level access is out of scope — the "
-            "Obelisk main catalogue only contains aggregate per-object "
-            "properties, no particle data or particle->halo membership."
-        )
+        subhalo_id = kwargs.get('subhalo_id', None)
+        if subhalo_id is None:
+            logger.error("subhalo_id must be provided in kwargs")
+            raise ValueError("subhalo_id must be provided in kwargs")
+        return self._get_p_subhalo(subhalo_id)
 
     def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
         """
-        Not supported: the Obelisk main catalogue has no particle-level data.
+        Fetch and concatenate star-particle data for every subhalo of a halo. See `_get_p_halo`.
+
+        Parameters:
+        -----------
+        halo : Halo
+            The halo to fetch particles for; its `subhalo_ids` (set by
+            `_get_halos()`) are iterated over.
 
         Raises:
         -------
-        NotImplementedError
-            Always.
+        ValueError
+            If `halo` is not provided in kwargs.
         """
-        raise NotImplementedError(
-            "ObeliskFetcher: particle-level access is out of scope — the "
-            "Obelisk main catalogue only contains aggregate per-object "
-            "properties, no particle data or particle->halo membership."
-        )
+        halo = kwargs.get('halo', None)
+        if halo is None:
+            logger.error("halo must be provided in kwargs")
+            raise ValueError("halo must be provided in kwargs")
+        return self._get_p_halo(halo)
 
     def _inject_structural_field(self, fields_list: list, key: str, name: str):
         """Register a catalogue column that's used for structure (linkage,
@@ -4008,9 +4023,161 @@ class ObeliskFetcher(DataFetcher):
         d[out_key] = np.stack([d['x'], d['y'], d['z']], axis=1)
         return d
 
+    def _gal_stars_path(self, subhalo_id: int) -> str:
+        """
+        Path to one galaxy's star-particle file: `GAL_{iout:05d}/gal_stars_{ID:07d}`,
+        sibling to the main catalogue HDF5. The 7-digit zero-padded suffix is
+        the galaxy's own catalogue `ID` — same namespace as halo_id/subhalo_id.
+        """
+        iout = int(self.catalog.snapnum)
+        return os.path.join(self.catalog.path, f"GAL_{iout:05d}", f"gal_stars_{int(subhalo_id):07d}")
+
+    def _read_gal_stars_file(self, subhalo_id: int) -> dict:
+        """
+        Read one galaxy's star-particle Fortran binary file into a flat
+        dict of numpy arrays. Record layout ported from
+        src/data_generation/test/data/obelisk/galstars.py's read_galfile
+        (kept in test/data as reference documentation, not imported directly
+        since it isn't a production module) — a fixed-format header record
+        per attribute, followed by one record per per-particle array, in a
+        fixed order.
+
+        Only mass/position/velocity are declared as science fields in
+        configs/catalog/obelisk.yaml today; `particle_id`/`birth_time`/
+        `metallicity` are read (for fidelity with the file format, which
+        requires reading every record in order) but not currently exposed
+        as SubhaloParticles attributes — out of scope until needed.
+
+        Returns:
+        --------
+        dict
+            `{'position': (N, 3), 'velocity': (N, 3), 'mass': (N,),
+            'particle_id': (N,), 'birth_time': (N,), 'metallicity': (N,)}`.
+
+        Raises:
+        -------
+        Exception
+            If the file does not exist, or its own header `id` doesn't
+            match `subhalo_id` (wrong file, or wrong padding assumption).
+        """
+        path = self._gal_stars_path(subhalo_id)
+        if not os.path.exists(path):
+            logger.error(f"The path {path} does not exist.")
+            raise Exception(f'The path {path} does not exist.')
+
+        with FortranFile(path) as ff:
+            header = ff.read_attrs([
+                ('id', 1, 'i'), ('level', 1, 'i'), ('mass', 1, 'd'),
+                ('position', 3, 'd'), ('velocity', 3, 'd'), ('angular_momentum', 3, 'd'),
+                ('nparts', 1, 'i'),
+            ])
+            if int(header['id']) != int(subhalo_id):
+                raise Exception(
+                    f"gal_stars file {path} has header id={header['id']}, expected {subhalo_id}."
+                )
+
+            position_x = ff.read_vector('d')
+            position_y = ff.read_vector('d')
+            position_z = ff.read_vector('d')
+            velocity_x = ff.read_vector('d')
+            velocity_y = ff.read_vector('d')
+            velocity_z = ff.read_vector('d')
+            mass = ff.read_vector('d')
+            particle_id = ff.read_vector('i')
+            birth_time = ff.read_vector('d')
+            metallicity = ff.read_vector('d')
+
+        return {
+            'position': np.stack([position_x, position_y, position_z], axis=1),
+            'velocity': np.stack([velocity_x, velocity_y, velocity_z], axis=1),
+            'mass': mass,
+            'particle_id': particle_id,
+            'birth_time': birth_time,
+            'metallicity': metallicity,
+        }
+
+    def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
+        """
+        Fetch star-particle data for one galaxy (see `_read_gal_stars_file`).
+
+        Obelisk has only one particle type (stars), unlike the DM+gas+stars
+        catalogues the generic particles pipeline was built for, but
+        `self.particle_fields` is still the expected set of top-level
+        particle-type names (here `{'stars'}`, from `fields.particles.stars`
+        in the YAML) so the same nested validate_and_process_fields /
+        apply_unit_conversion / apply_filters machinery Illustris300Fetcher
+        uses applies unchanged.
+
+        Returns:
+        --------
+        SubhaloParticles
+            Star-particle data for this galaxy (`star_m`/`star_p`/`star_v`,
+            per fields.particles.stars' `name` entries).
+        """
+        logger.debug(f"Fetching star particles for subhalo: {subhalo_id}")
+        data = {'stars': self._read_gal_stars_file(subhalo_id)}
+
+        particle_conditions = {}
+        for col, type_config in self.catalog.fields.particles.items():
+            for t in type_config:
+                if 'filter' in type_config[t]:
+                    if col not in particle_conditions:
+                        particle_conditions[col] = {}
+                    particle_conditions[col][t] = type_config[t]
+
+        table = 'particles'
+        steps = [
+            lambda particles: validate_and_process_fields(particles, self.particle_fields, table, self.catalog),
+            lambda particles: convert_to_dataframe(particles),
+            lambda particles: apply_unit_conversion(particles, self.particle_fields, table, self.catalog),
+            lambda particles: apply_filters(particles, particle_conditions, self.catalog.fields.particles),
+        ]
+        processed_particles = run_pipeline(data, steps)
+        particle_data = SubhaloParticles(processed_particles, self.catalog.fields.particles)
+        logger.debug(f"Star particles fetched successfully for subhalo {subhalo_id}.")
+        return particle_data
+
+    def _get_p_halo(self, halo: Halo) -> SubhaloParticles:
+        """
+        Fetch and concatenate star-particle data for every subhalo of a halo.
+
+        Mirrors Illustris300Fetcher._get_p_halo: loops `halo.subhalo_ids`
+        (populated by `_get_halos()`, from the same id_parents linkage
+        `_get_subhalos()` computes) and merges each galaxy's particles via
+        `SubhaloParticles.__add__`.
+
+        Returns:
+        --------
+        SubhaloParticles
+            Combined star-particle data for all of the halo's subhalos,
+            with `overlapping_particles_id` reset to None. `None` if the
+            halo has no subhalos at all (should not normally happen, since
+            every halo is its own central subhalo).
+        """
+        logger.debug(f"Fetching particle data for halo: {halo.halo_id}")
+        subhalo_ids = halo.subhalo_ids
+        particles_halo = None
+        for subhalo_id in subhalo_ids:
+            particles = self._get_p_subhalo(subhalo_id)
+            if particles_halo is None:
+                particles_halo = particles
+            else:
+                particles_halo += particles
+
+        if particles_halo is not None:
+            particles_halo.overlapping_particles_id = None
+        logger.debug(f"Particle data for halo {halo.halo_id}: {particles_halo}")
+        return particles_halo
+
     def _get_halos(self) -> HaloContext:
         """
         Fetch all top-level (`level == 1`) objects from the catalogue as halos.
+
+        Also computes each halo's `subhalo_ids` — the raw catalogue `ID`
+        values of every subhalo/galaxy (any level) whose `id_parents`
+        equals this halo's ID, per `_get_subhalos()`'s own linkage — so
+        `get_p_halo()` can gather star particles across a halo's full
+        substructure, the same convention Illustris300Fetcher uses.
 
         Returns:
         --------
@@ -4021,13 +4188,15 @@ class ObeliskFetcher(DataFetcher):
         logger.debug("Fetching halos from Obelisk...")
 
         self._inject_structural_field(self.halo_fields, 'ID', 'halo_id')
-        # 'pos' is declared under both fields.halo (-> gpos) and
-        # fields.subhalo (-> spos) with the SAME raw key, so the shared
-        # self.column_map dict built once in __build_config() only holds
-        # whichever of the two was merged in last — same situation
-        # FlamingoFetcher's input_halos.halo_centre is in, fixed the same
-        # way: re-assert the mapping this context needs right before use.
+
+        # _get_subhalos() is needed up front to populate subhalo_ids below;
+        # it also re-asserts self.column_map['pos'] = 'spos' and
+        # ['ID'] = 'subhalo_id' (both shared raw keys with our own
+        # 'pos' -> 'gpos' / 'ID' -> 'halo_id'), so re-assert both again
+        # right after, before this method's own pipeline runs.
+        subhalo_context = self._get_subhalos()
         self.column_map['pos'] = 'gpos'
+        self.column_map['ID'] = 'halo_id'
 
         raw = self._raw_copy()
         level_mask = raw['level'] == 1
@@ -4044,7 +4213,15 @@ class ObeliskFetcher(DataFetcher):
             lambda h: apply_unit_conversion(h, self.halo_fields, table, self.catalog),
             lambda h: apply_filters(h, halo_conditions, self.catalog.fields.halo),
         ]
-        processed_halos = run_pipeline(halos, steps)
+        processed_halos = run_pipeline(halos, steps).copy()
+        # subhalo_ids: raw catalogue IDs of every subhalo (any level)
+        # belonging to this halo — the same set get_subhalos() assigns
+        # id_parents == ID to. 'ID' (not yet 'halo_id') since column_map
+        # renaming only happens inside HaloContext.__init__, below.
+        processed_halos['subhalo_ids'] = processed_halos['ID'].apply(
+            lambda hid: subhalo_context.data.loc[subhalo_context.data['id_parents'] == hid, 'subhalo_id'].tolist()
+        )
+        self.column_map['subhalo_ids'] = 'subhalo_ids'
         halo_context = HaloContext(processed_halos, self.column_map)
         logger.debug(f"Halo data fetched successfully: {halo_context.data['halo_id'].nunique()} halos.")
         return halo_context
