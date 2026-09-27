@@ -12,11 +12,7 @@ ObeliskFetcher, see its docstring).
 Edit the constants below to point at real data, then run directly:
     python src/data_generation/test/manual_tests/manual_test_obelisk.py
 """
-import rootutils
 from hydra import compose, initialize_config_dir
-
-PROJECT_ROOT = rootutils.setup_root(__file__, pythonpath=True)
-
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 
 
@@ -32,7 +28,7 @@ def load_obelisk_config():
     default (see configs/data_generation.yaml's `defaults` list), then apply
     the CATALOG_PATH/SNAPNUM/LBOX overrides above.
     """
-    configs_dir = str(PROJECT_ROOT / "configs")
+    configs_dir = "../../../../configs"
     with initialize_config_dir(config_dir=configs_dir, version_base=None):
         cfg = compose(config_name="data_generation.yaml")
         cfg.catalog = compose(config_name="catalog/obelisk.yaml")["catalog"]
