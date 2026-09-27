@@ -3,9 +3,10 @@ defaults:
   - paths: gpfs
 #  - catalog: tngcluster
 #  - catalog: illustris300
-  - catalog: magneticum
+#  - catalog: magneticum
 #  - catalog: flamingo
 #  - catalog: millenium
+  - catalog: obelisk
   - extras: default
   - hydra: default
 
