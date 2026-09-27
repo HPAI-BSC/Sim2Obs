@@ -1894,6 +1894,28 @@ class FlamingoFetcher(DataFetcher):
         self.fof_subhalos = sw.load(fof_path)
         self.particles = sw.load(path)
 
+        # configs/catalog/flamingo.yaml's Lbox is the box's COMOVING size
+        # (677400 kpc/h == 1000 comoving Mpc, the "L1000" in L1000N0900,
+        # times h — verified against this file's own metadata.boxsize).
+        # But _validate_and_process_fields() converts every SOAP/particle
+        # position field to PHYSICAL units via .convert_to_physical()
+        # before this fetcher's "x * h" scaling ever runs. Comparing those
+        # physical deltas against a still-comoving Lbox/2 in the periodic-
+        # boundary correction (SubhaloContext.preprocess /
+        # SubhaloParticles.preprocess) silently mis-wraps objects near the
+        # box edge. Converting Lbox to physical once here, using the
+        # snapshot's own true scale factor (not the YAML's separately
+        # hand-entered `a`, which is never cross-checked against the file),
+        # keeps it consistent with the positions everywhere it's later read
+        # from self.catalog.Lbox — no changes needed to the shared PBC code
+        # or to other fetchers, which stay fully comoving and are
+        # unaffected by this mutation (it's scoped to this instance's copy
+        # of the config). Lbox itself stays optional (some test catalogs
+        # omit it, since not every test exercises PBC-dependent behaviour).
+        lbox = OmegaConf.select(self.catalog, "Lbox", default=None)
+        if lbox is not None:
+            self.catalog.Lbox = lbox * float(self.fof_subhalos.metadata.a)
+
     def _get_halos(self) -> HaloContext:
         """
         Fetches halo data from the Flamingo simulation.
@@ -4066,10 +4088,18 @@ class ObeliskFetcher(DataFetcher):
             raise Exception(f'The path {path} does not exist.')
 
         with FortranFile(path) as ff:
+            # nparts and the per-particle id below are int64 ('q'), not
+            # int32 ('i') as galstars.py's default (longint=False) assumes —
+            # confirmed against real gal_stars files: reading nparts as
+            # int32 splits its 8-byte record into 2 elements instead of 1
+            # ("Expected a record of length 1, got 2"); as int64 it reads
+            # as a single value that exactly matches the star-particle
+            # array lengths that follow, and the file is consumed to
+            # exactly its last byte.
             header = ff.read_attrs([
                 ('id', 1, 'i'), ('level', 1, 'i'), ('mass', 1, 'd'),
                 ('position', 3, 'd'), ('velocity', 3, 'd'), ('angular_momentum', 3, 'd'),
-                ('nparts', 1, 'i'),
+                ('nparts', 1, 'q'),
             ])
             if int(header['id']) != int(subhalo_id):
                 raise Exception(
@@ -4083,7 +4113,7 @@ class ObeliskFetcher(DataFetcher):
             velocity_y = ff.read_vector('d')
             velocity_z = ff.read_vector('d')
             mass = ff.read_vector('d')
-            particle_id = ff.read_vector('i')
+            particle_id = ff.read_vector('q')
             birth_time = ff.read_vector('d')
             metallicity = ff.read_vector('d')
 

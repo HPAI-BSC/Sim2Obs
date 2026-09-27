@@ -18,9 +18,20 @@
 #     The master (`Obelisk_catalogue.h5`) and main-only
 #     (`Obelisk_main_catalogue.h5`) files use the same per-group layout if a
 #     single combined file is preferred instead.
-#   - Particle-level (fields.particles.stars) position/velocity units are
-#     UNCONFIRMED — see the caution comment above that block. Not yet run
-#     against real gal_stars_* data.
+#   - Particle-level (fields.particles.stars): mass and position confirmed
+#     against real gal_stars_* data (see their own comments below).
+#     Velocity is still UNCONFIRMED — no catalogue equivalent to cross-check
+#     it against.
+#   - Halo/subhalo split uses AdaptaHOP's `level == 1` (see
+#     ObeliskFetcher._get_halos), not `is_central`. Checked against real
+#     data: every level==1 row is also is_central, but ~36% of is_central
+#     rows have level > 1 (AdaptaHOP nesting != true centrality, per the
+#     Obelisk team) — among these, 23 objects (up to 1.7e12 Msun, close to
+#     the most massive halo in the box) would independently pass the
+#     current mvir filter if treated as their own halos, instead of being
+#     folded into another halo's subhalo_ids as they are today. This is a
+#     known, deliberate scope decision (keep level==1), not an oversight —
+#     revisit if halo completeness near this mass range matters later.
 
 name: obelisk
 snapnum: 201        # z=3.56 (lowest value available, see README table)
@@ -103,32 +114,38 @@ fields:
 
   particles:
     stars:
-      # CAUTION — UNCONFIRMED UNITS: neither the README nor the galstars.py
-      # reference reader documents what units these per-galaxy gal_stars_*
-      # Fortran files use. Unlike the main catalogue's x/y/z (explicitly
-      # documented as [0,1] box-unit fractions), position_x/y/z here may
-      # already be comoving Mpc/kpc rather than box units — a common
-      # convention for this kind of RAMSES/AdaptaHOP per-object particle
-      # dump. Scaling is left as a pass-through (null) until this is
-      # verified against real data.
-      # Suggested check: for one galaxy, compare mean(position) from its
-      # gal_stars file against that same ID's xstar/ystar/zstar in the main
-      # catalogue (the star-based shrinking-sphere centre) — matching units
-      # should put both in the same ballpark once in the same frame.
+      # CONFIRMED against real data (gal_stars_0000256, an ID present in the
+      # main catalogue): position_x/y/z are PHYSICAL (proper) Mpc, relative
+      # to the box CENTRE — not comoving, no h, and not box-fraction like
+      # the main catalogue's x/y/z. Converting to comoving kpc/h (matching
+      # gpos/spos elsewhere in this config) means undoing both the
+      # comoving->physical scaling (divide by a) and the box-centre offset
+      # (add back Lbox/2): `Lbox/2 + (x/a) * h * 1000`. Verified to ~1e-6
+      # relative precision against mean(gal_stars position) vs. that same
+      # galaxy's catalogue x/y/z * Lbox.
       position:
-        input: null
-        output: null
-        scaling: null
+        input: "physical Mpc, relative to box centre"
+        output: "kpc/h"
+        scaling: "Lbox/2 + (x/a) * h * 1000"
         name: "p"
       velocity:
-        input: "km/s"   # assumed, unconfirmed — see caution above
+        # UNCONFIRMED (unlike position/mass above, not yet cross-checked
+        # against real data — there's no direct catalogue equivalent to
+        # compare a per-particle velocity mean against). Given position
+        # turned out to be physical rather than comoving, this may need
+        # the same a-dependent treatment; verify before trusting star_v.
+        input: "km/s"
         output: "km/s"
         scaling: "x"
         name: "v"
       mass:
-        input: "Msun"
+        # CONFIRMED against real data (gal_stars_0000256 vs its catalogue
+        # mstar): catalogue_mstar / gal_stars_mass_sum = 1.000000e+11
+        # exactly — an exact round number, i.e. per-particle mass is in
+        # RAMSES code units where 1 code unit = 1e11 Msun.
+        input: "1e11 Msun"
         output: "Msun/h"
-        scaling: "x * h"
+        scaling: "x * 1e11 * h"
         name: "m"
 
 ignore_halos: []
