@@ -14,6 +14,7 @@ Edit the constants below to point at real data, then run directly:
 """
 import os
 
+import numpy as np
 from hydra import compose, initialize_config_dir
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 
@@ -70,12 +71,36 @@ def main():
 
     print()
     print("=" * 60)
+    print("DIAGNOSTIC: raw level / mvir distributions (before any filtering)")
+    print("=" * 60)
+    level = np.asarray(fetcher._raw["level"])
+    mvir = np.asarray(fetcher._raw["mvir"])
+    levels, counts = np.unique(level, return_counts=True)
+    print(f"level value counts: {dict(zip(levels.tolist(), counts.tolist()))}")
+    n_level1 = int(np.sum(level == 1))
+    print(f"rows with level == 1: {n_level1}")
+    print(f"mvir [Msun] over level==1 rows: min={mvir[level == 1].min():.3e}  "
+          f"max={mvir[level == 1].max():.3e}  median={np.median(mvir[level == 1]):.3e}"
+          if n_level1 > 0 else "mvir over level==1 rows: N/A (no level==1 rows)")
+    # the config's halo filter is "m200 (Msun/h) > 1e13 * H", i.e. mvir (Msun) > 1e13 in Msun terms
+    threshold_msun = 1e13
+    n_above = int(np.sum((level == 1) & (mvir > threshold_msun)))
+    print(f"level==1 rows with mvir > {threshold_msun:.0e} Msun (the config's current filter threshold): {n_above}")
+
+    print()
+    print("=" * 60)
     print("TEST 1: get_halos()")
     print("=" * 60)
-    halo_context = fetcher.get_halos()
-    print(f"Total halos: {len(halo_context.data)}")
-    print(f"Columns: {list(halo_context.data.columns)}")
-    print(halo_context.data.head())
+    halo_context = None
+    try:
+        halo_context = fetcher.get_halos()
+        print(f"Total halos: {len(halo_context.data)}")
+        print(f"Columns: {list(halo_context.data.columns)}")
+        print(halo_context.data.head())
+    except Exception as e:
+        print(f"get_halos() FAILED: {type(e).__name__}: {e}")
+        print("(continuing to TEST 2 anyway — get_subhalos() has no mass filter, so it should still work "
+              "even if get_halos() legitimately found zero halos above the mass cut)")
 
     print()
     print("=" * 60)
@@ -85,6 +110,13 @@ def main():
     print(f"Total subhalos: {len(subhalo_context.data)}")
     print(f"Columns: {list(subhalo_context.data.columns)}")
     print(subhalo_context.data.head())
+
+    if halo_context is None:
+        print()
+        print("=" * 60)
+        print("SANITY CHECK skipped (get_halos() failed above)")
+        print("=" * 60)
+        return
 
     print()
     print("=" * 60)
