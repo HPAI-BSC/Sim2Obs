@@ -115,7 +115,7 @@ class TestUtils(unittest.TestCase):
         store_overlapping_matrix_as_df(cfg_illustris, overlapping_matrix)
 
     def test_filter_outliers(self):
-        df = pd.read_csv('../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/_millenium_MTNG-L500-4320-A_transition_radius.csv')
+        df = pd.read_csv('../../../transition_radius_exploration/magneticum/_magneticum_transition_radius.csv')
         transition_radius = df['transition_radius']
         tmp = df.describe()
         percentiles = [97]
@@ -139,7 +139,7 @@ class TestUtils(unittest.TestCase):
         sts = new_df.describe()
         print()
 
-        errors_df = pd.read_csv('../../../transition_radius_exploration/millenium/MTNG-L500-4320-A/errors__millenium_MTNG-L500-4320-A.csv')
+        errors_df = pd.read_csv('../../../transition_radius_exploration/magneticum/errors__magneticum.csv')
         halos = errors_df['halo_id']
         final_set = set(ignored_halos).union(set(halos))
         print()

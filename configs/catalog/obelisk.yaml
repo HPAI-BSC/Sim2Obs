@@ -1,0 +1,104 @@
+# Obelisk main catalogue (AdaptaHOP halo/galaxy properties, post-processed
+# HDF5 — see src/data_generation/test/data/obelisk/README.md for the full
+# field list and units).
+#
+# PROVISIONAL — not yet validated against real data (no local sample exists
+# yet beyond the README). H and Lbox below are confirmed from the published
+# Obelisk papers (see their comments); everything else is still unverified.
+# Before running for real:
+#   - kpc-vs-kpc/h and comoving-vs-physical convention for rvir/r50_kpc/etc:
+#     the README states units as plain "kpc"/"Msun"/"km/s" without saying
+#     comoving vs physical. Scalings below assume physical (proper) kpc and
+#     plain Msun, matching how Trebitsch et al. papers typically report
+#     these quantities for AdaptaHOP-derived catalogues — but this is an
+#     assumption, not confirmed against the actual file. Verify against a
+#     real catalogue (or ask the Obelisk team) before trusting downstream
+#     features derived from these.
+#   - File variant: assumes the per-snapshot file
+#     `Obelisk_{snapnum:05d}_catalogue.h5` (see ObeliskFetcher.load_files).
+#     The master (`Obelisk_catalogue.h5`) and main-only
+#     (`Obelisk_main_catalogue.h5`) files use the same per-group layout if a
+#     single combined file is preferred instead.
+
+name: obelisk
+snapnum: 201        # z=3.56 (lowest value available, see README table)
+a: 0.21947         # aexp for snapnum=201, from the README's timestep table
+# H0 = 70.4 km/s/Mpc (h=0.704) — Obelisk uses the same WMAP-7 LCDM cosmology
+# as its parent Horizon-AGN simulation.
+# Source: Trebitsch et al. 2021, "The OBELISK simulation: galaxies
+# contribute more than AGN to HI reionization of protoclusters", A&A 653,
+# A5, Sect. 2 (cosmological parameters).
+# https://www.aanda.org/articles/aa/ref/2021/09/aa37698-20/aa37698-20.html
+# Cross-checked against the same value in the Obelisk follow-up papers:
+# https://www.aanda.org/articles/aa/full_html/2023/08/aa46435-23/aa46435-23.html
+# https://www.aanda.org/articles/aa/full_html/2025/03/aa51963-24/aa51963-24.html
+H: 0.704
+
+# 100 h^-1 Mpc = 100,000 h^-1 kpc (comoving) — the full Horizon-AGN parent
+# box. Obelisk re-simulates a ~1e4 cMpc^3 overdense region within it at high
+# resolution (a RAMSES zoom), but positions in this catalogue are still
+# given as [0,1] box units spanning the FULL parent box, not just the
+# zoomed sub-region — the standard RAMSES convention.
+# Source: Trebitsch et al. 2021 (same paper as above), Sect. 2.1: "the rest
+# of the 100 h^-1 cMpc Horizon-AGN box is maintained at a lower resolution".
+# https://www.aanda.org/articles/aa/ref/2021/09/aa37698-20/aa37698-20.html
+Lbox: 100000.0
+
+path: ${paths.datasets_dir}/obelisk
+
+fields:
+  halo:
+    mvir:
+      input: "Msun"
+      output: "Msun/h"
+      scaling: "x * h"
+      name: "m200"
+      filter: [ "> 1e13 * 0.704" ]
+    rvir:
+      input: "kpc"
+      output: "kpc/h"
+      scaling: "x * h"
+      name: "r200"
+    pos:
+      # built from x/y/z (box units, [0,1]) by ObeliskFetcher._stack_position
+      input: "box units"
+      output: "kpc/h"
+      scaling: "x * Lbox"
+      name: "gpos"
+    sigma:
+      # CAUTION (see README "LATEST NEWS", 2026-02-18): AdaptaHOP's velocity
+      # dispersion calculation is flagged as systematically overestimating
+      # ALL velocity dispersions, unfixed as of the catalogue version this
+      # README documents. Kept here so it's visible in the schema, but
+      # anything consuming it downstream (e.g. VelocityDispersionProcessor)
+      # should treat it as known-biased until the Obelisk team ships a fix.
+      input: "km/s"
+      output: "km/s"
+      scaling: "x"
+      name: "sigma_v"
+
+  subhalo:
+    mstar:
+      input: "Msun"
+      output: "Msun"
+      scaling: "x"
+      name: "mstr"
+      filter: "> 1e10"
+    r50_kpc:
+      input: "kpc"
+      output: "kpc/h"
+      scaling: "x * h"
+      name: "shmr"
+    pos:
+      # built from x/y/z (box units, [0,1]) by ObeliskFetcher._stack_position
+      # NB: uses the same all-particle shrinking-sphere centre as the halo's
+      # `pos`, not the star-only xstar/ystar/zstar centre — consistent with
+      # FlamingoFetcher using the same halo_centre field for both gpos/spos.
+      input: "box units"
+      output: "kpc/h"
+      scaling: "x * Lbox"
+      name: "spos"
+
+  particles: {}   # out of scope — see ObeliskFetcher.get_p_halo/get_p_subhalo
+
+ignore_halos: []

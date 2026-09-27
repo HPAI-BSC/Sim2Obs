@@ -6,8 +6,8 @@ import torch
 from PIL import Image
 from matplotlib import pyplot as plt
 
-folder_path_fi = '../data/tng_cluster/no_rotation_s1.5_2nd_it/VelocityDispersion'
-folder_path_fo = '../data/tng_cluster/no_rotation_s1.5_2nd_it/IntraClusterLight'
+folder_path_fi = '../data/millenium/2nd_iteration/VelocityDispersion'
+folder_path_fo = '../data/millenium/2nd_iteration/IntraClusterLight'
 
 #folder_path = '../../../../local/data/datasets/millenium/MTNG-L31.25-270-A/no_rotation_s1.5/VelocityDispersion'
 #folder_path = '../../../../local/data/datasets/millenium/MTNG-L31.25-270-A/no_rotation_s1.5/IntraClusterLight'
@@ -21,7 +21,7 @@ folder_path_fo = '../data/tng_cluster/no_rotation_s1.5_2nd_it/IntraClusterLight'
 #folder_path = '../../../../local/data/datasets/eagle/AGNdT9L0050N0752/no_rotation_s1.5/VelocityDispersion'
 #folder_path = '../../../../local/data/datasets/eagle/AGNdT9L0050N0752/no_rotation_s1.5/IntraClusterLight'
 
-folder_path = folder_path_fo
+folder_path = folder_path_fi
 npz_files = glob.glob(os.path.join(folder_path, "*.npz"))
 
 npz_files.sort()
