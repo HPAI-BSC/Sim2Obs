@@ -9,7 +9,7 @@
 #SBATCH -c 64               # Cores per task requested — MN5 has no --mem flag; memory is
                              # auto-set per core (GPP: 2G/core), so 64 cores -> 128G total.
                              # Obelisk halos can have tens of millions of star particles.
-#SBATCH -t 02:00:00         # Run time (hh:mm:ss)
+#SBATCH -t 10:00:00         # Run time (hh:mm:ss)
 #SBATCH --account bsc70
 #SBATCH --qos=gp_bsccs
 
