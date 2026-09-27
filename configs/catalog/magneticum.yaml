@@ -8,9 +8,9 @@ H: 0.704
 # TODO review params
 Lbox: 290294.4   # box size in kpc/h, box_size_raw = snap.header.BoxSize  # 352000.0 ckpc/h
 
-# TODO recompute it
-transition_radius: 637.031 # kpc
-spatial_resolution: 1.480 # kpc
+# Recomputed
+transition_radius: 499.39 # kpc
+spatial_resolution: 2.425 # kpc # TODO review
 # bin_size = spatial_resolution * 1 ->
 # ensure that bins use a proper resolution,
 #bin_size > spatial resolution *1.5-2 times
@@ -87,4 +87,4 @@ fields:
         name: "m"
 
 
-ignore_halos: []
+ignore_halos: [67, 255, 315, 1050, 1066, 1163, 1390, 2712, 3245, 3554, 4206, 8718, 15657]

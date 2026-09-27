@@ -61,9 +61,9 @@ def get_generator(cfg, data_loader, n=None, starting_idx=None, ending_idx=None, 
     logger.debug(f'subhalo context: {type(subhalo_context)}')
 
     # TODO DEBUG
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
-    halo_context.data.to_csv(os.path.join(dataset_dir, 'obelisk_halo_context.csv'))
-    subhalo_context.data.to_csv(os.path.join(dataset_dir, 'obelisk_subhalo_context.csv'))
+    # dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/logs/'
+    # halo_context.data.to_csv(os.path.join(dataset_dir, 'obelisk_halo_context.csv'))
+    # subhalo_context.data.to_csv(os.path.join(dataset_dir, 'obelisk_subhalo_context.csv'))
     #as_subhalo_dataframe(subhalo_context).to_csv(os.path.join(dataset_dir, 'magneticum_subhalo_context.csv'))
 
     if len(ignore_halos) > 0:

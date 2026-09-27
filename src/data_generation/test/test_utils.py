@@ -54,13 +54,13 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(all(np.array_equal(a, b) for a, b in zip(converted, converted_ii)))
 
     def test_find_values(self):
-        comoving_resolution = 2.5 # for millenim
-        scale_factor = 0.8
+        comoving_resolution = 2 # magneticum TODO review
+        scale_factor = 0.8247
         spatial_resolution = comoving_resolution / scale_factor # Convert to physical kpc
         print(spatial_resolution)
 
         # bin calculation
-        TR = 703.578
+        TR = 499.39
         fov = TR * 2
         r = fov / 2  # Radius of the field of view
 
