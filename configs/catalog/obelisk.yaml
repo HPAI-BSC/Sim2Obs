@@ -22,16 +22,18 @@
 #     against real gal_stars_* data (see their own comments below).
 #     Velocity is still UNCONFIRMED — no catalogue equivalent to cross-check
 #     it against.
-#   - Halo/subhalo split uses AdaptaHOP's `level == 1` (see
-#     ObeliskFetcher._get_halos), not `is_central`. Checked against real
-#     data: every level==1 row is also is_central, but ~36% of is_central
-#     rows have level > 1 (AdaptaHOP nesting != true centrality, per the
-#     Obelisk team) — among these, 23 objects (up to 1.7e12 Msun, close to
-#     the most massive halo in the box) would independently pass the
-#     current mvir filter if treated as their own halos, instead of being
-#     folded into another halo's subhalo_ids as they are today. This is a
-#     known, deliberate scope decision (keep level==1), not an oversight —
-#     revisit if halo completeness near this mass range matters later.
+#   - RESOLVED: halo/subhalo split now uses AdaptaHOP's `is_central` flag
+#     (see ObeliskFetcher._get_halos), not `level == 1`. Every level==1 row
+#     is also is_central, but ~36% of is_central rows have level > 1
+#     (AdaptaHOP nesting != true centrality — a level>1 object can sit
+#     outside its level-1 parent's virial radius entirely). Confirmed with
+#     the Obelisk team (Maxime Trebitsch): use `is_central` for halos, and
+#     `host`/`hostsub` to identify parents. Switching from level==1 fixed a
+#     real gap: 23 objects (up to 1.7e12 Msun, close to the most massive
+#     halo in the box) were being folded into another halo's subhalo_ids
+#     instead of counted as their own halo. Verified against real data
+#     (snapnum 201): is_central now returns 2518 halos vs level==1's 1612,
+#     recovering exactly those 23 above the mvir filter.
 
 name: obelisk
 snapnum: 201        # z=3.56 (lowest value available, see README table)

@@ -3907,10 +3907,19 @@ class ObeliskFetcher(DataFetcher):
     Obelisk's particle dumps — only stars, unlike the DM+gas+stars
     catalogues the generic particles pipeline was originally built for.
 
-    Halo/subhalo split: AdaptaHOP's own `level` field (1 = top-level halo,
-    >1 = substructure) plus `host` (ID of the TOP-level parent, already
-    flattening arbitrary nesting depth) map directly onto this pipeline's
-    2-level halo/subhalo model — the same "halos and subhalos are the same
+    Halo/subhalo split: uses AdaptaHOP's `is_central` flag, not `level`.
+    Confirmed with the Obelisk team (Maxime Trebitsch): `level > 1` only
+    means an object sits within another structure's AdaptaHOP "radius", not
+    that it is gravitationally bound to it or should be called a satellite
+    — a level-2 structure can be outside its level-1 parent's virial radius
+    entirely. `is_central` is the field that actually reflects this
+    ("neither within their direct nor top-level parent"), and `host`/
+    `hostsub` are the recommended way to identify parents. On real data,
+    ~36% of `is_central` rows have `level > 1` (up to ~1.7e12 Msun), so the
+    two fields disagree often, not just at the margins. `is_central`
+    objects map to this pipeline's halos, `host` (ID of the TOP-level
+    parent, already flattening arbitrary nesting depth) maps non-central
+    objects to their halo — the same "halos and subhalos are the same
     table, filtered differently" shape FlamingoFetcher uses.
 
     Unlike Flamingo, there is no row-position vs true-catalogue-index split
@@ -3968,11 +3977,11 @@ class ObeliskFetcher(DataFetcher):
         return dict(self._raw)
 
     def get_halos(self, *args, **kwargs) -> HaloContext:
-        """Fetch halo (level == 1) data from the Obelisk catalogue. See `_get_halos`."""
+        """Fetch halo (is_central == True) data from the Obelisk catalogue. See `_get_halos`."""
         return self._get_halos()
 
     def get_subhalos(self, *args, **kwargs) -> SubhaloContext:
-        """Fetch subhalo (all levels) data from the Obelisk catalogue. See `_get_subhalos`."""
+        """Fetch subhalo (all objects, any level/is_central) data from the Obelisk catalogue. See `_get_subhalos`."""
         return self._get_subhalos()
 
     def get_p_subhalo(self, *args, **kwargs) -> SubhaloParticles:
@@ -4201,7 +4210,14 @@ class ObeliskFetcher(DataFetcher):
 
     def _get_halos(self) -> HaloContext:
         """
-        Fetch all top-level (`level == 1`) objects from the catalogue as halos.
+        Fetch all central (`is_central == True`) objects from the catalogue as halos.
+
+        Uses `is_central`, not `level == 1` — confirmed with the Obelisk
+        team that `level` reflects AdaptaHOP's spatial nesting radius, not
+        gravitational boundedness, so a `level > 1` object can still be a
+        genuine standalone halo (`is_central == True`). See the class
+        docstring for the full explanation and the real-data discrepancy
+        this caused under the old `level`-based logic.
 
         Also computes each halo's `subhalo_ids` — the raw catalogue `ID`
         values of every subhalo/galaxy (any level) whose `id_parents`
@@ -4229,8 +4245,8 @@ class ObeliskFetcher(DataFetcher):
         self.column_map['ID'] = 'halo_id'
 
         raw = self._raw_copy()
-        level_mask = raw['level'] == 1
-        halos = {k: v[level_mask] for k, v in raw.items()}
+        central_mask = raw['is_central']
+        halos = {k: v[central_mask] for k, v in raw.items()}
         halos = self._stack_position(halos)
 
         table = 'halo'
@@ -4258,14 +4274,14 @@ class ObeliskFetcher(DataFetcher):
 
     def _get_subhalos(self) -> SubhaloContext:
         """
-        Fetch every object in the catalogue (all `level` values) as subhalos.
+        Fetch every object in the catalogue (any `level`, any `is_central`) as subhalos.
 
         Returns:
         --------
         SubhaloContext
             Subhalos passing the configured filters, with `subhalo_id`
             taken from the catalogue's own `ID` column and `id_parents`
-            set to `ID` (for `level == 1` rows) or `host` (otherwise).
+            set to `ID` (for `is_central == True` rows) or `host` (otherwise).
         """
         logger.debug("Fetching subhalos from Obelisk...")
 
@@ -4274,12 +4290,13 @@ class ObeliskFetcher(DataFetcher):
         self.column_map['pos'] = 'spos'  # see _get_halos() for why this must be re-asserted here
 
         raw = self._raw_copy()
-        # id_parents: self ID for top-level (central) objects, `host` (already
-        # in ID-space, already flattened to the top-level parent) otherwise —
+        # id_parents: self ID for central objects, `host` (already in
+        # ID-space, already flattened to the top-level parent) otherwise —
         # mirrors FlamingoFetcher.__reindexing_satellites' role, but Obelisk
         # needs no row-position/true-id conversion since host/ID share a
-        # namespace already.
-        raw['id_parents_computed'] = np.where(raw['level'] == 1, raw['ID'], raw['host'])
+        # namespace already. Uses `is_central`, not `level == 1` — see
+        # class docstring / Obelisk team guidance.
+        raw['id_parents_computed'] = np.where(raw['is_central'], raw['ID'], raw['host'])
         raw = self._stack_position(raw)
 
         table = 'subhalo'
