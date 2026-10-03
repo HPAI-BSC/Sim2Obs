@@ -28,43 +28,6 @@ logger = setup_logger("DataLoader-step")
 os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 
-def filter_outliers_transition_radius(transition_radius_path):
-    """
-    Exploratory helper: print and plot how filtering transition-radius
-    outliers by percentile affects the resulting halo sample.
-
-    Reads a CSV of per-halo transition radii, then for each percentile in
-    [99, 98, 97, 96, 95] keeps only halos whose transition radius falls
-    within [100-percentile, percentile], prints the resulting sample size
-    and number of halos dropped, and plots a histogram of
-    transition_radius/R200 for the kept halos. Not part of the pipeline
-    proper — a standalone diagnostic for tuning the outlier cut.
-
-    Parameters:
-    -----------
-    transition_radius_path : str
-        Path to a CSV file with `transition_radius`, `R200`, and `halo_id`
-        columns.
-    """
-    df = pd.read_csv(transition_radius_path)
-    transition_radius = df['transition_radius']
-    print(transition_radius.describe())
-
-    percentiles = [99, 98, 97, 96, 95]
-
-    for percentile in percentiles:
-        upper_bound = np.percentile(transition_radius, percentile)
-        lower_bound = 100 - upper_bound
-        filtered_df = df[(transition_radius >= lower_bound) & (transition_radius <= upper_bound)]
-        print(
-            f'Percentile: {percentile}, transition radius [kpc]: {upper_bound}, final size: {len(filtered_df)}, Ignored halos: {len(df) - len(filtered_df)}')
-        ignored_halos = set(df['halo_id']) - set(filtered_df['halo_id'])
-        # print(ignored_halos)
-
-        plt.hist(filtered_df["transition_radius"] / filtered_df['R200'], bins=100)
-        plt.title(f"Transition radius/R200 distribution, percentile: {percentile}")
-        plt.show()
-
 
 class DataLoader(PipelineStep):
     """
