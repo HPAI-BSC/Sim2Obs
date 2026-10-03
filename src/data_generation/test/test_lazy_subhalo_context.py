@@ -24,7 +24,7 @@ def make_mock_subhalo_dataset(path: str, n_halos: int = 5, subhalos_per_halo: in
             records.append({
                 "subhalo_id": subhalo_counter,
                 # FIX: real subhalo catalog schema field is "id_parents",
-                # not "parent_id" (see MagneticumFetcher._get_subhalos --
+                # not "parent_id" (see MagneticumFetcherV2._get_subhalos --
                 # df["parent_bucket"] = df["id_parents"] % 128). Mock data
                 # now mirrors production schema.
                 "id_parents": halo_id,

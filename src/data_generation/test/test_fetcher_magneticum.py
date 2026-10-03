@@ -13,7 +13,7 @@ from omegaconf import OmegaConf
 from rootutils import rootutils
 rootutils.setup_root(__file__, pythonpath=True)
 
-from src.data_generation.src.data_fetcher import MagneticumFetcher
+from src.data_generation.src.data_fetcher import MagneticumFetcherV2
 from src.data_generation.src.halo import HaloContext
 from src.data_generation.src.lazy_subhalo import LazySubhaloContext, LazySubhaloParticles
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
@@ -108,7 +108,7 @@ def mock_catalog():
 @pytest.fixture
 def fetcher(mock_catalog):
     with patch("g3read.read_new"), patch("g3read.yield_all_files", return_value=[]):
-        f = MagneticumFetcher(catalog=mock_catalog)
+        f = MagneticumFetcherV2(catalog=mock_catalog)
 
     f._cache_loaded        = True
     f._group_base          = "/fake/group_base"
@@ -134,7 +134,15 @@ def fetcher(mock_catalog):
 
 # ── tests ──────────────────────────────────────────────────────────────────────
 
-class TestMagneticumFetcher:
+
+def _assign_all_to_zero(ids):
+    """Stand-in for _assign_halo_ids/_assign_subhalo_ids: every particle -> id 0.
+    These tests exercise _store_particles' output shape, not the PID matching
+    (which has its own tests in test_fetcher_magneticum_v2.py)."""
+    return np.zeros(len(ids), dtype=np.int32)
+
+
+class TestMagneticumFetcherV2:
 
     # ── _load_catalog_cache ────────────────────────────────────────────────────
 
@@ -161,15 +169,15 @@ class TestMagneticumFetcher:
 
         with patch("g3read.read_new", side_effect=fake_read_new), \
              patch("g3read.yield_all_files", return_value=[]), \
-             patch.object(MagneticumFetcher, "_build_pid_file_boundaries", return_value=[]):
-            f = MagneticumFetcher(catalog=mock_catalog)
+             patch.object(MagneticumFetcherV2, "_build_pid_file_boundaries", return_value=[]):
+            f = MagneticumFetcherV2(catalog=mock_catalog)
             f._load_catalog_cache()
         assert f._cache_loaded is True
 
     def test_load_catalog_cache_empty_returns_early(self, mock_catalog):
         with patch("g3read.read_new", return_value={}), \
              patch("g3read.yield_all_files", return_value=[]):
-            f = MagneticumFetcher(catalog=mock_catalog)
+            f = MagneticumFetcherV2(catalog=mock_catalog)
             result = f._load_catalog_cache()
         assert result == {}
 
@@ -199,8 +207,8 @@ class TestMagneticumFetcher:
 
         with patch("g3read.read_new", side_effect=fake_read_new), \
              patch("g3read.yield_all_files", return_value=[]), \
-             patch.object(MagneticumFetcher, "_build_pid_file_boundaries", return_value=[]):
-            f = MagneticumFetcher(catalog=mock_catalog)
+             patch.object(MagneticumFetcherV2, "_build_pid_file_boundaries", return_value=[]):
+            f = MagneticumFetcherV2(catalog=mock_catalog)
             f._load_catalog_cache()
 
         assert len(f._goff) == 2
@@ -232,80 +240,6 @@ class TestMagneticumFetcher:
         assert "ID  " in fetcher._snap_cache_config["star"]["fields_padded"]
         # ptype_int must resolve from the patched mapping
         assert fetcher._snap_cache_config["star"]["ptype_int"] == 4
-
-    # ── _build_pid_file_boundaries ─────────────────────────────────────────────
-
-    def test_build_pid_file_boundaries_empty_files(self, fetcher):
-        with patch("g3read.yield_all_files", return_value=[]):
-            result = fetcher._build_pid_file_boundaries()
-        assert result == []
-
-    def test_build_pid_file_boundaries_accumulates_offsets(self, fetcher):
-        fake_file = MagicMock()
-        fake_file.read.return_value = np.arange(10, dtype=np.int64)
-
-        with patch("g3read.yield_all_files", return_value=["f1.hdf5", "f2.hdf5"]), \
-             patch("g3read.GadgetFile", return_value=fake_file):
-            result = fetcher._build_pid_file_boundaries()
-
-        assert len(result) == 2
-        assert result[0]["start"] == 0
-        assert result[0]["end"]   == 10
-        assert result[1]["start"] == 10
-        assert result[1]["end"]   == 20
-
-    def test_build_pid_file_boundaries_skips_empty_pid_blocks(self, fetcher):
-        fake_file = MagicMock()
-        fake_file.read.return_value = np.array([])
-
-        with patch("g3read.yield_all_files", return_value=["f1.hdf5"]), \
-             patch("g3read.GadgetFile", return_value=fake_file):
-            result = fetcher._build_pid_file_boundaries()
-
-        assert result == []
-
-    # ── _get_pid_for_entity ────────────────────────────────────────────────────
-
-    def test_get_pid_for_entity_zero_length_returns_empty(self, fetcher):
-        result = fetcher._get_pid_for_entity(offset=0, length=0)
-        assert len(result) == 0
-        # FIX: np.array([]) defaults to float64; source must use dtype=np.int64
-        assert result.dtype == np.int64
-
-    def test_get_pid_for_entity_no_boundaries_returns_empty(self, fetcher):
-        fetcher._pid_file_boundaries = []
-        result = fetcher._get_pid_for_entity(offset=0, length=5)
-        assert len(result) == 0
-
-    def test_get_pid_for_entity_reads_correct_slice(self, fetcher):
-        fake_file = MagicMock()
-        fake_file.read.return_value = np.arange(20, dtype=np.int64)
-
-        fetcher._pid_file_boundaries = [{"file": "f1", "start": 0, "end": 20}]
-
-        with patch("g3read.GadgetFile", return_value=fake_file):
-            result = fetcher._get_pid_for_entity(offset=5, length=3)
-
-        np.testing.assert_array_equal(result, [5, 6, 7])
-
-    def test_get_pid_for_entity_spans_two_files(self, fetcher):
-        fake_file_1 = MagicMock()
-        fake_file_1.read.return_value = np.arange(10, dtype=np.int64)
-        fake_file_2 = MagicMock()
-        fake_file_2.read.return_value = np.arange(10, 20, dtype=np.int64)
-
-        fetcher._pid_file_boundaries = [
-            {"file": "f1", "start":  0, "end": 10},
-            {"file": "f2", "start": 10, "end": 20},
-        ]
-
-        def fake_gadget(path, **kwargs):
-            return fake_file_1 if path == "f1" else fake_file_2
-
-        with patch("g3read.GadgetFile", side_effect=fake_gadget):
-            result = fetcher._get_pid_for_entity(offset=8, length=4)
-
-        np.testing.assert_array_equal(result, [8, 9, 10, 11])
 
     # ── _get_halos ────────────────────────────────────────────────────────────
 
@@ -384,160 +318,6 @@ class TestMagneticumFetcher:
                     fetcher.get_subhalos()
         assert "GRNR" in fetcher.subhalo_fields
 
-    # ── _build_halo_intervals ─────────────────────────────────────────────────
-
-    def test_build_halo_intervals_skips_zero_length_halos(self, fetcher):
-        fetcher._glen = np.array([0, 10, 0])
-        fetcher._goff = np.array([0,  0, 0])
-
-        # Only called for halo 1 (length=10); halos 0 and 2 are length=0 and
-        # must be skipped by _build_halo_intervals before calling _get_pid_for_entity.
-        def fake_get_pid(offset, length):
-            assert length > 0, "_get_pid_for_entity must not be called with length=0"
-            return np.arange(offset, offset + length, dtype=np.int64)
-
-        with patch.object(fetcher, "_get_pid_for_entity", side_effect=fake_get_pid):
-            fetcher._build_halo_intervals()
-
-        assert len(fetcher._halo_intervals) == 1
-        assert fetcher._halo_intervals[0][2] == 1   # halo_id=1
-
-    def test_build_halo_intervals_sorted_by_min_pid(self, fetcher):
-        fetcher._glen = np.array([5, 5, 5])
-        fetcher._goff = np.array([0, 5, 10])
-
-        def fake_get_pid(offset, length):
-            return np.arange(offset, offset + length, dtype=np.int64)
-
-        with patch.object(fetcher, "_get_pid_for_entity", side_effect=fake_get_pid):
-            fetcher._build_halo_intervals()
-
-        starts = [iv[0] for iv in fetcher._halo_intervals]
-        assert starts == sorted(starts)
-
-    def test_build_halo_intervals_stores_min_max_halo_id(self, fetcher):
-        fetcher._glen = np.array([3])
-        fetcher._goff = np.array([0])
-
-        pids = np.array([7, 3, 9], dtype=np.int64)
-        with patch.object(fetcher, "_get_pid_for_entity", return_value=pids):
-            fetcher._build_halo_intervals()
-
-        iv = fetcher._halo_intervals[0]
-        assert iv[0] == 3   # min pid
-        assert iv[1] == 9   # max pid
-        assert iv[2] == 0   # halo_id
-
-    # ── _assign_halo_ids ──────────────────────────────────────────────────────
-
-    def test_assign_halo_ids_empty_input_returns_empty(self, fetcher):
-        fetcher._halo_intervals = [(0, 10, 0)]
-        result = fetcher._assign_halo_ids(np.array([], dtype=np.int64))
-        assert len(result) == 0
-
-    def test_assign_halo_ids_assigns_correct_halo(self, fetcher):
-        fetcher._halo_intervals = [(0, 9, 0), (10, 19, 1)]
-        ids    = np.array([5, 15], dtype=np.int64)
-        result = fetcher._assign_halo_ids(ids)
-        np.testing.assert_array_equal(result, [0, 1])
-
-    def test_assign_halo_ids_unmatched_returns_minus_one(self, fetcher):
-        fetcher._halo_intervals = [(0, 9, 0)]
-        ids    = np.array([50], dtype=np.int64)
-        result = fetcher._assign_halo_ids(ids)
-        assert result[0] == -1
-
-    def test_assign_halo_ids_early_exit_past_max(self, fetcher):
-        fetcher._halo_intervals = [(0, 9, 0), (100, 200, 1)]
-        ids    = np.array([5], dtype=np.int64)
-        result = fetcher._assign_halo_ids(ids)
-        # Halo 1 start (100) > ids.max() (5) → early exit; only halo 0 can match
-        assert result[0] == 0
-
-    # ── _build_subhalo_index ──────────────────────────────────────────────────
-
-    def test_build_subhalo_index_length_matches_soff(self, fetcher):
-        fetcher._build_subhalo_index()
-        assert len(fetcher._subhalo_index) == len(fetcher._soff)
-
-    def test_build_subhalo_index_tuples_are_pairs(self, fetcher):
-        # Source (doc 3) stores (start, end) — a 2-tuple only.
-        # The earlier 3-tuple design was reverted; third element removed.
-        fetcher._build_subhalo_index()
-        for item in fetcher._subhalo_index:
-            assert len(item) == 2
-
-    def test_build_subhalo_index_correct_slice_boundaries(self, fetcher):
-        fetcher._soff = np.array([0, 5])
-        fetcher._slen = np.array([5, 3])
-        fetcher._build_subhalo_index()
-        start0, end0 = fetcher._subhalo_index[0]
-        start1, end1 = fetcher._subhalo_index[1]
-        assert (start0, end0) == (0, 5)
-        assert (start1, end1) == (5, 8)
-
-    # ── _build_subhalo_pid_arrays ──────────────────────────────────────────────
-
-    def test_build_subhalo_pid_arrays_correct_mapping(self, fetcher):
-        fetcher._soff = np.array([0, 3])
-        fetcher._slen = np.array([3, 2])
-        fetcher._build_subhalo_index()
-
-        all_pids = np.array([10, 11, 12, 13, 14], dtype=np.int64)
-
-        def fake_get_subhalo_pid(offset, length):
-            return all_pids[offset:offset + length]
-
-        with patch.object(fetcher, "_get_subhalo_pid_for_entity",
-                          side_effect=fake_get_subhalo_pid):
-            fetcher._build_subhalo_pid_arrays()
-
-        def lookup(pid):
-            i = np.searchsorted(fetcher._subhalo_sorted_pids, pid)
-            if i < len(fetcher._subhalo_sorted_pids) and fetcher._subhalo_sorted_pids[i] == pid:
-                return int(fetcher._subhalo_sorted_ids[i])
-            return -1
-
-        assert lookup(10) == 0
-        assert lookup(12) == 0
-        assert lookup(13) == 1
-        assert lookup(14) == 1
-
-    def test_build_subhalo_pid_arrays_no_undefined_attributes(self, fetcher):
-        """Regression: no reference to self._pid or self._subhalos_pid."""
-        fetcher._build_subhalo_index()
-        with patch.object(fetcher, "_get_subhalo_pid_for_entity",
-                          return_value=np.array([], dtype=np.int64)):
-            fetcher._build_subhalo_pid_arrays()
-        assert hasattr(fetcher, "_subhalo_sorted_pids")
-        assert hasattr(fetcher, "_subhalo_sorted_ids")
-
-    # ── _assign_subhalo_ids ───────────────────────────────────────────────────
-
-    def test_assign_subhalo_ids_empty_input_returns_empty(self, fetcher):
-        fetcher._subhalo_sorted_pids = np.array([], dtype=np.int64)
-        fetcher._subhalo_sorted_ids  = np.array([], dtype=np.int32)
-        result = fetcher._assign_subhalo_ids(np.array([], dtype=np.int64))
-        assert len(result) == 0
-
-    def test_assign_subhalo_ids_correct_mapping(self, fetcher):
-        fetcher._subhalo_sorted_pids = np.array([10, 11, 12], dtype=np.int64)
-        fetcher._subhalo_sorted_ids  = np.array([0, 0, 1],   dtype=np.int32)
-        ids    = np.array([10, 12, 99], dtype=np.int64)
-        result = fetcher._assign_subhalo_ids(ids)
-        assert result[0] == 0
-        assert result[1] == 1
-        assert result[2] == -1   # unassigned
-
-    def test_assign_subhalo_ids_builds_arrays_if_absent(self, fetcher):
-        fetcher._build_subhalo_index()
-        if hasattr(fetcher, "_subhalo_sorted_pids"):
-            del fetcher._subhalo_sorted_pids
-        with patch.object(fetcher, "_get_subhalo_pid_for_entity",
-                          return_value=np.array([], dtype=np.int64)):
-            fetcher._assign_subhalo_ids(np.array([0, 1, 2], dtype=np.int64))
-        assert hasattr(fetcher, "_subhalo_sorted_pids")
-
     # ── _store_particles ──────────────────────────────────────────────────────
 
     def test_store_particles_loads_from_existing_parquet(self, fetcher):
@@ -577,11 +357,6 @@ class TestMagneticumFetcher:
         fetcher._cache_loaded = True
         assert not hasattr(fetcher, "_particle_cache_loaded")
 
-        fetcher._halo_intervals    = [(0, 4, 0)]
-        fetcher._subhalo_index     = [(0, 5)]
-        fetcher._subhalo_sorted_pids = np.arange(5, dtype=np.int64)
-        fetcher._subhalo_sorted_ids  = np.zeros(5, dtype=np.int32)
-
         snap_data = make_fake_snap_data(5)
 
         def fake_read_new(path, fields, ptype, **kwargs):
@@ -597,9 +372,8 @@ class TestMagneticumFetcher:
                  patch("pyarrow.parquet.write_to_dataset"), \
                  patch("src.data_generation.src.data_fetcher.LazySubhaloParticles"), \
                  patch.object(fetcher, "_run_particle_pipeline", side_effect=lambda d: d), \
-                 patch.object(fetcher, "_build_halo_intervals"), \
-                 patch.object(fetcher, "_build_subhalo_index"), \
-                 patch.object(fetcher, "_build_subhalo_pid_arrays"):
+                 patch.object(fetcher, "_assign_halo_ids", side_effect=_assign_all_to_zero), \
+                 patch.object(fetcher, "_assign_subhalo_ids", side_effect=_assign_all_to_zero):
                 fetcher._store_particles()
 
         assert fetcher._particle_cache_loaded is True
@@ -610,10 +384,6 @@ class TestMagneticumFetcher:
         snap_data = make_fake_snap_data(20)
 
         # _subhalo_index is now 2-tuples (start, end) — no third element.
-        fetcher._halo_intervals    = [(0, 19, 0)]
-        fetcher._subhalo_index     = [(0, 20)]
-        fetcher._subhalo_sorted_pids = np.arange(20, dtype=np.int64)
-        fetcher._subhalo_sorted_ids  = np.zeros(20, dtype=np.int32)
         fetcher._snap_cache_config = {
             "stars": {"fields_padded": ["ID  ", "POS ", "MASS"], "ptype_int": 4}
         }
@@ -638,15 +408,8 @@ class TestMagneticumFetcher:
                  patch("pyarrow.parquet.write_to_dataset", side_effect=capture_write), \
                  patch("src.data_generation.src.data_fetcher.LazySubhaloParticles"), \
                  patch.object(fetcher, "_run_particle_pipeline", side_effect=lambda d: d), \
-                 patch.object(fetcher, "_build_halo_intervals"), \
-                 patch.object(fetcher, "_build_subhalo_index"), \
-                 patch.object(fetcher, "_build_subhalo_pid_arrays"):
-                # _store_particles() unconditionally rebuilds these three via
-                # the calls above; patch them out so the pre-seeded
-                # _halo_intervals / _subhalo_index / _subhalo_sorted_pids
-                # above are what's actually exercised, instead of being
-                # silently overwritten by an empty rebuild (no PID boundary
-                # files exist in this mock setup).
+                 patch.object(fetcher, "_assign_halo_ids", side_effect=_assign_all_to_zero), \
+                 patch.object(fetcher, "_assign_subhalo_ids", side_effect=_assign_all_to_zero):
                 fetcher._store_particles()
 
         assert "table" in written, "write_to_dataset was never called"
@@ -656,10 +419,6 @@ class TestMagneticumFetcher:
         """Regression: parent_bucket_data must be a copy, not an alias."""
         snap_data = make_fake_snap_data(10)
 
-        fetcher._halo_intervals    = [(0, 9, 0)]
-        fetcher._subhalo_index     = [(0, 10)]
-        fetcher._subhalo_sorted_pids = np.arange(10, dtype=np.int64)
-        fetcher._subhalo_sorted_ids  = np.zeros(10, dtype=np.int32)
         fetcher._snap_cache_config = {
             "stars": {"fields_padded": ["ID  ", "POS ", "MASS"], "ptype_int": 4}
         }
@@ -684,13 +443,8 @@ class TestMagneticumFetcher:
                  patch("pyarrow.parquet.write_to_dataset", side_effect=capture_write), \
                  patch("src.data_generation.src.data_fetcher.LazySubhaloParticles"), \
                  patch.object(fetcher, "_run_particle_pipeline", side_effect=lambda d: d), \
-                 patch.object(fetcher, "_build_halo_intervals"), \
-                 patch.object(fetcher, "_build_subhalo_index"), \
-                 patch.object(fetcher, "_build_subhalo_pid_arrays"):
-                # See test_store_particles_includes_subhalo_id_column: these
-                # three are unconditionally rebuilt by _store_particles() and
-                # would otherwise overwrite the pre-seeded state above with
-                # an empty rebuild.
+                 patch.object(fetcher, "_assign_halo_ids", side_effect=_assign_all_to_zero), \
+                 patch.object(fetcher, "_assign_subhalo_ids", side_effect=_assign_all_to_zero):
                 fetcher._store_particles()
 
         assert "table" in written, "write_to_dataset was never called"

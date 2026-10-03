@@ -57,7 +57,7 @@ class FakeSubhaloContext:
 class FakeFetcher:
     """Only needs .catalog.path -- particles are read directly from
     particles_parquet on disk by _load_bucket_particle_groups, matching
-    how MagneticumFetcher actually stores them."""
+    how MagneticumFetcherV2 actually stores them."""
     def __init__(self, catalog_path, subhalo_context, halo_context):
         self.catalog = SimpleNamespace(path=catalog_path)
         self._subhalo_context = subhalo_context

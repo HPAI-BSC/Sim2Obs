@@ -688,8 +688,6 @@ class DataFetcherFactory:
             return FlamingoFetcher(catalog, **kwargs)
         elif catalog.name == "flamingo_v2":
             return FlamingoFetcherV2(catalog, **kwargs)
-        elif catalog.name == "magneticum":
-            return MagneticumFetcher(catalog, **kwargs)
         elif catalog.name == "magneticum_v2":
             return MagneticumFetcherV2(catalog, **kwargs)
         elif catalog.name == "obelisk":
@@ -2493,7 +2491,7 @@ class FlamingoFetcherV2(FlamingoFetcher):
         return particle_data
 
 
-class MagneticumFetcher(DataFetcher):
+class MagneticumFetcherV2(DataFetcher):
     """
     Data fetcher for the Magneticum simulation (g3read/Gadget-family binary format).
 
@@ -2504,10 +2502,60 @@ class MagneticumFetcher(DataFetcher):
     are each triggered on first use by `_get_halos`/`_get_subhalos`/
     `_store_particles`/`_get_p_subhalo`/`_get_p_halo`, and cached for
     reuse. Particle data is written to/read from a bucketed parquet
-    dataset (`_store_particles`) rather than kept fully in memory. See
-    `MagneticumFetcherV2` for the corrected (non-interval-based)
-    halo/subhalo particle assignment.
+    dataset (`_store_particles`) rather than kept fully in memory.
+
+    Star-particle -> halo/subhalo assignment by exact PID matching, under a
+    hard memory ceiling (no swap, no bigger --mem available on the cluster).
+
+    The earlier interval-based implementation (a since-removed V1 class)
+    approximated "does particle X belong to halo H?" with a [min(PID of H), max(PID of H)] range test (_build_halo_intervals /
+    _assign_halo_ids). That is invalid: particle IDs are not ordered by
+    spatial/halo membership, so a halo's interval ends up spanning almost the
+    entire ID space. Measured on real Magneticum group-catalog data: 17x-103x
+    over-inclusion (a halo with e.g. 900K true member particles matches
+    ~90M IDs against its own interval). That version also rebuilt each halo's/subhalo's
+    interval via a per-entity call (_get_pid_for_entity /
+    _get_subhalo_pid_for_entity) that reopens and re-reads the relevant group
+    file's "PID " block from disk on every single call, with no caching —
+    for millions of halos/subhalos this reads multi-GB blocks off disk
+    repeatedly.
+
+    A first corrected version of this class fixed correctness and the redundant
+    re-reads by building ONE global sorted (PID -> halo_id, subhalo_id)
+    index across the whole group catalogue, held in RAM. That is correct and
+    reads each group file only once, but its peak memory is O(N) in the
+    TOTAL group-catalogue particle count — it OOM-killed a real production
+    run, and this cluster's queue cannot grant more memory. A smaller
+    constant factor (dropping a stable sort, freeing intermediates eagerly)
+    only bought ~13% (measured: 2.80 GB -> 2.44 GB on a 90M-entry local
+    fixture) — nowhere near enough headroom for a production box, since the
+    approach still scales with total N regardless of tuning.
+
+    This version restructures the algorithm instead of tuning it: rather
+    than building one global index, _assign_halo_ids/_assign_subhalo_ids
+    stream the group catalogue's "PID " block once PER CALL (i.e. once per
+    snapshot-file chunk from _store_particles()'s existing loop), holding
+    only one group file's chunk in memory at a time, and match it directly
+    against that chunk's (much smaller) particle IDs via a sorted search.
+    Peak memory is now bounded by max(one group file's chunk, one snapshot
+    file's particle count) — independent of the total group-catalogue size —
+    at the cost of re-reading the group catalogue once per snapshot file
+    instead of once total. Since snapshot files are typically far fewer than
+    halos (tens, not millions), this trade is favourable under a hard memory
+    cap: it fully fixes the O(N) memory scaling that the global-index
+    version could not escape, in exchange for a bounded, small multiple of
+    extra disk I/O.
+
+    _store_particles() calls
+    self._assign_halo_ids(ids) then self._assign_subhalo_ids(ids) with the
+    SAME `ids` array back to back, once per snapshot file. Streaming the
+    group catalogue separately for each of those two calls would double the
+    re-read cost for no reason, so the first call does the full streaming
+    pass and computes both results, caching them (keyed by identity of the
+    `ids` array) for the second call to reuse.
+
     """
+
     def __init__(self, catalog: DictConfig, **kwargs):
         """
         Initialize the fetcher; catalogue/particle data is loaded lazily on first use, not here.
@@ -2521,7 +2569,7 @@ class MagneticumFetcher(DataFetcher):
             Forwarded to `DataFetcher.__init__`.
         """
         super().__init__(catalog, **kwargs)
-        logger.info(f"MagneticumFetcher initialized with config: {catalog.path}")
+        logger.info(f"MagneticumFetcherV2 initialized with config: {catalog.path}")
 
     # ── cache loading ──────────────────────────────────────────────────────────
 
@@ -2600,137 +2648,7 @@ class MagneticumFetcher(DataFetcher):
 
     # ── PID helpers (halos) ────────────────────────────────────────────────────
 
-    def _build_pid_file_boundaries(self) -> list:
-        """
-        Build a lookup table of {file, start, end} for halo PID files (block 0).
-        Reads only file content for PID block — not full snapshot data.
-        """
-        boundaries = []
-        current_offset = 0
-
-        for group_file in g3read.yield_all_files(self._group_base):
-            f = g3read.GadgetFile(group_file, is_snap=False)
-            pid_in_file = f.read("PID ", 2)
-
-            if pid_in_file is None or len(pid_in_file) == 0:
-                continue
-
-            n = len(pid_in_file)
-            boundaries.append({
-                "file":  group_file,
-                "start": current_offset,
-                "end":   current_offset + n,
-            })
-            current_offset += n
-            del pid_in_file
-
-        logger.debug(
-            f"PID boundaries: {len(boundaries)} files, total PIDs: {current_offset}"
-        )
-        return boundaries
-
-    def _get_pid_for_entity(self, offset: int, length: int) -> np.ndarray:
-        """
-        Read halo PIDs for a specific halo on demand.
-        Only reads the file(s) that contain the required offset range.
-        """
-        if length == 0:
-            return np.array([], dtype=np.int64)
-
-        entity_start = offset
-        entity_end = offset + length
-        pids = []
-
-        for boundary in self._pid_file_boundaries:
-            file_start = boundary["start"]
-            file_end = boundary["end"]
-
-            overlap_start = max(entity_start, file_start)
-            overlap_end = min(entity_end,   file_end)
-
-            if overlap_start >= overlap_end:
-                continue
-
-            f = g3read.GadgetFile(boundary["file"], is_snap=False)
-            pid_in_file = f.read("PID ", 2)
-
-            local_start = overlap_start - file_start
-            local_end = overlap_end - file_start
-            pids.append(pid_in_file[local_start:local_end])
-            del pid_in_file
-
-            if file_end >= entity_end:
-                break
-
-        return np.concatenate(pids) if pids else np.array([], dtype=np.int64)
-
     # ── PID helpers (subhalos) ─────────────────────────────────────────────────
-
-    def _build_subhalo_pid_file_boundaries(self) -> list:
-        """
-        Build a lookup table of {file, start, end} for subhalo PID files (block 2).
-        Mirrors _build_pid_file_boundaries for the subhalo PID block.
-        Replaces the old eager full-array load of self._subhalos_pid.
-        """
-        boundaries = []
-        current_offset = 0
-
-        for group_file in g3read.yield_all_files(self._group_base):
-            f = g3read.GadgetFile(group_file, is_snap=False)
-            pid_in_file = f.read("PID ", 2)
-
-            if pid_in_file is None or len(pid_in_file) == 0:
-                continue
-
-            n = len(pid_in_file)
-            boundaries.append({
-                "file":  group_file,
-                "start": current_offset,
-                "end":   current_offset + n,
-            })
-            current_offset += n
-            del pid_in_file
-
-        logger.debug(
-            f"Subhalo PID boundaries: {len(boundaries)} files, "
-            f"total subhalo PIDs: {current_offset}"
-        )
-        return boundaries
-
-    def _get_subhalo_pid_for_entity(self, offset: int, length: int) -> np.ndarray:
-        """
-        Read subhalo PIDs for a specific subhalo on demand using SOFF/SLEN.
-        Only reads the file(s) that contain the required offset range.
-        """
-        if length == 0:
-            return np.array([], dtype=np.int64)
-
-        entity_start = offset
-        entity_end = offset + length
-        pids = []
-
-        for boundary in self._subhalo_pid_boundaries:
-            file_start = boundary["start"]
-            file_end = boundary["end"]
-
-            overlap_start = max(entity_start, file_start)
-            overlap_end = min(entity_end,   file_end)
-
-            if overlap_start >= overlap_end:
-                continue
-
-            f = g3read.GadgetFile(boundary["file"], is_snap=False)
-            pid_in_file = f.read("PID ", 2)
-
-            local_start = overlap_start - file_start
-            local_end = overlap_end - file_start
-            pids.append(pid_in_file[local_start:local_end])
-            del pid_in_file
-
-            if file_end >= entity_end:
-                break
-
-        return np.concatenate(pids) if pids else np.array([], dtype=np.int64)
 
     # ── halo fetching ──────────────────────────────────────────────────────────
 
@@ -2946,154 +2864,7 @@ class MagneticumFetcher(DataFetcher):
 
     # ── halo interval index (for particle → halo assignment) ──────────────────
 
-    def _build_halo_intervals(self):
-        """
-        Build compact halo representation without expanding particle IDs.
-        Each halo is represented by (min_pid, max_pid, halo_id).
-        """
-        intervals = []
-
-        for halo_id in range(len(self._glen)):
-            # Guard against empty halos (GLEN == 0) to avoid pids.min() raising
-            if int(self._glen[halo_id]) == 0:
-                continue
-
-            pids = self._get_pid_for_entity(
-                offset=int(self._goff[halo_id]),
-                length=int(self._glen[halo_id]),
-            )
-
-            if len(pids) == 0:
-                continue
-
-            intervals.append((int(pids.min()), int(pids.max()), halo_id))
-
-        intervals.sort(key=lambda x: x[0])
-        self._halo_intervals = intervals
-
-    def _assign_halo_ids(self, ids: np.ndarray) -> np.ndarray:
-        """
-        Vectorised halo assignment via interval scanning.
-        Returns array of halo_ids, -1 where unassigned.
-        Note: uses min/max PID bounds per halo — particles whose PID falls
-        inside an interval but doesn't truly belong are misassigned. This is
-        a known approximation; replace with exact set lookup for full accuracy.
-        """
-        if len(ids) == 0:
-            return np.array([], dtype=np.int32)
-
-        halo_ids = np.full(len(ids), -1, dtype=np.int32)
-        id_max = ids.max()
-
-        for start, end, halo_id in self._halo_intervals:
-            if start > id_max:
-                break
-            mask = (ids >= start) & (ids <= end)
-            halo_ids[mask] = halo_id
-
-        return halo_ids
-
     # ── subhalo index (for particle → subhalo assignment) ─────────────────────
-
-    def _build_subhalo_index(self):
-        """
-        Build a compact subhalo index using exact SOFF/SLEN slices
-        into the subhalo PID file boundaries.
-
-        Structure:
-            self._subhalo_index[subhalo_idx] = (start, end)
-            where start/end are logical offsets into the subhalo PID stream,
-            consumed on demand via _get_subhalo_pid_for_entity.
-        """
-        soff = self._soff
-        slen = self._slen
-
-        self._subhalo_index = []
-
-        for sub_idx in range(len(soff)):
-            start = int(soff[sub_idx])
-            end = start + int(slen[sub_idx])
-            self._subhalo_index.append((start, end))
-
-    def _build_subhalo_pid_arrays(self):
-        """
-        Build two sorted numpy arrays for subhalo PID lookup:
-            _subhalo_sorted_pids     : int64 — every PID belonging to any subhalo
-            _subhalo_sorted_ids      : int32 — corresponding subhalo index
-
-        Replaces the Python dict approach (_pid_to_subhalo) which OOM'd at
-        ~5M subhalos because a Python dict costs ~200 bytes per entry.
-        Two int arrays cost 12 bytes per entry — ~16x more memory-efficient.
-
-        Memory estimate for 5M subhalos with avg 100 PIDs each (500M entries):
-            dict  : ~100 GB
-            arrays: ~6 GB   ← still large but fits a cluster node
-        """
-        logger.info("Building subhalo PID sorted arrays...")
-        total_pids = int(self._slen.sum())
-        logger.info(f"Total subhalo PIDs to index: {total_pids:,}")
-        logger.info(f"Subhalo PID boundary files : {len(self._subhalo_pid_boundaries)}")
-        logger.info(f"Subhalo index entries      : {len(self._subhalo_index)}")
-
-        if len(self._subhalo_pid_boundaries) == 0:
-            logger.warning(
-                "No subhalo PID boundary files found — "
-                "_subhalo_sorted_pids will be empty. "
-                "Check that _build_subhalo_pid_file_boundaries ran correctly."
-            )
-        if total_pids == 0:
-            logger.warning("All SLEN values are 0 — no subhalo PIDs to index.")
-
-        all_pids = np.empty(total_pids, dtype=np.int64)
-        all_sids = np.empty(total_pids, dtype=np.int32)
-
-        cursor = 0
-        for sub_idx, (start, end) in enumerate(self._subhalo_index):
-            length = end - start
-            if length == 0:
-                continue
-            pids = self._get_subhalo_pid_for_entity(offset=start, length=length)
-            n = len(pids)
-            all_pids[cursor:cursor + n] = pids
-            all_sids[cursor:cursor + n] = sub_idx
-            cursor += n
-
-            if sub_idx % 100_000 == 0:
-                logger.info(f"  indexed {sub_idx:,} / {len(self._subhalo_index):,} subhalos")
-
-        # trim in case some subhalos were empty
-        all_pids = all_pids[:cursor]
-        all_sids = all_sids[:cursor]
-
-        sorter = np.argsort(all_pids, kind="stable")
-        self._subhalo_sorted_pids = all_pids[sorter]
-        self._subhalo_sorted_ids = all_sids[sorter]
-
-        logger.info(f"Subhalo PID arrays built: {cursor:,} entries")
-
-    def _assign_subhalo_ids(self, particle_ids: np.ndarray) -> np.ndarray:
-        """
-        Vectorised subhalo assignment via np.searchsorted on sorted PID arrays.
-        Returns array of subhalo indices, -1 where unassigned.
-        No Python dict — O(log N) per lookup, O(1) extra memory per call.
-        """
-        if not hasattr(self, "_subhalo_sorted_pids"):
-            self._build_subhalo_pid_arrays()
-
-        if len(particle_ids) == 0:
-            return np.array([], dtype=np.int32)
-
-        if len(self._subhalo_sorted_pids) == 0:
-            logger.warning("_subhalo_sorted_pids is empty — no subhalo PIDs indexed.")
-            return np.full(len(particle_ids), -1, dtype=np.int32)
-
-        indices = np.searchsorted(self._subhalo_sorted_pids, particle_ids)
-        indices = np.clip(indices, 0, len(self._subhalo_sorted_pids) - 1)
-
-        result = np.full(len(particle_ids), -1, dtype=np.int32)
-        matched = self._subhalo_sorted_pids[indices] == particle_ids
-        result[matched] = self._subhalo_sorted_ids[indices[matched]]
-        return result
 
     # ── particle pipeline ──────────────────────────────────────────────────────
 
@@ -3290,6 +3061,22 @@ class MagneticumFetcher(DataFetcher):
 
         return self._load_subhalo_particles(subhalo_id, particles_parquet)
 
+    @staticmethod
+    def _column_to_numpy(series: pd.Series) -> np.ndarray:
+        """
+        Convert a parquet column to numpy, stacking per-particle vectors into 2-D.
+
+        Parquet list columns (POS/VEL) read back through pandas as a 1-D object
+        array of shape (N,), each element a length-3 array. Stack those into a
+        proper (N, 3) array (dtype preserved) so downstream feature code, which
+        assumes real 2-D arrays, doesn't fail on them. Other columns (e.g. MASS)
+        are returned untouched.
+        """
+        arr = series.to_numpy()
+        if arr.dtype == object and len(arr) > 0 and isinstance(arr[0], (list, np.ndarray)):
+            return np.stack(arr)
+        return arr
+
     def _load_subhalo_particles(self, subhalo_id: int, particles_parquet: str) -> SubhaloParticles:
         """
         Load particles for a specific subhalo directly from parquet.
@@ -3328,7 +3115,7 @@ class MagneticumFetcher(DataFetcher):
         for col in df.columns:
             if col in ('parent_id', 'subhalo_id', 'parent_bucket', 'parent_bucket_data'):
                 continue
-            data[col] = df[col].to_numpy()
+            data[col] = self._column_to_numpy(df[col])
             print(f'{col}: {len(data[col])}')
 
         # Remove white spaces on the right
@@ -3406,7 +3193,7 @@ class MagneticumFetcher(DataFetcher):
         for col in df.columns:
             if col in ('parent_id', 'subhalo_id', 'parent_bucket', 'parent_bucket_data'):
                 continue
-            data[col] = df[col].to_numpy()
+            data[col] = self._column_to_numpy(df[col])
 
         data = {key.rstrip(): value for key, value in data.items()}
         # Using part type 4
@@ -3439,67 +3226,11 @@ class MagneticumFetcher(DataFetcher):
 
         return self._load_halo_particles(halo.halo_id, particles_parquet)
 
-
-class MagneticumFetcherV2(MagneticumFetcher):
-    """
-    Fixes MagneticumFetcher's star-particle -> halo assignment bug, under a
-    hard memory ceiling (no swap, no bigger --mem available on the cluster).
-
-    V1 (MagneticumFetcher) approximates "does particle X belong to halo H?"
-    with a [min(PID of H), max(PID of H)] range test (_build_halo_intervals /
-    _assign_halo_ids). That is invalid: particle IDs are not ordered by
-    spatial/halo membership, so a halo's interval ends up spanning almost the
-    entire ID space. Measured on real Magneticum group-catalog data: 17x-103x
-    over-inclusion (a halo with e.g. 900K true member particles matches
-    ~90M IDs against its own interval). V1 also rebuilds each halo's/subhalo's
-    interval via a per-entity call (_get_pid_for_entity /
-    _get_subhalo_pid_for_entity) that reopens and re-reads the relevant group
-    file's "PID " block from disk on every single call, with no caching —
-    for millions of halos/subhalos this reads multi-GB blocks off disk
-    repeatedly.
-
-    An earlier version of this class fixed correctness and the redundant
-    re-reads by building ONE global sorted (PID -> halo_id, subhalo_id)
-    index across the whole group catalogue, held in RAM. That is correct and
-    reads each group file only once, but its peak memory is O(N) in the
-    TOTAL group-catalogue particle count — it OOM-killed a real production
-    run, and this cluster's queue cannot grant more memory. A smaller
-    constant factor (dropping a stable sort, freeing intermediates eagerly)
-    only bought ~13% (measured: 2.80 GB -> 2.44 GB on a 90M-entry local
-    fixture) — nowhere near enough headroom for a production box, since the
-    approach still scales with total N regardless of tuning.
-
-    This version restructures the algorithm instead of tuning it: rather
-    than building one global index, _assign_halo_ids/_assign_subhalo_ids
-    stream the group catalogue's "PID " block once PER CALL (i.e. once per
-    snapshot-file chunk from _store_particles()'s existing loop), holding
-    only one group file's chunk in memory at a time, and match it directly
-    against that chunk's (much smaller) particle IDs via a sorted search.
-    Peak memory is now bounded by max(one group file's chunk, one snapshot
-    file's particle count) — independent of the total group-catalogue size —
-    at the cost of re-reading the group catalogue once per snapshot file
-    instead of once total. Since snapshot files are typically far fewer than
-    halos (tens, not millions), this trade is favourable under a hard memory
-    cap: it fully fixes the O(N) memory scaling that the global-index
-    version could not escape, in exchange for a bounded, small multiple of
-    extra disk I/O.
-
-    _store_particles() (inherited, unmodified) calls
-    self._assign_halo_ids(ids) then self._assign_subhalo_ids(ids) with the
-    SAME `ids` array back to back, once per snapshot file. Streaming the
-    group catalogue separately for each of those two calls would double the
-    re-read cost for no reason, so the first call does the full streaming
-    pass and computes both results, caching them (keyed by identity of the
-    `ids` array) for the second call to reuse.
-    """
-
     def _build_pid_file_boundaries(self) -> list:
         """
-        V2 has no per-entity lazy PID readers to index (see
-        _assign_halo_ids), so there is nothing to build here. Overridden
-        (rather than left as V1's real implementation) purely so the
-        inherited _load_catalog_cache() does not perform a wasted
-        boundary-only scan of the PID block.
+        No per-entity lazy PID readers exist to index (see _assign_halo_ids),
+        so there is nothing to build here. Kept as a no-op because
+        _load_catalog_cache() still calls it.
         """
         return []
 
@@ -3508,7 +3239,7 @@ class MagneticumFetcherV2(MagneticumFetcher):
         return []
 
     def _build_halo_intervals(self) -> None:
-        """V2 builds no upfront index at all — ownership is streamed and
+        """No upfront index is built — ownership is streamed and
         matched per snapshot-file chunk inside _assign_halo_ids/
         _assign_subhalo_ids, to keep peak memory bounded by one group file's
         chunk rather than the total group-catalogue size."""
@@ -3734,9 +3465,7 @@ class MagneticumFetcherV2(MagneticumFetcher):
     def _assign_subhalo_ids(self, ids: np.ndarray) -> np.ndarray:
         """
         Exact-match subhalo assignment, streamed the same way as
-        _assign_halo_ids (and sharing its cache — see there). Overridden
-        because V1's version depends on self._subhalo_sorted_pids /
-        self._subhalo_sorted_ids, which this class never builds.
+        _assign_halo_ids (and sharing its cache — see there).
         """
         if len(ids) == 0:
             return np.array([], dtype=np.int32)

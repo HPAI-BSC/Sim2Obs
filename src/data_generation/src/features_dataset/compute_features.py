@@ -25,11 +25,11 @@ def compute_features_stage(fetcher, feature_names, cfg, force_recompute=False, h
     reads total), then split by subhalo_id in memory via pandas groupby.
     This deliberately bypasses fetcher.get_p_subhalo(), which -- per
     subhalo -- does an O(n_halos) linear scan in
-    MagneticumFetcher._get_halo_id_for_subhalo AND issues its own
+    MagneticumFetcherV2._get_halo_id_for_subhalo AND issues its own
     pd.read_parquet(..., filters=...) call. Calling that once per subhalo
     would cost O(n_subhalos) reads and O(n_subhalos * n_halos) scan work;
     the per-particle 'subhalo_id' column already written by
-    MagneticumFetcher._store_particles makes both unnecessary here.
+    MagneticumFetcherV2._store_particles makes both unnecessary here.
 
     Idempotency across repeated executions:
 
@@ -61,7 +61,7 @@ def compute_features_stage(fetcher, feature_names, cfg, force_recompute=False, h
 
     Parameters
     ----------
-    fetcher : MagneticumFetcher (or compatible DataFetcher)
+    fetcher : MagneticumFetcherV2 (or compatible DataFetcher)
         Must expose get_subhalos(), get_halos(), and .catalog.path
         (used to locate particles_parquet directly).
     feature_names : list[str]
@@ -277,7 +277,7 @@ def _load_bucket_particle_groups(fetcher, bucket):
     Read ALL star particles for a bucket in a single filtered parquet read,
     then split into one SubhaloParticles per subhalo_id in memory.
 
-    Mirrors MagneticumFetcher._load_subhalo_particles' column handling
+    Mirrors MagneticumFetcherV2._load_subhalo_particles' column handling
     (strip whitespace-padded g3read field names, apply the same
     column_map) but applied once per bucket instead of once per subhalo.
     """
@@ -318,7 +318,7 @@ def _load_bucket_particle_groups(fetcher, bucket):
                     and isinstance(value[0], (list, np.ndarray)):
                 data[key] = np.stack(value)
         # TODO avoid hardcoding -- same column_map used in
-        # MagneticumFetcher._load_subhalo_particles, centralize if that
+        # MagneticumFetcherV2._load_subhalo_particles, centralize if that
         # ever changes.
         groups[int(subhalo_id)] = SubhaloParticles(data=data, column_map={'POS': 'p', 'MASS': 'm', 'VEL': 'v'})
 
@@ -378,7 +378,7 @@ def _write_bucket_atomic(bucket_dir, rows):
 def _get_buckets(subhalo_context):
     """
     subhalos_parquet columns are 'id_parents' / 'parent_bucket' /
-    'parent_bucket_data' (per MagneticumFetcher._get_subhalos) -- NOT
+    'parent_bucket_data' (per MagneticumFetcherV2._get_subhalos) -- NOT
     'parent_id', which is only the particles_parquet's naming.
     """
     if hasattr(subhalo_context, 'dataset'):

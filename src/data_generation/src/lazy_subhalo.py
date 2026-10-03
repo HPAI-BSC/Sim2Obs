@@ -132,7 +132,7 @@ class LazySubhaloContext:
             filters/transforms are applied first).
         """
         # FIX: subhalo catalog schema field is "id_parents", not "parent_id"
-        # (see MagneticumFetcher._get_subhalos: df["parent_bucket"] =
+        # (see MagneticumFetcherV2._get_subhalos: df["parent_bucket"] =
         # df["id_parents"] % 128 -- "id_parents" is what's actually written).
         base_filter = ds.field("subhalo_id") == subhalo_id
         if halo_id is not None:

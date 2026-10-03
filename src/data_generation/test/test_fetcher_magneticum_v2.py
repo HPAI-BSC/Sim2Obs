@@ -12,11 +12,11 @@ from omegaconf import OmegaConf
 from rootutils import rootutils
 rootutils.setup_root(__file__, pythonpath=True)
 
-from src.data_generation.src.data_fetcher import MagneticumFetcher, MagneticumFetcherV2
+from src.data_generation.src.data_fetcher import MagneticumFetcherV2
 from src.data_generation.src.lazy_subhalo import LazySubhaloParticles
 
-# Reuse the exact fixtures/helpers already used to test MagneticumFetcher, so
-# V2's tests stay aligned with V1's conventions and fixture shapes.
+# Reuse the fixtures/helpers from test_fetcher_magneticum.py, so both test
+# files stay aligned on fixture shapes.
 from src.data_generation.test.test_fetcher_magneticum import (
     mock_catalog,
     make_fake_snap_data,
@@ -113,7 +113,7 @@ class TestMagneticumFetcherV2:
     # why: an in-RAM global index scales with total group-catalogue size
     # and OOM'd on a real production run with a hard memory cap). Ownership
     # is streamed and matched per call to _assign_halo_ids/_assign_subhalo_ids
-    # instead, so all four of V1's builder methods are no-ops here.
+    # instead, so the index-builder methods are no-ops here.
 
     def test_build_pid_file_boundaries_is_noop(self, fetcher):
         assert fetcher._build_pid_file_boundaries() == []
@@ -388,31 +388,20 @@ class TestMagneticumFetcherV2:
             "the previous batch's cached result"
         )
 
-    def test_assign_halo_ids_rejects_false_positive_that_v1_interval_would_accept(self, fetcher):
+    def test_assign_halo_ids_rejects_non_member_inside_a_halos_pid_range(self, fetcher):
         """
-        The actual bug, reproduced directly: halo 0's true pids are
-        {5, 50, 100} -> V1's interval for halo 0 is [5, 100]. Particle 77
-        was never a member of ANY halo (not present in the group catalogue
-        at all), but V1's range test still matches it to halo 0 purely
-        because 77 falls inside [5, 100].
+        Regression for the removed interval-based assignment: halo 0's true
+        pids are {5, 50, 100}, so a [min, max] range test would give halo 0
+        the interval [5, 100]. Particle 77 was never a member of ANY halo
+        (not present in the group catalogue at all), but a range test would
+        still match it to halo 0 purely because 77 falls inside [5, 100].
 
-        V1's own _assign_halo_ids (unchanged, exercised here directly)
-        confirms the false positive; V2's exact-match streaming lookup on
-        the same underlying data must reject it (-1).
+        The exact-match streaming lookup must reject it (-1).
         """
-        # halo0 true pids = {100, 5, 50} -> V1 interval [5, 100]
-        # halo1 true pids = {200, 250}   -> V1 interval [200, 250] (no overlap)
+        # halo0 true pids = {100, 5, 50}; halo1 true pids = {200, 250}
         pid_values = np.array([100, 5, 50, 200, 250], dtype=np.int64)
         probe_id = np.array([77], dtype=np.int64)  # not a real particle anywhere, but 5<=77<=100
 
-        # V1 behaviour (unmodified MagneticumFetcher logic) on the same data.
-        v1_intervals = [(5, 100, 0), (200, 250, 1)]  # (min_pid, max_pid, halo_id), sorted by min
-        v1_fetcher = MagicMock(spec=MagneticumFetcher)
-        v1_fetcher._halo_intervals = v1_intervals
-        v1_result = MagneticumFetcher._assign_halo_ids(v1_fetcher, probe_id)
-        assert v1_result[0] == 0, "sanity check: V1's interval approximation should reproduce the false positive"
-
-        # V2 behaviour on equivalent data via the streaming path.
         fetcher._goff = np.array([0, 3])
         fetcher._glen = np.array([3, 2])
         fetcher._soff = np.array([0, 3])
@@ -425,15 +414,15 @@ class TestMagneticumFetcherV2:
              patch("g3read.GadgetFile", _FakeGadgetFile):
             v2_result = fetcher._assign_halo_ids(probe_id)
 
-        assert v2_result[0] == -1, "V2 must not reproduce V1's false-positive interval match"
+        assert v2_result[0] == -1, "a non-member inside a halo's pid range must not be assigned to that halo"
 
-    # ── end-to-end through _store_particles (inherited, unmodified) ───────────
+    # ── end-to-end through _store_particles ───────────────────────────────────
 
-    def test_store_particles_assigns_correct_halo_where_v1_interval_would_fail(self, fetcher):
+    def test_store_particles_assigns_correct_halo_where_a_range_test_would_fail(self, fetcher):
         """
         End-to-end regression through the real ingestion entry point.
         Star snapshot contains an ID (77) that isn't a true member of any
-        halo but sits inside halo 0's V1 interval [5, 100]; under V2 it must
+        halo but sits inside halo 0's pid range [5, 100]; it must
         be dropped (mask=False), not written into halo 0's output rows.
         """
         fetcher._goff = np.array([0, 3])
@@ -448,8 +437,8 @@ class TestMagneticumFetcherV2:
         # _snap_cache_config above via the real _load_particle_cache().
         fetcher._particle_cache_loaded = True
 
-        # halo0 true pids = {100, 5, 50} -> V1 interval [5, 100]
-        # halo1 true pids = {200, 250}   -> V1 interval [200, 250] (no overlap)
+        # halo0 true pids = {100, 5, 50} -> pid range [5, 100]
+        # halo1 true pids = {200, 250}   -> pid range [200, 250] (no overlap)
         group_pid_values = np.array([100, 5, 50, 200, 250], dtype=np.int64)
         _FakeGadgetFile.read_calls = []
         _FakeGadgetFile.pid_by_file = {"group_f1": group_pid_values}
@@ -487,7 +476,7 @@ class TestMagneticumFetcherV2:
 
         # Only the two genuine members (100 -> halo 0, 200 -> halo 1) may be
         # written; the decoy (77) must have been dropped, not assigned to
-        # halo 0 as V1's interval approximation would have done.
+        # halo 0 as a range test would have done.
         assert len(df) == 2
         assert set(df["parent_id"].tolist()) == {0, 1}
 
