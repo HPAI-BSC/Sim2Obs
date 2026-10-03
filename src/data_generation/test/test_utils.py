@@ -123,7 +123,7 @@ class TestUtils(unittest.TestCase):
 
         for percentile in percentiles:
             upper_bound = np.percentile(transition_radius, percentile)
-            lower_bound = 100 - upper_bound
+            lower_bound = np.percentile(transition_radius, 100 - percentile)
             filtered_df = df[(transition_radius >= lower_bound) & (transition_radius <= upper_bound)]
             stats = filtered_df.describe()
             print(f'Percentile: {percentile}, transition radius [kpc]: {upper_bound}, final size: {len(filtered_df)}, Ignored halos: {len(df) - len(filtered_df)}')
