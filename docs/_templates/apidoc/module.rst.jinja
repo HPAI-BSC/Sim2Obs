@@ -1,0 +1,10 @@
+{%- set title = qualname[4:] if qualname.startswith('src.') else qualname %}
+{%- if show_headings %}
+{{- [title, "module"] | join(' ') | e | heading }}
+
+{% endif -%}
+.. automodule:: {{ qualname }}
+{%- for option in automodule_options %}
+   :{{ option }}:
+{%- endfor %}
+

@@ -1,0 +1,66 @@
+site_name: space-coe wiki
+site_description: Narrative guide to the space-coe codebase
+docs_dir: wiki
+theme:
+  name: material
+  logo: assets/space-logo-dark.png
+  favicon: assets/space-logo-dark.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+extra_css:
+  - assets/logo.css
+markdown_extensions:
+  - tables
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+nav:
+  - Home: README.md
+  - "Part I: Overview & Architecture":
+      - 01-overview-architecture/01-how-to-use-this-wiki.md
+      - 01-overview-architecture/02-entry-points.md
+      - 01-overview-architecture/03-data-flow.md
+      - 01-overview-architecture/04-core-abstractions.md
+  - "Part II: Data Generation Pipeline":
+      - 02-data-generation-pipeline/01-shared-mechanics.md
+      - 02-data-generation-pipeline/02-fetcher-illustris-family.md
+      - 02-data-generation-pipeline/03-fetcher-eagle.md
+      - 02-data-generation-pipeline/04-fetcher-magneticum.md
+      - 02-data-generation-pipeline/05-fetcher-flamingo.md
+      - 02-data-generation-pipeline/06-fetcher-obelisk.md
+      - 02-data-generation-pipeline/07-neighbour-search.md
+      - 02-data-generation-pipeline/08-periodic-boundary-correction.md
+      - 02-data-generation-pipeline/09-rotation.md
+      - 02-data-generation-pipeline/10-icl-bcg-classification.md
+      - 02-data-generation-pipeline/11-muse-instrument-simulation.md
+      - 02-data-generation-pipeline/12-map-generation.md
+  - "Part III: Model Training":
+      - 03-model-training/01-model-architecture-catalog.md
+      - 03-model-training/02-training-pipeline.md
+      - 03-model-training/03-loss-functions-and-metrics.md
+  - "Part IV: Infrastructure & Operations":
+      - 04-infrastructure-operations/01-configuration-system.md
+      - 04-infrastructure-operations/02-hpc-cluster-operations.md
+      - 18-known-issues.md
+  - "Part V: Appendix":
+      - 19-glossary.md
+      - 20-change-log.md
