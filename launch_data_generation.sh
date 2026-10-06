@@ -10,7 +10,7 @@
                              # auto-set per core (GPP: 2G/core), so 64 cores -> 128G total.
                              # Obelisk halos can have tens of millions of star particles.
 
-#SBATCH -t 10:00:00         # Run time (hh:mm:ss)
+#SBATCH -t 05:00:00         # Run time (hh:mm:ss)
 #SBATCH --account bsc70
 #SBATCH --qos=gp_bsccs
 

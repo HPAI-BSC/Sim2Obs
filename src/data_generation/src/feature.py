@@ -931,7 +931,7 @@ class ICLProcessor(FeatureProcessor):
 
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
         # For debug purposes
-        # store_RF_input(self.cfg, halo, icl_mask, v_delta, distance)
+        store_RF_input(self.cfg, halo, icl_mask, v_delta, distance)
         return icl_mask
 
     def _compute_transition_radius(self, halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
