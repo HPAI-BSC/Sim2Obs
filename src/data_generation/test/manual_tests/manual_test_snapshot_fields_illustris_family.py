@@ -1,0 +1,268 @@
+"""
+Standalone field check for the Illustris-family catalogs (illustris300, tngcluster, millenium).
+
+Not a pytest fixture, run it directly on a machine that can see the snapshots
+(MN5). It only needs h5py and numpy, not the pipeline or illustris_python.
+
+Purpose: before adding stellar metallicity and dark-matter mass maps, confirm
+that each simulation's snapshot actually contains the variables those features
+need, and that their units behave as assumed. For each simulation it finds the
+first chunk of the snapshot and of the group catalogue, and checks:
+
+  Header      scale factor vs the expected `a`, BoxSize vs `Lbox`, MassTable,
+              NumPart_Total (incl. the high word), number of files
+  PartType4   Coordinates, Masses, Velocities, GFM_Metallicity and
+              GFM_StellarFormationTime are present, plus a sample of
+              metallicity statistics and the wind-particle fraction
+  PartType1   Coordinates present, and whether the DM mass comes from a
+              Masses dataset or only from the header MassTable (and whether
+              MassTable[1] is close to the published DM particle mass)
+  Groups      SubhaloMassType, SubhaloLenType and the subhalo parent field
+              (SubhaloGrNr or SubhaloGroupNr). Cross-checks
+              SubhaloMassType[:, 1] against SubhaloLenType[:, 1] * MassTable[1],
+              which validates the DM mass unit end to end.
+
+Only the FIRST chunk file of each snapshot is read (and at most MAX_ROWS rows
+of each dataset), so the statistics are a sample, not the whole box. Chunk 0
+is not guaranteed to be representative of the full volume.
+
+Parameters are hardcoded in the SIMULATIONS table below (copied from
+configs/catalog/{illustris300,tngcluster,millenium}.yaml). Edit DATASETS_DIR or
+an entry if your data lives elsewhere, then run directly:
+    python src/data_generation/test/manual_tests/manual_test_snapshot_fields_illustris_family.py
+
+Only the FIRST chunk file of each snapshot is read (and at most MAX_ROWS rows
+of each dataset), so the statistics are a sample, not the whole box. Chunk 0
+is not guaranteed to be representative of the full volume.
+
+Usage:
+    # 1) parameters passed directly, no YAML needed (one simulation per call)
+    python ... --path /gpfs/.../tng_cluster --snapnum 84 --a 0.8333 --lbox 680000 \
+               --expected-masstable 0.0041 --name tngcluster
+    # 2) read the parameters from the catalog YAMLs (all three, or a subset)
+    python ...
+    python ... --datasets-dir /path/to/datasets --only tngcluster --json report.json
+
+In direct mode --path is the simulation folder, or the `output` folder itself:
+the script looks for snapdir_NNN/ and groups_NNN/ in either. --a, --lbox and
+--expected-masstable are optional, and the matching checks are skipped when
+they are not given.
+
+Exit code is 1 if any FAIL is reported, so it can gate a job.
+"""
+import glob
+import json
+import os
+import sys
+
+import h5py
+import numpy as np
+
+DATASETS_DIR = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets'
+
+# path: simulation folder (or its `output` folder), containing snapdir_NNN/ and groups_NNN/
+# a, Lbox: from the catalog YAMLs, checked against the snapshot header (None to skip)
+# expected_masstable: approximate MassTable[1] in header units (1e10 Msun/h), derived from
+# the published DM particle masses assuming h = 0.6774 (TNG300 ~5.9e7 Msun, TNG-Cluster
+# ~6.1e7 Msun, MTNG-L500-4320-A 1.12e8 Msun/h). Only a sanity range, not a documented value.
+SIMULATIONS = {
+    'illustris300': {'path': f'{DATASETS_DIR}/illustris300', 'snapnum': 84, 'a': 0.8333,
+                     'Lbox': 205000, 'expected_masstable': 0.0040},
+    'tngcluster': {'path': f'{DATASETS_DIR}/tng_cluster', 'snapnum': 84, 'a': 0.8333,
+                   'Lbox': 680000, 'expected_masstable': 0.0041},
+    'millenium': {'path': f'{DATASETS_DIR}/millenium/MTNG-L500-4320-A', 'snapnum': 237, 'a': 0.8,
+                  'Lbox': 500000, 'expected_masstable': 0.0112},
+}
+ONLY = None          # e.g. ['tngcluster'] to check a subset
+JSON_OUTPUT = None   # e.g. 'report.json' to also save the full report
+
+EXPECTED_TOLERANCE = 0.25  # relative
+
+STAR_FIELDS = ['Coordinates', 'Masses', 'Velocities', 'GFM_Metallicity', 'GFM_StellarFormationTime']
+MAX_ROWS = 2_000_000
+
+
+class Report:
+    """Collects (status, label, detail) lines for one catalog and prints them as it goes."""
+
+    def __init__(self, name):
+        self.name = name
+        self.lines = []
+
+    def add(self, status, label, detail=''):
+        self.lines.append({'status': status, 'label': label, 'detail': detail})
+        print(f'  [{status:<4}] {label}' + (f': {detail}' if detail else ''))
+
+    @property
+    def failed(self):
+        return any(line['status'] == 'FAIL' for line in self.lines)
+
+
+def resolve_output_dir(path):
+    """Accept either the simulation folder or its `output` subfolder."""
+    candidate = os.path.join(path, 'output')
+    return candidate if os.path.isdir(candidate) else path
+
+
+def first_chunk(directory, pattern):
+    matches = sorted(glob.glob(os.path.join(directory, pattern)))
+    return matches[0] if matches else None
+
+
+def header_summary(h5, rep, cat):
+    hdr = dict(h5['Header'].attrs)
+    masstable = np.asarray(hdr.get('MassTable', np.zeros(6)), dtype=float)
+    low = np.asarray(hdr.get('NumPart_Total', np.zeros(6)), dtype=np.uint64)
+    high = np.asarray(hdr.get('NumPart_Total_HighWord', np.zeros(6)), dtype=np.uint64)
+    n_total = (high << np.uint64(32)) + low
+
+    rep.add('INFO', 'Header',
+            f"Time={hdr.get('Time')}, Redshift={hdr.get('Redshift')}, h={hdr.get('HubbleParam')}, "
+            f"BoxSize={hdr.get('BoxSize')}, files={hdr.get('NumFilesPerSnapshot')}")
+    rep.add('INFO', 'NumPart_Total (gas, dm, type2, tracers, stars, bh)', str([int(x) for x in n_total]))
+    rep.add('INFO', 'MassTable', str(masstable.tolist()))
+
+    time = hdr.get('Time')
+    if cat['a'] is not None and time is not None:
+        ok = abs(float(time) - float(cat['a'])) < 5e-3
+        rep.add('OK' if ok else 'WARN', 'scale factor matches expected a', f"snapshot a={float(time):.4f}, expected a={cat['a']}")
+    if cat['Lbox'] is not None and hdr.get('BoxSize') is not None:
+        ok = abs(float(hdr['BoxSize']) - float(cat['Lbox'])) / float(cat['Lbox']) < 1e-3
+        rep.add('OK' if ok else 'WARN', 'BoxSize matches expected Lbox', f"snapshot={float(hdr['BoxSize'])}, expected={cat['Lbox']}")
+    return masstable, n_total
+
+
+def check_stars(h5, rep):
+    if 'PartType4' not in h5:
+        rep.add('FAIL', 'PartType4 group', 'missing in this chunk')
+        return
+    star = h5['PartType4']
+    for field in STAR_FIELDS:
+        if field in star:
+            ds = star[field]
+            rep.add('OK', f'PartType4/{field}', f'shape={ds.shape}, dtype={ds.dtype}')
+        else:
+            level = 'FAIL' if field == 'GFM_Metallicity' else 'WARN'
+            rep.add(level, f'PartType4/{field}', 'MISSING')
+    if 'GFM_StellarFormationTime' in star:
+        t = star['GFM_StellarFormationTime'][:MAX_ROWS]
+        wind = float(np.mean(t <= 0))
+        rep.add('INFO', 'wind fraction in PartType4 sample (formation time <= 0)', f'{wind:.2%}')
+        if wind > 0:
+            rep.add('WARN', 'wind particles are present',
+                    'a filter on GFM_StellarFormationTime > 0 is needed to keep real stars only')
+
+    if 'GFM_Metallicity' not in star:
+        candidates = [k for k in star.keys() if 'etal' in k]
+        rep.add('INFO', 'metallicity-like PartType4 fields', str(candidates))
+        return
+
+    z = star['GFM_Metallicity'][:MAX_ROWS]
+    if z.ndim > 1:
+        rep.add('WARN', 'GFM_Metallicity is not 1-D', f'shape={z.shape}')
+        return
+    n_nan = int(np.isnan(z).sum())
+    rep.add('INFO', 'GFM_Metallicity sample', f'n={len(z)}, min={np.nanmin(z):.4g}, mean={np.nanmean(z):.4g}, '
+                                              f'max={np.nanmax(z):.4g}, NaN={n_nan}')
+    # total metal mass fraction, so it must live in [0, 1] and be of order 1e-2
+    in_range = bool(np.nanmin(z) >= 0 and np.nanmax(z) <= 1)
+    rep.add('OK' if in_range else 'WARN', 'metallicity looks like a mass fraction in [0, 1]')
+
+
+def check_dm(h5, rep, masstable, expected):
+    if 'PartType1' not in h5:
+        rep.add('FAIL', 'PartType1 group', 'missing in this chunk')
+        return
+    dm = h5['PartType1']
+    rep.add('INFO', 'PartType1 fields', str(sorted(dm.keys())))
+    rep.add('OK' if 'Coordinates' in dm else 'FAIL', 'PartType1/Coordinates')
+
+    if 'Masses' in dm:
+        m = dm['Masses'][:MAX_ROWS]
+        n_unique = len(np.unique(m))
+        rep.add('INFO', 'PartType1/Masses present', f'{n_unique} distinct value(s) in sample, min={m.min():.4g}, max={m.max():.4g}')
+        if n_unique > 1:
+            rep.add('WARN', 'DM masses are NOT uniform', 'a header-only mass would be wrong, read Masses per particle')
+    else:
+        rep.add('INFO', 'PartType1 has no Masses dataset', 'DM mass must come from the header MassTable')
+        if masstable[1] > 0:
+            rep.add('OK', 'MassTable[1] is non-zero', f'{masstable[1]:.5g} (1e10 Msun/h)')
+        else:
+            rep.add('FAIL', 'MassTable[1] is zero and PartType1 has no Masses', 'no way to recover the DM mass')
+
+    if expected is not None and masstable[1] > 0:
+        rel = abs(masstable[1] - expected) / expected
+        rep.add('OK' if rel < EXPECTED_TOLERANCE else 'WARN', 'MassTable[1] vs published DM mass (approx)',
+                f'header={masstable[1]:.5g}, expected about {expected} (rel diff {rel:.0%})')
+    if masstable[2] > 0:
+        rep.add('INFO', 'MassTable[2] is non-zero', f'{masstable[2]:.5g}, type-2 (low-resolution) DM may exist')
+
+
+def check_groups(group_file, rep, masstable):
+    with h5py.File(group_file, 'r') as g:
+        if 'Subhalo' not in g:
+            rep.add('FAIL', 'Subhalo group', f'missing in {os.path.basename(group_file)}')
+            return
+        sub = g['Subhalo']
+        for field in ['SubhaloMassType', 'SubhaloLenType']:
+            rep.add('OK' if field in sub else 'FAIL', f'Subhalo/{field}', f'shape={sub[field].shape}' if field in sub else 'MISSING')
+        parent = [f for f in ('SubhaloGrNr', 'SubhaloGroupNr') if f in sub]
+        rep.add('OK' if parent else 'FAIL', 'subhalo parent field', str(parent) if parent else 'neither SubhaloGrNr nor SubhaloGroupNr found')
+
+        if 'SubhaloMassType' in sub and 'SubhaloLenType' in sub and masstable[1] > 0:
+            mass_dm = sub['SubhaloMassType'][:MAX_ROWS, 1]
+            len_dm = sub['SubhaloLenType'][:MAX_ROWS, 1]
+            sel = len_dm > 0
+            if sel.any():
+                ratio = mass_dm[sel] / (len_dm[sel] * masstable[1])
+                ok = abs(np.median(ratio) - 1) < 0.01
+                rep.add('OK' if ok else 'WARN', 'SubhaloMassType[:,1] == SubhaloLenType[:,1] * MassTable[1]',
+                        f'ratio median={np.median(ratio):.4f}, min={ratio.min():.4f}, max={ratio.max():.4f} over {int(sel.sum())} subhalos')
+            else:
+                rep.add('INFO', 'DM mass cross-check skipped', 'no subhalo with DM in this group chunk')
+
+
+def check_catalog(name, cat):
+    print(f'\n=== {name} ===')
+    rep = Report(name)
+    snap = cat['snapnum']
+    out = resolve_output_dir(cat['path'])
+    rep.add('INFO', 'catalog path', f"{cat['path']} (snapnum {snap})")
+
+    snapdir = os.path.join(out, f'snapdir_{snap:03d}')
+    groupdir = os.path.join(out, f'groups_{snap:03d}')
+    snap_file = first_chunk(snapdir, '*.0.hdf5') if os.path.isdir(snapdir) else None
+    group_file = first_chunk(groupdir, 'fof_subhalo_tab_*.0.hdf5') if os.path.isdir(groupdir) else None
+    rep.add('OK' if snap_file else 'FAIL', 'snapshot chunk 0', snap_file or f'nothing under {snapdir}')
+    rep.add('OK' if group_file else 'FAIL', 'group catalogue chunk 0', group_file or f'nothing under {groupdir}')
+
+    masstable = np.zeros(6)
+    if snap_file:
+        with h5py.File(snap_file, 'r') as h5:
+            masstable, _ = header_summary(h5, rep, cat)
+            print('  -- stars')
+            check_stars(h5, rep)
+            print('  -- dark matter')
+            check_dm(h5, rep, masstable, cat.get('expected_masstable'))
+    if group_file:
+        print('  -- group catalogue')
+        check_groups(group_file, rep, masstable)
+    return rep
+
+
+def main():
+    reports = [check_catalog(name, cat) for name, cat in SIMULATIONS.items() if ONLY is None or name in ONLY]
+
+    print('\n=== summary ===')
+    for rep in reports:
+        counts = {s: sum(1 for line in rep.lines if line['status'] == s) for s in ('OK', 'WARN', 'FAIL')}
+        print(f'  {rep.name:<14} OK={counts["OK"]} WARN={counts["WARN"]} FAIL={counts["FAIL"]}')
+    if JSON_OUTPUT:
+        with open(JSON_OUTPUT, 'w') as f:
+            json.dump({rep.name: rep.lines for rep in reports}, f, indent=2)
+        print(f'report written to {JSON_OUTPUT}')
+    sys.exit(1 if any(rep.failed for rep in reports) else 0)
+
+
+if __name__ == '__main__':
+    main()
