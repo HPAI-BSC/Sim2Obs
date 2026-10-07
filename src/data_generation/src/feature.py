@@ -798,11 +798,11 @@ class ICLProcessor(FeatureProcessor):
         })
 
         # TODO debug
-        dataset_dir = self.cfg.paths.datasets_dir
-        name = self.cfg.catalog.path.replace(dataset_dir, '')
-        name = name.replace('/', '_')
-        path = dataset_dir + f'/../logs/{name}_rf_data_{halo.halo_id}.csv'
-        Data.to_csv(path)
+        #dataset_dir = self.cfg.paths.datasets_dir
+        #name = self.cfg.catalog.path.replace(dataset_dir, '')
+        #name = name.replace('/', '_')
+        #path = dataset_dir + f'/../logs/{name}_rf_data_{halo.halo_id}.csv'
+        #Data.to_csv(path)
 
         # Replace any infinite values in the DataFrame with NaN, then drop all rows with NaN values
         Data = Data.replace([np.inf, -np.inf], np.nan).dropna(axis=0)
@@ -926,12 +926,12 @@ class ICLProcessor(FeatureProcessor):
 
         if n_icl_total == 0:
             logger.warning('No particles predicted as ICL.')
-            store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
+            # store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
             raise ValueError("icl_mask is empty; no masking applied.")
 
         logger.info(f'Generated ICL mask for {len(icl_mask)} particles.')
         # For debug purposes
-        # store_RF_input(self.cfg, halo, icl_mask, v_delta, distance)
+        #store_RF_input(self.cfg, halo, icl_mask, v_delta, distance)
         return icl_mask
 
     def _compute_transition_radius(self, halo: Halo, subhalo_particles: SubhaloParticles, icl_mask: np.ndarray):
@@ -958,7 +958,7 @@ class ICLProcessor(FeatureProcessor):
             The transition radius (in units of `r200`) where ICL starts to dominate, or `None` if no transition is found.
         """
         logger.debug(f'Computing transition radius for: {halo.halo_id}')
-        store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
+        # store_tr_obj(self.cfg, halo, subhalo_particles, icl_mask)
 
         particle_position = subhalo_particles.star_p
         # Computing the Euclidean distance from the new origin to each particle
@@ -1016,7 +1016,7 @@ class ICLProcessor(FeatureProcessor):
         self.transition_radius = transition_radius
 
         # Build cumsum profiles
-        plot_icl_bcg_profiles(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
+        # plot_icl_bcg_profiles(self.cfg, icl_cumulative, bcg_cumulative, self.log_r, transition_index[max_pos], halo.halo_id)
 
     def process(self, halo: Halo, subhalo_particles: SubhaloParticles):
         """
