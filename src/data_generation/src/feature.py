@@ -798,11 +798,11 @@ class ICLProcessor(FeatureProcessor):
         })
 
         # TODO debug
-        #dataset_dir = self.cfg.paths.datasets_dir
-        #name = self.cfg.catalog.path.replace(dataset_dir, '')
-        #name = name.replace('/', '_')
-        #path = dataset_dir + f'/../logs/{name}_rf_data_{halo.halo_id}.csv'
-        #Data.to_csv(path)
+        dataset_dir = self.cfg.paths.datasets_dir
+        name = self.cfg.catalog.path.replace(dataset_dir, '')
+        name = name.replace('/', '_')
+        path = dataset_dir + f'/../logs/{name}_rf_data_{halo.halo_id}.csv'
+        Data.to_csv(path)
 
         # Replace any infinite values in the DataFrame with NaN, then drop all rows with NaN values
         Data = Data.replace([np.inf, -np.inf], np.nan).dropna(axis=0)
