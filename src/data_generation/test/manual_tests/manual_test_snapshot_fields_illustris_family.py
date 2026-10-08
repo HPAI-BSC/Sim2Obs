@@ -73,7 +73,7 @@ SIMULATIONS = {
     'millenium': {'path': f'{DATASETS_DIR}/millenium/MTNG-L500-4320-A', 'snapnum': 237, 'a': 0.8,
                   'Lbox': 500000, 'expected_masstable': 0.0112},
 }
-ONLY = ['tngcluster']          # e.g. ['tngcluster'] to check a subset
+ONLY = None          # e.g. ['tngcluster'] to check a subset
 JSON_OUTPUT = None   # e.g. 'report.json' to also save the full report
 
 EXPECTED_TOLERANCE = 0.25  # relative
