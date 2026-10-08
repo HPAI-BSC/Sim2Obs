@@ -73,7 +73,7 @@ SIMULATIONS = {
     'millenium': {'path': f'{DATASETS_DIR}/millenium/MTNG-L500-4320-A', 'snapnum': 237, 'a': 0.8,
                   'Lbox': 500000, 'expected_masstable': 0.0112},
 }
-ONLY = None          # e.g. ['tngcluster'] to check a subset
+ONLY = ['millenium']          # e.g. ['tngcluster'] to check a subset
 JSON_OUTPUT = None   # e.g. 'report.json' to also save the full report
 
 EXPECTED_TOLERANCE = 0.25  # relative
@@ -109,6 +109,23 @@ def first_chunk(directory, pattern):
     return matches[0] if matches else None
 
 
+def find_snapshot_chunk(snapdir, snap, rep):
+    """
+    Chunk 0 of the FULL snapshot. Prefers snap_NNN.0 / snapshot_NNN.0 and never picks reduced
+    files such as 'snapshot-prevmostboundonly_NNN.0' (MTNG), which hold only a subset of particles.
+    """
+    if not os.path.isdir(snapdir):
+        return None
+    candidates = sorted(glob.glob(os.path.join(snapdir, '*.0.hdf5')))
+    rep.add('INFO', 'chunk-0 files in snapdir', str([os.path.basename(c) for c in candidates]))
+    for name in (f'snap_{snap:03d}.0.hdf5', f'snapshot_{snap:03d}.0.hdf5'):
+        path = os.path.join(snapdir, name)
+        if os.path.exists(path):
+            return path
+    others = [c for c in candidates if 'prevmostbound' not in os.path.basename(c)]
+    return others[0] if others else None
+
+
 def header_summary(h5, rep, cat):
     hdr = dict(h5['Header'].attrs)
     masstable = np.asarray(hdr.get('MassTable', np.zeros(6)), dtype=float)
@@ -124,11 +141,18 @@ def header_summary(h5, rep, cat):
 
     time = hdr.get('Time')
     if cat['a'] is not None and time is not None:
-        ok = abs(float(time) - float(cat['a'])) < 5e-3
-        rep.add('OK' if ok else 'WARN', 'scale factor matches expected a', f"snapshot a={float(time):.4f}, expected a={cat['a']}")
+        rel = abs(float(time) - float(cat['a'])) / float(cat['a'])
+        rep.add('OK' if rel < 1e-4 else 'WARN', 'scale factor matches expected a',
+                f"header a={float(time):.5f}, expected a={cat['a']} (rel diff {rel:.2%})")
     if cat['Lbox'] is not None and hdr.get('BoxSize') is not None:
-        ok = abs(float(hdr['BoxSize']) - float(cat['Lbox'])) / float(cat['Lbox']) < 1e-3
-        rep.add('OK' if ok else 'WARN', 'BoxSize matches expected Lbox', f"snapshot={float(hdr['BoxSize'])}, expected={cat['Lbox']}")
+        box = float(hdr['BoxSize'])
+        lbox = float(cat['Lbox'])
+        if abs(box - lbox) / lbox < 1e-3:
+            rep.add('OK', 'BoxSize matches expected Lbox', f'{box} (kpc/h)')
+        elif abs(box * 1000 - lbox) / lbox < 1e-3:
+            rep.add('OK', 'BoxSize matches expected Lbox', f'{box} is in Mpc/h, x1000 = {box * 1000:g} kpc/h')
+        else:
+            rep.add('WARN', 'BoxSize matches expected Lbox', f'header={box}, expected={lbox}')
     return masstable, n_total
 
 
@@ -196,6 +220,14 @@ def check_dm(h5, rep, masstable, expected):
                 f'header={masstable[1]:.5g}, expected about {expected} (rel diff {rel:.0%})')
     if masstable[2] > 0:
         rep.add('INFO', 'MassTable[2] is non-zero', f'{masstable[2]:.5g}, type-2 (low-resolution) DM may exist')
+    if 'PartType2' in h5:
+        t2 = h5['PartType2']
+        rep.add('INFO', 'PartType2 fields (low-resolution DM in zooms)', str(sorted(t2.keys())))
+        if 'Masses' in t2:
+            m2 = t2['Masses'][:MAX_ROWS]
+            rep.add('INFO', 'PartType2/Masses sample', f'distinct values={len(np.unique(m2))}, min={m2.min():.4g}, max={m2.max():.4g}')
+        elif masstable[2] == 0:
+            rep.add('WARN', 'PartType2 exists but has no Masses and MassTable[2] is zero', 'its particle mass is not recoverable')
 
 
 def check_groups(group_file, rep, masstable):
@@ -221,6 +253,18 @@ def check_groups(group_file, rep, masstable):
             else:
                 rep.add('INFO', 'DM mass cross-check skipped', 'no subhalo with DM in this group chunk')
 
+        if 'SubhaloLenType' in sub and 'SubhaloMassType' in sub:
+            len_all = sub['SubhaloLenType'][:MAX_ROWS]
+            mass_all = sub['SubhaloMassType'][:MAX_ROWS]
+            n_with_t2 = int((len_all[:, 2] > 0).sum())
+            if n_with_t2 > 0:
+                frac = float(mass_all[:, 2].sum() / max(mass_all[:, 1].sum(), 1e-30))
+                rep.add('WARN', 'subhalos contain type-2 particles',
+                        f'{n_with_t2} subhalos, type-2 mass = {frac:.2%} of type-1 mass in this chunk. '
+                        'A PartType1-only DM map would miss it')
+            else:
+                rep.add('OK', 'no subhalo contains type-2 particles in this group chunk')
+
 
 def check_catalog(name, cat):
     print(f'\n=== {name} ===')
@@ -231,9 +275,10 @@ def check_catalog(name, cat):
 
     snapdir = os.path.join(out, f'snapdir_{snap:03d}')
     groupdir = os.path.join(out, f'groups_{snap:03d}')
-    snap_file = first_chunk(snapdir, '*.0.hdf5') if os.path.isdir(snapdir) else None
+    snap_file = find_snapshot_chunk(snapdir, snap, rep)
     group_file = first_chunk(groupdir, 'fof_subhalo_tab_*.0.hdf5') if os.path.isdir(groupdir) else None
-    rep.add('OK' if snap_file else 'FAIL', 'snapshot chunk 0', snap_file or f'nothing under {snapdir}')
+    rep.add('OK' if snap_file else 'FAIL', 'full snapshot chunk 0',
+            snap_file or f'no full-snapshot file under {snapdir} (only reduced files, or nothing)')
     rep.add('OK' if group_file else 'FAIL', 'group catalogue chunk 0', group_file or f'nothing under {groupdir}')
 
     masstable = np.zeros(6)
