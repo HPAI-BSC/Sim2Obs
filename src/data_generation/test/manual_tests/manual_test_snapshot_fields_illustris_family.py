@@ -53,7 +53,9 @@ Exit code is 1 if any FAIL is reported, so it can gate a job.
 import glob
 import json
 import os
+import re
 import sys
+import time
 
 import h5py
 import numpy as np
@@ -74,6 +76,11 @@ SIMULATIONS = {
                   'Lbox': 500000, 'expected_masstable': 0.0112},
 }
 ONLY = ['tngcluster']          # e.g. ['tngcluster'] to check a subset
+# Simulations whose group catalogue is scanned in FULL (every chunk, only 3 small datasets each) to count
+# how many massive halos are free of low-resolution (type-2) contamination. Only useful for zoom
+# simulations, TNG300 and MTNG have no type-2 particles. Takes a few minutes on GPFS.
+SCAN_ALL_CHUNKS_FOR = ['tngcluster']
+CONTAMINATION_THRESHOLDS = [0.0, 0.001, 0.01, 0.1]   # type-2 mass fraction cuts to report
 JSON_OUTPUT = None   # e.g. 'report.json' to also save the full report
 
 EXPECTED_TOLERANCE = 0.25  # relative
@@ -306,6 +313,74 @@ def check_contamination(group_file, rep, min_m200=1000.0):
         summarise('type-2 contamination, massive groups that are NOT zoom targets', sel & ~target.astype(bool))
 
 
+def scan_all_group_chunks(groupdir, snap, rep, min_m200=1000.0):
+    """
+    Whole-box version of check_contamination: reads Group_M_Crit200, GroupMassType and (if present) the
+    zoom-target flag from EVERY group-catalogue chunk, then reports how many massive groups stay below
+    each contamination threshold, separately for zoom targets and for the other massive groups.
+    """
+    def chunk_no(path):
+        return int(re.search(r'\.(\d+)\.hdf5$', path).group(1))
+
+    files = sorted(glob.glob(os.path.join(groupdir, f'fof_subhalo_tab_{snap:03d}.*.hdf5')), key=chunk_no)
+    if not files:
+        rep.add('FAIL', 'full group scan', f'no fof_subhalo_tab files under {groupdir}')
+        return
+    start = time.time()
+    n_groups, n_empty = 0, 0
+    m200_l, frac_l, tgt_l, file_l = [], [], [], []
+    flag_name = None
+    for i, path in enumerate(files):
+        with h5py.File(path, 'r') as g:
+            if 'Group' not in g or 'Group_M_Crit200' not in g['Group']:
+                n_empty += 1
+                continue
+            grp = g['Group']
+            m200 = grp['Group_M_Crit200'][:]
+            mass = grp['GroupMassType'][:]
+            if flag_name is None:
+                flag_name = next((k for k in grp.keys() if 'zoomtarget' in k.lower()), None)
+            tgt = grp[flag_name][:].astype(bool) if flag_name else np.zeros(len(m200), dtype=bool)
+        n_groups += len(m200)
+        keep = (m200 >= min_m200) | tgt
+        total = mass[keep, 1] + mass[keep, 2]
+        m200_l.append(m200[keep])
+        frac_l.append(mass[keep, 2] / np.maximum(total, 1e-30))
+        tgt_l.append(tgt[keep])
+        file_l.append(np.full(int(keep.sum()), chunk_no(path)))
+        if (i + 1) % 100 == 0:
+            print(f'    ... {i + 1}/{len(files)} group chunks scanned ({time.time() - start:.0f}s)')
+
+    if not m200_l:
+        rep.add('FAIL', 'full group scan', 'no usable group data in any chunk')
+        return
+    m200, frac, tgt, chunk = (np.concatenate(x) for x in (m200_l, frac_l, tgt_l, file_l))
+    massive = m200 >= min_m200
+    rep.add('INFO', 'full group scan', f'{len(files)} chunks ({n_empty} without groups) in {time.time() - start:.0f}s, '
+                                       f'{n_groups} groups, {int(massive.sum())} massive (M200 >= {min_m200:g}), '
+                                       f'zoom-target flag: {flag_name or "none"}, {int(tgt.sum())} targets')
+
+    def counts(label, sel):
+        n = int(sel.sum())
+        if n == 0:
+            rep.add('INFO', label, 'no groups')
+            return
+        parts = ', '.join(f'<= {t:.1%}: {int((frac[sel] <= t).sum())}' for t in CONTAMINATION_THRESHOLDS)
+        rep.add('INFO', label, f'{n} groups. Clean counts ({"type-2 mass fraction"}): {parts}')
+
+    counts('massive groups, all', massive)
+    if flag_name:
+        counts('zoom targets', tgt)
+        counts('massive groups that are not zoom targets', massive & ~tgt)
+        bad = tgt & (frac > 0.01)
+        if bad.any():
+            worst = np.argsort(-frac[bad])[:10]
+            listing = ', '.join(f'chunk {int(chunk[bad][k])}: {frac[bad][k]:.1%}' for k in worst)
+            rep.add('WARN', 'zoom targets with contamination above 1%', f'{int(bad.sum())} of {int(tgt.sum())}. Worst: {listing}')
+        else:
+            rep.add('OK', 'all zoom targets are below 1% contamination', f'{int(tgt.sum())} targets checked')
+
+
 def check_catalog(name, cat):
     print(f'\n=== {name} ===')
     rep = Report(name)
@@ -333,6 +408,9 @@ def check_catalog(name, cat):
         print('  -- group catalogue')
         check_groups(group_file, rep, masstable)
         check_contamination(group_file, rep)
+        if name in SCAN_ALL_CHUNKS_FOR:
+            print('  -- full group-catalogue scan')
+            scan_all_group_chunks(groupdir, snap, rep)
     return rep
 
 
