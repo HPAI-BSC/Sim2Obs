@@ -266,6 +266,35 @@ def check_groups(group_file, rep, masstable):
                 rep.add('OK', 'no subhalo contains type-2 particles in this group chunk')
 
 
+def check_contamination(group_file, rep, min_m200=1000.0):
+    """
+    How much low-resolution (type-2) mass do the MASSIVE FoF groups contain?
+
+    min_m200 is in header units (1e10 Msun/h), so 1000 = 1e13 Msun/h, roughly the catalogs' halo
+    mass cut. This is group level (includes unbound material), a conservative measure for the
+    clusters that actually get mapped.
+    """
+    with h5py.File(group_file, 'r') as g:
+        if 'Group' not in g or not all(k in g['Group'] for k in ('GroupMassType', 'Group_M_Crit200')):
+            rep.add('INFO', 'cluster contamination check skipped', 'Group/GroupMassType or Group_M_Crit200 missing')
+            return
+        grp = g['Group']
+        m200 = grp['Group_M_Crit200'][:MAX_ROWS]
+        mass = grp['GroupMassType'][:MAX_ROWS]
+    sel = m200 >= min_m200
+    n = int(sel.sum())
+    if n == 0:
+        rep.add('INFO', 'cluster contamination check', f'no group with M200 >= {min_m200:g} (1e10 Msun/h) in this chunk')
+        return
+    dm_hi = mass[sel, 1]
+    dm_lo = mass[sel, 2]
+    frac = dm_lo / np.maximum(dm_hi + dm_lo, 1e-30)
+    n_any = int((dm_lo > 0).sum())
+    detail = (f'{n} groups with M200 >= {min_m200:g}: {n_any} contain type-2 mass, contamination '
+              f'(type-2 / (type-1 + type-2)) median={np.median(frac):.3%}, p90={np.percentile(frac, 90):.3%}, max={frac.max():.3%}')
+    rep.add('WARN' if n_any > 0 else 'OK', 'type-2 contamination of massive groups', detail)
+
+
 def check_catalog(name, cat):
     print(f'\n=== {name} ===')
     rep = Report(name)
@@ -292,6 +321,7 @@ def check_catalog(name, cat):
     if group_file:
         print('  -- group catalogue')
         check_groups(group_file, rep, masstable)
+        check_contamination(group_file, rep)
     return rep
 
 
