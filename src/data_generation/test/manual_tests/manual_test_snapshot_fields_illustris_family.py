@@ -73,7 +73,7 @@ SIMULATIONS = {
     'millenium': {'path': f'{DATASETS_DIR}/millenium/MTNG-L500-4320-A', 'snapnum': 237, 'a': 0.8,
                   'Lbox': 500000, 'expected_masstable': 0.0112},
 }
-ONLY = None          # e.g. ['tngcluster'] to check a subset
+ONLY = ['tngcluster']          # e.g. ['tngcluster'] to check a subset
 JSON_OUTPUT = None   # e.g. 'report.json' to also save the full report
 
 EXPECTED_TOLERANCE = 0.25  # relative
@@ -281,18 +281,29 @@ def check_contamination(group_file, rep, min_m200=1000.0):
         grp = g['Group']
         m200 = grp['Group_M_Crit200'][:MAX_ROWS]
         mass = grp['GroupMassType'][:MAX_ROWS]
+        # TNG-Cluster flags its 352 zoom targets (believed to be GroupPrimaryZoomTarget, to be confirmed by this run)
+        flag_name = next((k for k in grp.keys() if 'zoomtarget' in k.lower()), None)
+        target = grp[flag_name][:MAX_ROWS] if flag_name else None
+    rep.add('INFO', 'zoom-target flag in Group', flag_name or 'none found')
+
+    def summarise(label, sel):
+        n = int(sel.sum())
+        if n == 0:
+            rep.add('INFO', label, 'no groups')
+            return
+        dm_hi, dm_lo = mass[sel, 1], mass[sel, 2]
+        frac = dm_lo / np.maximum(dm_hi + dm_lo, 1e-30)
+        c = [int((frac <= 0).sum()), int(((frac > 0) & (frac <= 0.01)).sum()), int(((frac > 0.01) & (frac <= 0.1)).sum()),
+             int(((frac > 0.1) & (frac <= 0.9)).sum()), int((frac > 0.9).sum())]
+        detail = (f'{n} groups, contamination median={np.median(frac):.3%}, p90={np.percentile(frac, 90):.3%}, max={frac.max():.3%}. '
+                  f'Counts: =0%: {c[0]}, (0,1%]: {c[1]}, (1,10%]: {c[2]}, (10,90%]: {c[3]}, >90%: {c[4]}')
+        rep.add('WARN' if (dm_lo > 0).any() else 'OK', label, detail)
+
     sel = m200 >= min_m200
-    n = int(sel.sum())
-    if n == 0:
-        rep.add('INFO', 'cluster contamination check', f'no group with M200 >= {min_m200:g} (1e10 Msun/h) in this chunk')
-        return
-    dm_hi = mass[sel, 1]
-    dm_lo = mass[sel, 2]
-    frac = dm_lo / np.maximum(dm_hi + dm_lo, 1e-30)
-    n_any = int((dm_lo > 0).sum())
-    detail = (f'{n} groups with M200 >= {min_m200:g}: {n_any} contain type-2 mass, contamination '
-              f'(type-2 / (type-1 + type-2)) median={np.median(frac):.3%}, p90={np.percentile(frac, 90):.3%}, max={frac.max():.3%}')
-    rep.add('WARN' if n_any > 0 else 'OK', 'type-2 contamination of massive groups', detail)
+    summarise(f'type-2 contamination, groups with M200 >= {min_m200:g} (1e10 Msun/h)', sel)
+    if target is not None:
+        summarise('type-2 contamination, zoom targets only', target.astype(bool))
+        summarise('type-2 contamination, massive groups that are NOT zoom targets', sel & ~target.astype(bool))
 
 
 def check_catalog(name, cat):
