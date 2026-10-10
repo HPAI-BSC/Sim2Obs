@@ -81,6 +81,9 @@ ONLY = ['tngcluster']          # e.g. ['tngcluster'] to check a subset
 # simulations, TNG300 and MTNG have no type-2 particles. Takes a few minutes on GPFS.
 SCAN_ALL_CHUNKS_FOR = ['tngcluster']
 CONTAMINATION_THRESHOLDS = [0.0, 0.001, 0.01, 0.1]   # type-2 mass fraction cuts to report
+# Halo mass cut of the catalogs: filter "> 1e13 * 0.6774" on m200 in Msun/h, i.e. 677.4 in header
+# units (1e10 Msun/h). The scans use the same cut so their counts match what the pipeline selects.
+MIN_M200 = 1e13 * 0.6774 / 1e10
 JSON_OUTPUT = None   # e.g. 'report.json' to also save the full report
 
 EXPECTED_TOLERANCE = 0.25  # relative
@@ -273,14 +276,14 @@ def check_groups(group_file, rep, masstable):
                 rep.add('OK', 'no subhalo contains type-2 particles in this group chunk')
 
 
-def check_contamination(group_file, rep, min_m200=1000.0):
+def check_contamination(group_file, rep, min_m200=None):
     """
     How much low-resolution (type-2) mass do the MASSIVE FoF groups contain?
 
-    min_m200 is in header units (1e10 Msun/h), so 1000 = 1e13 Msun/h, roughly the catalogs' halo
-    mass cut. This is group level (includes unbound material), a conservative measure for the
+    min_m200 is in header units (1e10 Msun/h) and defaults to MIN_M200, the catalogs' halo mass cut. This is group level (includes unbound material), a conservative measure for the
     clusters that actually get mapped.
     """
+    min_m200 = MIN_M200 if min_m200 is None else min_m200
     with h5py.File(group_file, 'r') as g:
         if 'Group' not in g or not all(k in g['Group'] for k in ('GroupMassType', 'Group_M_Crit200')):
             rep.add('INFO', 'cluster contamination check skipped', 'Group/GroupMassType or Group_M_Crit200 missing')
@@ -313,7 +316,7 @@ def check_contamination(group_file, rep, min_m200=1000.0):
         summarise('type-2 contamination, massive groups that are NOT zoom targets', sel & ~target.astype(bool))
 
 
-def scan_all_group_chunks(groupdir, snap, rep, min_m200=1000.0):
+def scan_all_group_chunks(groupdir, snap, rep, min_m200=None):
     """
     Whole-box version of check_contamination: reads Group_M_Crit200, GroupMassType and (if present) the
     zoom-target flag from EVERY group-catalogue chunk, then reports how many massive groups stay below
@@ -322,6 +325,7 @@ def scan_all_group_chunks(groupdir, snap, rep, min_m200=1000.0):
     def chunk_no(path):
         return int(re.search(r'\.(\d+)\.hdf5$', path).group(1))
 
+    min_m200 = MIN_M200 if min_m200 is None else min_m200
     files = sorted(glob.glob(os.path.join(groupdir, f'fof_subhalo_tab_{snap:03d}.*.hdf5')), key=chunk_no)
     if not files:
         rep.add('FAIL', 'full group scan', f'no fof_subhalo_tab files under {groupdir}')
