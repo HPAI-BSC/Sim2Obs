@@ -306,11 +306,17 @@ def candidate_boxes(cfg):
     """
     Box lengths the recentring could use, in the units of the particle positions.
 
-    The positions are scaled to physical kpc/h by the catalog (`x * a`), while `Lbox` is the comoving length. The
-    pipeline passes `Lbox` as it is to `preprocess`, so the box that fits the positions would be `Lbox * a`.
+    The positions are scaled to physical kpc/h (`x * a`), so the box that fits them is the comoving length times `a`.
+    The original catalogs give the comoving length as `Lbox` (and the pipeline uses it as it is), the `*_dm` variants
+    give the physical one. The three candidates tell which of the two conventions a catalog follows.
     """
     lbox, a = float(cfg.catalog.Lbox), float(cfg.catalog.a)
-    return {'Lbox (as the pipeline uses it)': lbox, 'Lbox * a (physical)': lbox * a}
+    return {'Lbox (as the pipeline uses it)': lbox, 'Lbox * a': lbox * a, 'Lbox / a': lbox / a}
+
+
+def estimate_box(halo_context):
+    """Box length in position units, estimated from the largest halo coordinate (the halos fill the box to the edge)."""
+    return float(np.max(np.stack([np.asarray(g, dtype=float) for g in halo_context.data['gpos']])))
 
 
 def far_fractions(own, halo, box):
@@ -577,9 +583,9 @@ def check_catalog(catalog_name):
     rep.add('INFO', 'memory after listing the halos (catalogue only, no particles)', f'{current_rss_mb():.0f} MB now, peak {peak_rss_mb():.0f} MB')
     positions = [p for p in HALO_POSITIONS if p < len(halo_ids)]
     checked_ids = [halo_ids[p] for p in positions]
-    box = float(cfg.catalog.Lbox) * float(cfg.catalog.a)
+    box = estimate_box(halo_context)
     edge_ids = [i for i in find_edge_halos(halo_context, box, N_EDGE_HALOS) if i not in checked_ids]
-    rep.add('INFO', 'halos that touch a face of the box (also checked)', f'{edge_ids} (box length {box:.0f} in position units)')
+    rep.add('INFO', 'halos that touch a face of the box (also checked)', f'{edge_ids} (box length about {box:.0f} in position units, from the halo positions)')
     if len(positions) < len(HALO_POSITIONS):
         rep.add('WARN', 'halo positions beyond the list were ignored', str([p for p in HALO_POSITIONS if p >= len(halo_ids)]))
 

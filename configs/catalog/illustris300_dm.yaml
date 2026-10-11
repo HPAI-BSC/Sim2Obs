@@ -21,6 +21,13 @@ particles_v2: true
 # marker, which the fetcher uses to pick the subhalo parent field.
 path: ${paths.datasets_dir}/illustris300_dm_v1
 
+# Periodic box length for the recentring of the particles and subhalos (preprocess), in the units of the positions.
+# The positions are scaled to PHYSICAL kpc/h (`x * a`) but the original catalog gives the COMOVING box length
+# (205000), so a halo that straddles a face of the box was wrapped with the wrong length: 5 to 14% of the
+# particles of such halos ended up about 100 Mpc away (measured on real MTNG halos at the box edge). The box
+# length that fits the positions is Lbox * a = 205000 * 0.8333, with the `a` of this catalog.
+Lbox: 170826.5
+
 fields:
   particles:
     star:
