@@ -59,7 +59,7 @@ def main(cfg: DictConfig) -> Any:
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
     starting_idx = 0
-    ending_idx = 4
+    ending_idx = 200
 
     #ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
     ignore_halos = [] # just for flamingo
