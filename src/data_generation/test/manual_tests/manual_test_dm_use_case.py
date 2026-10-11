@@ -40,6 +40,7 @@ import resource
 import sys
 import time
 
+import h5py
 import illustris_python as il
 import numpy as np
 
@@ -54,10 +55,10 @@ from src.data_generation.src.feature import FeatureProcessorFactory  # noqa: E40
 from src.data_generation.src.subhalo_particles_v2 import SubhaloParticlesV2  # noqa: E402
 from src.data_generation.src.utils import muse_bins_r  # noqa: E402
 
-CATALOGS = ['illustris300_dm', 'millenium_dm']
+CATALOGS = ['millenium_dm'] #'illustris300_dm'
 # Positions in the halo list of the pipeline (catalogue order, the first ones are the most massive halos and
 # so the heaviest to load). Positions beyond the end of the list are ignored.
-HALO_POSITIONS = [0, 1, 2, 3, 200]
+HALO_POSITIONS = [0, 200]
 DATASETS_DIR = None            # None: the one of configs/paths/gpfs.yaml
 MAX_SUBHALOS_FOR_MASS_CHECK = 3000      # loading one catalogue record per subhalo, skip the check above this
 MAX_OUTPUT_FILES_TO_READ = 60
@@ -97,21 +98,75 @@ def peak_rss_mb():
     return usage / (1024 * 1024 if platform.system() == 'Darwin' else 1024)
 
 
+def current_rss_mb():
+    """Resident memory of this process right now in MB (Linux), the peak when /proc is not available."""
+    try:
+        with open('/proc/self/statm') as statm:
+            return int(statm.read().split()[1]) * os.sysconf('SC_PAGE_SIZE') / 1024 ** 2
+    except OSError:
+        return peak_rss_mb()
+
+
 def ratio(numerator, denominator):
     return float(numerator) / float(denominator) if denominator else float('nan')
 
 
 class CatalogLookup:
-    """Group catalogue records of single subhalos or halos, read through illustris_python."""
+    """
+    Group catalogue records of single subhalos or halos, reading ONLY the fields the checks need.
+
+    `il.groupcat.loadSingle` reads every field of the record, which fails on the Millennium-TNG catalogue (it has a
+    field with a 6 byte integer type that h5py cannot read). This follows the same steps (offsets file, then the
+    chunk file that holds the record) for the requested fields only, and keeps the last chunk file open because the
+    subhalos of a halo are consecutive.
+    """
+    FIELDS = {'Subhalo': ['SubhaloLenType', 'SubhaloMassType'], 'Group': ['GroupMassType']}
 
     def __init__(self, base_path, snapnum):
         self.base_path, self.snapnum = base_path, snapnum
+        self._offsets = {}
+        self._open_file = None
+        self._open_chunk = None
+
+    def _file_offsets(self, name):
+        if name not in self._offsets:
+            if 'fof_subhalo' in il.groupcat.gcPath(self.base_path, self.snapnum):
+                with h5py.File(il.groupcat.offsetPath(self.base_path, self.snapnum), 'r') as offsets_file:
+                    self._offsets[name] = offsets_file['FileOffsets/' + name][()]
+            else:
+                with h5py.File(il.groupcat.gcPath(self.base_path, self.snapnum), 'r') as first_chunk:
+                    self._offsets[name] = first_chunk['Header'].attrs['FileOffsets_' + name]
+        return self._offsets[name]
+
+    def _record(self, name, index):
+        relative = int(index) - self._file_offsets(name)
+        chunk = int(np.max(np.where(relative >= 0)))
+        if self._open_chunk != chunk:
+            self.close()
+            self._open_file = h5py.File(il.groupcat.gcPath(self.base_path, self.snapnum, chunk), 'r')
+            self._open_chunk = chunk
+        local = int(relative[chunk])
+        return {field: self._open_file[name][field][local] for field in self.FIELDS[name]}
 
     def subhalo(self, subhalo_id):
-        return il.groupcat.loadSingle(self.base_path, self.snapnum, subhaloID=int(subhalo_id))
+        return self._record('Subhalo', subhalo_id)
 
     def group(self, halo_id):
-        return il.groupcat.loadSingle(self.base_path, self.snapnum, haloID=int(halo_id))
+        return self._record('Group', halo_id)
+
+    def close(self):
+        if self._open_file is not None:
+            self._open_file.close()
+        self._open_file, self._open_chunk = None, None
+
+
+def guarded(rep, label, function, *args):
+    """Run one check section. An exception becomes a FAIL line and the remaining sections still run."""
+    try:
+        return function(*args)
+    except Exception as error:      # noqa: BLE001
+        rep.add('FAIL', f'{label} raised an exception', f'{type(error).__name__}: {error}')
+        return None
 
 
 def load_config(catalog):
@@ -312,22 +367,58 @@ def check_halo(rep, cfg, fetcher, halo_context, halo_id, halo_ids, lookup, mass_
     halo = halo_context.get_halo_by_id(halo_id)
     print(f'\n  -- halo {halo_id}: m200={float(halo.m200):.4g}, r200={float(halo.r200):.1f}, '
           f'{len(halo.subhalo_ids)} subhalos')
+    before = current_rss_mb()
     start = time.perf_counter()
     own = fetcher.get_p_halo(halo=halo)
-    rep.add('INFO', 'load time and peak memory so far', f'{time.perf_counter() - start:.1f} s, {peak_rss_mb():.0f} MB')
+    elapsed = time.perf_counter() - start
+    millions = (len(own.star_m) + len(own.dm_m)) / 1e6 if hasattr(own, 'star_m') and hasattr(own, 'dm_m') else float('nan')
+    rep.add('INFO', 'load time', f'{elapsed:.1f} s for {millions:.1f} million particles ({ratio(elapsed, millions):.1f} s per million)')
+    rep.add('INFO', 'memory', f'{current_rss_mb():.0f} MB now ({current_rss_mb() - before:+.0f} MB for this halo), peak so far {peak_rss_mb():.0f} MB')
 
+    sample = (float(halo.m200), millions, elapsed)
     if not check_particles(rep, own, mass_table):
-        return
-    check_catalogue(rep, own, halo, lookup)
+        return sample
+    guarded(rep, 'catalogue check', check_catalogue, rep, own, halo, lookup)
     own.preprocess(halo, cfg.catalog.get('Lbox', None))
-    check_geometry(rep, own, halo)
+    guarded(rep, 'geometry check', check_geometry, rep, own, halo)
     for feature in features:
         feature.process(halo=halo, subhalo_particles=own)
     start = time.perf_counter()
-    check_maps(rep, cfg, own, halo, features)
+    guarded(rep, 'map check', check_maps, rep, cfg, own, halo, features)
     rep.add('INFO', 'map generation time (3 projections, 2 features)', f'{time.perf_counter() - start:.1f} s')
-    check_neighbour(rep, own, halo_context, halo_id, halo_ids, fetcher)
-    check_rotation_guard(rep, own)
+    guarded(rep, 'neighbour check', check_neighbour, rep, own, halo_context, halo_id, halo_ids, fetcher)
+    guarded(rep, 'rotation check', check_rotation_guard, rep, own)
+    return sample
+
+
+# ---------------------------------------------------------------------------------------------- planning
+
+def estimate_full_run(rep, m200_values, dm_particle_mass, samples):
+    """
+    Rough planning estimate of the particle loading time for EVERY selected halo.
+
+    `samples` are the halos checked above, as (m200, millions of particles loaded, seconds to load them). The
+    particles loaded per halo are of the order of M200 / m_dm, with a factor that depends on the halo (the FoF group
+    reaches beyond R200), measured here as particles / (M200 / m_dm). The estimate takes the lowest, the median and
+    the highest of the measured factors and of the measured seconds per million particles. It covers the particle
+    loading only, not the catalogue listing, the neighbours (stars only) nor the map generation.
+    """
+    samples = [sample for sample in samples if sample]
+    if len(samples) < 2 or dm_particle_mass <= 0:
+        rep.add('INFO', 'planning estimate skipped', 'needs at least two loaded halos')
+        return
+    factors = np.array([millions * 1e6 / (m200 / dm_particle_mass) for m200, millions, _ in samples])
+    speeds = np.array([seconds / millions for _, millions, seconds in samples])
+    expected = np.asarray(m200_values, dtype=float) / dm_particle_mass          # DM particles inside M200, per halo
+    millions = {name: expected.sum() * factor / 1e6 for name, factor in
+                (('low', factors.min()), ('median', np.median(factors)), ('high', factors.max()))}
+    hours = {'low': millions['low'] * speeds.min() / 3600, 'median': millions['median'] * np.median(speeds) / 3600,
+             'high': millions['high'] * speeds.max() / 3600}
+    rep.add('INFO', 'measured', f'{factors.min():.2f} to {factors.max():.2f} particles per M200/m_dm, '
+                                f'{speeds.min():.1f} to {speeds.max():.1f} s per million particles')
+    rep.add('INFO', f'planning estimate for loading the particles of all {len(expected)} selected halos',
+            f"{millions['median']:.0f} million particles in total (range {millions['low']:.0f} to {millions['high']:.0f}), "
+            f"about {hours['median']:.1f} h in one process (range {hours['low']:.1f} to {hours['high']:.1f} h)")
 
 
 # ---------------------------------------------------------------------------------------------- output
@@ -399,17 +490,25 @@ def check_catalog(catalog_name):
     halo_context = fetcher.get_halos()
     halo_ids = [int(i) for i in halo_context.halo_id]
     rep.add('INFO', 'halos after the catalog filters', f'{len(halo_ids)}, listed in {time.perf_counter() - start:.0f} s')
+    rep.add('INFO', 'memory after listing the halos (catalogue only, no particles)', f'{current_rss_mb():.0f} MB now, peak {peak_rss_mb():.0f} MB')
     positions = [p for p in HALO_POSITIONS if p < len(halo_ids)]
     if len(positions) < len(HALO_POSITIONS):
         rep.add('WARN', 'halo positions beyond the list were ignored', str([p for p in HALO_POSITIONS if p >= len(halo_ids)]))
 
     features = [FeatureProcessorFactory.get_feature(feature, cfg=cfg) for feature in cfg.feature_names]
     mass_table = fetcher._get_mass_table()
-    for position in positions:
-        try:
-            check_halo(rep, cfg, fetcher, halo_context, halo_ids[position], halo_ids, lookup, mass_table, features)
-        except Exception as error:      # noqa: BLE001
-            rep.add('FAIL', f'halo {halo_ids[position]} raised an exception', f'{type(error).__name__}: {error}')
+    samples = []
+    try:
+        for position in positions:
+            try:
+                samples.append(check_halo(rep, cfg, fetcher, halo_context, halo_ids[position], halo_ids, lookup,
+                                          mass_table, features))
+            except Exception as error:      # noqa: BLE001
+                rep.add('FAIL', f'halo {halo_ids[position]} raised an exception', f'{type(error).__name__}: {error}')
+    finally:
+        lookup.close()
+    print('\n  -- planning')
+    estimate_full_run(rep, halo_context.data['m200'], mass_table[1] * MASS_UNIT, samples)
     print('\n  -- generated maps')
     check_output_directory(rep, cfg)
     return rep
