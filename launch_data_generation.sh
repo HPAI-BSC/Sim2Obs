@@ -10,9 +10,9 @@
                              # auto-set per core (GPP: 2G/core), so 64 cores -> 128G total.
                              # Obelisk halos can have tens of millions of star particles.
 
-#SBATCH -t 02:00:00         # Run time (hh:mm:ss)
+#SBATCH -t 10:00:00         # Run time (hh:mm:ss)
 #SBATCH --account bsc70
-#SBATCH --qos=gp_debug
+#SBATCH --qos=gp_bsccs
 
 CURRENT_DIR=$(pwd)
 echo "Current directory: '$CURRENT_DIR'"
@@ -22,4 +22,4 @@ COMMIT_HASH=$(basename "$CURRENT_DIR")
 module load singularity
 singularity exec -B /gpfs/scratch/bsc70/hpai/storage/projects \
                  --nv /gpfs/scratch/bsc70/hpai/storage/projects/space/singularity/space_data_generation_v2.sif \
-   bash -c 'export PROJECT_ROOT='$CURRENT_DIR' && export COMMIT_HASH='$COMMIT_HASH' && export PYTHONPATH=$PYTHONPATH:$PROJECT_ROOT && cd $PROJECT_ROOT && python src/data_generation/test/manual_tests/manual_test_snapshot_fields_illustris_family.py'
+   bash -c 'export PROJECT_ROOT='$CURRENT_DIR' && export COMMIT_HASH='$COMMIT_HASH' && export PYTHONPATH=$PYTHONPATH:$PROJECT_ROOT && cd $PROJECT_ROOT && python src/generate_dataset.py'
