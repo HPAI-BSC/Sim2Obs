@@ -55,10 +55,10 @@ from src.data_generation.src.feature import FeatureProcessorFactory  # noqa: E40
 from src.data_generation.src.subhalo_particles_v2 import SubhaloParticlesV2  # noqa: E402
 from src.data_generation.src.utils import muse_bins_r  # noqa: E402
 
-CATALOGS = ['illustris300_dm'] # 'millenium_dm'
+CATALOGS = ['millenium_dm'] # 'millenium_dm'
 # Positions in the halo list of the pipeline (catalogue order, the first ones are the most massive halos and
 # so the heaviest to load). Positions beyond the end of the list are ignored.
-HALO_POSITIONS = [0, 3, 200, 1000, 3000]
+HALO_POSITIONS = [0, 200, 2000, 10000, 40000]
 DATASETS_DIR = None            # None: the one of configs/paths/gpfs.yaml
 MAX_SUBHALOS_FOR_MASS_CHECK = 3000      # loading one catalogue record per subhalo, skip the check above this
 MAX_OUTPUT_FILES_TO_READ = 60
