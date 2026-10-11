@@ -27,6 +27,7 @@ from src.data_generation.src.halo import HaloContext, Halo
 from src.data_generation.src.lazy_subhalo import LazySubhaloContext, LazySubhaloParticles
 from src.data_generation.src.part_types import MAGNETICUM_PART_TYPES
 from src.data_generation.src.subhalo import SubhaloContext, SubhaloParticles
+from src.data_generation.src.subhalo_particles_v2 import SubhaloParticlesV2
 from src.data_generation.src.utils import get_connection, read_dataset, setup_logger, to_list, apply_conversion, \
     dict_depth, to_list_in_batches
 import src.data_generation.src.features_dataset
@@ -700,6 +701,23 @@ class Illustris300Fetcher(DataFetcher):
     """
     Data fetcher for the Illustris-300 catalog.
     """
+    # Particle types loaded for the overlapping neighbour subhalos (get_p_subhalo, only used by the neighbour
+    # path of the data loader). Neighbours only need their stars: the heavy dark matter of the neighbours is
+    # not used by default, and with several particle types per catalog it would multiply the loading time.
+    # Only applied when the catalog sets `particles_v2: true` (see `_particles_v2`).
+    NEIGHBOUR_PARTICLE_TYPES = ('star',)
+
+    @property
+    def _particles_v2(self) -> bool:
+        """
+        bool: True if the catalog opts in to the multi particle type behaviour with `particles_v2: true`.
+
+        The flag switches on three things together: `SubhaloParticlesV2` instead of `SubhaloParticles`, the
+        constant particle masses (dark matter) taken from the snapshot header, and stars only for the overlapping
+        neighbours. Catalogs without it behave exactly as before, even if they declare several particle types.
+        """
+        return bool(self.catalog.get('particles_v2', False))
+
     def __init__(self, catalog: DictConfig, **kwargs):
         """
         Initializes the fetcher with the given configuration.
@@ -784,7 +802,7 @@ class Illustris300Fetcher(DataFetcher):
             raise ValueError("subhalo_id must be provided in kwargs")
 
         #logger.info(f"Fetching particle data for subhalo: {subhalo_id}")
-        return self._get_p_subhalo(subhalo_id)
+        return self._get_p_subhalo(subhalo_id, particle_types=self.NEIGHBOUR_PARTICLE_TYPES)
 
     def get_p_halo(self, *args, **kwargs) -> SubhaloParticles:
         """
@@ -956,14 +974,101 @@ class Illustris300Fetcher(DataFetcher):
             logger.warning("No subhalos found.")
             return SubhaloContext(pd.DataFrame(data=[]), self.column_map)
 
-    def _get_p_subhalo(self, subhalo_id: int) -> SubhaloParticles:
+    def _get_mass_table(self) -> np.ndarray:
         """
-        Fetches particle data for a specific subhalo.
+        Return the `MassTable` of the snapshot header, read once from chunk 0 and cached.
+
+        Particle types with a constant mass (dark matter in Illustris, TNG and MTNG) have no per-particle
+        `Masses` dataset in the snapshot, their mass is in this table, in the snapshot's mass units
+        (10^10 Msun/h). `illustris_python` has no snapshot header reader (its group catalogue header has no
+        `MassTable`), so the file that `il.snapshot.snapPath` returns is opened with h5py.
+
+        Returns:
+        --------
+        np.ndarray
+            Mass of each of the 6 particle types, 0 for the types that store per-particle masses.
+        """
+        if getattr(self, '_mass_table', None) is None:
+            snapshot_file = il.snapshot.snapPath(self.catalog.path + '/output', self.catalog.snapnum)
+            with h5py.File(snapshot_file, 'r') as snapshot:
+                self._mass_table = np.asarray(snapshot['Header'].attrs['MassTable'], dtype=np.float64)
+        return self._mass_table
+
+    def _constant_mass(self, part_type: str, fields: list):
+        """
+        Return the constant particle mass of `part_type` if its `Masses` have to come from the header.
+
+        Following the Gadget convention, a particle type with a non-zero `MassTable` entry stores no
+        per-particle masses, so a `Masses` field requested for it cannot be read from the snapshot.
 
         Parameters:
         -----------
-        isubhalo : int
+        part_type : str
+            Particle type key of the catalog YAML (e.g. 'star', 'dm').
+        fields : list
+            Snapshot fields requested for this particle type.
+
+        Returns:
+        --------
+        float or None
+            The header mass (snapshot mass units) when `Masses` is requested and the type has a constant
+            mass, otherwise None (everything is read from the snapshot).
+        """
+        # Catalogs without `particles_v2` keep the original behaviour exactly: no header access
+        if 'Masses' not in fields or not self._particles_v2:
+            return None
+        mass = float(self._get_mass_table()[il.util.partTypeNum(part_type)])
+        return mass if mass > 0 else None
+
+    @staticmethod
+    def _particle_count(particles: dict) -> int:
+        """Number of particles in a loaded particle dict (length of its first array)."""
+        for value in particles.values():
+            if isinstance(value, np.ndarray):
+                return len(value)
+        return 0
+
+    def _select_particle_types(self, particle_types=None) -> list:
+        """
+        Particle types to load, in the order of the catalog YAML.
+
+        `particle_types` restricts the selection, but only for catalogs with `particles_v2: true` that declare
+        more than one particle type, so every other catalog loads all its types as before. If the restriction
+        matches nothing, every type is loaded.
+
+        Parameters:
+        -----------
+        particle_types : iterable of str, optional
+            Particle type keys to keep. None keeps every declared type.
+        """
+        declared = [part_type for part_type in self.catalog.fields.particles.keys()
+                    if part_type in self.particle_fields]
+        if particle_types is None or not self._particles_v2 or len(declared) <= 1:
+            return declared
+        selected = [part_type for part_type in declared if part_type in particle_types]
+        if not selected:
+            logger.warning(f'None of the requested particle types {list(particle_types)} is declared in the '
+                           f'catalog {declared}, loading all of them.')
+            return declared
+        return selected
+
+    def _get_p_subhalo(self, subhalo_id: int, particle_types=None) -> SubhaloParticles:
+        """
+        Fetches particle data for a specific subhalo.
+
+        Particle types with a constant mass in the snapshot header (dark matter) do not have a `Masses`
+        dataset: if the catalog declares `Masses` for them, it is not requested from the snapshot and is
+        filled with the header mass instead, so it goes through the usual unit conversion of the YAML.
+
+        Catalogs with `particles_v2: true` get a `SubhaloParticlesV2` (several particle types need their own
+        overlap boundaries), all the others keep `SubhaloParticles`.
+
+        Parameters:
+        -----------
+        subhalo_id : int
             The index of the subhalo from which to retrieve particle data.
+        particle_types : iterable of str, optional
+            Restrict the loading to these particle type keys of the catalog (see `_select_particle_types`).
 
         Returns:
         --------
@@ -977,27 +1082,29 @@ class Illustris300Fetcher(DataFetcher):
             logger.error(f"The path {path} does not exist.")
             raise Exception(f'The path {path} does not exist.')
 
-        part_types = self.particle_fields
+        part_types = self._select_particle_types(particle_types)
         data = {}
         for part_type in part_types:
             fields = list(self.catalog.fields.particles[part_type].keys())
-            particles = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, part_type, fields=fields)
+            constant_mass = self._constant_mass(part_type, fields)
+            request = fields if constant_mass is None else [field for field in fields if field != 'Masses']
+            if not request:
+                raise ValueError(f"Particle type '{part_type}' only declares 'Masses', which comes from the "
+                                 f"header, so there is no snapshot field to size the particles with.")
+            particles = il.snapshot.loadSubhalo(path, self.catalog.snapnum, subhalo_id, part_type, fields=request)
 
             # if numpy, convert it to a dict
             if isinstance(particles, np.ndarray):
                 tmp = particles
-                particles = {fields[0]: tmp}
+                particles = {request[0]: tmp}
 
             if len(particles) > 0:
                 count = particles.get('count', None)
                 if count is None or count > 0:
+                    if constant_mass is not None:
+                        particles['Masses'] = np.full(self._particle_count(particles), constant_mass,
+                                                      dtype=np.float64)
                     data[part_type] = particles
-
-                    for key in particles:
-                        if isinstance(key, np.ndarray):
-                            num_particles = particles[key].shape[0]
-                            #logger.debug(f"Particle data fetched successfully, particles retrieved: {num_particles}")
-                            break
             else:
                 logger.warning(f"No particle data found for subhalo {subhalo_id}.")
 
@@ -1019,7 +1126,8 @@ class Illustris300Fetcher(DataFetcher):
         ]
 
         processed_particles = run_pipeline(data, steps)
-        particle_data = SubhaloParticles(processed_particles, self.catalog.fields.particles)
+        particles_class = SubhaloParticlesV2 if self._particles_v2 else SubhaloParticles
+        particle_data = particles_class(processed_particles, self.catalog.fields.particles)
         return particle_data
 
     def _get_p_halo(self, halo: Halo) -> SubhaloParticles:

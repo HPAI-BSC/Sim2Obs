@@ -1128,234 +1128,265 @@ class ICLProcessor(FeatureProcessor):
         return np.array([])
 
 
-class StellarMassDensityProcessor(FeatureProcessor):
+class ParticleFieldProcessor(FeatureProcessor):
     """
-    Class to process the ...
+    Generic feature processor: bins one per-particle scalar attribute of a `SubhaloParticles` into a 2D map.
+
+    The attribute is any `<particle_type>_<name>` attribute that the catalog YAML defines (for example
+    `star_z`, `star_m` or `dm_m`), so a new physical property only needs a catalog entry and a
+    `feature_names` entry, no new class. Particle positions are taken from the matching `<particle_type>_p`
+    attribute, so a `dm_*` feature is binned on dark-matter positions and a `star_*` feature on star positions.
+
+    Configuration (the feature entry in `feature_names`):
+        attribute (str): Attribute to map, e.g. `star_z`. Required.
+        statistic (str): Per-pixel reduction. `sum` (default), `mean` (unweighted) or `weighted_mean`
+            (`sum(w * v) / sum(w)`, needs `weight`).
+        weight (str): Attribute used as weight by `weighted_mean`, e.g. `star_m`. It must belong to the same
+            particle type as `attribute`.
+        clip_min (float): Optional lower bound applied to the values, e.g. 0 to remove the tiny negative
+            metallicities some snapshots contain.
+        include_overlapping (bool): If False (default) only the halo's own particles (`non_overlapping`) are
+            mapped, so the input and the output map describe the same particle population. If True, the
+            particles passed to `generate_map` are used as they come.
+        per_area (bool): Divide a `sum` map by the pixel area, giving a surface density. Default False.
+        label (str): Name of the feature and of its output folder. Defaults to `attribute`.
+
     Attributes:
-        name (str): The name of the feature ('VelocityDispersion').
-        map ([]): Velocity Dispersion map.
-        value ([]): Placeholder for storing computed value.
+        name (str): Feature name, used by `map_step` to name the output folder.
+        map ([]): Map of the feature, set by `map_step`.
+        value ([]): Per-particle values computed by `process`.
     """
+    STATISTICS = ('sum', 'mean', 'weighted_mean')
+
     def __init__(self, kwargs):
         """
-        Initialize the processor's name, empty map, and empty value placeholder.
+        Validate the feature configuration and initialise the name, empty map and empty value placeholder.
 
         Parameters:
         -----------
         kwargs : dict
-            Feature configuration entry; unused by this processor beyond
-            being accepted for a consistent constructor signature across
-            FeatureProcessor subclasses.
+            Feature configuration entry without its `name` key (see the class docstring).
+
+        Raises:
+        -------
+        ValueError
+            If `attribute` is missing or not of the form `<particle_type>_<name>`, if `statistic` is unknown,
+            if `weighted_mean` has no `weight`, if `weight` is of another particle type, or if `per_area` is
+            used with a statistic other than `sum`.
         """
-        self.name = 'StellarMassDensity'
+        attribute = kwargs.get('attribute', None)
+        if not attribute:
+            raise ValueError("ParticleField needs an 'attribute' (e.g. 'star_z').")
+
+        statistic = kwargs.get('statistic', 'sum')
+        if statistic not in self.STATISTICS:
+            raise ValueError(f"Unknown statistic '{statistic}'. Valid options: {list(self.STATISTICS)}.")
+
+        weight = kwargs.get('weight', None)
+        if statistic == 'weighted_mean' and not weight:
+            raise ValueError("The statistic 'weighted_mean' needs a 'weight' attribute (e.g. 'star_m').")
+        if weight and statistic != 'weighted_mean':
+            logger.warning(f"ParticleField '{attribute}': 'weight' is only used by 'weighted_mean', ignoring it.")
+            weight = None
+
+        per_area = bool(kwargs.get('per_area', False))
+        if per_area and statistic != 'sum':
+            raise ValueError("'per_area' only makes sense with the statistic 'sum'.")
+
+        self.particle_type = self._particle_type(attribute)
+        if weight and self._particle_type(weight) != self.particle_type:
+            raise ValueError(f"The weight '{weight}' must belong to the same particle type as '{attribute}'.")
+
+        self.attribute = attribute
+        self.weight = weight
+        self.statistic = statistic
+        self.position_attribute = f'{self.particle_type}_p'
+        clip_min = kwargs.get('clip_min', None)
+        self.clip_min = None if clip_min is None else float(clip_min)
+        self.include_overlapping = bool(kwargs.get('include_overlapping', False))
+        self.per_area = per_area
+        self.name = kwargs.get('label', None) or attribute
         self.map = []
         self.value = []
 
-    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
-        """
-        Calculate the velocity dispersion of particles.
+    @staticmethod
+    def _particle_type(attribute: str) -> str:
+        """Return the particle type prefix of a `<particle_type>_<name>` attribute name (e.g. 'star' for 'star_z')."""
+        prefix, separator, field = str(attribute).partition('_')
+        if not separator or not prefix or not field:
+            raise ValueError(f"'{attribute}' must look like '<particle_type>_<name>', e.g. 'star_z' or 'dm_m'.")
+        return prefix
 
-        Args:
-            **kwargs: Keyword arguments, expected to include the necessary data for processing, in this case
-            the velocities of the particles.
+    @staticmethod
+    def _to_float_array(values) -> np.ndarray:
+        """Convert a column to float64, stacking object arrays of per-particle vectors into a proper 2D array."""
+        array = np.asarray(values)
+        if array.dtype == object and array.size > 0 and isinstance(array[0], (list, np.ndarray)):
+            array = np.stack(array)
+        return array.astype(np.float64, copy=False)
+
+    def _get_attribute(self, subhalo_particles: SubhaloParticles, attribute: str) -> np.ndarray:
+        """Fetch `attribute` from the particles as float64, with an error that lists what is available."""
+        if not hasattr(subhalo_particles, attribute):
+            available = sorted(a for a in vars(subhalo_particles) if a.startswith(f'{self.particle_type}_'))
+            logger.error(f"ParticleField needs '{attribute}', available '{self.particle_type}_*' attributes: {available}")
+            raise AttributeError(f"SubhaloParticles has no attribute '{attribute}'. Available "
+                                 f"'{self.particle_type}_*' attributes: {available}. Check the particle fields "
+                                 f"of the catalog YAML.")
+        return self._to_float_array(getattr(subhalo_particles, attribute))
+
+    def _gather(self, subhalo_particles: SubhaloParticles):
+        """
+        Collect the positions, values and weights to bin, validated and cleaned.
+
+        Applies the `include_overlapping` rule, checks that every array has the same number of particles,
+        applies `clip_min`, and drops (with a warning) particles whose value or weight is not finite.
 
         Returns:
-            np.ndarray: The velocity for each particle.
+        --------
+        tuple
+            (positions (N, 3), values (N,), weights (N,) or None), all float64.
 
         Raises:
-            ValueError: If the input particle_velocity is empty.
+        -------
+        AttributeError
+            If an attribute is missing from the particles.
+        ValueError
+            If the arrays have different lengths, positions are not (N, 3), or no valid particle remains.
         """
-        if not hasattr(subhalo_particles, 'star_m'):
-            logger.error('StellarMassDensity needs star_m as input parameter.')
-            raise Exception('StellarMassDensity needs star_m as input parameter.')
+        if not self.include_overlapping:
+            subhalo_particles = getattr(subhalo_particles, 'non_overlapping', subhalo_particles)
 
-        if subhalo_particles.star_m.size == 0:
-            logger.error("SubhaloParticles cannot have 'm' (mass) empty.")
-            raise ValueError("SubhaloParticles cannot have 'm' (mass) empty.")
+        positions = self._get_attribute(subhalo_particles, self.position_attribute)
+        values = self._get_attribute(subhalo_particles, self.attribute)
+        weights = self._get_attribute(subhalo_particles, self.weight) if self.weight else None
 
-        return subhalo_particles.star_m
+        if positions.ndim != 2 or positions.shape[1] != 3:
+            raise ValueError(f"'{self.position_attribute}' must have shape (N, 3), got {positions.shape}.")
+        if values.ndim != 1:
+            raise ValueError(f"'{self.attribute}' must be a scalar per particle (shape (N,)), got {values.shape}.")
+        sizes = {self.position_attribute: len(positions), self.attribute: len(values)}
+        if weights is not None:
+            sizes[self.weight] = len(weights)
+        if len(set(sizes.values())) != 1:
+            raise ValueError(f'ParticleField needs the same number of particles in every array, got {sizes}.')
+        if len(values) == 0:
+            raise ValueError(f"SubhaloParticles cannot have '{self.attribute}' empty.")
 
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+        if self.clip_min is not None:
+            values = np.maximum(values, self.clip_min)
+
+        valid = np.isfinite(values)
+        if weights is not None:
+            valid &= np.isfinite(weights)
+        if not valid.all():
+            logger.warning(f"ParticleField '{self.attribute}': dropping {int((~valid).sum())} particles "
+                           f"with non-finite value or weight.")
+            positions, values = positions[valid], values[valid]
+            weights = weights[valid] if weights is not None else None
+        if len(values) == 0:
+            raise ValueError(f"No particle with a finite '{self.attribute}' is left.")
+        return positions, values, weights
+
+    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> None:
         """
-        Generate a 2D map of processed particle features using binned statistics.
-
-        This method calculates a 2D histogram-like map of a feature derived from particle data.
-        It uses the positions of particles and bins them into a grid, computing the mean of a
-        specific feature for each grid cell. The resulting feature values are processed further
-        to compute their normalized root mean square (RMS).
-
-        Args:
-            particle_positions (np.ndarray): A 2D array of shape (N, 3) representing the positions
-                of particles in 3D space, where N is the number of particles.
-            bins (int): The number of bins to use along each axis for the grid.
-            ranging (tuple): A tuple of two tuples defining the range for binning along each axis,
-                e.g., ((xmin, xmax), (ymin, ymax)).
-            axis (tuple): A tuple of two integers indicating which axes to use for the 2D grid
-                (e.g., (0, 1) for x and y).
-
-        Returns:
-            tuple: A tuple containing:
-                - input_ij (np.ndarray): A 2D array representing the grid of processed feature values.
-                - binx (np.ndarray): The bin edges along the first axis.
-                - biny (np.ndarray): The bin edges along the second axis.
-
-        Raises:
-            Exception: If the `self.value` attribute is empty, indicating that the `process`
-                method needs to be called before generating the map.
-        """
-        pos_rot = subhalo_particles.star_p
-        if axis is not None:
-            i, j = axis
-            if len(self.value) == 0:
-                logger.error('FeatureProcessor value is empty, call first process method.')
-                raise Exception('FeatureProcessor value is empty, call first process method.')
-
-            if isinstance(self.value, List):
-                self.value = np.array(self.value)
-
-            components = {0, 1, 2}
-            missing_component = components - set(axis)
-            k = next(iter(missing_component))
-
-            input_ij, binx, biny, _ = stats.binned_statistic_2d(
-                pos_rot[:, i], pos_rot[:, j],
-                (self.value[:, k]) ** 2,  # Access the relevant feature
-                statistic="sum", bins=bins, range=ranging
-            )
-            input_ij = np.sqrt(input_ij / 3)
-            input_ij[np.isnan(input_ij)] = 0
-            return input_ij, binx, biny
-        else:
-            # TODO to review computation and output
-            assert pos_rot[:, 0].size == pos_rot[:, 1].size == pos_rot[:, 2].size == len(self.value)
-            statistic_ijk, bin_edges, bin_number = stats.binned_statistic_dd(pos_rot, self.value, statistic="sum",
-                                                                             bins=bins, range=ranging)
-            statistic_ijk[np.isnan(statistic_ijk)] = 0
-            return statistic_ijk, bin_edges, bin_number
-
-    @classmethod
-    def get_empty(cls) -> np.ndarray:
-        """
-        Return an empty value for velocity dispersion (an empty array).
-
-        Returns:
-            np.ndarray: Empty array for velocity dispersion.
-        """
-        return np.array([])
-
-
-class DMMassDensityProcessor(FeatureProcessor):
-    """
-    Class to process the ...
-    Attributes:
-        name (str): The name of the feature ('VelocityDispersion').
-        map ([]): Velocity Dispersion map.
-        value ([]): Placeholder for storing computed value.
-    """
-    def __init__(self, kwargs):
-        """
-        Initialize the processor's name, empty map, and empty value placeholder.
+        Validate the particles and store the per-particle values of the attribute in `self.value`.
 
         Parameters:
         -----------
-        kwargs : dict
-            Feature configuration entry; unused by this processor beyond
-            being accepted for a consistent constructor signature across
-            FeatureProcessor subclasses.
-        """
-        self.name = 'DMMassDensity'
-        self.map = []
-        self.value = []
-
-    def process(self, halo: Halo, subhalo_particles: SubhaloParticles) -> np.ndarray:
-        """
-        Calculate the velocity dispersion of particles.
-
-        Args:
-            **kwargs: Keyword arguments, expected to include the necessary data for processing, in this case
-            the velocities of the particles.
-
-        Returns:
-            np.ndarray: The velocity for each particle.
+        halo : Halo
+            The halo being processed (unused, kept for the common FeatureProcessor signature).
+        subhalo_particles : SubhaloParticles
+            Particles holding the configured attribute, its weight (if any) and the matching positions.
 
         Raises:
-            ValueError: If the input particle_velocity is empty.
+        -------
+        AttributeError
+            If the attribute, the weight or the positions are missing.
+        ValueError
+            If the arrays are empty, have different lengths, or contain no finite value.
         """
-        if not hasattr(subhalo_particles, 'dm_m'):
-            logger.error('StellarMassDensity needs dm_m as input parameter.')
-            raise Exception('StellarMassDensity needs dm_m as input parameter.')
+        _, values, _ = self._gather(subhalo_particles)
+        self.value = values
+        logger.info(f"Computed '{self.attribute}' for {len(values)} particles.")
 
-        if subhalo_particles.dm_m.size == 0:
-            logger.error("SubhaloParticles cannot have 'm' (mass) empty.")
-            raise ValueError("SubhaloParticles cannot have 'm' (mass) empty.")
-
-        return subhalo_particles.dm_m
-
-    def generate_map(self, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple, axis: tuple) -> tuple:
+    def rotate(self, z, degree):
         """
-        Generate a 2D map of processed particle features using binned statistics.
+        Do nothing: a scalar per particle is invariant under rotation.
 
-        This method calculates a 2D histogram-like map of a feature derived from particle data.
-        It uses the positions of particles and bins them into a grid, computing the mean of a
-        specific feature for each grid cell. The resulting feature values are processed further
-        to compute their normalized root mean square (RMS).
+        The particle positions are rotated by `SubhaloParticles.rotate`. The base class version would try to
+        rotate `self.value` as a vector and fail on a 1D array.
+        """
+        return
 
-        Args:
-            particle_positions (np.ndarray): A 2D array of shape (N, 3) representing the positions
-                of particles in 3D space, where N is the number of particles.
-            bins (int): The number of bins to use along each axis for the grid.
-            ranging (tuple): A tuple of two tuples defining the range for binning along each axis,
-                e.g., ((xmin, xmax), (ymin, ymax)).
-            axis (tuple): A tuple of two integers indicating which axes to use for the 2D grid
-                (e.g., (0, 1) for x and y).
+    def generate_map(self, cfg, halo, subhalo_particles: SubhaloParticles, bins: int, ranging: tuple,
+                     axis: tuple, muse_filter: bool = False) -> tuple:
+        """
+        Generate a 2D map of the attribute with the configured per-pixel statistic.
+
+        The attribute is read from the particles passed here (not from `self.value`), because `map_step`
+        passes a different particle set to the input and to the output feature. Empty pixels are 0, and the
+        array orientation is the same as the other processors (first index along the first axis of
+        `axis`), so maps of different features share the same pixel grid.
+
+        Parameters:
+        -----------
+        cfg, halo :
+            Unused, kept for the signature `map_step` calls.
+        subhalo_particles : SubhaloParticles
+            Particles to map.
+        bins : int
+            Number of bins along each axis.
+        ranging : tuple
+            ((xmin, xmax), (ymin, ymax)) range of the map.
+        axis : tuple
+            Two axes to project, e.g. (0, 1) for the x-y plane.
+        muse_filter : bool
+            Not supported by this processor.
 
         Returns:
-            tuple: A tuple containing:
-                - input_ij (np.ndarray): A 2D array representing the grid of processed feature values.
-                - binx (np.ndarray): The bin edges along the first axis.
-                - biny (np.ndarray): The bin edges along the second axis.
+        --------
+        tuple
+            (map, binx, biny): the 2D map and the bin edges along each axis.
 
         Raises:
-            Exception: If the `self.value` attribute is empty, indicating that the `process`
-                method needs to be called before generating the map.
+        -------
+        NotImplementedError
+            If `muse_filter` is requested or `axis` is None (3D map).
         """
-        pos_rot = subhalo_particles.star_p
-        if axis is not None:
-            i, j = axis
-            if len(self.value) == 0:
-                logger.error('FeatureProcessor value is empty, call first process method.')
-                raise Exception('FeatureProcessor value is empty, call first process method.')
+        if muse_filter:
+            raise NotImplementedError('The MUSE filter is only implemented for VelocityDispersion.')
+        if axis is None:
+            raise NotImplementedError('ParticleField only generates 2D maps, axis cannot be None.')
 
-            if isinstance(self.value, List):
-                self.value = np.array(self.value)
+        i, j = axis
+        positions, values, weights = self._gather(subhalo_particles)
+        x, y = positions[:, i], positions[:, j]
+        logger.debug(f"Generating map for '{self.attribute}' ({self.statistic}), bins: {bins}, ranging: {ranging}")
 
-            components = {0, 1, 2}
-            missing_component = components - set(axis)
-            k = next(iter(missing_component))
+        def binned(array, statistic):
+            """Bin `array` on the (x, y) positions with the given scipy statistic."""
+            return stats.binned_statistic_2d(x, y, array, statistic=statistic, bins=bins, range=ranging)
 
-            input_ij, binx, biny, _ = stats.binned_statistic_2d(
-                pos_rot[:, i], pos_rot[:, j],
-                (self.value[:, k]) ** 2,  # Access the relevant feature
-                statistic="sum", bins=bins, range=ranging
-            )
-            input_ij = np.sqrt(input_ij / 3)
-            input_ij[np.isnan(input_ij)] = 0
-            return input_ij, binx, biny
+        if self.statistic == 'weighted_mean':
+            numerator, binx, biny, _ = binned(values * weights, 'sum')
+            denominator, _, _, _ = binned(weights, 'sum')
+            output_ij = np.divide(numerator, denominator, out=np.zeros_like(numerator), where=denominator > 0)
         else:
-            # TODO to review computation and output
-            assert pos_rot[:, 0].size == pos_rot[:, 1].size == pos_rot[:, 2].size == len(self.value)
-            statistic_ijk, bin_edges, bin_number = stats.binned_statistic_dd(pos_rot, self.value, statistic="sum",
-                                                                             bins=bins, range=ranging)
-            statistic_ijk[np.isnan(statistic_ijk)] = 0
-            return statistic_ijk, bin_edges, bin_number
+            output_ij, binx, biny, _ = binned(values, self.statistic)
+            output_ij[np.isnan(output_ij)] = 0
+
+        if self.per_area:
+            output_ij = output_ij / (np.diff(binx)[0] * np.diff(biny)[0])
+        return output_ij, binx, biny
 
     @classmethod
     def get_empty(cls) -> np.ndarray:
         """
-        Return an empty value for velocity dispersion (an empty array).
+        Return an empty value for the feature (an empty array).
 
         Returns:
-            np.ndarray: Empty array for velocity dispersion.
+            np.ndarray: Empty array.
         """
         return np.array([])
 
@@ -1376,7 +1407,7 @@ class FeatureProcessorFactory:
         Get an instance of the appropriate FeatureProcessor based on the feature name.
 
         Args:
-            feature (DictConfig): The feature type ('velocity_dispersion' or 'icl').
+            feature (DictConfig): The feature entry ('VelocityDispersion', 'IntraClusterLight' or 'ParticleField').
             **kwargs: Additional keyword arguments passed to the feature processor.
 
         Returns:
@@ -1398,10 +1429,8 @@ class FeatureProcessorFactory:
                 feature_processor = VelocityDispersionProcessor(kwargs=kwargs)
             case'IntraClusterLight':
                 feature_processor = ICLProcessor(cfg=cfg, kwargs=kwargs)
-            case 'StellarMassDensity':
-                feature_processor = StellarMassDensityProcessor(kwargs=kwargs)
-            case 'DarkMatterMassDensity':
-                feature_processor = DMMassDensityProcessor(kwargs=kwargs)
+            case 'ParticleField':
+                feature_processor = ParticleFieldProcessor(kwargs=kwargs)
             # Add more features if required
             case _:
                 raise ValueError(f"Invalid feature name {feature} provided")
