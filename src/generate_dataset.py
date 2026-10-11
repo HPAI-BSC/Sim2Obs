@@ -50,7 +50,7 @@ def get_pipeline_steps(cfg: DictConfig) -> List[PipelineStep]:
     return pipeline
 
 
-@hydra.main(version_base="1.3", config_path="../configs", config_name="data_generation.yaml")
+@hydra.main(version_base="1.3", config_path="../configs", config_name="data_generation_dm.yaml")
 def main(cfg: DictConfig) -> Any:
     import uuid
     run_id = uuid.uuid4()
@@ -58,8 +58,8 @@ def main(cfg: DictConfig) -> Any:
     steps = get_pipeline_steps(cfg)
     pipeline = Pipeline(cfg=cfg, steps=steps)
 
-    starting_idx = None
-    ending_idx = None
+    starting_idx = 0
+    ending_idx = 4
 
     #ignore_halos = OmegaConf.select(cfg, "catalog.ignore_halos", default=[])
     ignore_halos = [] # just for flamingo

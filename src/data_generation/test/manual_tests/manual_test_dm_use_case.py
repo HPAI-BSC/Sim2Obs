@@ -585,6 +585,8 @@ def check_catalog(catalog_name):
     checked_ids = [halo_ids[p] for p in positions]
     box = estimate_box(halo_context)
     edge_ids = [i for i in find_edge_halos(halo_context, box, N_EDGE_HALOS) if i not in checked_ids]
+    n_touching = len(find_edge_halos(halo_context, box, len(halo_ids)))
+    rep.add('INFO', 'halos that touch a face of the box (R200 reaches the face), all of them', f'{n_touching} of {len(halo_ids)} ({n_touching / len(halo_ids):.1%}). With the comoving Lbox of the original catalogs the particles of these halos are wrapped wrongly')
     rep.add('INFO', 'halos that touch a face of the box (also checked)', f'{edge_ids} (box length about {box:.0f} in position units, from the halo positions)')
     if len(positions) < len(HALO_POSITIONS):
         rep.add('WARN', 'halo positions beyond the list were ignored', str([p for p in HALO_POSITIONS if p >= len(halo_ids)]))

@@ -22,4 +22,4 @@ COMMIT_HASH=$(basename "$CURRENT_DIR")
 module load singularity
 singularity exec -B /gpfs/scratch/bsc70/hpai/storage/projects \
                  --nv /gpfs/scratch/bsc70/hpai/storage/projects/space/singularity/space_data_generation_v2.sif \
-   bash -c 'export PROJECT_ROOT='$CURRENT_DIR' && export COMMIT_HASH='$COMMIT_HASH' && export PYTHONPATH=$PYTHONPATH:$PROJECT_ROOT && cd $PROJECT_ROOT && python src/data_generation/test/manual_tests/manual_test_dm_use_case.py'
+   bash -c 'export PROJECT_ROOT='$CURRENT_DIR' && export COMMIT_HASH='$COMMIT_HASH' && export PYTHONPATH=$PYTHONPATH:$PROJECT_ROOT && cd $PROJECT_ROOT && python src/generate_dataset.py'
