@@ -60,6 +60,7 @@ CATALOGS = ['millenium_dm'] # 'millenium_dm'
 # so the heaviest to load). Positions beyond the end of the list are ignored.
 HALO_POSITIONS = [0, 200, 2000, 10000, 40000]
 DATASETS_DIR = None            # None: the one of configs/paths/gpfs.yaml
+N_EDGE_HALOS = 2               # also check the most massive halos that touch a face of the simulation box
 MAX_SUBHALOS_FOR_MASS_CHECK = 3000      # loading one catalogue record per subhalo, skip the check above this
 MAX_OUTPUT_FILES_TO_READ = 60
 JSON_OUTPUT = None             # e.g. 'dm_smoke_report.json' to also save the report
@@ -74,6 +75,9 @@ DM_MASS_REL_TOL = 1e-4         # summed float32 catalogue masses against the flo
 CENTRE_OFFSET_WARN = 0.5       # in units of R200
 RADIUS_FAIL_RANGE = (0.01, 10.0)    # median particle radius in units of R200
 DM_FRACTION_OF_M200_WARN = (0.3, 1.0)   # DM mass inside R200 over M200, about 0.84 for a complete halo
+FAR_PARTICLES_R200 = 5.0       # a particle farther than this from the halo centre is not part of the halo
+FAR_FRACTION_WARN = 1e-3       # more than this share of far particles is a wrapping problem
+PERIODIC_SAMPLE = 2_000_000    # particles per type used to compare the candidate box lengths
 
 
 class Report:
@@ -296,6 +300,64 @@ def check_geometry(rep, own, halo):
             f'{fraction:.3f} (M200={m200:.4g} Msun/h)')
 
 
+# ---------------------------------------------------------------------------------------------- periodic box
+
+def candidate_boxes(cfg):
+    """
+    Box lengths the recentring could use, in the units of the particle positions.
+
+    The positions are scaled to physical kpc/h by the catalog (`x * a`), while `Lbox` is the comoving length. The
+    pipeline passes `Lbox` as it is to `preprocess`, so the box that fits the positions would be `Lbox * a`.
+    """
+    lbox, a = float(cfg.catalog.Lbox), float(cfg.catalog.a)
+    return {'Lbox (as the pipeline uses it)': lbox, 'Lbox * a (physical)': lbox * a}
+
+
+def far_fractions(own, halo, box):
+    """Share of the particles of each type farther than FAR_PARTICLES_R200 R200 from the halo centre, with the
+    minimum image convention for a periodic box of length `box`, on a sample of at most PERIODIC_SAMPLE particles."""
+    result = {}
+    for label, positions in (('stars', own.star_p), ('dark matter', own.dm_p)):
+        step = max(1, len(positions) // PERIODIC_SAMPLE)
+        delta = np.asarray(positions[::step], dtype=np.float64) - np.asarray(halo.gpos, dtype=np.float64)
+        delta -= box * np.round(delta / box)
+        result[label] = float((np.linalg.norm(delta, axis=1) > FAR_PARTICLES_R200 * float(halo.r200)).mean())
+    return result
+
+
+def check_periodic(rep, own, halo, candidates):
+    """
+    Compare the share of far particles left by the pipeline's recentring (already applied to `own`) with the ones that
+    each candidate box length would give. `candidates` are the `far_fractions` computed BEFORE the recentring.
+    """
+    r200 = float(halo.r200)
+    for label, positions in (('stars', own.star_p), ('dark matter', own.dm_p)):
+        step = max(1, len(positions) // PERIODIC_SAMPLE)
+        left = float((np.linalg.norm(positions[::step], axis=1) > FAR_PARTICLES_R200 * r200).mean())
+        if left <= FAR_FRACTION_WARN:
+            rep.add('OK', f'{label}: no particle left far from the halo after the pipeline recentring', f'{left:.4%} beyond {FAR_PARTICLES_R200:g} R200')
+            continue
+        best = min(candidates, key=lambda name: candidates[name][label])
+        rep.add('WARN', f'{label}: particles left far from the halo by the periodic wrapping of the recentring',
+                f'{left:.1%} beyond {FAR_PARTICLES_R200:g} R200. With the minimum image convention: ' +
+                ', '.join(f'{name} -> {fractions[label]:.2%}' for name, fractions in candidates.items()) +
+                f'. The box length that fits is "{best}"')
+
+
+def find_edge_halos(halo_context, box, count):
+    """Ids of the most massive halos whose centre is closer to a face of the box than their R200."""
+    if count <= 0:
+        return []
+    data = halo_context.data
+    gpos = np.stack([np.asarray(g, dtype=float) for g in data['gpos']])
+    distance = np.minimum(gpos, box - gpos).min(axis=1)
+    touching = np.where(distance < np.asarray(data['r200'], dtype=float))[0]
+    if not len(touching):
+        return []
+    order = touching[np.argsort(-np.asarray(data['m200'], dtype=float)[touching])][:count]
+    return [int(i) for i in np.asarray(data['halo_id'])[order]]
+
+
 # ---------------------------------------------------------------------------------------------- maps
 
 def check_maps(rep, cfg, own, halo, features):
@@ -366,7 +428,7 @@ def check_rotation_guard(rep, own):
 def check_halo(rep, cfg, fetcher, halo_context, halo_id, halo_ids, lookup, mass_table, features):
     halo = halo_context.get_halo_by_id(halo_id)
     print(f'\n  -- halo {halo_id}: m200={float(halo.m200):.4g}, r200={float(halo.r200):.1f}, '
-          f'{len(halo.subhalo_ids)} subhalos')
+          f'{len(halo.subhalo_ids)} subhalos, gpos={np.round(np.asarray(halo.gpos, dtype=float))}')
     before = current_rss_mb()
     start = time.perf_counter()
     own = fetcher.get_p_halo(halo=halo)
@@ -375,50 +437,72 @@ def check_halo(rep, cfg, fetcher, halo_context, halo_id, halo_ids, lookup, mass_
     rep.add('INFO', 'load time', f'{elapsed:.1f} s for {millions:.1f} million particles ({ratio(elapsed, millions):.1f} s per million)')
     rep.add('INFO', 'memory', f'{current_rss_mb():.0f} MB now ({current_rss_mb() - before:+.0f} MB for this halo), peak so far {peak_rss_mb():.0f} MB')
 
-    sample = (float(halo.m200), millions, elapsed)
+    sample = (float(halo.m200), millions, elapsed, None)
     if not check_particles(rep, own, mass_table):
         return sample
     guarded(rep, 'catalogue check', check_catalogue, rep, own, halo, lookup)
+    boxes = candidate_boxes(cfg)
+    candidates = guarded(rep, 'periodic box check (before recentring)',
+                         lambda: {name: far_fractions(own, halo, box) for name, box in boxes.items()})
     own.preprocess(halo, cfg.catalog.get('Lbox', None))
+    if candidates:
+        guarded(rep, 'periodic box check', check_periodic, rep, own, halo, candidates)
     guarded(rep, 'geometry check', check_geometry, rep, own, halo)
     for feature in features:
         feature.process(halo=halo, subhalo_particles=own)
     start = time.perf_counter()
     guarded(rep, 'map check', check_maps, rep, cfg, own, halo, features)
-    rep.add('INFO', 'map generation time (3 projections, 2 features)', f'{time.perf_counter() - start:.1f} s')
+    map_seconds = time.perf_counter() - start
+    rep.add('INFO', 'map generation time (3 projections, 2 features)', f'{map_seconds:.1f} s')
     guarded(rep, 'neighbour check', check_neighbour, rep, own, halo_context, halo_id, halo_ids, fetcher)
     guarded(rep, 'rotation check', check_rotation_guard, rep, own)
-    return sample
+    return (sample[0], sample[1], sample[2], map_seconds)
 
 
 # ---------------------------------------------------------------------------------------------- planning
 
 def estimate_full_run(rep, m200_values, dm_particle_mass, samples):
     """
-    Rough planning estimate of the particle loading time for EVERY selected halo.
+    Planning estimate of the time to process EVERY selected halo in one process.
 
-    `samples` are the halos checked above, as (m200, millions of particles loaded, seconds to load them). The
-    particles loaded per halo are of the order of M200 / m_dm, with a factor that depends on the halo (the FoF group
-    reaches beyond R200), measured here as particles / (M200 / m_dm). The estimate takes the lowest, the median and
-    the highest of the measured factors and of the measured seconds per million particles. It covers the particle
-    loading only, not the catalogue listing, the neighbours (stars only) nor the map generation.
+    `samples` are the halos checked above, as (m200, millions of particles, seconds to load, seconds to make the maps).
+    The time of a halo is modelled as a fixed cost per halo plus a cost per million particles (least squares fit on the
+    samples, the fixed cost is what dominates the many small halos). The particles of a halo are of the order of
+    M200 / m_dm times a factor that depends on the halo (the FoF group reaches beyond R200), taken from the samples:
+    the lowest, the median and the highest factor give the range. The catalogue listing (a fixed cost of each run) and
+    the neighbours are not included.
     """
-    samples = [sample for sample in samples if sample]
+    samples = [sample for sample in samples if sample and sample[3] is not None]
     if len(samples) < 2 or dm_particle_mass <= 0:
-        rep.add('INFO', 'planning estimate skipped', 'needs at least two loaded halos')
+        rep.add('INFO', 'planning estimate skipped', 'needs at least two halos that went through the whole check')
         return
-    factors = np.array([millions * 1e6 / (m200 / dm_particle_mass) for m200, millions, _ in samples])
-    speeds = np.array([seconds / millions for _, millions, seconds in samples])
+    millions_loaded = np.array([sample[1] for sample in samples])
+    factors = np.array([m200_i / dm_particle_mass for m200_i, _, _, _ in samples])
+    factors = millions_loaded * 1e6 / factors
     expected = np.asarray(m200_values, dtype=float) / dm_particle_mass          # DM particles inside M200, per halo
-    millions = {name: expected.sum() * factor / 1e6 for name, factor in
-                (('low', factors.min()), ('median', np.median(factors)), ('high', factors.max()))}
-    hours = {'low': millions['low'] * speeds.min() / 3600, 'median': millions['median'] * np.median(speeds) / 3600,
-             'high': millions['high'] * speeds.max() / 3600}
-    rep.add('INFO', 'measured', f'{factors.min():.2f} to {factors.max():.2f} particles per M200/m_dm, '
-                                f'{speeds.min():.1f} to {speeds.max():.1f} s per million particles')
-    rep.add('INFO', f'planning estimate for loading the particles of all {len(expected)} selected halos',
-            f"{millions['median']:.0f} million particles in total (range {millions['low']:.0f} to {millions['high']:.0f}), "
-            f"about {hours['median']:.1f} h in one process (range {hours['low']:.1f} to {hours['high']:.1f} h)")
+    n_halos = len(expected)
+
+    def fit(column):
+        slope, intercept = np.polyfit(millions_loaded, np.array([sample[column] for sample in samples]), 1)
+        return max(float(intercept), 0.0), max(float(slope), 0.0)
+
+    (load_fixed, load_slope), (map_fixed, map_slope) = fit(2), fit(3)
+    totals = {name: expected.sum() * factor / 1e6 for name, factor in
+              (('low', factors.min()), ('median', np.median(factors)), ('high', factors.max()))}
+
+    def hours(fixed, slope, name):
+        return (n_halos * fixed + slope * totals[name]) / 3600
+
+    rep.add('INFO', 'measured', f'{factors.min():.2f} to {factors.max():.2f} particles per M200/m_dm. Loading: '
+                                f'{load_fixed:.2f} s per halo + {load_slope:.2f} s per million particles. Maps: '
+                                f'{map_fixed:.2f} s per halo + {map_slope:.2f} s per million particles')
+    load = {name: hours(load_fixed, load_slope, name) for name in totals}
+    maps = {name: hours(map_fixed, map_slope, name) for name in totals}
+    rep.add('INFO', f'planning estimate for all {n_halos} selected halos',
+            f"{totals['median']:.0f} million particles in total (range {totals['low']:.0f} to {totals['high']:.0f}). "
+            f"Loading {load['median']:.1f} h (range {load['low']:.1f} to {load['high']:.1f} h), maps {maps['median']:.1f} h "
+            f"(range {maps['low']:.1f} to {maps['high']:.1f} h), in total {load['median'] + maps['median']:.1f} h "
+            f"in one process, plus the catalogue listing of each run")
 
 
 # ---------------------------------------------------------------------------------------------- output
@@ -492,6 +576,10 @@ def check_catalog(catalog_name):
     rep.add('INFO', 'halos after the catalog filters', f'{len(halo_ids)}, listed in {time.perf_counter() - start:.0f} s')
     rep.add('INFO', 'memory after listing the halos (catalogue only, no particles)', f'{current_rss_mb():.0f} MB now, peak {peak_rss_mb():.0f} MB')
     positions = [p for p in HALO_POSITIONS if p < len(halo_ids)]
+    checked_ids = [halo_ids[p] for p in positions]
+    box = float(cfg.catalog.Lbox) * float(cfg.catalog.a)
+    edge_ids = [i for i in find_edge_halos(halo_context, box, N_EDGE_HALOS) if i not in checked_ids]
+    rep.add('INFO', 'halos that touch a face of the box (also checked)', f'{edge_ids} (box length {box:.0f} in position units)')
     if len(positions) < len(HALO_POSITIONS):
         rep.add('WARN', 'halo positions beyond the list were ignored', str([p for p in HALO_POSITIONS if p >= len(halo_ids)]))
 
@@ -499,12 +587,13 @@ def check_catalog(catalog_name):
     mass_table = fetcher._get_mass_table()
     samples = []
     try:
-        for position in positions:
+        for halo_id in checked_ids + edge_ids:
             try:
-                samples.append(check_halo(rep, cfg, fetcher, halo_context, halo_ids[position], halo_ids, lookup,
-                                          mass_table, features))
+                sample = check_halo(rep, cfg, fetcher, halo_context, halo_id, halo_ids, lookup, mass_table, features)
+                if halo_id in checked_ids:      # the edge halos are not typical, they stay out of the estimate
+                    samples.append(sample)
             except Exception as error:      # noqa: BLE001
-                rep.add('FAIL', f'halo {halo_ids[position]} raised an exception', f'{type(error).__name__}: {error}')
+                rep.add('FAIL', f'halo {halo_id} raised an exception', f'{type(error).__name__}: {error}')
     finally:
         lookup.close()
     print('\n  -- planning')
