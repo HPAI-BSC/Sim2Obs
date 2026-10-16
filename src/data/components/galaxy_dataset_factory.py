@@ -15,6 +15,6 @@ class GalaxyDatasetFactory:
                 return Illustris300Dataset(**kwargs)
             case "eagle":
                 return EagleDataset(**kwargs)
-            case "combined":
+            case "combined" | "combined_vd_dm" | "combined_dm":
                 return CombinedDataset(**kwargs)
         raise ValueError(f"Invalid feature name {dataset} provided")
