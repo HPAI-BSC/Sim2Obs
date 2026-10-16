@@ -1,0 +1,14 @@
+_target_: src.data.galaxy_datamodule.GalaxyDataModule
+data_dir:
+  - ${paths.datasets_dir}/illustris300/no_rotation_s1.5
+target_maskdir:
+  - ${paths.datasets_dir}/illustris300_dm_v1/no_rotation_s1.5
+dataset: combined_dm
+mask_interlopers: True
+batch_size: 32
+train_val_test_split: [.85, .05, .10]
+resize_shape: [128, 128]
+random_seed:  0
+num_workers: 8
+pin_memory: True
+fraction_data: 1.00

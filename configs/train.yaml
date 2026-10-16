@@ -3,12 +3,8 @@
 # specify here default configuration
 # order of defaults determines the order in which configs override each other
 defaults:
-  #- data: galaxy_dianoga_rotation45
-  #- data: galaxy_eagle_refl005
-  - data: combined_dataset
-  #- data: galaxy_illustris300
-  #- model: gaussian_interp
-  - model: mamba_unet
+  - data: combined_dm
+  - model: unet
   - callbacks: default
   - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default
