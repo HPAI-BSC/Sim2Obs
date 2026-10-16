@@ -12,8 +12,13 @@ class GalaxyDataset(Dataset, ABC):
         self.images = sorted(os.listdir(image_dir))
         self.labels = sorted(os.listdir(labels_dir))
 
-        if len(self.images) != len(self.labels):
-            raise ValueError("Mismatch between number of images and labels.")
+        # Keep only samples whose image and label both exist
+        common = sorted(set(self.images) & set(self.labels))
+        if len(common) != len(self.images) or len(common) != len(self.labels):
+            print(f"Mismatch between images ({len(self.images)}) and labels ({len(self.labels)}) "
+                  f"in {image_dir} / {labels_dir}. Keeping {len(common)} matching samples.")
+            self.images = common
+            self.labels = list(common)
 
     def __len__(self):
         return len(self.images)
