@@ -1,7 +1,7 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
-data_dir: ${paths.datasets_dir}/millenium/MTNG-L500-4320-A
-target_maskdir: ${paths.datasets_dir}/millenium/MTNG-L500-4320-A
-dataset: eagle
+data_dir: ${paths.datasets_dir}/millenium/MTNG-L500-4320-A/no_rotation_s1.5/VelocityDispersion
+target_maskdir: ${paths.datasets_dir}/millenium/MTNG-L500-4320-A/no_rotation_s1.5/IntraClusterLight
+dataset: millenium
 batch_size: 8
 train_val_test_split: [.85, .05, .10]
 resize_shape: [128, 128]

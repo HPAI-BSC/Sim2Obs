@@ -1,0 +1,20 @@
+_target_: src.data.galaxy_datamodule.GalaxyDataModule
+data_dir:
+  - ${paths.datasets_dir}/ilarias_dataset_v0/VelocityDispersion
+  - ${paths.datasets_dir}/eagle/RefL0050N0752/rotation_45_s1.5/VelocityDispersion
+  - ${paths.datasets_dir}/illustris300/rotation_45_s1.5_v4/VelocityDispersion
+  - ${paths.datasets_dir}/eagle/AGNdT9L0050N0752/rotation_45_s1.5/VelocityDispersion
+target_maskdir:
+  - ${paths.datasets_dir}/ilarias_dataset_v0/Labels
+  - ${paths.datasets_dir}/eagle/RefL0050N0752/rotation_45_s1.5/IntraClusterLight
+  - ${paths.datasets_dir}/illustris300/rotation_45_s1.5_v4/IntraClusterLight
+  - ${paths.datasets_dir}/eagle/AGNdT9L0050N0752/rotation_45_s1.5/IntraClusterLight
+dataset: combined
+mask_interlopers: True
+batch_size: 32
+train_val_test_split: [.85, .05, .10]
+resize_shape: [128, 128]
+random_seed:  0
+num_workers: 8
+pin_memory: True
+fraction_data: 1.00
