@@ -1,8 +1,8 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
 data_dir:
-  - ${paths.datasets_dir}/illustris300/no_rotation_s1.5
+  - ${paths.datasets_dir}/illustris300/no_rotation_s1.5/VelocityDispersion
 target_maskdir:
-  - ${paths.datasets_dir}/illustris300_dm_v1/no_rotation_s1.5
+  - ${paths.datasets_dir}/illustris300_dm_v1/no_rotation_s1.5/DarkMatterMass
 dataset: combined_dm
 mask_interlopers: True
 batch_size: 32
