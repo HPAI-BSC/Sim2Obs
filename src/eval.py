@@ -132,7 +132,7 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         log.info("Predicting...")
         predictions = trainer.predict(model=model, dataloaders=datamodule.predict_dataloader(), ckpt_path=cfg.ckpt_path)
 
-        dataset_name = cfg.defaults.data
+        dataset_name = cfg.data.dataset
         target_property = (dataset_name.split('.yaml')[0]).split('_')[-1]
         print(f"Target property: {target_property}")
         # Plot the first 3

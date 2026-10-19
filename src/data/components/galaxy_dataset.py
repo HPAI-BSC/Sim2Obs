@@ -12,27 +12,19 @@ class GalaxyDataset(Dataset, ABC):
         self.images = sorted(os.listdir(image_dir))
         self.labels = sorted(os.listdir(labels_dir))
 
-        # Pair samples by name: both folders are sorted, so sample i matches
-        # label i. Walk both listings in tandem and stop at the first name
-        # mismatch — everything after that point cannot be paired reliably,
-        # so the dataset length is that of the longest matching prefix.
-        paired_images = []
-        paired_labels = []
-        for img_name, label_name in zip(self.images, self.labels):
-            if img_name != label_name:
-                break
-            paired_images.append(img_name)
-            paired_labels.append(label_name)
+        # Pair samples by name: keep only files present in both folders,
+        # sorted so image i and label i refer to the same sample.
+        paired = sorted(set(self.images) & set(self.labels))
 
-        if len(paired_images) != len(self.images) or len(paired_labels) != len(self.labels):
+        if len(paired) != len(self.images) or len(paired) != len(self.labels):
             print(f"Mismatch between images ({len(self.images)}) and labels ({len(self.labels)}) "
-                  f"in {image_dir} / {labels_dir}. Keeping the first {len(paired_images)} paired samples.")
+                  f"in {image_dir} / {labels_dir}. Keeping {len(paired)} paired samples.")
 
-        if not paired_images:
+        if not paired:
             raise ValueError(f"No matching image/label pairs found between {image_dir} and {labels_dir}.")
 
-        self.images = paired_images
-        self.labels = paired_labels
+        self.images = paired
+        self.labels = list(paired)
 
     def __len__(self):
         return len(self.images)
