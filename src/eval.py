@@ -132,7 +132,9 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         log.info("Predicting...")
         predictions = trainer.predict(model=model, dataloaders=datamodule.predict_dataloader(), ckpt_path=cfg.ckpt_path)
 
-        """
+        dataset_name = cfg.defaults.data
+        target_property = (dataset_name.split('.yaml')[0]).split('_')[-1]
+        print(f"Target property: {target_property}")
         # Plot the first 3
         pred0, pred1, pred2 = predictions[0][0], predictions[0][1], predictions[0][2]
         preds = [pred0, pred1, pred2]
@@ -140,7 +142,7 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         for imgs, labels in datamodule.test_dataloader():
             gts = [labels[0], labels[1], labels[2]]  # Get the first two in the batch
             break
-        """
+
         output_path = cfg.paths.output_dir
         random_idxs = random.sample(list(range(len(predictions[0]))), 3)
 
@@ -161,24 +163,23 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
             print(f'sample {i}: {torch.mean(torch.abs(diff))}')
             diff = np.array(diff.tolist())
             im = plt.imshow(diff, cmap="bwr", vmin=-np.max(np.abs(diff)), vmax=np.max(np.abs(diff)))
-            plt.colorbar(im, label="ICL frac difference")
+            plt.colorbar(im, label=f"{target_property} frac difference")
             plt.axis("off")
-            plt.savefig(f"{output_path}/icl_diff_sample_{i}.png")
+            plt.savefig(f"{output_path}/{target_property}_diff_sample_{i}.png")
 
             plt.figure(figsize=(8, 6))
             im = plt.imshow(np.array(pred_i.permute(1, 2, 0).detach().cpu().tolist()))
-            plt.colorbar(im, label="ICL frac")
+            plt.colorbar(im, label=f"{target_property} frac")
             plt.axis("off")
-            plt.savefig(f"{output_path}/icl_pred_sample_{i}.png")
+            plt.savefig(f"{output_path}/{target_property}_pred_sample_{i}.png")
 
             plt.figure(figsize=(8, 6))
             im = plt.imshow(np.array(gts_i.permute(1, 2, 0).detach().cpu().tolist()))
-            plt.colorbar(im, label="ICL frac")
+            plt.colorbar(im, label=f"{target_property} frac")
             plt.axis("off")
-            plt.savefig(f"{output_path}/icl_gt_sample_{i}.png")
+            plt.savefig(f"{output_path}/{target_property}_gt_sample_{i}.png")
 
-        """
-        print('plotting ICL frac difference')
+        print(f'plotting {target_property} frac difference')
         gts0 = gts[0]
         print(gts0.shape)
         print(torch.max(gts0), torch.min(gts0))
@@ -186,17 +187,16 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         diff_abs = diff_abs.permute(1, 2, 0).detach().cpu()
         diff_abs = np.array(diff_abs.tolist())
         plt.imshow(diff_abs)
-        plt.savefig(f"{output_path}/icl_diff_sample.png")
+        plt.savefig(f"{output_path}/{target_property}_diff_sample.png")
 
         plt.figure(figsize=(8, 6))
         diff = pred0-gts0
         diff = diff.permute(1, 2, 0).detach().cpu()
         diff = np.array(diff.tolist())
         im = plt.imshow(diff, cmap="bwr", vmin=-np.max(np.abs(diff)), vmax=np.max(np.abs(diff)))
-        plt.colorbar(im, label="ICL frac difference")
+        plt.colorbar(im, label=f"{target_property} frac difference")
         plt.axis("off")
-        plt.savefig(f"{output_path}/icl_diff_sample2.png")
-        """
+        plt.savefig(f"{output_path}/{target_property}_diff_sample2.png")
 
         if cfg.save_all_predictions:
             log.info("Saving predictions...")
