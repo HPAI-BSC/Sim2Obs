@@ -25,7 +25,7 @@ save_all_predictions: False
 
 
 # Final evals October 2026
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/b31be31d/output/checkpoints/b31be31d/epoch_26.ckpt
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/b31be31d/output/checkpoints/b31be31d/epoch_026.ckpt
 
 
 # NEW COMBINED DATASET (~18k maps)
