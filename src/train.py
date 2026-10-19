@@ -3,6 +3,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import hydra
 import lightning as L
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 import rootutils
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.profilers import PyTorchProfiler
@@ -34,6 +38,57 @@ rootutils.setup_root(__file__, pythonpath=True)
 from src import utils
 
 log = utils.get_pylogger(__name__)
+
+
+class MetricsPlotter(Callback):
+    """Tracks training/validation metric curves and saves plots at the end of training."""
+
+    PAIRS = {
+        "RASE": ("train/RASE", "val/RASE"),
+        "MAE": ("train/mae", "val/mae"),
+        "Masked_MAE": ("train/masked_mae", "val/masked_mae"),
+    }
+
+    def __init__(self, output_dir: str) -> None:
+        self.output_dir = output_dir
+        self.history: Dict[str, Dict[str, List[float]]] = {
+            name: {"train": [], "val": []} for name in self.PAIRS
+        }
+
+    def _record(self, trainer: Trainer, split: str) -> None:
+        metrics = trainer.callback_metrics
+        for name, (train_key, val_key) in self.PAIRS.items():
+            key = train_key if split == "train" else val_key
+            if key in metrics:
+                self.history[name][split].append(float(metrics[key]))
+
+    def on_train_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        self._record(trainer, "train")
+
+    def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        self._record(trainer, "val")
+
+    def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        os.makedirs(self.output_dir, exist_ok=True)
+        for name in self.PAIRS:
+            train_curve = self.history[name]["train"]
+            val_curve = self.history[name]["val"]
+            if not train_curve and not val_curve:
+                log.warning(f"No {name} values recorded, skipping plot.")
+                continue
+            fig, ax = plt.subplots()
+            if train_curve:
+                ax.plot(range(1, len(train_curve) + 1), train_curve, label="train")
+            if val_curve:
+                ax.plot(range(1, len(val_curve) + 1), val_curve, label="val")
+            ax.set_title(f"{name} curve")
+            ax.set_xlabel("Epoch")
+            ax.set_ylabel(name.replace("_", " "))
+            ax.legend()
+            fig.tight_layout()
+            fig.savefig(os.path.join(self.output_dir, f"{name}_curve.png"), dpi=150)
+            plt.close(fig)
+            log.info(f"Saved {name} curve plot to {self.output_dir}")
 
 import torch
 
@@ -72,6 +127,7 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info("Instantiating callbacks...")
     callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
+    callbacks.append(MetricsPlotter(output_dir=cfg.paths.output_dir))
 
     log.info("Instantiating loggers...")
     logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
