@@ -4,7 +4,7 @@ defaults:
   - _self_
   #- data: combined_dataset
   #- data: galaxy_dianoga_rotation45
-  - data: combined_vd_dm.yaml
+  - data: galaxy_eagle
   - model: unet
   - logger:
   - trainer: default
@@ -25,7 +25,8 @@ save_all_predictions: False
 
 
 # Final evals October 2026
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/b31be31d/output/checkpoints/b31be31d/epoch_026.ckpt
+#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/b31be31d/output/checkpoints/b31be31d/epoch_026.ckpt
+ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/0534d449/output/checkpoints/0534d449/epoch_049.ckpt  # UNET Combined VD-ICL
 
 
 # NEW COMBINED DATASET (~18k maps)
