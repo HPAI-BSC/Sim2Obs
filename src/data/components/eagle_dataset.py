@@ -14,7 +14,9 @@ class EagleDataset(GalaxyDataset):
 
     def __init__(self, image_dir, labels_dir, transform=None, mask_interlopers=True, **kwargs):
         self.mask_interlopers = mask_interlopers
-        if isinstance(image_dir, (list, tuple)):
+        # OmegaConf passes YAML lists as ListConfig, which is not a list subclass,
+        # so detect multiple directories by excluding path-like single values.
+        if not isinstance(image_dir, (str, bytes, os.PathLike)):
             # Multiple EAGLE simulation directories: build one sub-dataset per
             # directory pair and concatenate them (same layout as CombinedDataset).
             self.sub_datasets = [
