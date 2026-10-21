@@ -4,6 +4,7 @@ from PIL import Image
 
 import numpy as np
 import torch
+from torch.utils.data import ConcatDataset
 
 from src.data.components.galaxy_dataset import GalaxyDataset
 
@@ -12,10 +13,27 @@ class EagleDataset(GalaxyDataset):
     name = 'eagle'
 
     def __init__(self, image_dir, labels_dir, transform=None, mask_interlopers=True, **kwargs):
-        super().__init__(image_dir, labels_dir, transform, mask_interlopers, **kwargs)
         self.mask_interlopers = mask_interlopers
+        if isinstance(image_dir, (list, tuple)):
+            # Multiple EAGLE simulation directories: build one sub-dataset per
+            # directory pair and concatenate them (same layout as CombinedDataset).
+            self.sub_datasets = [
+                EagleDataset(img_dir, lbl_dir, transform=transform, mask_interlopers=mask_interlopers)
+                for img_dir, lbl_dir in zip(image_dir, labels_dir)
+            ]
+            self.concat_dataset = ConcatDataset(self.sub_datasets)
+        else:
+            super().__init__(image_dir, labels_dir, transform, mask_interlopers, **kwargs)
+
+    def __len__(self):
+        if hasattr(self, 'concat_dataset'):
+            return len(self.concat_dataset)
+        return super().__len__()
 
     def __getitem__(self, index):
+        if hasattr(self, 'concat_dataset'):
+            return self.concat_dataset[index]
+
         img_path = os.path.join(self.image_dir, self.images[index])
         labels_path = os.path.join(self.labels_dir, self.labels[index])
 
@@ -48,6 +66,12 @@ class EagleDataset(GalaxyDataset):
         return filtered_files
 
     def get_halo_ids(self):
+        if hasattr(self, 'concat_dataset'):
+            halo_ids = []
+            for dataset in self.sub_datasets:
+                halo_ids.extend(dataset.get_halo_ids())
+            return halo_ids
+
         halo_ids = set()
         for file in self.images:
             match = re.match(r'halo_(\d+)', file)
@@ -61,8 +85,12 @@ class EagleDataset(GalaxyDataset):
         Filters the dataset by the list of halo IDs.
 
         :param halos: List of halo IDs to include in the dataset.
-        :return: A new `DianogaDataset` instance with only the filtered halos.
+        :return: A new dataset instance with only the filtered halos.
         """
+        if hasattr(self, 'concat_dataset'):
+            filtered = [dataset.filter_by_halos(halos) for dataset in self.sub_datasets]
+            return ConcatDataset(filtered)
+
         filtered_images = self._filter_image_files_by_halos(self.images, halos)
         filtered_labels = self._filter_image_files_by_halos(self.labels, halos)
 
