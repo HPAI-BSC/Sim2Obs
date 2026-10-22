@@ -1,6 +1,7 @@
 # Entry points
 
-Three independent Hydra (`@hydra.main`) scripts, each its own pipeline
+Four independent Hydra-driven scripts (three `@hydra.main`, `complete_eval.py` composes
+configs in-process), each its own pipeline
 stage — there's no single "run everything" command.
 
 | Script | Config | Launcher | Role |
@@ -8,6 +9,7 @@ stage — there's no single "run everything" command.
 | `src/generate_dataset.py` | `configs/data_generation.yaml` | `launch_data_generation.sh` | Builds the `PipelineStep` chain from `cfg.pipeline`, runs `Pipeline.run()` |
 | `src/train.py` | `configs/train.yaml` | `launch_train.sh` | Instantiates `cfg.data`/`cfg.model` via Hydra, runs PyTorch-Lightning `Trainer.fit`/`.test` |
 | `src/eval.py` | `configs/eval.yaml` | `launch_eval.sh` | Loads a checkpoint, runs inference/prediction saving |
+| `src/complete_eval.py` | `configs/complete_eval.yaml` | — | Evaluates every checkpoint in `ckpt_paths` on every dataset in `data_names`; infers each checkpoint's model from its run dir's `configs/train.yaml` (or takes them explicitly from `models`) |
 
 ## Data-generation step chain
 

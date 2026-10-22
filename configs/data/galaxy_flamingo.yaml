@@ -1,13 +1,11 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
 data_dir:
-  - ${paths.datasets_dir}/flamingo/L1000N0900/no_rotation_s1.5.5/VelocityDispersion
-  - ${paths.datasets_dir}/flamingo/L1000N0900_dm_v1/no_rotation_s1.5.5/VelocityDispersion
+  - ${paths.datasets_dir}/flamingo/L1000N0900/no_rotation_s0.5/VelocityDispersion
 target_maskdir:
-  - ${paths.datasets_dir}/flamingo/L1000N0900/no_rotation_s1.5.5/IntraClusterLight
-  - ${paths.datasets_dir}/flamingo/L1000N0900_dm_v1/no_rotation_s1.5.5/IntraClusterLight
+  - ${paths.datasets_dir}/flamingo/L1000N0900/no_rotation_s0.5/IntraClusterLight
 dataset: flamingo
 mask_interlopers: True
-batch_size: 8
+batch_size: 32
 train_val_test_split: [.85, .05, .10]
 resize_shape: [128, 128]
 random_seed:  0

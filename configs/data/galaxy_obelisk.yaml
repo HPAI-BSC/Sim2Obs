@@ -1,0 +1,13 @@
+_target_: src.data.galaxy_datamodule.GalaxyDataModule
+data_dir:
+  - ${paths.datasets_dir}/obelisk/VelocityDispersion
+target_maskdir:
+  - ${paths.datasets_dir}/obelisk/IntraClusterLight
+dataset: flamingo
+mask_interlopers: True
+batch_size: 32
+train_val_test_split: [.85, .05, .10]
+resize_shape: [128, 128]
+random_seed:  0
+num_workers: 8
+pin_memory: True
