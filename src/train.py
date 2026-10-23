@@ -1,4 +1,6 @@
 import os
+import time
+from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 import hydra
@@ -166,7 +168,19 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     if cfg.get("train"):
         log.info("Starting training!")
+        start_time = time.time()
+        start_epoch = trainer.fit_loop.epoch_progress.current.completed
         trainer.fit(model=model, datamodule=datamodule, ckpt_path=cfg.get("ckpt_path"))
+        train_time = time.time() - start_time
+        epochs_completed = trainer.fit_loop.epoch_progress.current.completed - start_epoch
+        if epochs_completed > 0:
+            log.info(
+                f"Total training time: {timedelta(seconds=int(train_time))} "
+                f"({epochs_completed} epochs)"
+            )
+            log.info(f"Avg time per epoch: {timedelta(seconds=int(train_time / epochs_completed))}")
+        else:
+            log.info(f"Total training time: {timedelta(seconds=int(train_time))} (no epoch completed)")
         """
         with torch.cuda.device(0):
             macs, params = get_model_complexity_info(model, (3, 224, 224), as_strings=False)

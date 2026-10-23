@@ -35,6 +35,7 @@ ckpt_paths:
   - /gpfs/projects/bsc70/pipelines/space-coe/0534d449/output/checkpoints/0534d449/epoch_049.ckpt  # UNET Combined VD-ICL
   - /gpfs/projects/bsc70/pipelines/space-coe/f5f021a0/output/checkpoints/f5f021a0/epoch_062.ckpt  # UNET 2 Combined VD-ICL
   - /gpfs/projects/bsc70/pipelines/space-coe/ef6663e9/output/checkpoints/ef6663e9/epoch_049.ckpt  # MambaUNet Combined VD-ICL
+  - /gpfs/projects/bsc70/pipelines/space-coe/b24c2739/output/checkpoints/b24c2739/epoch_048.ckpt  # TransUNet Combined VD-ICL
 
 # List of dataset config names (configs/data/<name>.yaml) to evaluate on.
 data_names:
