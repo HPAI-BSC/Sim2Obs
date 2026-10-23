@@ -3,8 +3,8 @@
 # specify here default configuration
 # order of defaults determines the order in which configs override each other
 defaults:
-  - data: combined_vd_icl
-  - model: transunet
+  - data: combined_vd_dm
+  - model: unet
   - callbacks: default
   - logger: mlflow # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default

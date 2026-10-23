@@ -139,21 +139,20 @@ def format_metric(value: Any) -> str:
 def results_to_markdown(
     results: Dict[Tuple[str, str], Dict[str, Any]],
     models_by_label: Dict[str, str],
-    ckpts_by_label: Dict[str, str],
 ) -> str:
     """Renders the evaluation results as a Markdown table (long format).
 
     One row per (checkpoint, dataset) run with columns for the run label, model
-    architecture, checkpoint path, dataset and one column per collected metric.
+    architecture, dataset and one column per collected metric.
     """
     metric_names = sorted({metric for metric_dict in results.values() for metric in metric_dict})
-    header = "| run | model | ckpt_path | dataset | " + " | ".join(metric_names) + " |"
-    separator = "|---|---|---|---|" + "---|" * len(metric_names)
+    header = "| run | model | dataset | " + " | ".join(metric_names) + " |"
+    separator = "|---|---|---|" + "---|" * len(metric_names)
     lines = [header, separator]
     for (label, data_name), metric_dict in results.items():
         cells = [format_metric(metric_dict[metric]) if metric in metric_dict else "" for metric in metric_names]
         lines.append(
-            f"| {label} | {models_by_label[label]} | {ckpts_by_label[label]} | {data_name} | "
+            f"| {label} | {models_by_label[label]} | {data_name} | "
             + " | ".join(str(cell) for cell in cells)
             + " |"
         )
@@ -226,7 +225,7 @@ def complete_evaluate(cfg: DictConfig) -> Tuple[Dict[Tuple[str, str], Dict[str, 
         log.info(f"[ckpt={ckpt_path}] [dataset={data_name}] [model={model_name}]")
         log.info(f"  { {k: to_scalar(v) for k, v in metric_dict.items()} }")
 
-    md_table = results_to_markdown(results, models_by_label, ckpts_by_label)
+    md_table = results_to_markdown(results, models_by_label)
     md_path = Path("output") / "complete_eval" / "results.md"
     md_path.parent.mkdir(parents=True, exist_ok=True)
     md_path.write_text(f"# Complete evaluation results\n\n{md_table}\n")
