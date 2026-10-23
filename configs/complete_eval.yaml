@@ -42,7 +42,6 @@ ckpt_paths:
 data_names:
   - galaxy_flamingo
   - galaxy_dianoga_rotation45
-  - galaxy_dianoga
   - galaxy_eagle
   - galaxy_obelisk
 
