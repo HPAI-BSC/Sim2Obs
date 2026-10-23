@@ -1,8 +1,6 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
-data_dir:
-  - ${paths.datasets_dir}/obelisk/VelocityDispersion
-target_maskdir:
-  - ${paths.datasets_dir}/obelisk/IntraClusterLight
+data_dir: ${paths.datasets_dir}/obelisk/VelocityDispersion
+target_maskdir: ${paths.datasets_dir}/obelisk/IntraClusterLight
 dataset: flamingo
 mask_interlopers: True
 batch_size: 32

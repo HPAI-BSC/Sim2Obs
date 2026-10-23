@@ -1,8 +1,6 @@
 _target_: src.data.galaxy_datamodule.GalaxyDataModule
-data_dir:
-  - ${paths.datasets_dir}/flamingo/L1000N0900/no_rotation_s0.5/VelocityDispersion
-target_maskdir:
-  - ${paths.datasets_dir}/flamingo/L1000N0900/no_rotation_s0.5/IntraClusterLight
+data_dir: ${paths.datasets_dir}/flamingo/L1000N0900/no_rotation_s0.5/VelocityDispersion
+target_maskdir: ${paths.datasets_dir}/flamingo/L1000N0900/no_rotation_s0.5/IntraClusterLight
 dataset: flamingo
 mask_interlopers: True
 batch_size: 32
