@@ -122,6 +122,20 @@ def run_label(ckpt_path: str) -> str:
         run_name = ckpt.parent.name
     return f"{run_name}_{ckpt.stem}"
 
+def to_scalar(value: Any) -> Any:
+    """Converts torch tensors/scalars to plain Python scalars for clean printing."""
+    if hasattr(value, "item"):
+        return value.item()
+    return value
+
+
+def format_metric(value: Any) -> str:
+    """Formats a metric value for the Markdown table: scalars with 4 decimals."""
+    value = to_scalar(value)
+    if isinstance(value, float):
+        return f"{value:.4f}"
+    return str(value)
+
 def results_to_markdown(
     results: Dict[Tuple[str, str], Dict[str, Any]],
     models_by_label: Dict[str, str],
@@ -137,7 +151,7 @@ def results_to_markdown(
     separator = "|---|---|---|---|" + "---|" * len(metric_names)
     lines = [header, separator]
     for (label, data_name), metric_dict in results.items():
-        cells = [metric_dict.get(metric, "") for metric in metric_names]
+        cells = [format_metric(metric_dict[metric]) if metric in metric_dict else "" for metric in metric_names]
         lines.append(
             f"| {label} | {models_by_label[label]} | {ckpts_by_label[label]} | {data_name} | "
             + " | ".join(str(cell) for cell in cells)
@@ -210,7 +224,7 @@ def complete_evaluate(cfg: DictConfig) -> Tuple[Dict[Tuple[str, str], Dict[str, 
         model_name = models_by_label[label]
         ckpt_path = ckpts_by_label[label]
         log.info(f"[ckpt={ckpt_path}] [dataset={data_name}] [model={model_name}]")
-        log.info(f"  {dict(metric_dict)}")
+        log.info(f"  { {k: to_scalar(v) for k, v in metric_dict.items()} }")
 
     md_table = results_to_markdown(results, models_by_label, ckpts_by_label)
     md_path = Path("output") / "complete_eval" / "results.md"
@@ -218,6 +232,7 @@ def complete_evaluate(cfg: DictConfig) -> Tuple[Dict[Tuple[str, str], Dict[str, 
     md_path.write_text(f"# Complete evaluation results\n\n{md_table}\n")
     log.info(f"Markdown summary written to {md_path}")
     log.info("Markdown summary:\n" + md_table)
+    print(md_table)
 
     return results, {"cfg": cfg}
 
