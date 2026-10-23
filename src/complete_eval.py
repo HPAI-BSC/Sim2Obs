@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
+import logging
 import sys
 
 import hydra
@@ -195,6 +196,8 @@ def main() -> None:
     Accepts optional Hydra-style command line overrides, e.g.:
         python src/complete_eval.py paths=local data_names=[galaxy_flamingo,galaxy_dianoga]
     """
+    # without @hydra.main, no one configures logging for us
+    logging.basicConfig(level=logging.INFO)
     with hydra_config_dir():
         cfg = hydra.compose(config_name="complete_eval", overrides=sys.argv[1:])
     with open_dict(cfg):
