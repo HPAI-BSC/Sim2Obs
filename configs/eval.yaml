@@ -22,8 +22,6 @@ save_predictions: True
 save_all_predictions: False
 
 
-
-
 # Final evals October 2026
 ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/0534d449/output/checkpoints/0534d449/epoch_049.ckpt  # UNET Combined VD-ICL
 # ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/b24c2739/output/checkpoints/b24c2739/epoch_048.ckpt  # TransUNet Combined VD-ICL

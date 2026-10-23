@@ -18,7 +18,7 @@ tags: ["dev"]
 
 commit_tag: "commit_hash"
 
-save_predictions: True
+save_predictions: False
 save_all_predictions: False
 
 # Single checkpoint selected for one run (set automatically per combination by complete_eval.py,
