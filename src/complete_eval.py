@@ -122,6 +122,28 @@ def run_label(ckpt_path: str) -> str:
         run_name = ckpt.parent.name
     return f"{run_name}_{ckpt.stem}"
 
+def results_to_markdown(
+    results: Dict[Tuple[str, str], Dict[str, Any]],
+    models_by_label: Dict[str, str],
+    ckpts_by_label: Dict[str, str],
+) -> str:
+    """Renders the evaluation results as a Markdown table (long format).
+
+    One row per (checkpoint, dataset) run with columns for the run label, model
+    architecture, checkpoint path, dataset and one column per collected metric.
+    """
+    metric_names = sorted({metric for metric_dict in results.values() for metric in metric_dict})
+    header = "| run | model | ckpt_path | dataset | " + " | ".join(metric_names) + " |"
+    separator = "|---|---|---|---|" + "---|" * len(metric_names)
+    lines = [header, separator]
+    for (label, data_name), metric_dict in results.items():
+        cells = [metric_dict.get(metric, "") for metric in metric_names]
+        lines.append(
+            f"| {label} | {models_by_label[label]} | {ckpts_by_label[label]} | {data_name} | "
+            + " | ".join(str(cell) for cell in cells)
+            + " |"
+        )
+    return "\n".join(lines)
 
 @utils.task_wrapper
 def complete_evaluate(cfg: DictConfig) -> Tuple[Dict[Tuple[str, str], Dict[str, Any]], Dict[str, Any]]:
@@ -153,6 +175,7 @@ def complete_evaluate(cfg: DictConfig) -> Tuple[Dict[Tuple[str, str], Dict[str, 
     run_user_overrides = extract_run_overrides(cfg.get("complete_eval_overrides"))
     results: Dict[Tuple[str, str], Dict[str, Any]] = {}
     models_by_label = {run_label(ckpt): model for ckpt, model in zip(ckpt_paths, model_names)}
+    ckpts_by_label = {run_label(ckpt): ckpt for ckpt in ckpt_paths}
     with hydra_config_dir():
         for ckpt_path, model_name in zip(ckpt_paths, model_names):
             label = run_label(ckpt_path)
@@ -185,7 +208,16 @@ def complete_evaluate(cfg: DictConfig) -> Tuple[Dict[Tuple[str, str], Dict[str, 
     log.info("Complete evaluation finished! Results:")
     for (label, data_name), metric_dict in results.items():
         model_name = models_by_label[label]
-        log.info(f"[{label} | model <{model_name}> | {data_name}] {dict(metric_dict)}")
+        ckpt_path = ckpts_by_label[label]
+        log.info(f"[ckpt={ckpt_path}] [dataset={data_name}] [model={model_name}]")
+        log.info(f"  {dict(metric_dict)}")
+
+    md_table = results_to_markdown(results, models_by_label, ckpts_by_label)
+    md_path = Path("output") / "complete_eval" / "results.md"
+    md_path.parent.mkdir(parents=True, exist_ok=True)
+    md_path.write_text(f"# Complete evaluation results\n\n{md_table}\n")
+    log.info(f"Markdown summary written to {md_path}")
+    log.info("Markdown summary:\n" + md_table)
 
     return results, {"cfg": cfg}
 

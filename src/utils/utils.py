@@ -2,11 +2,45 @@ import warnings
 from importlib.util import find_spec
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, ListConfig, open_dict
 
 from src.utils import pylogger, rich_utils
 
 log = pylogger.get_pylogger(__name__)
+
+
+def set_model_channels_from_data(cfg: DictConfig) -> None:
+    """Overwrite the model's in/out channel settings when the dataset config disables interloper masking.
+
+    With `mask_interlopers: False`, the datasets return two-channel inputs and targets (data +
+    interloper mask), so the model must be built with 2 in/out channels. Model configs name these
+    settings differently (`in_chans`/`n_channels`/`in_channels`/`input_channels` for the input,
+    `num_classes`/`n_classes`/`out_channels` for the output), so every known key present in
+    `cfg.model` is updated in place. No-op unless `cfg.data.mask_interlopers` is explicitly False.
+
+    :param cfg: A DictConfig object containing the config tree (with `data` and `model` nodes).
+    """
+    if cfg.data.get("mask_interlopers", True):
+        return
+
+    channels = 2
+    in_keys = {"in_chans", "in_channels", "n_channels", "input_channels"}
+    out_keys = {"num_classes", "n_classes", "out_channels"}
+
+    def _walk(node: Any) -> None:
+        if isinstance(node, DictConfig):
+            for key in list(node.keys()):
+                if key in in_keys or key in out_keys:
+                    node[key] = channels
+                else:
+                    _walk(node[key])
+        elif isinstance(node, ListConfig):
+            for item in node:
+                _walk(item)
+
+    with open_dict(cfg):
+        _walk(cfg.model)
+    log.info(f"mask_interlopers=False: set model in/out channels to {channels}")
 
 
 def extras(cfg: DictConfig) -> None:

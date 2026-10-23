@@ -8,13 +8,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import time
 import math
 import copy
 from torch.utils.checkpoint import checkpoint
-from builtins import int
 from functools import partial
-from typing import Optional, Callable
+from typing import Callable
 
 import torch
 import torch.nn as nn
@@ -22,23 +20,84 @@ import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from einops import rearrange, repeat
 from timm.models.layers import DropPath, trunc_normal_
-from fvcore.nn import FlopCountAnalysis, flop_count_str, flop_count, parameter_count
+from fvcore.nn import flop_count
 
 DropPath.__repr__ = lambda self: f"timm.DropPath({self.drop_prob})"
 
-#import selective_scan_cuda
+def _selective_scan_ref(u, delta, A, B, C, D=None, z=None, delta_bias=None, delta_softplus=False,
+                        return_last_state=False):
+    """Pure-PyTorch reference implementation of the Mamba selective scan (no custom CUDA kernels),
+    numerically equivalent to `mamba_ssm.ops.selective_scan_interface.selective_scan_ref`. Used as a
+    last-resort fallback when neither `mamba_ssm` nor `selective_scan_cuda` is importable, which also
+    makes the model runnable on CPU (e.g. for tests and debugging)."""
+    dtype_in = u.dtype
+    # Compute in at least float32 (matching mamba_ssm's reference), preserving float64 if given.
+    compute_dtype = torch.float64 if u.dtype == torch.float64 else torch.float32
+    u = u.to(compute_dtype)
+    delta = delta.to(compute_dtype)
+    if delta_bias is not None:
+        delta = delta + delta_bias[..., None].to(compute_dtype)
+    if delta_softplus:
+        delta = F.softplus(delta)
+    batch, dim, dstate = u.shape[0], A.shape[0], A.shape[1]
+    is_variable_B = B.dim() >= 3
+    is_variable_C = C.dim() >= 3
+    B = B.to(compute_dtype)
+    C = C.to(compute_dtype)
+    x = A.new_zeros((batch, dim, dstate))
+    ys = []
+    deltaA = torch.exp(torch.einsum('bdl,dn->bdln', delta, A))
+    if not is_variable_B:
+        deltaB_u = torch.einsum('bdl,dn,bdl->bdln', delta, B, u)
+    else:
+        if B.dim() == 3:
+            deltaB_u = torch.einsum('bdl,bnl,bdl->bdln', delta, B, u)
+        else:
+            B = repeat(B, "B G N L -> B (G H) N L", H=dim // B.shape[1])
+            deltaB_u = torch.einsum('bdl,bdnl,bdl->bdln', delta, B, u)
+    if is_variable_C and C.dim() == 4:
+        C = repeat(C, "B G N L -> B (G H) N L", H=dim // C.shape[1])
+    last_state = None
+    for i in range(u.shape[2]):
+        x = deltaA[:, :, i] * x + deltaB_u[:, :, i]
+        if not is_variable_C:
+            y = torch.einsum('bdn,dn->bd', x, C)
+        else:
+            if C.dim() == 3:
+                y = torch.einsum('bdn,bn->bd', x, C[:, :, i])
+            else:
+                y = torch.einsum('bdn,bdn->bd', x, C[:, :, :, i])
+        if i == u.shape[2] - 1:
+            last_state = x
+        ys.append(y)
+    y = torch.stack(ys, dim=2)  # (batch dim L)
+    out = y if D is None else y + u * rearrange(D.to(compute_dtype), "d -> d 1")
+    if z is not None:
+        out = out * F.silu(z.to(compute_dtype))
+    out = out.to(dtype=dtype_in)
+    return out if not return_last_state else (out, last_state)
+
 
 # import mamba_ssm.selective_scan_fn (in which causal_conv1d is needed)
 try:
     from mamba_ssm.ops.selective_scan_interface import selective_scan_fn, selective_scan_ref
-except:
-    import selective_scan_cuda
+    _cuda_scan_available = False
+except ImportError:
+    selective_scan_fn = None
+    try:
+        import selective_scan_cuda
+        _cuda_scan_available = True
+    except ImportError:
+        selective_scan_cuda = None
+        _cuda_scan_available = False
+
+if _cuda_scan_available and selective_scan_fn is None:
     class SelectiveScanFn(torch.autograd.Function):
         """CUDA-kernel-backed autograd Function for the Mamba selective scan, used as a fallback when `mamba_ssm`'s own implementation isn't importable."""
 
         @staticmethod
         def forward(ctx, u, delta, A, B, C, D=None, z=None, delta_bias=None, delta_softplus=False,
-                    return_last_state=False):
+                        return_last_state=False):
             """Run the selective scan forward pass via `selective_scan_cuda.fwd`, saving tensors needed for backward.
 
             :param ctx: Autograd context.
@@ -84,8 +143,8 @@ except:
                 out_z = rest[0]
                 return out_z if not return_last_state else (out_z, last_state)
 
-        @staticmethod
-        def backward(ctx, dout, *args):
+    @staticmethod
+    def backward(ctx, dout, *args):
             """Compute gradients for the selective scan via `selective_scan_cuda.bwd`, using the tensors saved in `forward`.
 
             :param ctx: Autograd context (with saved tensors from `forward`).
@@ -124,17 +183,13 @@ except:
         not considered in the backward pass.
         """
         return SelectiveScanFn.apply(u, delta, A, B, C, D, z, delta_bias, delta_softplus, return_last_state)
-    pass
 
-"""  
-# an alternative for mamba_ssm
 
-try:
-    from selective_scan import selective_scan_fn as selective_scan_fn_v1
-    from selective_scan import selective_scan_ref as selective_scan_ref_v1
-except:
-    pass
-"""
+# Fall back to the pure-PyTorch reference scan when no fast implementation is available.
+if selective_scan_fn is None:
+    selective_scan_fn = _selective_scan_ref
+if "selective_scan_ref" not in globals():
+    selective_scan_ref = _selective_scan_ref
 
 
 def flops_selective_scan_ref(B=1, L=256, D=768, N=16, with_D=True, with_Z=False, with_Group=True, with_complex=False):
@@ -294,33 +349,6 @@ def selective_scan_flop_jit(inputs, outputs):
     return flops
 
 
-def selective_scan_flop_jit_og(inputs, outputs):
-    """
-    Original `fvcore` JIT flop-count handle for the selective scan op, relying on each traced tensor's debug name (`xs`, `As`, `Bs`, `Ds`, `z`) rather than position — superseded by `selective_scan_flop_jit`.
-
-    :param inputs: The traced op's input tensors, expected in
-        `xs, dts, As, Bs, Cs, Ds, z, dt_projs_bias` order (with
-        `Ds`/`z` optional, detected by name).
-    :param outputs: Unused; required by the `fvcore` handle signature.
-    :return: Estimated FLOPs, via `flops_selective_scan_ref`.
-    """
-    # xs, dts, As, Bs, Cs, Ds (skip), z (skip), dt_projs_bias (skip)
-    print(inputs)
-    assert inputs[0].debugName().startswith("xs")  # (B, D, L)
-    assert inputs[2].debugName().startswith("As")  # (D, N)
-    assert inputs[3].debugName().startswith("Bs")  # (D, N)
-    with_Group = len(inputs[3].type().sizes()) == 4
-    with_D = inputs[5].debugName().startswith("Ds")
-    if not with_D:
-        with_z = inputs[5].debugName().startswith("z")
-    else:
-        with_z = inputs[6].debugName().startswith("z")
-    B, D, L = inputs[0].type().sizes()
-    N = inputs[2].type().sizes()[1]
-    flops = flops_selective_scan_ref(B=B, L=L, D=D, N=N, with_D=with_D, with_Z=with_z, with_Group=with_Group)
-    return flops
-
-
 class PatchEmbed2D(nn.Module):
     r""" Image to Patch Embedding
     Args:
@@ -390,7 +418,9 @@ class PatchMerging2D(nn.Module):
             x3 = x3[:, :SHAPE_FIX[0], :SHAPE_FIX[1], :]
 
         x = torch.cat([x0, x1, x2, x3], -1)  # B H/2 W/2 4*C
-        x = x.view(B, H // 2, W // 2, 4 * C)  # B H/2*W/2 4*C
+        # Use the (possibly SHAPE_FIX-truncated) spatial dims, not the original H, W — which would
+        # mismatch the view for odd input sizes.
+        x = x.view(B, x0.shape[1], x0.shape[2], 4 * C)
 
         x = self.norm(x)
         x = self.reduction(x)
@@ -457,41 +487,6 @@ class FinalPatchExpand_X4(nn.Module):
                       c=C // (self.dim_scale ** 2))
         x = self.compress(x)
         x = self.norm(x)
-        return x
-
-
-class FinalPatchExpand_X1(nn.Module):
-    """Variant of `FinalPatchExpand_X4` with `dim_scale=1` by default (no actual spatial upsampling; still expands then compresses channels, since `dim_scale=1` still needs the compress step to undo the 16x channel expansion)."""
-    def __init__(self, dim, dim_scale=1, norm_layer=nn.LayerNorm):
-        """
-        :param dim: Input/output channel dimension.
-        :param dim_scale: Spatial upsampling factor (rearrange block size).
-        :param norm_layer: Normalization layer applied to the output.
-        """
-        super().__init__()
-        self.dim = dim
-        self.dim_scale = dim_scale
-        self.expand = nn.Linear(dim, 16 * dim, bias=False)
-        self.output_dim = dim
-        self.norm = norm_layer(self.output_dim)
-        self.compress = nn.Linear(16 * dim, dim, bias=False)
-
-    def forward(self, x):
-        """Expand channels, rearrange into a `dim_scale`x upsampled spatial layout, compress back to `dim` channels if `dim_scale == 1`, then normalize.
-
-        :param x: Input tensor, shape `(B, H, W, dim)`.
-        :return: Output tensor, shape `(B, dim_scale*H, dim_scale*W, dim)`.
-        """
-        print(f"FinalPatchExpand X1: {x.shape}")
-        x = self.expand(x)
-        B, H, W, C = x.shape
-        x = rearrange(x, 'b h w (p1 p2 c)-> b (h p1) (w p2) c', p1=self.dim_scale, p2=self.dim_scale,
-                      c=C // (self.dim_scale ** 2))
-        if self.dim_scale == 1:
-            # In this case we need to compress, cause p1 and p2 == 1
-            x = self.compress(x)
-        x = self.norm(x)
-
         return x
 
 
@@ -876,7 +871,10 @@ class SS2D(nn.Module):
 
         x = x.permute(0, 3, 1, 2).contiguous()
         x = self.act(self.conv2d(x))  # (b, d, h, w)
-        with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+        if x.is_cuda:
+            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+                y = self.forward_core(x)
+        else:
             y = self.forward_core(x)
         y = y * F.silu(z)
         out = self.out_proj(y)
@@ -1035,7 +1033,7 @@ class VSSLayer_up(nn.Module):
             self.apply(_init_weights)
 
         if upsample is not None:
-            self.upsample = PatchExpand(dim, dim_scale=2, norm_layer=nn.LayerNorm)
+            self.upsample = upsample(dim=dim, dim_scale=2, norm_layer=nn.LayerNorm)
         else:
             self.upsample = None
 
@@ -1063,7 +1061,7 @@ class VSSM(nn.Module):
     windowed self-attention.
     """
     def __init__(self, patch_size=4, in_chans=1, num_classes=4, depths=[2, 2, 9, 2],
-                 dims=[96, 192, 384, 768], d_state=16, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
+                 embed_dim=96, dims=None, d_state=16, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, patch_norm=True,
                  use_checkpoint=False, final_upsample="expand_first", **kwargs):
         """
@@ -1072,8 +1070,10 @@ class VSSM(nn.Module):
         :param num_classes: Number of output classes/channels.
         :param depths: Per-stage `VSSBlock` counts (encoder; mirrored for
             the decoder).
-        :param dims: Per-stage embedding dimensions (or a single int, in
-            which case dims double at each stage).
+        :param embed_dim: Base (stage-0) embedding dimension; each deeper
+            stage doubles it. Ignored if `dims` is given.
+        :param dims: Explicit per-stage embedding dimensions (defaults to
+            `[embed_dim * 2**i for i in range(len(depths))]`).
         :param d_state: SSM state dimension for every `SS2D` block
             (`ceil(dims[0] / 6)` if None).
         :param drop_rate: Dropout rate.
@@ -1090,11 +1090,12 @@ class VSSM(nn.Module):
         super().__init__()
         self.num_classes = num_classes
         self.num_layers = len(depths)
-        if isinstance(dims, int):
+        if dims is None:
+            dims = [int(embed_dim * 2 ** i_layer) for i_layer in range(self.num_layers)]
+        elif isinstance(dims, int):
             dims = [int(dims * 2 ** i_layer) for i_layer in range(self.num_layers)]
         self.embed_dim = dims[0]
         self.num_features = dims[-1]
-        self.num_features_up = int(dims[0] * 2)
         self.dims = dims
         self.patch_size = patch_size
         self.final_upsample = final_upsample
@@ -1108,8 +1109,7 @@ class VSSM(nn.Module):
         self.layers = nn.ModuleList()
         for i_layer in range(self.num_layers):
             layer = VSSLayer(
-                # dim=dims[i_layer], #int(embed_dim * 2 ** i_layer)
-                dim=int(dims[0] * 2 ** i_layer),
+                dim=dims[i_layer],
                 depth=depths[i_layer],
                 d_state=math.ceil(dims[0] / 6) if d_state is None else d_state,  # 20240109
                 drop=drop_rate,
@@ -1125,15 +1125,14 @@ class VSSM(nn.Module):
         self.layers_up = nn.ModuleList()
         self.concat_back_dim = nn.ModuleList()
         for i_layer in range(self.num_layers):
-            concat_linear = nn.Linear(2 * int(dims[0] * 2 ** (self.num_layers - 1 - i_layer)),
-                                      int(dims[0] * 2 ** (
-                                                  self.num_layers - 1 - i_layer))) if i_layer > 0 else nn.Identity()
+            concat_linear = nn.Linear(2 * dims[self.num_layers - 1 - i_layer],
+                                      dims[self.num_layers - 1 - i_layer]) if i_layer > 0 else nn.Identity()
             if i_layer == 0:
-                layer_up = PatchExpand(dim=int(self.embed_dim * 2 ** (self.num_layers - 1 - i_layer)), dim_scale=2,
+                layer_up = PatchExpand(dim=dims[self.num_layers - 1 - i_layer], dim_scale=2,
                                        norm_layer=norm_layer)
             else:
                 layer_up = VSSLayer_up(
-                    dim=int(dims[0] * 2 ** (self.num_layers - 1 - i_layer)),
+                    dim=dims[self.num_layers - 1 - i_layer],
                     depth=depths[(self.num_layers - 1 - i_layer)],
                     d_state=math.ceil(dims[0] / 6) if d_state is None else d_state,  # 20240109
                     drop=drop_rate,
@@ -1161,8 +1160,6 @@ class VSSM(nn.Module):
             self.up = lambda x: x
 
         self.apply(self._init_weights)
-        flops = self.flops(shape=(1,128,128))
-        print(f"VSSM FLOPS: {flops}, GFLOPS: {flops * 1e-9:.4f}")
 
     def _init_weights(self, m: nn.Module):
         """
@@ -1240,14 +1237,8 @@ class VSSM(nn.Module):
             (unchanged if `final_upsample != "expand_first"`).
         """
         if self.final_upsample == "expand_first":
-            B, H, W, C = x.shape
             x = self.up(x)
-            if self.patch_size == 1:
-                pass
-            else:
-                #x = x.view(B, 4 * H, 4 * W, -1)
-                # Actually, this is not needed because FinalPatchExpand already fixes the dims
-                pass
+            # FinalPatchExpand already restores the spatial dims, so no reshape is needed here.
             x = x.permute(0, 3, 1, 2)  # B,C,H,W
             x = self.output(x)
 
@@ -1260,6 +1251,12 @@ class VSSM(nn.Module):
         :param x: Input image tensor.
         :return: Output logits, shape `(B, num_classes, H, W)`.
         """
+        _, _, H, W = x.shape
+        divisor = self.patch_size * (2 ** (self.num_layers - 1))
+        assert H % divisor == 0 and W % divisor == 0, (
+            f"Input spatial dims ({H}, {W}) must be divisible by {divisor} "
+            f"(patch_size={self.patch_size} x 2^(num_layers-1) downsamplings)."
+        )
         x, x_downsample = self.forward_features(x)
         x = self.forward_up_features(x, x_downsample)
         x = self.up_x4(x)
@@ -1277,63 +1274,15 @@ class VSSM(nn.Module):
         }
 
         model = copy.deepcopy(self)
-        model.cuda().eval()
+        device = next(model.parameters()).device
+        model.to(device).eval()
 
-        input = torch.randn((1, *shape), device=next(model.parameters()).device)
-        params = parameter_count(model)[""]
+        input = torch.randn((1, *shape), device=device)
         Gflops, unsupported = flop_count(model=model, inputs=(input,), supported_ops=supported_ops)
 
         del model, input
         return sum(Gflops.values()) * 1e9
-        return f"params {params} GFLOPs {sum(Gflops.values())}"
 
-
-"""
-# APIs with VMamba2Dp =================
-def check_vssm_equals_vmambadp():
-    from bak.vmamba_bak1 import VMamba2Dp
-
-    # test 1 True =================================
-    torch.manual_seed(time.time());
-    torch.cuda.manual_seed(time.time())
-    oldvss = VMamba2Dp(depths=[2, 2, 6, 2]).half().cuda()
-    newvss = VSSM(depths=[2, 2, 6, 2]).half().cuda()
-    newvss.load_state_dict(oldvss.state_dict())
-    input = torch.randn((12, 3, 224, 224)).half().cuda()
-    torch.cuda.manual_seed(0)
-    with torch.cuda.amp.autocast():
-        y1 = oldvss.forward_backbone(input)
-    torch.cuda.manual_seed(0)
-    with torch.cuda.amp.autocast():
-        y2 = newvss.forward_backbone(input)
-    print((y1 - y2).abs().sum())  # tensor(0., device='cuda:0', grad_fn=<SumBackward0>)
-
-    # test 2 True ==========================================
-    torch.manual_seed(0);
-    torch.cuda.manual_seed(0)
-    oldvss = VMamba2Dp(depths=[2, 2, 6, 2]).cuda()
-    torch.manual_seed(0);
-    torch.cuda.manual_seed(0)
-    newvss = VSSM(depths=[2, 2, 6, 2]).cuda()
-
-    miss_align = 0
-    for k, v in oldvss.state_dict().items():
-        same = (oldvss.state_dict()[k] == newvss.state_dict()[k]).all()
-        if not same:
-            print(k, same)
-            miss_align += 1
-    print("init miss align", miss_align)  # init miss align 0
-"""
-
-"""
-if __name__ == "__main__":
-    # check_vssm_equals_vmambadp()
-    #model = VSSM().to('cuda')
-    model = VSSM()
-    int = torch.randn(16, 1, 224, 224) #.cuda()
-    out = model(int)
-    print(out.shape)
-"""
 
 
 class MambaUNet(nn.Module):
@@ -1342,16 +1291,9 @@ class MambaUNet(nn.Module):
         """
         Build the underlying `VSSM` from `config`.
 
-        Note: passes `embed_dim=`/`mlp_ratio=` to `VSSM`, which doesn't
-        declare either as a named parameter (it uses `dims=` instead, and
-        has no `mlp_ratio`) — both are silently absorbed by `VSSM`'s
-        `**kwargs` rather than raising, so `dims` ends up at its default
-        rather than `config.embed_dim`.
-
-        :param config: Config object with `patch_size`, `in_chains`,
-            `embed_dim`, `depths`, `mlp_ratio`, `drop_rate`,
-            `drop_path_rate`, `patch_norm`, `use_checkpoint`,
-            `final_upsample`.
+        :param config: Config object with `patch_size`, `in_chans`,
+            `embed_dim`, `depths`, `drop_rate`, `drop_path_rate`,
+            `patch_norm`, `use_checkpoint`, `final_upsample`.
         :param img_size: Unused (kept for interface parity with
             `SwinUnet`).
         :param num_classes: Number of output classes/channels.
@@ -1365,11 +1307,10 @@ class MambaUNet(nn.Module):
 
         self.mamba_unet = VSSM(
                                 patch_size=config.patch_size,
-                                in_chans=config.in_chains,
+                                in_chans=config.in_chans,
                                 num_classes=self.num_classes,
                                 embed_dim=config.embed_dim,
                                 depths=config.depths,
-                                mlp_ratio=config.mlp_ratio,
                                 drop_rate=config.drop_rate,
                                 drop_path_rate=config.drop_path_rate,
                                 patch_norm=config.patch_norm,
@@ -1377,65 +1318,21 @@ class MambaUNet(nn.Module):
                                 final_upsample=config.final_upsample)
 
     def forward(self, x):
-        """Run the underlying `VSSM`. Unlike `SwinUnet.forward`, does not repeat a single-channel input to 3 channels (see the dead code below, left disabled: "we don't use 3 channels").
+        """Run the underlying `VSSM`. Unlike `SwinUnet.forward`, does not repeat a single-channel input to 3 channels.
 
         :param x: Input image tensor.
         :return: Output logits, shape `(B, num_classes, H, W)`.
         """
-        # Remove this, we don't use 3 channels
-        # if x.size()[1] == 1:
-        #     x = x.repeat(1,3,1,1)
         logits = self.mamba_unet(x)
         return logits
 
-    def load_from(self, config):
-        """
-        Load a pretrained checkpoint into the encoder, and mirror encoder weights into the decoder (`layers.` -> `layers_up.`) for stages with matching shapes.
-
-        Skips (deletes) any checkpoint key whose shape doesn't match this
-        model's corresponding parameter, and loads the rest with
-        `strict=False`. No-ops (prints a message) if
-        `config.MODEL.PRETRAIN_CKPT` is None.
-
-        :param config: Config object with `MODEL.PRETRAIN_CKPT`, the
-            checkpoint path to load.
-        """
-        pretrained_path = config.MODEL.PRETRAIN_CKPT
-        if pretrained_path is not None:
-            print("pretrained_path:{}".format(pretrained_path))
-            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            pretrained_dict = torch.load(pretrained_path, map_location=device)
-            if "model"  not in pretrained_dict:
-                print("---start load pretrained model by splitting---")
-                pretrained_dict = {k[17:]:v for k,v in pretrained_dict.items()}
-                for k in list(pretrained_dict.keys()):
-                    if "output" in k:
-                        print("delete key:{}".format(k))
-                        del pretrained_dict[k]
-                msg = self.mamba_unet.load_state_dict(pretrained_dict,strict=False)
-                # print(msg)
-                return
-            pretrained_dict = pretrained_dict['model']
-            print("---start load pretrained modle of swin encoder---")
-
-            model_dict = self.mamba_unet.state_dict()
-            full_dict = copy.deepcopy(pretrained_dict)
-            for k, v in pretrained_dict.items():
-                if "layers." in k:
-                    current_layer_num = 3-int(k[7:8])
-                    current_k = "layers_up." + str(current_layer_num) + k[8:]
-                    full_dict.update({current_k:v})
-            for k in list(full_dict.keys()):
-                if k in model_dict:
-                    if full_dict[k].shape != model_dict[k].shape:
-                        print("delete:{};shape pretrain:{};shape model:{}".format(k,v.shape,model_dict[k].shape))
-                        del full_dict[k]
-
-            msg = self.mamba_unet.load_state_dict(full_dict, strict=False)
-            print(f"msg: {msg}")
-        else:
-            print("none pretrain")
-
 
 if __name__ == "__main__":
-    _ = MambaUNet()
+    from types import SimpleNamespace
+
+    config = SimpleNamespace(patch_size=4, in_chans=1, embed_dim=24, depths=[1, 1, 1, 1],
+                             drop_rate=0., drop_path_rate=0., patch_norm=True,
+                             use_checkpoint=False, final_upsample="expand_first")
+    model = MambaUNet(config, num_classes=1)
+    out = model(torch.randn(1, 1, 64, 64))
+    print(out.shape)

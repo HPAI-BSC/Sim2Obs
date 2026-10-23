@@ -135,6 +135,12 @@ class MambaLitModule(LightningModule):
         import torch
         from torch.profiler import profile, record_function, ProfilerActivity
 
+        if not torch.cuda.is_available():
+            print('_'*25)
+            print("Skipping FLOPs estimation: CUDA is not available.")
+            print('_'*25)
+            return
+
         # Example input
         x = torch.randn(1, 1, 128, 128).cuda()
 
