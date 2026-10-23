@@ -1,0 +1,49 @@
+# @package _global_
+
+defaults:
+  - _self_
+  # data and model are selected per run (from data_names and the inferred/explicit models),
+  # so no defaults are set here
+  - data:
+  - model:
+  - logger:
+  - trainer: default
+  - paths: gpfs
+  - extras: default
+  - hydra: default
+
+task_name: "complete_eval"
+
+tags: ["dev"]
+
+commit_tag: "commit_hash"
+
+save_predictions: True
+save_all_predictions: False
+
+# Single checkpoint selected for one run (set automatically per combination by complete_eval.py,
+# use eval.yaml to evaluate a single checkpoint manually).
+ckpt_path: null
+
+# List of checkpoints to evaluate. Every checkpoint is evaluated on every dataset in `data_names`.
+# The model architecture of each checkpoint is inferred automatically from the checkpoint's run
+# directory (a full copy of the repo under /gpfs/projects/bsc70/pipelines/space-coe/<run_id>), by
+# reading `<run_dir>/configs/train.yaml` and extracting `defaults.model`.
+# If that is not possible (e.g. the run dir no longer exists), provide the architectures explicitly
+# in `models` below, one per checkpoint, in the same order as `ckpt_paths`.
+ckpt_paths:
+  - /gpfs/projects/bsc70/pipelines/space-coe/0534d449/output/checkpoints/0534d449/epoch_049.ckpt  # UNET Combined VD-ICL
+  - /gpfs/projects/bsc70/pipelines/space-coe/f5f021a0/output/checkpoints/f5f021a0/epoch_062.ckpt  # UNET 2 Combined VD-ICL
+  - /gpfs/projects/bsc70/pipelines/space-coe/ef6663e9/output/checkpoints/ef6663e9/epoch_049.ckpt  # MambaUNet Combined VD-ICL
+
+# List of dataset config names (configs/data/<name>.yaml) to evaluate on.
+data_names:
+  - galaxy_flamingo
+  - galaxy_dianoga_rotation45
+  - galaxy_dianoga
+  - galaxy_eagle
+  - galaxy_obelisk
+
+# Optional explicit model config names (configs/model/<name>.yaml), one per checkpoint, in the same
+# order as `ckpt_paths`. Leave empty to infer the model from each checkpoint's run dir.
+models: []

@@ -25,8 +25,9 @@ save_all_predictions: False
 
 
 # Final evals October 2026
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/b31be31d/output/checkpoints/b31be31d/epoch_026.ckpt
 ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/0534d449/output/checkpoints/0534d449/epoch_049.ckpt  # UNET Combined VD-ICL
+# ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/b24c2739/output/checkpoints/b24c2739/epoch_048.ckpt  # TransUNet Combined VD-ICL
+# ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/ba87a495/output/checkpoints/ba87a495/epoch_049.ckpt  # AttUNet Combined
 
 
 # NEW COMBINED DATASET (~18k maps)

@@ -125,7 +125,7 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info("Starting testing!")
 
-    trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
+    test_outputs = trainer.test(model=model, datamodule=datamodule, ckpt_path=cfg.ckpt_path)
 
     # for predictions use trainer.predict(...)
     if cfg.save_predictions:
@@ -210,6 +210,12 @@ def evaluate(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
 
     metric_dict = trainer.callback_metrics
+    if test_outputs:
+        # `trainer.predict` (below) may reset callback metrics on some Lightning versions, so
+        # fall back to (and merge with) the metrics returned by `trainer.test`
+        merged_metrics = dict(test_outputs[0])
+        merged_metrics.update(metric_dict)
+        metric_dict = merged_metrics
 
     return metric_dict, object_dict
 
