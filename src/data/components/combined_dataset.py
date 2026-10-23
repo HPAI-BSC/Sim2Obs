@@ -6,6 +6,8 @@ import torch
 
 from src.data.components.illustris300_dataset import Illustris300Dataset
 from src.data.components.eagle_dataset import EagleDataset
+from src.data.components.flamingo_dataset import FlamingoDataset
+from src.data.components.obelisk_dataset import ObeliskDataset
 
 
 class CombinedDataset(GalaxyDataset):
@@ -23,6 +25,10 @@ class CombinedDataset(GalaxyDataset):
                 dataset = Illustris300Dataset(img_dir, label_dir, transform=transform)
             elif 'eagle' in img_dir:
                 dataset = EagleDataset(img_dir, label_dir, transform=transform)
+            elif 'flamingo' in img_dir:
+                dataset = FlamingoDataset(img_dir, label_dir, transform=transform)
+            elif 'obelisk' in img_dir:
+                dataset = ObeliskDataset(img_dir, label_dir, transform=transform)
             else:
                 dataset = None
             self.datasets.append(dataset)
