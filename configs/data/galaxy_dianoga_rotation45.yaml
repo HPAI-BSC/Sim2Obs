@@ -8,3 +8,4 @@ resize_shape: [128, 128]
 random_seed:  0
 num_workers: 8
 pin_memory: True
+mask_interlopers: True
