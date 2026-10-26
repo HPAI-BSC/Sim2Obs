@@ -100,7 +100,8 @@ class EagleDataset(GalaxyDataset):
         filtered_dataset = EagleDataset(
             image_dir=self.image_dir,
             labels_dir=self.labels_dir,
-            transform=self.transform
+            transform=self.transform,
+            mask_interlopers=self.mask_interlopers,
         )
         filtered_dataset.images = filtered_images
         filtered_dataset.labels = filtered_labels

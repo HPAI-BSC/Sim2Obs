@@ -13,22 +13,22 @@ from src.data.components.obelisk_dataset import ObeliskDataset
 class CombinedDataset(GalaxyDataset):
     name = 'combined'
 
-    def __init__(self, image_dir, labels_dir, transform=None, fraction_data=1, **kwargs):
+    def __init__(self, image_dir, labels_dir, transform=None, fraction_data=1, mask_interlopers=True, **kwargs):
         np.random.seed(42)
         # image_dirs and label_dirs should be lists of the datasets that we are combining.
         self.datasets = []
         self.fraction_data = fraction_data
         for img_dir, label_dir in zip(image_dir, labels_dir):
             if 'dianoga' in img_dir or 'ilarias' in img_dir:
-                dataset = DianogaDataset(img_dir, label_dir, transform=transform)
+                dataset = DianogaDataset(img_dir, label_dir, transform=transform, mask_interlopers=mask_interlopers)
             elif 'illustris' in img_dir:
-                dataset = Illustris300Dataset(img_dir, label_dir, transform=transform)
+                dataset = Illustris300Dataset(img_dir, label_dir, transform=transform, mask_interlopers=mask_interlopers)
             elif 'eagle' in img_dir:
-                dataset = EagleDataset(img_dir, label_dir, transform=transform)
+                dataset = EagleDataset(img_dir, label_dir, transform=transform, mask_interlopers=mask_interlopers)
             elif 'flamingo' in img_dir:
-                dataset = FlamingoDataset(img_dir, label_dir, transform=transform)
+                dataset = FlamingoDataset(img_dir, label_dir, transform=transform, mask_interlopers=mask_interlopers)
             elif 'obelisk' in img_dir:
-                dataset = ObeliskDataset(img_dir, label_dir, transform=transform)
+                dataset = ObeliskDataset(img_dir, label_dir, transform=transform, mask_interlopers=mask_interlopers)
             else:
                 dataset = None
             self.datasets.append(dataset)

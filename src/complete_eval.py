@@ -139,24 +139,51 @@ def format_metric(value: Any) -> str:
 def results_to_markdown(
     results: Dict[Tuple[str, str], Dict[str, Any]],
     models_by_label: Dict[str, str],
+    stats: Dict[Tuple[str, str], Tuple[int, int]],
 ) -> str:
     """Renders the evaluation results as a Markdown table (long format).
 
     One row per (checkpoint, dataset) run with columns for the run label, model
-    architecture, dataset and one column per collected metric.
+    architecture, dataset, number of maps, number of halos and one column per
+    collected metric.
     """
     metric_names = sorted({metric for metric_dict in results.values() for metric in metric_dict})
-    header = "| run | model | dataset | " + " | ".join(metric_names) + " |"
-    separator = "|---|---|---|" + "---|" * len(metric_names)
+    header = "| run | model | dataset | maps | halos | " + " | ".join(metric_names) + " |"
+    separator = "|---|---|---|---|---|" + "---|" * len(metric_names)
     lines = [header, separator]
     for (label, data_name), metric_dict in results.items():
         cells = [format_metric(metric_dict[metric]) if metric in metric_dict else "" for metric in metric_names]
+        n_maps, n_halos = stats.get((label, data_name), ("", ""))
         lines.append(
-            f"| {label} | {models_by_label[label]} | {data_name} | "
+            f"| {label} | {models_by_label[label]} | {data_name} | {n_maps} | {n_halos} | "
             + " | ".join(str(cell) for cell in cells)
             + " |"
         )
     return "\n".join(lines)
+
+
+def dataset_stats(object_dict: Dict[str, Any]) -> Tuple[int, int]:
+    """Counts the maps and unique halos in the datamodule's test split.
+
+    :param object_dict: Dict returned by `evaluate` (must contain `datamodule`).
+    :return: Tuple with the number of test maps and the number of unique halos.
+    """
+    from torch.utils.data import ConcatDataset, Subset
+
+    data_test = object_dict["datamodule"].data_test
+    n_maps = len(data_test)
+
+    def _halos(ds) -> set:
+        if hasattr(ds, "get_halo_ids"):
+            return set(ds.get_halo_ids())
+        if isinstance(ds, Subset) and isinstance(ds.dataset, ConcatDataset):
+            halos: set = set()
+            for sub in ds.dataset.datasets:
+                halos |= _halos(sub)
+            return halos
+        return set()
+
+    return n_maps, len(_halos(data_test))
 
 @utils.task_wrapper
 def complete_evaluate(cfg: DictConfig) -> Tuple[Dict[Tuple[str, str], Dict[str, Any]], Dict[str, Any]]:
@@ -187,6 +214,7 @@ def complete_evaluate(cfg: DictConfig) -> Tuple[Dict[Tuple[str, str], Dict[str, 
 
     run_user_overrides = extract_run_overrides(cfg.get("complete_eval_overrides"))
     results: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    stats: Dict[Tuple[str, str], Tuple[int, int]] = {}
     models_by_label = {run_label(ckpt): model for ckpt, model in zip(ckpt_paths, model_names)}
     ckpts_by_label = {run_label(ckpt): ckpt for ckpt in ckpt_paths}
     with hydra_config_dir():
@@ -215,8 +243,9 @@ def complete_evaluate(cfg: DictConfig) -> Tuple[Dict[Tuple[str, str], Dict[str, 
                     ]
                     + run_user_overrides,
                 )
-                metric_dict, _ = evaluate(run_cfg)
+                metric_dict, object_dict = evaluate(run_cfg)
                 results[(label, data_name)] = metric_dict
+                stats[(label, data_name)] = dataset_stats(object_dict)
 
     log.info("Complete evaluation finished! Results:")
     for (label, data_name), metric_dict in results.items():
@@ -225,7 +254,7 @@ def complete_evaluate(cfg: DictConfig) -> Tuple[Dict[Tuple[str, str], Dict[str, 
         log.info(f"[ckpt={ckpt_path}] [dataset={data_name}] [model={model_name}]")
         log.info(f"  { {k: to_scalar(v) for k, v in metric_dict.items()} }")
 
-    md_table = results_to_markdown(results, models_by_label)
+    md_table = results_to_markdown(results, models_by_label, stats)
     md_path = Path("output") / "complete_eval" / "results.md"
     md_path.parent.mkdir(parents=True, exist_ok=True)
     md_path.write_text(f"# Complete evaluation results\n\n{md_table}\n")

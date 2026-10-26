@@ -16,7 +16,7 @@ scheduler:
 net:
   _target_: src.models.components.Mamba_UNet.MambaUNet
   config:
-    patch_size: 4
+    patch_size: 2
     in_chans: 1
     embed_dim: 96
     depths: [2, 1, 1, 1]
