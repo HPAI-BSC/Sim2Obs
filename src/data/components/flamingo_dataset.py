@@ -10,7 +10,8 @@ import re
 class FlamingoDataset(GalaxyDataset):
     name = 'flamingo'
 
-    def __init__(self, image_dir, labels_dir, transform=None, **kwargs):
+    def __init__(self, image_dir, labels_dir, transform=None, mask_interlopers=True, **kwargs):
+        self.mask_interlopers = mask_interlopers
         super().__init__(image_dir, labels_dir, transform, **kwargs)
 
     def __getitem__(self, index):
@@ -22,6 +23,11 @@ class FlamingoDataset(GalaxyDataset):
 
         labels = np.load(labels_path)
         label = labels[f'arr_0'].astype('float64')
+
+        # Maps are stored as (H, W, 2): value channel + interloper mask channel
+        if self.mask_interlopers and image.ndim == 3 and image.shape[-1] == 2:
+            image = image[..., 0] * (1 - image[..., 1])
+            label = label[..., 0] * (1 - label[..., 1])
 
         if self.transform:
             image, label = self.transform(image, label)
@@ -64,7 +70,8 @@ class FlamingoDataset(GalaxyDataset):
         filtered_dataset = FlamingoDataset(
             image_dir=self.image_dir,
             labels_dir=self.labels_dir,
-            transform=self.transform
+            transform=self.transform,
+            mask_interlopers=self.mask_interlopers,
         )
         filtered_dataset.images = filtered_images
         filtered_dataset.labels = filtered_labels
