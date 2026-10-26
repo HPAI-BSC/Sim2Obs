@@ -34,7 +34,7 @@ class ObeliskDataset(GalaxyDataset):
 
         for file in image_files:
             # Extract the halo ID from the filename using regex (assuming it's in the form 'halo_X')
-            match = re.match(r'D(\d+)', file)
+            match = re.match(r'halo_(\d+)', file)
             if match:
                 halo_id = int(match.group(1))
                 if halo_id in halo_ids_to_include:
@@ -44,7 +44,7 @@ class ObeliskDataset(GalaxyDataset):
     def get_halo_ids(self):
         halo_ids = set()
         for file in self.images:
-            match = re.match(r'D(\d+)', file)
+            match = re.match(r'halo_(\d+)', file)
             if match:
                 halo_id = int(match.group(1))
                 halo_ids.add(halo_id)
@@ -55,7 +55,7 @@ class ObeliskDataset(GalaxyDataset):
         Filters the dataset by the list of halo IDs.
 
         :param halos: List of halo IDs to include in the dataset.
-        :return: A new `DianogaDataset` instance with only the filtered halos.
+        :return: A new `ObeliskDataset` instance with only the filtered halos.
         """
         filtered_images = self._filter_image_files_by_halos(self.images, halos)
         filtered_labels = self._filter_image_files_by_halos(self.labels, halos)
