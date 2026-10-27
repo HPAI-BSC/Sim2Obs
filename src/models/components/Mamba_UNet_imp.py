@@ -1433,7 +1433,8 @@ class MambaUNet(nn.Module):
                                 drop_path_rate=config.drop_path_rate,
                                 patch_norm=config.patch_norm,
                                 use_checkpoint=config.use_checkpoint,
-                                final_upsample=config.final_upsample)
+                                final_upsample=config.final_upsample,
+                                bottleneck_depth=config.bottleneck_depth)
 
     def forward(self, x):
         """Run the underlying `VSSM`. Unlike `SwinUnet.forward`, does not repeat a single-channel input to 3 channels.

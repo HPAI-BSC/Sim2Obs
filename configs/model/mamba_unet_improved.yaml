@@ -3,7 +3,7 @@ _target_: src.models.mamba_module.MambaLitModule
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.0005
+  lr: 0.0001
   weight_decay: 0.0
 
 scheduler:
@@ -25,6 +25,7 @@ net:
     patch_norm: True
     use_checkpoint: False
     final_upsample: expand_first  # From [None, 'expand_first']
+    bottleneck_depth: 1
   num_classes: 1 # aka num out channels
   zero_head: False
   vis: True
