@@ -4,7 +4,7 @@ optimizer:
   _target_: torch.optim.Adam
   _partial_: true
   lr: 0.0005
-  weight_decay: 0.0
+  weight_decay: 0.01
 
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
@@ -19,8 +19,8 @@ net:
     patch_size: 4
     in_chans: 1
     embed_dim: 96
-    depths: [2, 2, 6, 2]
-    drop_rate: 0.01
+    depths: [2, 2, 2, 2]
+    drop_rate: 0.1
     drop_path_rate: 0.01
     patch_norm: True
     use_checkpoint: False
