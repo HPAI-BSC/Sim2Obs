@@ -6,8 +6,16 @@ Improvements over `Mamba_UNet.py`:
    transposed convolutions instead of pure linear expand/rearrange, so
    upsampling has spatial context.
 2. Full-resolution conv stem: two conv blocks at input resolution whose
-   features are added to the final logits, preserving fine detail that the
-   patch_size=4 embedding would otherwise discard.
+   features are added (via a zero-initialized learnable gate) to the final
+   logits, preserving fine detail that the patch_size=4 embedding would
+   otherwise discard.
+3. Final upsampling as stacked 2x transposed convs (kernel == stride per
+   stage) to avoid checkerboard artifacts.
+4. Residual conv blocks at the high-resolution stage 0 (Mamba blocks are
+   comparatively wasteful there) and VSS blocks in the first decoder stage
+   (the bottleneck->decoder handoff is no longer unprocessed).
+5. Skip fusion is Linear + GELU instead of a bare linear.
+6. Output heads have biases; dead "fake init" passes removed.
 """
 
 
@@ -472,21 +480,30 @@ class PatchExpand(nn.Module):
 
 
 class FinalPatchExpand_X4(nn.Module):
-    """`dim_scale`x spatial upsampling with a transposed convolution (`ConvTranspose2d(dim, dim, dim_scale, dim_scale)`), followed by normalization — replacing the original linear expand/rearrange/compress so the final upsampling has spatial context."""
+    """`dim_scale`x spatial upsampling as a stack of 2x transposed convolutions (kernel 2, stride 2) with GroupNorm+SiLU between stages, followed by normalization. A single `ConvTranspose2d(kernel=dim_scale, stride=dim_scale)` produces checkerboard artifacts; staging the upsampling as log2(dim_scale) 2x transposed convs avoids them, which matters for the fine spatial detail this final upsampling must restore."""
     def __init__(self, dim, dim_scale=4, norm_layer=nn.LayerNorm):
         """
         :param dim: Input/output channel dimension.
-        :param dim_scale: Spatial upsampling factor.
+        :param dim_scale: Spatial upsampling factor (must be a power of 2).
         :param norm_layer: Normalization layer applied to the output.
         """
         super().__init__()
         self.dim = dim
         self.dim_scale = dim_scale
-        self.up = nn.ConvTranspose2d(dim, dim, kernel_size=dim_scale, stride=dim_scale)
+        n_stages = int(round(math.log2(dim_scale)))
+        assert 2 ** n_stages == dim_scale, f"dim_scale={dim_scale} must be a power of 2"
+        layers = []
+        for i in range(n_stages):
+            in_dim = dim if i == 0 else dim // 2
+            out_dim = dim // 2 if i < n_stages - 1 else dim
+            layers.append(nn.ConvTranspose2d(in_dim, out_dim, kernel_size=2, stride=2))
+            if i < n_stages - 1:
+                layers += [nn.GroupNorm(math.gcd(8, out_dim), out_dim), nn.SiLU()]
+        self.up = nn.Sequential(*layers)
         self.norm = norm_layer(dim)
 
     def forward(self, x):
-        """Transposed-conv upsample into a `dim_scale`x spatial layout.
+        """Staged transposed-conv upsample into a `dim_scale`x spatial layout.
 
         :param x: Input tensor, shape `(B, H, W, dim)`.
         :return: Output tensor, shape `(B, dim_scale*H, dim_scale*W, dim)`.
@@ -921,6 +938,64 @@ class VSSBlock(nn.Module):
         return x
 
 
+class ConvBlock(nn.Module):
+    """Pre-norm residual convolution block (`x + conv(GELU(GroupNorm(x)))`), channels-last in/out. Cheaper than a `VSSBlock` and better suited to high-resolution stages, where the global receptive field of the selective scan is wasted on mostly-local structure."""
+    def __init__(self, dim):
+        """
+        :param dim: Input/output channel dimension.
+        """
+        super().__init__()
+        self.norm = nn.GroupNorm(math.gcd(8, dim), dim)
+        self.conv = nn.Conv2d(dim, dim, kernel_size=3, padding=1, bias=True)
+
+    def forward(self, x: torch.Tensor):
+        """Apply the residual conv block to `x`.
+
+        :param x: Input tensor, shape `(B, H, W, dim)`.
+        :return: Output tensor, shape `(B, H, W, dim)`.
+        """
+        y = x.permute(0, 3, 1, 2)  # B C H W
+        y = self.conv(F.gelu(self.norm(y)))
+        y = y.permute(0, 2, 3, 1)  # B H W C
+        return x + y
+
+
+class ConvStage(nn.Module):
+    """High-resolution encoder stage: `depth` residual `ConvBlock`s followed by an optional `PatchMerging2D` downsample. A drop-in replacement for `VSSLayer` at stage 0 (channels-last in/out, same downsample semantics)."""
+    def __init__(
+            self,
+            dim,
+            depth,
+            norm_layer=nn.LayerNorm,
+            downsample=None,
+            use_checkpoint=False,
+            **kwargs,
+    ):
+        """
+        :param dim: Number of input channels.
+        :param depth: Number of `ConvBlock`s.
+        :param norm_layer: Normalization layer constructor (used by `downsample`).
+        :param downsample: Downsample layer class applied at the end, or None.
+        :param use_checkpoint: Accepted for interface parity with `VSSLayer` (unused;
+            conv blocks are cheap enough to not need checkpointing).
+        """
+        super().__init__()
+        self.dim = dim
+        self.use_checkpoint = use_checkpoint
+        self.blocks = nn.ModuleList([ConvBlock(dim) for _ in range(depth)])
+        self.downsample = downsample(dim=dim, norm_layer=norm_layer) if downsample is not None else None
+
+    def forward(self, x):
+        """Run `x` through all `ConvBlock`s then the downsample layer, if any."""
+        for blk in self.blocks:
+            x = blk(x)
+
+        if self.downsample is not None:
+            x = self.downsample(x)
+
+        return x
+
+
 class VSSLayer(nn.Module):
     """ A basic Swin Transformer layer for one stage.
     Args:
@@ -960,16 +1035,6 @@ class VSSLayer(nn.Module):
                 d_state=d_state,
             )
             for i in range(depth)])
-
-        if True:  # is this really applied? Yes, but been overriden later in VSSM!
-            def _init_weights(module: nn.Module):
-                """Re-apply kaiming-uniform init to any `out_proj.weight` parameter found in `module` (fake-clone-then-init, to keep the RNG state consistent with the reference implementation)."""
-                for name, p in module.named_parameters():
-                    if name in ["out_proj.weight"]:
-                        p = p.clone().detach_()  # fake init, just to keep the seed ....
-                        nn.init.kaiming_uniform_(p, a=math.sqrt(5))
-
-            self.apply(_init_weights)
 
         if downsample is not None:
             self.downsample = downsample(dim=dim, norm_layer=norm_layer)
@@ -1030,16 +1095,6 @@ class VSSLayer_up(nn.Module):
             )
             for i in range(depth)])
 
-        if True:  # is this really applied? Yes, but been overriden later in VSSM!
-            def _init_weights(module: nn.Module):
-                """Re-apply kaiming-uniform init to any `out_proj.weight` parameter found in `module` (fake-clone-then-init, to keep the RNG state consistent with the reference implementation)."""
-                for name, p in module.named_parameters():
-                    if name in ["out_proj.weight"]:
-                        p = p.clone().detach_()  # fake init, just to keep the seed ....
-                        nn.init.kaiming_uniform_(p, a=math.sqrt(5))
-
-            self.apply(_init_weights)
-
         if upsample is not None:
             self.upsample = upsample(dim=dim, dim_scale=2, norm_layer=nn.LayerNorm)
         else:
@@ -1071,7 +1126,7 @@ class VSSM(nn.Module):
     def __init__(self, patch_size=4, in_chans=1, num_classes=4, depths=[2, 2, 9, 2],
                  embed_dim=96, dims=None, d_state=16, drop_rate=0., attn_drop_rate=0., drop_path_rate=0.1,
                  norm_layer=nn.LayerNorm, patch_norm=True,
-                 use_checkpoint=False, final_upsample="expand_first", **kwargs):
+                 use_checkpoint=False, final_upsample="expand_first", bottleneck_depth=2, **kwargs):
         """
         :param patch_size: Patch token size.
         :param in_chans: Number of input image channels.
@@ -1094,6 +1149,10 @@ class VSSM(nn.Module):
         :param final_upsample: If `"expand_first"`, use
             `FinalPatchExpand_X4` + a conv for the final upsample;
             otherwise the identity.
+        :param bottleneck_depth: Number of `VSSBlock`s in the first decoder
+            stage (processing the bottleneck features before the first
+            upsample). The original architecture left this stage as a bare
+            `PatchExpand`; the blocks are cheap (bottleneck resolution).
         """
         super().__init__()
         self.num_classes = num_classes
@@ -1116,7 +1175,17 @@ class VSSM(nn.Module):
         # build encoder and bottleneck layers
         self.layers = nn.ModuleList()
         for i_layer in range(self.num_layers):
-            layer = VSSLayer(
+            # Stage 0 stays at the highest resolution, where the selective
+            # scan's global receptive field is wasted on mostly-local
+            # structure; residual conv blocks do the same job far more
+            # cheaply. Deeper stages use Mamba blocks.
+            layer = ConvStage(
+                dim=dims[i_layer],
+                depth=depths[i_layer],
+                norm_layer=norm_layer,
+                downsample=PatchMerging2D if (i_layer < self.num_layers - 1) else None,
+                use_checkpoint=use_checkpoint,
+            ) if i_layer == 0 else VSSLayer(
                 dim=dims[i_layer],
                 depth=depths[i_layer],
                 d_state=math.ceil(dims[0] / 6) if d_state is None else d_state,  # 20240109
@@ -1133,11 +1202,29 @@ class VSSM(nn.Module):
         self.layers_up = nn.ModuleList()
         self.concat_back_dim = nn.ModuleList()
         for i_layer in range(self.num_layers):
-            concat_linear = nn.Linear(2 * dims[self.num_layers - 1 - i_layer],
-                                      dims[self.num_layers - 1 - i_layer]) if i_layer > 0 else nn.Identity()
+            # Linear + GELU for the skip fusion (a bare linear has no
+            # nonlinearity to reconcile encoder/decoder feature spaces).
+            concat_linear = nn.Sequential(
+                nn.Linear(2 * dims[self.num_layers - 1 - i_layer],
+                          dims[self.num_layers - 1 - i_layer]),
+                nn.GELU(),
+            ) if i_layer > 0 else nn.Identity()
             if i_layer == 0:
-                layer_up = PatchExpand(dim=dims[self.num_layers - 1 - i_layer], dim_scale=2,
-                                       norm_layer=norm_layer)
+                # Process the bottleneck features with a few VSS blocks
+                # before the first upsample, instead of transposed-conv'ing
+                # them straight into the decoder. These blocks run at
+                # bottleneck resolution, so they are the cheapest in the net.
+                layer_up = VSSLayer_up(
+                    dim=dims[self.num_layers - 1 - i_layer],
+                    depth=bottleneck_depth,
+                    d_state=math.ceil(dims[0] / 6) if d_state is None else d_state,  # 20240109
+                    drop=drop_rate,
+                    attn_drop=attn_drop_rate,
+                    drop_path=dpr[max(0, sum(depths) - bottleneck_depth):],
+                    norm_layer=norm_layer,
+                    upsample=PatchExpand,
+                    use_checkpoint=use_checkpoint,
+                )
             else:
                 layer_up = VSSLayer_up(
                     dim=dims[self.num_layers - 1 - i_layer],
@@ -1162,20 +1249,25 @@ class VSSM(nn.Module):
             #print("---final upsample expand_first---")
             self.up = FinalPatchExpand_X4(dim_scale=self.patch_size, dim=self.embed_dim)
             self.output = nn.Conv2d(in_channels=self.embed_dim, out_channels=self.num_classes, kernel_size=1,
-                                    bias=False)
+                                    bias=True)
             # Full-resolution conv stem: processes the input before patchification
             # and adds fine-detail features to the final logits, so boundary
             # information lost by the stride-`patch_size` embedding is recovered.
+            # The branch is normalized and gated by a zero-initialized scale, so
+            # training starts from the stem-less model and grows the branch only
+            # if it helps (it cannot dominate the logits early on).
             stem_dim = self.embed_dim // 2
             self.stem = nn.Sequential(
-                nn.Conv2d(in_chans, stem_dim, kernel_size=3, padding=1, bias=False),
-                nn.GroupNorm(1, stem_dim),
+                nn.Conv2d(in_chans, stem_dim, kernel_size=3, padding=1, bias=True),
+                nn.GroupNorm(math.gcd(8, stem_dim), stem_dim),
                 nn.SiLU(),
-                nn.Conv2d(stem_dim, stem_dim, kernel_size=3, padding=1, bias=False),
-                nn.GroupNorm(1, stem_dim),
+                nn.Conv2d(stem_dim, stem_dim, kernel_size=3, padding=1, bias=True),
+                nn.GroupNorm(math.gcd(8, stem_dim), stem_dim),
                 nn.SiLU(),
             )
-            self.stem_head = nn.Conv2d(stem_dim, self.num_classes, kernel_size=1, bias=False)
+            self.stem_norm = norm_layer(stem_dim)
+            self.stem_head = nn.Conv2d(stem_dim, self.num_classes, kernel_size=1, bias=True)
+            self.stem_scale = nn.Parameter(torch.zeros(1, self.num_classes, 1, 1))
         else:
             #print("No final upsample")
             self.up = lambda x: x
@@ -1283,7 +1375,9 @@ class VSSM(nn.Module):
         x = self.forward_up_features(x, x_downsample)
         x = self.up_x4(x)
         if self.final_upsample == "expand_first":
-            x = x + self.stem_head(self.stem(x_in))
+            s = self.stem(x_in).permute(0, 2, 3, 1)  # B H W C
+            s = self.stem_norm(s).permute(0, 3, 1, 2)  # B C H W
+            x = x + self.stem_scale * self.stem_head(s)
         return x
 
     def flops(self, shape=(3, 224, 224)):
