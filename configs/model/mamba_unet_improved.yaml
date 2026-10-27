@@ -3,7 +3,7 @@ _target_: src.models.mamba_module.MambaLitModule
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.0005
+  lr: 0.0001
   weight_decay: 0.0
 
 scheduler:
@@ -11,7 +11,7 @@ scheduler:
   _partial_: true
   mode: min
   factor: 0.1
-  patience: 10
+  patience: 20
 
 net:
   _target_: src.models.components.Mamba_UNet_imp.MambaUNet
@@ -19,13 +19,13 @@ net:
     patch_size: 4
     in_chans: 1
     embed_dim: 96
-    depths: [1, 1, 1, 1]
+    depths: [2, 1, 1, 1]
     drop_rate: 0.01
-    drop_path_rate: 0.01
+    drop_path_rate: 0.05
     patch_norm: True
     use_checkpoint: False
     final_upsample: expand_first  # From [None, 'expand_first']
-    bottleneck_depth: 1
+    bottleneck_depth: 2
   num_classes: 1 # aka num out channels
 
 # compile model for faster training with pytorch 2.0
