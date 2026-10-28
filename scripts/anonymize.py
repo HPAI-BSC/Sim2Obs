@@ -19,7 +19,7 @@ REMOVE_DIR_NAMES = {
     "checkpoints", "checkpoint", "ckpt", "ckpts",
     "logs", "wandb", "mlruns", "outputs", "output",
 }
-REMOVE_FILE_SUFFIXES = {".ckpt", ".pt", ".pth"}
+REMOVE_FILE_SUFFIXES = {".ckpt", ".pt", ".pth", ".pkl"}
 SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", ".idea", ".pytest_cache"}
 TEXT_EXTENSIONS = {
     ".py", ".md", ".rst", ".yaml", ".yml", ".json", ".toml", ".cfg",
