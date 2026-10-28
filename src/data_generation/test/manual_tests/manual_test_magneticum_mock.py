@@ -50,7 +50,7 @@ from src.data_generation.src.data_fetcher import DataFetcherFactory
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Execution environment: "local" or "cluster"
-# Controls which paths config is loaded (paths/local.yaml vs paths/gpfs.yaml)
+# Controls which paths config is loaded (paths/local.yaml vs paths/path/to)
 ENV: str = "cluster"
 
 # Set to an integer to fix a specific halo, or None to auto-pick the smallest
@@ -64,7 +64,7 @@ MAX_GLEN: int | None = 100_000
 
 _PATHS_CONFIG = {
     "local":   "paths/local.yaml",
-    "cluster": "paths/gpfs.yaml",
+    "cluster": "paths/path/to",
 }
 
 

@@ -21,8 +21,8 @@ z = 0.2         # redshift (measure how much the universe has expanded)
 scalf = 0.8333  # scaling factor to convert from "comoving coordinates" to physical coordinates at the redshift
 
 # TODO update this to access the dataset stored in your pc
-# Dataset can be downloaded from /home/jovyan/minio/datasets/raw/space/Illustris-3
-basePath = '/Users/martabarrosoisidoro/Illustris-3/output'
+# Dataset can be downloaded from /path/to
+basePath = '/path/to'
 ihalo = 4       # selecting particular halos and subhalos
 isubhalo = 4
 

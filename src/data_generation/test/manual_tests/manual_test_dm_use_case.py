@@ -59,7 +59,7 @@ CATALOGS = ['illustris300_dm']   # or ['millenium_dm'], or both
 # Positions in the halo list of the pipeline (catalogue order, the first ones are the most massive halos and
 # so the heaviest to load). Positions beyond the end of the list are ignored.
 HALO_POSITIONS = [0, 200, 1000]
-DATASETS_DIR = None            # None: the one of configs/paths/gpfs.yaml
+DATASETS_DIR = None            # None: the one of configs/paths/path/to
 N_EDGE_HALOS = 2               # also check the most massive halos that touch a face of the simulation box
 MAX_SUBHALOS_FOR_MASS_CHECK = 3000      # loading one catalogue record per subhalo, skip the check above this
 MAX_OUTPUT_FILES_TO_READ = 60

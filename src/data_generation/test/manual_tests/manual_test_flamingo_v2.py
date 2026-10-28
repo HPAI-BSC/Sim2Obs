@@ -4,7 +4,7 @@ Flamingo SOAP catalogue on the cluster (not a pytest fixture — run it directly
 
 Loads the hydra config the same way the pipeline does (data_generation.yaml
 with the "flamingo" catalog swapped in, paths defaulting to the "gpfs"
-cluster mount — see configs/data_generation.yaml / configs/paths/gpfs.yaml),
+cluster mount — see configs/data_generation.yaml / configs/paths/path/to),
 forces catalog.name to "flamingo_v2" so DataFetcherFactory instantiates
 FlamingoFetcherV2 (the checked-in configs/catalog/flamingo.yaml still says
 "flamingo", i.e. V1 — this script does not depend on that being switched),
@@ -29,7 +29,7 @@ from hydra import compose, initialize_config_dir
 from src.data_generation.src.data_fetcher import DataFetcherFactory, FlamingoFetcher, FlamingoFetcherV2
 
 
-CATALOG_PATH = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/flamingo/L1000N0900'
+CATALOG_PATH = '/path/to'
 SNAPNUM = 73       # None => use configs/catalog/flamingo.yaml's default (73)
 # Number of halos to try get_p_halo()/get_p_subhalo() on in TEST 3/4 (particle
 # files are read one galaxy at a time, so keep this small for a quick smoke test)

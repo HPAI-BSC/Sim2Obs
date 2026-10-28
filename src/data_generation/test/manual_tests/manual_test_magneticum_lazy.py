@@ -21,7 +21,7 @@ def magneticum_particle_test():
         cfg_magneticum = compose(config_name="data_generation.yaml")
 
         # Load the local config for paths and assign them
-        local_config = compose(config_name="paths/gpfs.yaml")
+        local_config = compose(config_name="paths/path/to")
         cfg_magneticum.paths = local_config.paths
         cfg_magneticum.catalog = compose("catalog/magneticum.yaml")['catalog']
 

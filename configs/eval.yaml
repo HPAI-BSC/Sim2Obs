@@ -23,101 +23,101 @@ save_all_predictions: False
 
 
 # Final evals October 2026
-ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/0534d449/output/checkpoints/0534d449/epoch_049.ckpt  # UNET Combined VD-ICL
-# ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/b24c2739/output/checkpoints/b24c2739/epoch_048.ckpt  # TransUNet Combined VD-ICL
-# ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/ba87a495/output/checkpoints/ba87a495/epoch_049.ckpt  # AttUNet Combined
+ckpt_path: /path/to  # UNET Combined VD-ICL
+# ckpt_path: /path/to  # TransUNet Combined VD-ICL
+# ckpt_path: /path/to  # AttUNet Combined
 
 
 # NEW COMBINED DATASET (~18k maps)
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/4a83a922/output/checkpoints/4a83a922/epoch_046.ckpt # Unet combined 0.05
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/81f914a5/output/checkpoints/81f914a5/epoch_049.ckpt # Unet combined 1.0
+#ckpt_path: /path/to # Unet combined 0.05
+#ckpt_path: /path/to # Unet combined 1.0
 
 
-# ckpts path changed to: /gpfs/projects/bsc70/space-coe/pipelines/
+# ckpts path changed to: /path/to
 
 # passing checkpoint path is necessary for evaluation # last.skpt
 # BASELINE
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d400da3c/output/checkpoints/d400da3c/epoch_041.ckpt  # 14.04.25 Dianoga
+#ckpt_path: /path/to  # 14.04.25 Dianoga
 
 # INTERPOLATION MODELS
-#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/82d5f80a/output/checkpoints/82d5f80a/epoch_095.ckpt # Direct interpolation
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/de05dbb0/output/checkpoints/de05dbb0/epoch_160.ckpt  # Direct interpolation with regularization
+#ckpt_path:  /path/to # Direct interpolation
+#ckpt_path: /path/to  # Direct interpolation with regularization
 
 # -AttentionUNet
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e960795a/output/checkpoints/commit_hash/epoch_049.ckpt
-#ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/81406481/output/checkpoints/81406481/epoch_044.ckpt  # 14.04.25 Dianoga
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/f428ea0c/output/checkpoints/f428ea0c/epoch_043.ckpt  # 13.05.25 Combined
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/a2dfe98b/output/checkpoints/a2dfe98b/epoch_014.ckpt  # 07.06.25 Combined 0.01
-#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/f435e6e7/output/checkpoints/f435e6e7/epoch_014.ckpt # 07.06.25 Combined 0.05
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/01074dad/output/checkpoints/01074dad/epoch_013.ckpt  # 07.06.25 Combined 0.1
-#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/acae03c6/output/checkpoints/acae03c6/epoch_006.ckpt  # 07.06.25 Combined 0.25
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c07373e8/output/checkpoints/c07373e8/epoch_014.ckpt  # 07.06.25 Combined 1
+#ckpt_path: /path/to
+#ckpt_path: /path/to  # 14.04.25 Dianoga
+#ckpt_path: /path/to  # 13.05.25 Combined
+#ckpt_path: /path/to  # 07.06.25 Combined 0.01
+#ckpt_path:  /path/to # 07.06.25 Combined 0.05
+#ckpt_path: /path/to  # 07.06.25 Combined 0.1
+#ckpt_path:  /path/to  # 07.06.25 Combined 0.25
+#ckpt_path: /path/to  # 07.06.25 Combined 1
 
 # -Mamba
-# ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/735a16fd/output/checkpoints/735a16fd/last.ckpt
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/2888f740/output/checkpoints/2888f740/epoch_039.ckpt  # 02.10.25 Dianoga ps 1 depth [2,1,1,1]
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/4e897f5c/output/checkpoints/4e897f5c/last.ckpt  # 14.04.25 Dianoga
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/6e8b2ef3/last.ckpt  # 13.05.25 Combined
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6e8b2ef3/output/checkpoints/6e8b2ef3/epoch_035.ckpt  # 13.05.25 Combined
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c8eb9369/output/checkpoints/c8eb9369/epoch_035.ckpt  # 13.05.25 Combined 0.05
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e5d676db/output/checkpoints/e5d676db/epoch_031.ckpt  # 13.05.25 Combined 0.05
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/58c2e555/output/checkpoints/58c2e555/epoch_047.ckpt  # 13.05.25 Combined 0.1
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e5d676db/output/checkpoints/e5d676db/last.ckpt  # 13.05.25 Combined 0.25
-#ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/4ae18b9d/output/checkpoints/4ae18b9d/epoch_049.ckpt  # 02.06.25 Dianoga
+# ckpt_path: /path/to
+#ckpt_path: /path/to  # 02.10.25 Dianoga ps 1 depth [2,1,1,1]
+#ckpt_path: /path/to  # 14.04.25 Dianoga
+#ckpt_path: /path/to  # 13.05.25 Combined
+#ckpt_path: /path/to  # 13.05.25 Combined
+#ckpt_path: /path/to  # 13.05.25 Combined 0.05
+#ckpt_path: /path/to  # 13.05.25 Combined 0.05
+#ckpt_path: /path/to  # 13.05.25 Combined 0.1
+#ckpt_path: /path/to  # 13.05.25 Combined 0.25
+#ckpt_path: /path/to  # 02.06.25 Dianoga
 
 # Mamba ps 4
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6b3045df/output/checkpoints/6b3045df/last.ckpt  # 13.05.25 Combined 1
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/2812444c/output/checkpoints/2812444c/epoch_036.ckpt  # 13.05.25 Combined 0.25
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/7cf3fbb0/output/checkpoints/7cf3fbb0/epoch_021.ckpt  # 13.05.25 Combined 0.1
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/1e86dcee/output/checkpoints/1e86dcee/epoch_034.ckpt  # 13.05.25 Combined 0.05
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/85629c0a/output/checkpoints/85629c0a/epoch_049.ckpt  # 02.06.25 Dianoga
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/b5cf5e99/output/checkpoints/b5cf5e99/epoch_049.ckpt  # 05.06.25 Combined 0.01
-#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/395f5d19/output/checkpoints/395f5d19/epoch_013.ckpt  # 06.06.25 Combined 0.01
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/03de1f6c/output/checkpoints/03de1f6c/epoch_012.ckpt  # 07.06.25 Combined 0.01
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e24426db/output/checkpoints/e24426db/epoch_014.ckpt  # 06.06.25 Combined 0.05
-#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/2d0bfea5/output/checkpoints/2d0bfea5/epoch_014.ckpt  # 07.06.25 Combined 0.05
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d9ed4c2f/output/checkpoints/d9ed4c2f/epoch_014.ckpt  # 06.06.25 Combined 0.1
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/a06a11ab/output/checkpoints/a06a11ab/epoch_013.ckpt  # 07.07.25 Combined 0.25
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/24842b1b/output/checkpoints/24842b1b/epoch_014.ckpt  # 07.06.25 Combined 1
+#ckpt_path: /path/to  # 13.05.25 Combined 1
+#ckpt_path: /path/to  # 13.05.25 Combined 0.25
+#ckpt_path: /path/to  # 13.05.25 Combined 0.1
+#ckpt_path: /path/to  # 13.05.25 Combined 0.05
+#ckpt_path: /path/to  # 02.06.25 Dianoga
+#ckpt_path: /path/to  # 05.06.25 Combined 0.01
+#ckpt_path:  /path/to  # 06.06.25 Combined 0.01
+#ckpt_path: /path/to  # 07.06.25 Combined 0.01
+#ckpt_path: /path/to  # 06.06.25 Combined 0.05
+#ckpt_path:  /path/to  # 07.06.25 Combined 0.05
+#ckpt_path: /path/to  # 06.06.25 Combined 0.1
+#ckpt_path: /path/to  # 07.07.25 Combined 0.25
+#ckpt_path: /path/to  # 07.06.25 Combined 1
 
 # Mamba ps 8
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/31e9b4aa/output/checkpoints/31e9b4aa/last.ckpt
+#ckpt_path: /path/to
 
 # transunet
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/6fdf7f32/output/checkpoints/6fdf7f32/last.ckpt
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/c2dc4e53/output/checkpoints/c2dc4e53/epoch_041.ckpt  # 14.04.25 Dianoga
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/3400ce00/output/checkpoints/3400ce00/epoch_042.ckpt  # 02.06.25 Dianoga (4 heads)
-#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/9bfb523d/output/checkpoints/9bfb523d/epoch_012.ckpt  # 06.06.25 Combined 0.01
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/0164868e/output/checkpoints/0164868e/epoch_014.ckpt  # 06.06.25 Combined 0.05
-#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/4d133c9d/output/checkpoints/4d133c9d/epoch_014.ckpt  # 06.06.25 Combined 0.1
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e22861d1/output/checkpoints/e22861d1/epoch_013.ckpt  # 07.07.25 Combined 0.25
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/8a02e1f8/output/checkpoints/8a02e1f8/epoch_013.ckpt  # 07.07.25 Combined 1
+#ckpt_path: /path/to
+#ckpt_path: /path/to  # 14.04.25 Dianoga
+#ckpt_path: /path/to  # 02.06.25 Dianoga (4 heads)
+#ckpt_path:  /path/to  # 06.06.25 Combined 0.01
+#ckpt_path: /path/to  # 06.06.25 Combined 0.05
+#ckpt_path:  /path/to  # 06.06.25 Combined 0.1
+#ckpt_path: /path/to  # 07.07.25 Combined 0.25
+#ckpt_path: /path/to  # 07.07.25 Combined 1
 
 # - Unet
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/19b3ea5f/output/checkpoints/commit_hash/last.ckpt
+#ckpt_path: /path/to
 #ckpt_path: ${oc.env:PROJECT_ROOT}/local/ckpt/19b3ea5f/last.ckpt #Unet local
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/522dfd58/output/checkpoints/522dfd58/epoch_045.ckpt  # 02.10.25 DIANOGA
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/5c014fc5/output/checkpoints/5c014fc5/epoch_043.ckpt  # 14.04.25 Dianoga
-#clpt_path: /gpfs/projects/bsc70/pipelines/space-coe/499ff89d/output/checkpoints/499ff89d/epoch_047.ckpt  # 13.05.25 Combined
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/a9e9b7ee/output/checkpoints/a9e9b7ee/epoch_036.ckpt  # 13.05.25 Combined 0.25
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/47f75496/output/checkpoints/47f75496/epoch_034.ckpt  # 13.05.25 Combined 0.05
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d0a5bd44/output/checkpoints/d0a5bd44/epoch_036.ckpt  # 13.05.25 Combined 0.1
-#ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/a54fcf1d/output/checkpoints/a54fcf1d/epoch_048.ckpt  # 02.06.25 Dianoga
-#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/51aaea5f/output/checkpoints/51aaea5f/epoch_013.ckpt  # 07.06.25 Combined 0.01
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d4bc91cc/output/checkpoints/d4bc91cc/epoch_014.ckpt  # 07.06.25 Combined 0.05
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e02f1466/output/checkpoints/e02f1466/epoch_012.ckpt  # 07.06.25 Combined 0.1
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/eaa58be5/output/checkpoints/eaa58be5/epoch_013.ckpt  # 07.06.25 Combined 0.25
-#ckpt_path: /gpfs/projects/bsc70/space-coe/pipelines/6e345ef6/output/checkpoints/6e345ef6/epoch_013.ckpt  # 07.06.25 Combined 1
+#ckpt_path: /path/to  # 02.10.25 DIANOGA
+#ckpt_path: /path/to  # 14.04.25 Dianoga
+#clpt_path: /path/to  # 13.05.25 Combined
+#ckpt_path: /path/to  # 13.05.25 Combined 0.25
+#ckpt_path: /path/to  # 13.05.25 Combined 0.05
+#ckpt_path: /path/to  # 13.05.25 Combined 0.1
+#ckpt_path: /path/to  # 02.06.25 Dianoga
+#ckpt_path:  /path/to  # 07.06.25 Combined 0.01
+#ckpt_path: /path/to  # 07.06.25 Combined 0.05
+#ckpt_path: /path/to  # 07.06.25 Combined 0.1
+#ckpt_path: /path/to  # 07.06.25 Combined 0.25
+#ckpt_path: /path/to  # 07.06.25 Combined 1
 
 
 # UNet Baseline
-#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/d9ead2cb/output/checkpoints/d9ead2cb/epoch_014.ckpt  # 06.06.25 Combined 0.01
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/e786274b/output/checkpoints/e786274b/epoch_014.ckpt  # 07.06.25 Combined 1
+#ckpt_path:  /path/to  # 06.06.25 Combined 0.01
+#ckpt_path: /path/to  # 07.06.25 Combined 1
 
 
 # Mamba Depth 2
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/dfa59c03/output/checkpoints/dfa59c03/epoch_015.ckpt  # 07.06.25 Combined 0.01
-#ckpt_path:  /gpfs/projects/bsc70/pipelines/space-coe/23e7069f/output/checkpoints/23e7069f/epoch_015.ckpt  # 07.06.25 Combined 0.05
+#ckpt_path: /path/to  # 07.06.25 Combined 0.01
+#ckpt_path:  /path/to  # 07.06.25 Combined 0.05
 
 # Mamba Depth 3
-#ckpt_path: /gpfs/projects/bsc70/pipelines/space-coe/d651d683/output/checkpoints/d651d683/epoch_029.ckpt  # 07.06.25 Combined 0.05
+#ckpt_path: /path/to  # 07.06.25 Combined 0.05

@@ -27,17 +27,17 @@ ckpt_path: null
 
 # List of checkpoints to evaluate. Every checkpoint is evaluated on every dataset in `data_names`.
 # The model architecture of each checkpoint is inferred automatically from the checkpoint's run
-# directory (a full copy of the repo under /gpfs/projects/bsc70/pipelines/space-coe/<run_id>), by
+# directory (a full copy of the repo under /path/to), by
 # reading `<run_dir>/configs/train.yaml` and extracting `defaults.model`.
 # If that is not possible (e.g. the run dir no longer exists), provide the architectures explicitly
 # in `models` below, one per checkpoint, in the same order as `ckpt_paths`.
 ckpt_paths:
-  - /gpfs/projects/bsc70/pipelines/space-coe/0534d449/output/checkpoints/0534d449/epoch_049.ckpt  # UNET Combined VD-ICL
-  - /gpfs/projects/bsc70/pipelines/space-coe/f5f021a0/output/checkpoints/f5f021a0/epoch_062.ckpt  # UNET 2 Combined VD-ICL
-  - /gpfs/projects/bsc70/pipelines/space-coe/d933d5bd/output/checkpoints/d933d5bd/epoch_050.ckpt  # AttUNet Combined VD-ICL
-  - /gpfs/projects/bsc70/pipelines/space-coe/ef6663e9/output/checkpoints/ef6663e9/epoch_049.ckpt  # MambaUNet Combined VD-ICL
-  - /gpfs/projects/bsc70/pipelines/space-coe/0024f7b5/output/checkpoints/0024f7b5/epoch_059.ckpt  # MambaUNet Combined VD-ICL
-  - /gpfs/projects/bsc70/pipelines/space-coe/b24c2739/output/checkpoints/b24c2739/epoch_048.ckpt  # TransUNet Combined VD-ICL
+  - /path/to  # UNET Combined VD-ICL
+  - /path/to  # UNET 2 Combined VD-ICL
+  - /path/to  # AttUNet Combined VD-ICL
+  - /path/to  # MambaUNet Combined VD-ICL
+  - /path/to  # MambaUNet Combined VD-ICL
+  - /path/to  # TransUNet Combined VD-ICL
 
 # List of dataset config names (configs/data/<name>.yaml) to evaluate on.
 data_names:

@@ -265,10 +265,10 @@ class GaussianInterpLitModule(LightningModule):
             import matplotlib.pyplot as plt
             plt.imshow(preds[0].permute(1, 2, 0).detach().to(torch.float32).cpu().numpy())
             plt.colorbar()
-            plt.savefig(f"/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/stoch_interp/preds_{self.global_step}.png")
+            plt.savefig(f"/path/to")
 
             plt.imshow(targets[0].permute(1, 2, 0).detach().to(torch.float32).cpu().numpy())
-            plt.savefig(f"/gpfs/projects/bsc70/hpai/storage/data/pablo/space_debug/stoch_interp/tgt_{self.global_step}.png")
+            plt.savefig(f"/path/to")
             plt.colorbar()
             plt.close()
 

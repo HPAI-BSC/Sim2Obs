@@ -4,7 +4,7 @@ variables:
   #  pypi_pass: (if you need to access the private pypi repo)
   LAUNCH_TARGET_HOSTNAME: amdlogin.bsc.es
   LAUNCH_TARGET_USERNAME: hpai # bsc08561 
-  LAUNCH_TARGET_FOLDER: /gpfs/projects/bsc70/hpai/storage/data/martag
+  LAUNCH_TARGET_FOLDER: /path/to
   LAUNCH_TARGET_SRC_DIR: ./
   LAUNCH_TARGET_SSH_KEY: ${LAUNCH_TARGET_SSH_KEY_HPAI} #some_file, preferrably from the project CI/CD settings
   LAUNCH_CONFIG_PATH: config.json

@@ -1,7 +1,7 @@
 # HPC / cluster operations
 
 Runs on MN5 (a Barcelona Supercomputing Center cluster — `account bsc70`,
-paths under `/gpfs/scratch/bsc70/hpai/...`), via three SLURM launch
+paths under `/path/to), via three SLURM launch
 scripts at the repo root.
 
 ## SLURM resources per job

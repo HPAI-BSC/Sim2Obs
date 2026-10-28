@@ -547,7 +547,7 @@ def plot_hist(df, attribute, title, bins, name, log=False):
     if attribute not in df:
         raise Exception(f'Error, {attribute} not present in the dataframe with columns: {df.columns}')
 
-    dataset_dir = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets'
+    dataset_dir = '/path/to'
 
     # Plotting
     plt.figure(figsize=(8, 5))

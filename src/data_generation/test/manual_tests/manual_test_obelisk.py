@@ -4,7 +4,7 @@ Obelisk catalogue on the cluster (not a pytest fixture — run it directly).
 
 Loads the hydra config the same way the pipeline does (data_generation.yaml
 with the "obelisk" catalog swapped in, paths defaulting to the "gpfs"
-cluster mount — see configs/data_generation.yaml / configs/paths/gpfs.yaml),
+cluster mount — see configs/data_generation.yaml / configs/paths/path/to),
 instantiates ObeliskFetcher via DataFetcherFactory, and exercises
 get_halos()/get_subhalos()/get_p_halo()/get_p_subhalo().
 
@@ -18,7 +18,7 @@ from hydra import compose, initialize_config_dir
 from src.data_generation.src.data_fetcher import DataFetcherFactory
 
 
-CATALOG_PATH = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/obelisk'
+CATALOG_PATH = '/path/to'
 SNAPNUM = 201
 LBOX = 100000.0
 # Number of halos to try get_p_halo() on in TEST 3 (star-particle files are

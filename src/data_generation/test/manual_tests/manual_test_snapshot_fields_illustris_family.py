@@ -37,7 +37,7 @@ is not guaranteed to be representative of the full volume.
 
 Usage:
     # 1) parameters passed directly, no YAML needed (one simulation per call)
-    python ... --path /gpfs/.../tng_cluster --snapnum 84 --a 0.8333 --lbox 680000 \
+    python ... --path /path/to --snapnum 84 --a 0.8333 --lbox 680000 \
                --expected-masstable 0.0041 --name tngcluster
     # 2) read the parameters from the catalog YAMLs (all three, or a subset)
     python ...
@@ -60,7 +60,7 @@ import time
 import h5py
 import numpy as np
 
-DATASETS_DIR = '/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets'
+DATASETS_DIR = '/path/to'
 
 # path: simulation folder (or its `output` folder), containing snapdir_NNN/ and groups_NNN/
 # a, Lbox: from the catalog YAMLs, checked against the snapshot header (None to skip)

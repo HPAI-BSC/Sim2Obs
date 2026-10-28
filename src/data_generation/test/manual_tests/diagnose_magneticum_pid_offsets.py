@@ -28,7 +28,7 @@ import g3read as g3
 import numpy as np
 
 # Catalogue root: contains groups_<SNAPNUM>/ and snapdir_<SNAPNUM>/.
-PATH = "/gpfs/scratch/bsc70/hpai/storage/projects/space/datasets/magneticum"
+PATH = "/path/to"
 SNAPNUM = "120"
 
 

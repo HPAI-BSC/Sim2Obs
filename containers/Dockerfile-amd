@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
 ENV PATH="/usr/local/bin:${PATH}"
-RUN mkdir -p /gpfs/home /gpfs/scratch /gpfs/projects /gpfs/apps /apps
+RUN mkdir -p /path/to /path/to /path/to /path/to /apps
 
 ADD . .
 

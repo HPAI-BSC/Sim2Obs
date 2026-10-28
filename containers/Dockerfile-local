@@ -1,6 +1,6 @@
 FROM ubuntu:22.04
 
-RUN mkdir -p /gpfs/projects
+RUN mkdir -p /path/to
 WORKDIR /
 
 # HPAI PyPI

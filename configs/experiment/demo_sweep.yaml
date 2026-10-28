@@ -23,7 +23,7 @@ trainer:
 
 logger:
   mlflow:
-    tracking_uri: /gpfs/projects/bsc70/hpai/storage/data/logging/mlflow/mlruns
+    tracking_uri: /path/to
     experiment_name: "mlops_template"
     run_name: "${commit_tag}_run"
     artifact_location: null
